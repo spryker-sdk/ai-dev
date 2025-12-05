@@ -1,0 +1,14 @@
+    #[McpPrompt(name: '{{promptName}}', description: '{{PromptDescription}}')]
+    public function {{methodName}}({{promptParams}}): array
+    {
+        $template = <<<END
+{{promptTemplate}}
+END;
+
+        $content = $this->replacePlaceholders(
+            $template,
+            [{{promptParamsReplacements}}]
+        );
+
+        return ['role' => 'user', 'content' => $content];
+    }

@@ -1,0 +1,9 @@
+parameters:
+    level: 4
+    paths:
+        - src/
+
+includes:
+    - vendor/spryker-sdk/phpstan-spryker/extension.neon
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
