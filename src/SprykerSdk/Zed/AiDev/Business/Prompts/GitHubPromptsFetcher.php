@@ -142,7 +142,6 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
                     $currentKey = $lineMatches[1];
                     $value = trim($lineMatches[2]);
                     $frontmatter[$currentKey] = $value === '' || $value === '[]' ? [] : $value;
-
                 } elseif ($currentKey && preg_match('/^\s*-\s*(.+)$/', $line, $arrayMatches)) {
                     if (!is_array($frontmatter[$currentKey])) {
                         $frontmatter[$currentKey] = [];

@@ -14,7 +14,7 @@ use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructur
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
 
 /**
- * @method SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
+ * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
  */
 class AiDevDependencyProvider extends AbstractBundleDependencyProvider
 {
@@ -53,7 +53,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     }
 
     /**
-     * @return array<SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
      */
     protected function getMcpPromptPlugins(): array
     {
@@ -70,7 +70,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     }
 
     /**
-     * @return array<SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
      */
     protected function getMcpToolPlugins(): array
     {

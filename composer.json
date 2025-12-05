@@ -6,14 +6,13 @@
     "require": {
         "php": ">=8.3",
         "spryker/kernel": "^3.30.0",
-        "spryker/symfony": "^3.0.0",
         "spryker/transfer": "^3.27.0",
         "php-mcp/server": "^3.3"
     },
     "require-dev": {
         "spryker/code-sniffer": "*",
-        "spryker/propel": "*",
-        "spryker/testify": "*"
+        "spryker/testify": "*",
+        "spryker/development": "*"
     },
     "autoload": {
         "psr-4": {
@@ -28,8 +27,10 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "scripts": {
-        "cs-check": "phpcs -p -s --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/ tests/",
-        "cs-fix": "phpcbf -p --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/ tests/"
+        "cs-check": "phpcs -p -s --standard=vendor/spryker/development/ruleset.xml src/",
+        "architecture-check": "phpmd src/ text vendor/spryker/development/resources/phpmd/ruleset.xml --minimumpriority 2",
+        "cs-fix": "phpcbf -p --standard=vendor/spryker/development/ruleset.xml src/",
+        "stan": "phpstan analyse src"
     },
     "extra": {
         "branch-alias": {

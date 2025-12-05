@@ -12,8 +12,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * @method SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
- * @method SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
+ * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
+ * @method \SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
  */
 class GeneratePromptsConsole extends Console
 {
@@ -21,6 +21,9 @@ class GeneratePromptsConsole extends Console
 
     protected const string COMMAND_DESCRIPTION = 'Generate prompts from GitHub repository.';
 
+    /**
+     * @return void
+     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME)

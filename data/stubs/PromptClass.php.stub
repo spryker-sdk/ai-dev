@@ -7,7 +7,7 @@
 namespace Generated\Shared\Prompts;
 
 use PhpMcp\Server\Attributes\McpPrompt;
-use Spryker\Shared\AiDev\AbstractPrompt;
+use SprykerSdk\Shared\AiDev\AbstractPrompt;
 
 /**
  * !!! THIS FILE IS AUTO-GENERATED, EVERY CHANGE WILL BE LOST WITH THE NEXT RUN OF PROMPT GENERATOR

@@ -11,12 +11,26 @@ use ReflectionClass;
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
+/**
+ * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
+ * @method \SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
+ * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
+ */
 class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
+    /**
+     * @var string
+     */
     private const TRANSFER_SUFFIX = 'Transfer';
 
+    /**
+     * @var string
+     */
     private const TRANSFER_NAMESPACE_PREFIX = 'Generated\\Shared\\Transfer\\';
 
+    /**
+     * @var array
+     */
     private const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
 
     public function getName(): string

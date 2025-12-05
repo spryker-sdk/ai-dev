@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * Copyright © 2016-present Spryker Systems GmbH. All rights reserved.
+ * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
+ */
+
 declare(strict_types=1);
 
 namespace SprykerSdk\Zed\AiDev\Business\Prompts;
@@ -15,6 +20,9 @@ class PromptsGenerator implements PromptsGeneratorInterface
     ) {
     }
 
+    /**
+     * @return void
+     */
     public function generate(): void
     {
         $aiDevGitHubPromptTransfers = $this->githubPromptsFetcher->getAllPrompts();
@@ -49,7 +57,7 @@ class PromptsGenerator implements PromptsGeneratorInterface
         $parametersString = implode(', ', array_map(fn (string $parameter) => 'string $' . $parameter, $parameters));
         $parametersReplacement = implode(', ', array_map(
             fn (string $parameter) => '\'' . $parameter . '\' => $' . $parameter,
-            $parameters
+            $parameters,
         ));
 
         $methodStub = file_get_contents(__DIR__ . '/../../../../../../data/stubs/PromptMethod.php.stub');
@@ -60,7 +68,7 @@ class PromptsGenerator implements PromptsGeneratorInterface
         return str_replace(
             ['{{promptName}}', '{{methodName}}', '{{PromptDescription}}', '{{promptParams}}', '{{promptTemplate}}', '{{promptParamsReplacements}}'],
             [$promptName, $methodName, $description, $parametersString, $escapedContent, $parametersReplacement],
-            $methodStub
+            $methodStub,
         );
     }
 
@@ -71,6 +79,9 @@ class PromptsGenerator implements PromptsGeneratorInterface
         return str_replace('{{content}}', $methods, $classStub);
     }
 
+    /**
+     * @return void
+     */
     protected function writePromptClass(string $content): void
     {
         $targetDirectory = $this->config->getPromptClassTargetDirectory();

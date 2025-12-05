@@ -16,6 +16,11 @@ use ReflectionUnionType;
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
+/**
+ * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
+ * @method \SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
+ * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
+ */
 class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
     public function getName(): string

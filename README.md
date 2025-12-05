@@ -27,5 +27,5 @@ npx @modelcontextprotocol/inspector docker/sdk cli -x console ai-dev:mcp-server
 ```
 
 ```bash
-/Users/vitaliiivanov/Desktop/development/spryker/spryker-suite/docker/sdk console ai-dev:mcp-server
+/Users/vitaliiivanov/Desktop/development/spryker/spryker-suite/docker/sdk console ai-dev:mcp-server -q
 ```

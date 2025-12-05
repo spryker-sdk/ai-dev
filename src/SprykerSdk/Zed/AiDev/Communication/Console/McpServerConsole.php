@@ -16,9 +16,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 /**
- * @method SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
- * @method SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
- * @method SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
+ * @method \SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
+ * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
+ * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
  */
 class McpServerConsole extends Console
 {
@@ -53,7 +53,9 @@ class McpServerConsole extends Console
     {
         try {
             $this->ensurePromptsGenerated();
-        } catch (Throwable) {}
+        } catch (Throwable) {
+            // Ignore errors
+        }
 
         try {
             $serverBuilder = Server::make()
@@ -89,6 +91,9 @@ class McpServerConsole extends Console
         return static::CODE_SUCCESS;
     }
 
+    /**
+     * @return void
+     */
     protected function ensurePromptsGenerated(): void
     {
         $promptsDirectory = $this->getConfig()->getPromptClassTargetDirectory();

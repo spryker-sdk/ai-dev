@@ -31,6 +31,18 @@ jobs:
             - name: Syntax check
               run: find ./src -path src -prune -o -type f -name '*.php' -print0 | xargs -0 -n1 -P4 php -l -n | (! grep -v "No syntax errors detected" )
 
+            -   name: CodeStyle checks
+                run: composer cs-check
+
+            -   name: CodeStyle fix checks
+                run: composer cs-fix
+
+            -   name: Architecture sniffer checks
+                run: composer architecture-check
+
+            - name: Run PHPStan
+              run: composer stan
+
     lowest:
         name: Prefer Lowest
         runs-on: ubuntu-latest

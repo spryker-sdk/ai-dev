@@ -10,10 +10,21 @@ namespace SprykerSdk\Zed\AiDev\Business;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
 /**
+ * {@inheritDoc}
+ *
+ * @api
+ *
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevBusinessFactory getFactory()
  */
 class AiDevFacade extends AbstractFacade implements AiDevFacadeInterface
 {
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @return void
+     */
     public function generatePrompts(): void
     {
         $this->getFactory()

@@ -11,6 +11,9 @@ use Spryker\Zed\Kernel\AbstractBundleConfig;
 
 class AiDevConfig extends AbstractBundleConfig
 {
+    /**
+     * @var array
+     */
     protected const MCP_SERVER_INFO = [
         'name' => 'AI Synapse',
         'version' => '0.1.0',

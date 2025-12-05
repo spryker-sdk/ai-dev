@@ -11,13 +11,13 @@ use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
 
 /**
- * @method SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
- * @method SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
+ * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
+ * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
  */
 class AiDevCommunicationFactory extends AbstractCommunicationFactory
 {
     /**
-     * @return array<SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\Communication\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
      */
     public function getMcpPromptPlugins(): array
     {
@@ -25,7 +25,7 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
     }
 
     /**
-     * @return array<SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\Communication\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
      */
     public function getMcpToolPlugins(): array
     {

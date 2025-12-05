@@ -43,7 +43,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     {
         return new PromptsGenerator(
             $this->createGitHubPromptsFetcher(),
-            $this->getConfig()
+            $this->getConfig(),
         );
     }
 }
