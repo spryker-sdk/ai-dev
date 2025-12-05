@@ -23,7 +23,7 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
     protected const string GITHUB_API_URL = 'https://api.github.com';
 
     /**
-     * @return list<\Generated\Shared\Transfer\AiDevGitHubPromptTransfer>
+     * @return array<\Generated\Shared\Transfer\AiDevGitHubPromptTransfer>
      */
     public function getAllPrompts(): array
     {

@@ -53,7 +53,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     }
 
     /**
-     * @return array<\SprykerSdk\Zed\AiDev\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpPromptPluginInterface>
      */
     protected function getMcpPromptPlugins(): array
     {
@@ -70,7 +70,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     }
 
     /**
-     * @return array<\SprykerSdk\Zed\AiDev\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
+     * @return array<\SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface>
      */
     protected function getMcpToolPlugins(): array
     {

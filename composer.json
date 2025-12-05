@@ -10,18 +10,14 @@
         "php-mcp/server": "^3.3"
     },
     "require-dev": {
+        "phpstan/phpstan": "1.12.29",
+        "spryker-sdk/phpstan-spryker": "^0.4.3",
         "spryker/code-sniffer": "*",
-        "spryker/testify": "*",
         "spryker/development": "*"
     },
     "autoload": {
         "psr-4": {
             "SprykerSdk\\": "src/SprykerSdk/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "SprykerSdkTest\\": "tests/SprykerSdkTest/"
         }
     },
     "minimum-stability": "dev",
