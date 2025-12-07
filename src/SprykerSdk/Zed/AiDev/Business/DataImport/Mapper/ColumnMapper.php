@@ -66,7 +66,10 @@ class ColumnMapper implements ColumnMapperInterface
 
     /**
      * @param array<string, mixed> $row
-     * @param array<string, string>|string $reversedMapping
+     * @param string $header
+     * @param array<string, string> $reversedMapping
+     *
+     * @return string
      */
     protected function getValueForHeader(array $row, string $header, array $reversedMapping): string
     {

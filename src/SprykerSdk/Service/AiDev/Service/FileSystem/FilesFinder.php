@@ -20,6 +20,9 @@ class FilesFinder implements FilesFinderInterface
     ) {
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function findFiles(string $path, string $extension, string $searchString = ''): array
     {
         $resolvedPath = $this->pathResolver->resolvePath($path);
@@ -42,6 +45,9 @@ class FilesFinder implements FilesFinderInterface
         ];
     }
 
+    /**
+     * @return array<int, string>
+     */
     protected function scanFiles(string $path, string $searchString, string $extension): array
     {
         $files = [];
@@ -82,6 +88,9 @@ class FilesFinder implements FilesFinderInterface
         return true;
     }
 
+    /**
+     * @return array<int, string>
+     */
     protected function parseSearchString(string $searchString): array
     {
         return array_filter(

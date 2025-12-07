@@ -20,6 +20,14 @@ class CsvWriter implements CsvWriterInterface
 
     protected const string CSV_ESCAPE = '\\';
 
+    /**
+     * @param string $filePath
+     * @param array<string> $headers
+     * @param array<array<string, mixed>> $rows
+     * @param string $mode
+     *
+     * @return \Generated\Shared\Transfer\CsvOperationResultTransfer
+     */
     public function writeCsvFile(
         string $filePath,
         array $headers,
@@ -59,12 +67,17 @@ class CsvWriter implements CsvWriterInterface
         }
     }
 
+    /**
+     * @param resource $handle
+     * @param array<string> $headers
+     */
     protected function writeHeaders($handle, array $headers): bool
     {
         return fputcsv($handle, $headers, static::CSV_DELIMITER, static::CSV_ENCLOSURE, static::CSV_ESCAPE) !== false;
     }
 
     /**
+     * @param resource $handle
      * @param array<string> $headers
      * @param array<array<string, mixed>> $rows
      *

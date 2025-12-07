@@ -9,5 +9,11 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport\Finder;
 
 interface DataImportCsvFilesFinderInterface
 {
+    /**
+     * @param string $path
+     * @param string $searchString
+     *
+     * @return array<string>
+     */
     public function findDataImportCsvFiles(string $path, string $searchString = ''): array;
 }

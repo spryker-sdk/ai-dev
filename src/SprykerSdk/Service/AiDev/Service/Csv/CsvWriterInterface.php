@@ -14,8 +14,12 @@ use Generated\Shared\Transfer\CsvOperationResultTransfer;
 interface CsvWriterInterface
 {
     /**
-     * @param array<string>|string $headers
+     * @param string $filePath
+     * @param array<string> $headers
      * @param array<array<string, mixed>> $rows
+     * @param string $mode
+     *
+     * @return \Generated\Shared\Transfer\CsvOperationResultTransfer
      */
     public function writeCsvFile(
         string $filePath,

@@ -40,6 +40,8 @@ interface AiDevServiceInterface
      * - Returns array with path, searchString, extension, totalFiles, and files list.
      *
      * @api
+     *
+     * @return array<string, mixed>
      */
     public function findFiles(string $path, string $extension, string $searchString = ''): array;
 
@@ -51,8 +53,12 @@ interface AiDevServiceInterface
      *
      * @api
      *
-     * @param array<string>|string $headers
+     * @param string $filePath
+     * @param array<string> $headers
      * @param array<array<string, mixed>> $rows
+     * @param string $mode
+     *
+     * @return \Generated\Shared\Transfer\CsvOperationResultTransfer
      */
     public function writeCsvFile(
         string $filePath,

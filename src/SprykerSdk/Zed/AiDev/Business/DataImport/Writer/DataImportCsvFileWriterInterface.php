@@ -12,8 +12,11 @@ use Generated\Shared\Transfer\DataImportCsvWriteResponseTransfer;
 interface DataImportCsvFileWriterInterface
 {
     /**
-     * @param array<array<string, mixed>>|string $data
+     * @param string $filePath
+     * @param array<array<string, mixed>> $data
      * @param array<string, string> $columnMapping
+     *
+     * @return \Generated\Shared\Transfer\DataImportCsvWriteResponseTransfer
      */
     public function writeDataImportCsvFile(string $filePath, array $data, array $columnMapping = []): DataImportCsvWriteResponseTransfer;
 }

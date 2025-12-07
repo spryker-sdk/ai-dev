@@ -27,7 +27,11 @@ class DataImportCsvFileReader implements DataImportCsvFileReaderInterface
     }
 
     /**
-     * @param array<array<string, mixed>>|string $filters
+     * @param string $filePath
+     * @param int $offset
+     * @param int $limit
+     * @param array<array<string, mixed>> $filters
+     * @param string $filterLogic
      *
      * @return array<string, mixed>
      */
@@ -76,11 +80,14 @@ class DataImportCsvFileReader implements DataImportCsvFileReaderInterface
     }
 
     /**
-     * @param array<array<string, mixed>>|int $filters
+     * @param int $offset
+     * @param int $limit
+     * @param array<array<string, mixed>> $filters
+     * @param string $filterLogic
      *
      * @return array<string, mixed>
      */
-    protected function readPaginatedRows(int $offset, int $limit, array $filters = [], string $filterLogic = self::DEFAULT_FILTER_LOGIC): array
+    protected function readPaginatedRows(int $offset, int $limit, array $filters, string $filterLogic): array
     {
         $this->csvReader->rewind();
 

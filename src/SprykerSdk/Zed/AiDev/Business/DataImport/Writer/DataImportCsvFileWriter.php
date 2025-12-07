@@ -26,8 +26,11 @@ class DataImportCsvFileWriter implements DataImportCsvFileWriterInterface
     }
 
     /**
-     * @param array<array<string, mixed>>|string $data
+     * @param string $filePath
+     * @param array<array<string, mixed>> $data
      * @param array<string, string> $columnMapping
+     *
+     * @return \Generated\Shared\Transfer\DataImportCsvWriteResponseTransfer
      */
     public function writeDataImportCsvFile(string $filePath, array $data, array $columnMapping = []): DataImportCsvWriteResponseTransfer
     {
@@ -107,7 +110,11 @@ class DataImportCsvFileWriter implements DataImportCsvFileWriterInterface
     }
 
     /**
-     * @param array<string>|string $validationErrors
+     * @param string $error
+     * @param int $rowsWritten
+     * @param array<string> $validationErrors
+     *
+     * @return \Generated\Shared\Transfer\DataImportCsvWriteResponseTransfer
      */
     protected function createErrorResponse(string $error, int $rowsWritten = 0, array $validationErrors = []): DataImportCsvWriteResponseTransfer
     {

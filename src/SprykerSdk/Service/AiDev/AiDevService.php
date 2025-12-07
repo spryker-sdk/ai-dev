@@ -59,7 +59,7 @@ class AiDevService extends AbstractService implements AiDevServiceInterface
      * @param string $extension
      * @param string $searchString
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function findFiles(string $path, string $extension, string $searchString = ''): array
     {

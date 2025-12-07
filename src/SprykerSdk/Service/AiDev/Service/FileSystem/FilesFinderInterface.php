@@ -11,5 +11,8 @@ namespace SprykerSdk\Service\AiDev\Service\FileSystem;
 
 interface FilesFinderInterface
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function findFiles(string $path, string $extension, string $searchString = ''): array;
 }

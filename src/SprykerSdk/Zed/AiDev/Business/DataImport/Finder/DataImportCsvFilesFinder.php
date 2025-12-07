@@ -16,6 +16,12 @@ class DataImportCsvFilesFinder implements DataImportCsvFilesFinderInterface
     ) {
     }
 
+    /**
+     * @param string $path
+     * @param string $searchString
+     *
+     * @return array<string>
+     */
     public function findDataImportCsvFiles(string $path, string $searchString = ''): array
     {
         return $this->aiDevService->findFiles($path, 'csv', $searchString);

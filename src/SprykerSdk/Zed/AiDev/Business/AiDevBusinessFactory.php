@@ -81,7 +81,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createDataImportCsvFileReader(): DataImportCsvFileReaderInterface
     {
         return new DataImportCsvFileReader(
-            $this->getUtilDataReaderService()->createCsvReader(),
+            $this->getUtilDataReaderService()->getCsvReader(),
             $this->createRowFilter(),
             $this->getAiDevService(),
         );
@@ -90,7 +90,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createDataImportCsvFileWriter(): DataImportCsvFileWriterInterface
     {
         return new DataImportCsvFileWriter(
-            $this->getUtilDataReaderService()->createCsvReader(),
+            $this->getUtilDataReaderService()->getCsvReader(),
             $this->getAiDevService(),
             $this->createColumnMappingValidator(),
             $this->createColumnMapper(),
