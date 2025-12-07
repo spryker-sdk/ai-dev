@@ -17,6 +17,15 @@ use Spryker\Service\Kernel\AbstractService;
  */
 class AiDevService extends AbstractService implements AiDevServiceInterface
 {
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $path
+     *
+     * @return string
+     */
     public function resolvePath(string $path): string
     {
         return $this->getFactory()
@@ -24,6 +33,16 @@ class AiDevService extends AbstractService implements AiDevServiceInterface
             ->resolvePath($path);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $filePath
+     * @param string $content
+     *
+     * @return bool
+     */
     public function writeFile(string $filePath, string $content): bool
     {
         return $this->getFactory()
@@ -31,6 +50,17 @@ class AiDevService extends AbstractService implements AiDevServiceInterface
             ->writeFile($filePath, $content);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $path
+     * @param string $extension
+     * @param string $searchString
+     *
+     * @return array
+     */
     public function findFiles(string $path, string $extension, string $searchString = ''): array
     {
         return $this->getFactory()
@@ -39,22 +69,36 @@ class AiDevService extends AbstractService implements AiDevServiceInterface
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $filePath
      * @param array<string> $headers
      * @param array<array<string, mixed>> $rows
+     * @param string $mode
+     *
+     * @return \Generated\Shared\Transfer\CsvOperationResultTransfer
      */
     public function writeCsvFile(
         string $filePath,
         array $headers,
         array $rows,
-        string $mode,
+        string $mode
     ): CsvOperationResultTransfer {
         return $this->getFactory()
             ->createCsvWriter()
             ->writeCsvFile($filePath, $headers, $rows, $mode);
-
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $odsFilePath
+     * @param string $outputDirectory
+     *
      * @return array<int, string>
      */
     public function convertOdsToCsvFiles(string $odsFilePath, string $outputDirectory): array

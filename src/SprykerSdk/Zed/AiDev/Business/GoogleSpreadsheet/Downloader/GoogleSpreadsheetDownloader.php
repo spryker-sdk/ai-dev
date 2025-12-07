@@ -30,7 +30,7 @@ class GoogleSpreadsheetDownloader implements GoogleSpreadsheetDownloaderInterfac
         }
 
         $exportUrl = sprintf(static::GOOGLE_SHEETS_EXPORT_URL_PATTERN, $spreadsheetId);
-        $content = @file_get_contents($exportUrl);
+        $content = file_get_contents($exportUrl);
 
         if ($content === false) {
             return false;

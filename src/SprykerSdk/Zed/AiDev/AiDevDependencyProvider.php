@@ -9,9 +9,17 @@ namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\CopyDataImportCsvWithMappingAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DeleteDataImportCsvRowsAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DownloadGoogleSpreadsheetAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetDataImportCsvContentAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetDataImportCsvFilesAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByStateAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\WriteDataImportCsvContentAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -109,6 +117,14 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new GetTransferStructureByNamespaceAiDevMcpToolPlugin(),
             new GetTransferStructureByNameAiDevMcpToolPlugin(),
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
+            new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
+            new GetOmsTransitionsByStateAiDevMcpToolPlugin(),
+            new GetDataImportCsvFilesAiDevMcpToolPlugin(),
+            new GetDataImportCsvContentAiDevMcpToolPlugin(),
+            new WriteDataImportCsvContentAiDevMcpToolPlugin(),
+            new DeleteDataImportCsvRowsAiDevMcpToolPlugin(),
+            new CopyDataImportCsvWithMappingAiDevMcpToolPlugin(),
+            new DownloadGoogleSpreadsheetAiDevMcpToolPlugin(),
         ];
     }
 }
