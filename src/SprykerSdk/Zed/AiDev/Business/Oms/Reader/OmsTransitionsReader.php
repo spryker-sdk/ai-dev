@@ -99,6 +99,8 @@ class OmsTransitionsReader implements OmsTransitionsReaderInterface
         $transitionData = [
             'source' => $transition->getSource()->getName(),
             'target' => $transition->getTarget()->getName(),
+            'event' => null,
+            'condition' => null,
         ];
 
         if ($transition->hasEvent()) {
