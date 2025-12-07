@@ -94,6 +94,22 @@ class ColumnMapper implements ColumnMapperInterface
     ): array {
         $targetRow = array_fill_keys($targetHeaders, '');
 
+        if ($columnMapping === []) {
+            foreach ($targetHeaders as $targetHeader) {
+                if (isset($sourceRow[$targetHeader])) {
+                    $value = $sourceRow[$targetHeader];
+
+                    if (isset($valueReplacements[$targetHeader])) {
+                        $value = $this->applyValueReplacement($value, $valueReplacements[$targetHeader]);
+                    }
+
+                    $targetRow[$targetHeader] = $value;
+                }
+            }
+
+            return $targetRow;
+        }
+
         foreach ($columnMapping as $sourceColumn => $targetColumns) {
             if (!isset($sourceRow[$sourceColumn])) {
                 continue;

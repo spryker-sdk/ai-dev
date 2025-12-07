@@ -20,7 +20,7 @@ class GetDataImportCsvContentAiDevMcpToolPlugin extends AbstractPlugin implement
 {
     public function getDescription(): string
     {
-        return 'Read and inspect CSV data import files with filtering and pagination. Returns header columns, paginated data rows as JSON objects keyed by column name, and total row count. Parameters: filePath (string), offset (int, default 0), limit (int, default 100), filters (JSON array, default []), filterLogic (string: "AND"|"OR", default "AND"). Filter examples: Single value: [{"column":"store","value":"US"}]. Multiple values: [{"column":"sku","values":["SKU1","SKU2","SKU3"]}]. Exclude: [{"column":"status","value":"inactive","exclude":true}]. AND logic (default): All filters must match. OR logic: Any filter can match. Use case: Read US store active products with AND logic: [{"column":"store","value":"US"},{"column":"status","value":"active"}].';
+        return 'Read and inspect CSV data import files with filtering and pagination. Supports only relative paths. Returns header columns, paginated data rows as JSON objects keyed by column name, and total row count. Parameters: filePath (string), offset (int, default 0), limit (int, default 100), filters (JSON array, default []), filterLogic (string: "AND"|"OR", default "AND"). Filter examples: Single value: [{"column":"store","value":"US"}]. Multiple values: [{"column":"sku","values":["SKU1","SKU2","SKU3"]}]. Exclude: [{"column":"status","value":"inactive","exclude":true}]. AND logic (default): All filters must match. OR logic: Any filter can match. Use case: Read US store active products with AND logic: [{"column":"store","value":"US"},{"column":"status","value":"active"}].';
     }
 
     public function getName(): string

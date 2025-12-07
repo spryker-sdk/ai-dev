@@ -20,7 +20,7 @@ class GetDataImportCsvFilesAiDevMcpToolPlugin extends AbstractPlugin implements 
 {
     public function getDescription(): string
     {
-        return 'Tool to discover and list all CSV files in a data import directory. Returns a list of CSV file paths, optionally filtered by a search string in the filename. Useful for exploring available data import files.';
+        return 'Tool to discover and list all CSV files in a data import directory. Supports only relative paths. Returns a list of CSV file paths, optionally filtered by a search string in the filename. Useful for exploring available data import files.';
     }
 
     public function getName(): string

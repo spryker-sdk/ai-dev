@@ -20,7 +20,7 @@ class WriteDataImportCsvContentAiDevMcpToolPlugin extends AbstractPlugin impleme
 {
     public function getDescription(): string
     {
-        return 'Tool to write data to existing CSV data import files. Appends new rows to the end of the file while preserving existing data. Parameters: filePath (string), data (JSON string containing array of objects), columnMapping (JSON string containing object). Example data: "[{\"key\":\"value\"}]". Example columnMapping: "{\"dataKey\":\"csvHeader\"}". Returns success status, rows written count, and any validation errors.';
+        return 'Tool to write data to existing CSV data import files. Supports only relative paths. Appends new rows to the end of the file while preserving existing data. Parameters: filePath (string), data (JSON string containing array of objects), columnMapping (JSON string containing object). Example data: "[{\"key\":\"value\"}]". Example columnMapping: "{\"dataKey\":\"csvHeader\"}". Returns success status, rows written count, and any validation errors.';
     }
 
     public function getName(): string
