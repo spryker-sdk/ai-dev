@@ -13,7 +13,6 @@ use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
- * @method \SprykerSdk\Zed\AiDev\Business\AiDevBusinessFactory getBusinessFactory()
  */
 class AiDevCommunicationFactory extends AbstractCommunicationFactory
 {
