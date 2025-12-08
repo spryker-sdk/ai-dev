@@ -5,14 +5,13 @@
  * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
  */
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Business\Prompts;
 
-use Generated\Shared\Transfer\AiDevGitHubPromptTransfer;
 use RuntimeException;
 
-class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
+class GitHubPromptsFetcher implements PromptsFetcherInterface
 {
     protected const string GITHUB_OWNER = 'spryker-dev';
 
@@ -21,6 +20,10 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
     protected const string GITHUB_BASE_PATH = 'prompts';
 
     protected const string GITHUB_API_URL = 'https://api.github.com';
+
+    public function __construct(protected MarkdownPromptParserInterface $markdownPromptParser)
+    {
+    }
 
     /**
      * @return array<\Generated\Shared\Transfer\AiDevGitHubPromptTransfer>
@@ -31,11 +34,13 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
         $prompts = [];
 
         foreach ($files as $file) {
-            if ($file['type'] === 'file' && str_ends_with($file['name'], '.md')) {
-                $content = $this->fetchFileContent($file['download_url']);
-                $prompt = $this->parsePromptFile($content, $file['name']);
-                $prompts[] = $prompt;
+            if ($file['type'] !== 'file' || !str_ends_with($file['name'], '.md')) {
+                continue;
             }
+
+            $content = $this->fetchFileContent($file['download_url']);
+            $prompt = $this->markdownPromptParser->parsePromptFile($content, $file['name']);
+            $prompts[] = $prompt;
         }
 
         return $prompts;
@@ -80,9 +85,15 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
         foreach ($items as $item) {
             if ($item['type'] === 'file') {
                 $files[] = $item;
-            } elseif ($item['type'] === 'dir') {
-                $files = array_merge($files, $this->getGitHubFilesRecursive($owner, $repo, $item['path']));
+
+                continue;
             }
+
+            if ($item['type'] !== 'dir') {
+                continue;
+            }
+
+            $files = array_merge($files, $this->getGitHubFilesRecursive($owner, $repo, $item['path']));
         }
 
         return $files;
@@ -105,64 +116,5 @@ class GitHubPromptsFetcher implements GitHubPromptsFetcherInterface
         }
 
         return $content;
-    }
-
-    protected function parsePromptFile(string $content, string $filename): AiDevGitHubPromptTransfer
-    {
-        $frontmatter = $this->parseFrontmatter($content);
-        $bodyContent = $this->extractBody($content);
-
-        $description = $frontmatter['description'] ?? '';
-        $whenToUse = $frontmatter['when_to_use'] ?? '';
-        $description = implode(' ', array_filter([$description, $whenToUse]));
-
-        return (new AiDevGitHubPromptTransfer())
-            ->setFilename($filename)
-            ->setTitle($frontmatter['title'] ?? '')
-            ->setDescription($description)
-            ->setContent($bodyContent);
-    }
-
-    /**
-     * @param string $content
-     *
-     * @return array
-     */
-    protected function parseFrontmatter(string $content): array
-    {
-        if (preg_match('/^---\s*\n(.*?)\n---\s*\n/s', $content, $matches)) {
-            $yamlContent = $matches[1];
-            $frontmatter = [];
-
-            $lines = explode("\n", $yamlContent);
-            $currentKey = null;
-
-            foreach ($lines as $line) {
-                if (preg_match('/^(\w+):\s*(.*)$/', trim($line), $lineMatches)) {
-                    $currentKey = $lineMatches[1];
-                    $value = trim($lineMatches[2]);
-                    $frontmatter[$currentKey] = $value === '' || $value === '[]' ? [] : $value;
-                } elseif ($currentKey && preg_match('/^\s*-\s*(.+)$/', $line, $arrayMatches)) {
-                    if (!is_array($frontmatter[$currentKey])) {
-                        $frontmatter[$currentKey] = [];
-                    }
-
-                    $frontmatter[$currentKey][] = trim($arrayMatches[1]);
-                }
-            }
-
-            return $frontmatter;
-        }
-
-        return [];
-    }
-
-    protected function extractBody(string $content): string
-    {
-        if (preg_match('/^---\s*\n.*?\n---\s*\n(.*)$/s', $content, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return trim($content);
     }
 }

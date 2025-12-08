@@ -5,17 +5,17 @@
  * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
  */
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Business\Prompts;
 
-interface GitHubPromptsFetcherInterface
+interface PromptsFetcherInterface
 {
     /**
      * Specification:
      * - Retrieves all prompts.
      * - Returns cached prompts if available.
-     * - Loads all prompts from GitHub if cache is empty.
+     * - Loads all prompts from the configured source.
      *
      * @return list<\Generated\Shared\Transfer\AiDevGitHubPromptTransfer>
      */
