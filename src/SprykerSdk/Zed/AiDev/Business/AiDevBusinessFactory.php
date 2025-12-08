@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace SprykerSdk\Zed\AiDev\Business;
 
-use Pyz\Zed\Oms\Business\OmsFacadeInterface;
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
+use Spryker\Zed\Oms\Business\OmsFacadeInterface;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
