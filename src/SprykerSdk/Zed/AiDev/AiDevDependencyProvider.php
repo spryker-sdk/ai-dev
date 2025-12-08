@@ -22,14 +22,33 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
 
     public const string PLUGINS_MCP_TOOL = 'PLUGINS_MCP_TOOL';
 
-    /**
-     * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
-     */
+    public const string SERVICE_AI_DEV = 'SERVICE_AI_DEV';
+
+    public const string FACADE_OMS = 'FACADE_OMS';
+
     public function provideBusinessLayerDependencies(Container $container): Container
     {
         $container = parent::provideBusinessLayerDependencies($container);
+        $container = $this->addAiDevService($container);
+        $container = $this->addOmsFacade($container);
+
+        return $container;
+    }
+
+    protected function addAiDevService(Container $container): Container
+    {
+        $container->set(static::SERVICE_AI_DEV, function (Container $container) {
+            return $container->getLocator()->aiDev()->service();
+        });
+
+        return $container;
+    }
+
+    protected function addOmsFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_OMS, function (Container $container) {
+            return $container->getLocator()->oms()->facade();
+        });
 
         return $container;
     }

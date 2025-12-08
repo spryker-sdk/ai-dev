@@ -1,13 +1,14 @@
 {
     "name": "spryker-sdk/ai-dev",
     "type": "library",
-    "description": "Spryker AI Dev module",
+    "description": "AiDev module",
     "license": "proprietary",
     "require": {
         "php": ">=8.3",
+        "php-mcp/server": "^3.3",
         "spryker/kernel": "^3.30.0",
-        "spryker/transfer": "^3.27.0",
-        "php-mcp/server": "^3.3"
+        "spryker/oms": ">=8.0.0",
+        "spryker/transfer": "^3.27.0"
     },
     "require-dev": {
         "phpstan/phpstan": "1.12.29",
