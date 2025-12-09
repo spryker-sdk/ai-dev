@@ -5,7 +5,7 @@
  * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
  */
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Business\Prompts;
 
@@ -14,18 +14,19 @@ use SprykerSdk\Zed\AiDev\AiDevConfig;
 
 class PromptsGenerator implements PromptsGeneratorInterface
 {
+    /**
+     * @param array<\SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface> $promptsFetchers
+     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
+     */
     public function __construct(
-        protected GithubPromptsFetcherInterface $githubPromptsFetcher,
-        protected AiDevConfig $config
+        protected array $promptsFetchers,
+        protected AiDevConfig $config,
     ) {
     }
 
-    /**
-     * @return void
-     */
     public function generate(): void
     {
-        $aiDevGitHubPromptTransfers = $this->githubPromptsFetcher->getAllPrompts();
+        $aiDevGitHubPromptTransfers = $this->fetchAllPrompts();
 
         $methods = [];
         foreach ($aiDevGitHubPromptTransfers as $aiDevGitHubPromptTransfer) {
@@ -34,6 +35,21 @@ class PromptsGenerator implements PromptsGeneratorInterface
 
         $classContent = $this->generateClassContent(implode("\n", $methods));
         $this->writePromptClass($classContent);
+    }
+
+    /**
+     * @return array<\Generated\Shared\Transfer\AiDevGitHubPromptTransfer>
+     */
+    protected function fetchAllPrompts(): array
+    {
+        $allPrompts = [];
+
+        foreach ($this->promptsFetchers as $promptsFetcher) {
+            $prompts = $promptsFetcher->getAllPrompts();
+            $allPrompts = array_merge($allPrompts, $prompts);
+        }
+
+        return $allPrompts;
     }
 
     protected function transformFilenameToClassName(string $filename): array
@@ -79,9 +95,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
         return str_replace('{{content}}', $methods, $classStub);
     }
 
-    /**
-     * @return void
-     */
     protected function writePromptClass(string $content): void
     {
         $targetDirectory = $this->config->getPromptClassTargetDirectory();
@@ -94,6 +107,8 @@ class PromptsGenerator implements PromptsGeneratorInterface
     }
 
     /**
+     * @param string $content
+     *
      * @return array<string>
      */
     protected function parseParameters(string $content): array

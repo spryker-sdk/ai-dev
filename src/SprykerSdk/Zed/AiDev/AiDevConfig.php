@@ -38,4 +38,14 @@ class AiDevConfig extends AbstractBundleConfig
     {
         return rtrim(APPLICATION_SOURCE_DIR, DIRECTORY_SEPARATOR) . '/Generated/Shared/Prompts/';
     }
+
+    /**
+     * @api
+     *
+     * @return string
+     */
+    public function getPromptsDirectory(): string
+    {
+        return APPLICATION_ROOT_DIR . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'prompts';
+    }
 }

@@ -5,17 +5,16 @@
  * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
  */
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Business;
 
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
-use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcherInterface;
-use SprykerSdk\Zed\AiDev\Business\Prompts\PromptReader;
-use SprykerSdk\Zed\AiDev\Business\Prompts\PromptReaderInterface;
-use SprykerSdk\Zed\AiDev\Business\Prompts\PromptRenderer;
-use SprykerSdk\Zed\AiDev\Business\Prompts\PromptRendererInterface;
+use SprykerSdk\Zed\AiDev\Business\Prompts\LocalPromptsFetcher;
+use SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParser;
+use SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface;
+use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGenerator;
 use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface;
 
@@ -24,25 +23,39 @@ use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface;
  */
 class AiDevBusinessFactory extends AbstractBusinessFactory
 {
-    public function createGitHubPromptsFetcher(): GitHubPromptsFetcherInterface
+    public function createGitHubPromptsFetcher(): PromptsFetcherInterface
     {
-        return new GitHubPromptsFetcher();
+        return new GitHubPromptsFetcher($this->createMarkdownPromptParser());
     }
 
-    public function createPromptReader(): PromptReaderInterface
+    public function createLocalPromptsFetcher(): PromptsFetcherInterface
     {
-        return new PromptReader();
+        return new LocalPromptsFetcher(
+            $this->getConfig(),
+            $this->createMarkdownPromptParser(),
+        );
     }
 
-    public function createPromptRenderer(): PromptRendererInterface
+    /**
+     * @return array<\SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface>
+     */
+    public function getPromptsFetchers(): array
     {
-        return new PromptRenderer($this->createPromptReader());
+        return [
+            $this->createLocalPromptsFetcher(),
+            $this->createGitHubPromptsFetcher(),
+        ];
+    }
+
+    public function createMarkdownPromptParser(): MarkdownPromptParserInterface
+    {
+        return new MarkdownPromptParser();
     }
 
     public function createPromptsGenerator(): PromptsGeneratorInterface
     {
         return new PromptsGenerator(
-            $this->createGitHubPromptsFetcher(),
+            $this->getPromptsFetchers(),
             $this->getConfig(),
         );
     }
