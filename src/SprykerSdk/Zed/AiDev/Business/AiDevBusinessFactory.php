@@ -10,6 +10,10 @@ declare(strict_types = 1);
 namespace SprykerSdk\Zed\AiDev\Business;
 
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
+use Spryker\Zed\Oms\Business\OmsFacadeInterface;
+use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
+use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
+use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
 use SprykerSdk\Zed\AiDev\Business\Prompts\LocalPromptsFetcher;
 use SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParser;
@@ -58,5 +62,17 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
             $this->getPromptsFetchers(),
             $this->getConfig(),
         );
+    }
+
+    public function createOmsTransitionsReader(): OmsTransitionsReaderInterface
+    {
+        return new OmsTransitionsReader(
+            $this->getOmsFacade(),
+        );
+    }
+
+    public function getOmsFacade(): OmsFacadeInterface
+    {
+        return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_OMS);
     }
 }
