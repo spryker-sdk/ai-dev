@@ -78,7 +78,10 @@ class McpServerConsole extends Console
             }
 
             $server = $serverBuilder->build();
-            $server->discover($this->getConfig()->getPromptClassTargetDirectory());
+
+            if (file_exists($this->getConfig()->getPromptClassTargetDirectory())) {
+                $server->discover($this->getConfig()->getPromptClassTargetDirectory());
+            }
 
             $transport = new StdioServerTransport();
             $server->listen($transport);
