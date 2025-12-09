@@ -7,4 +7,64 @@
         <property name="content" type="string"/>
     </transfer>
 
+    <transfer name="CsvOperationResult" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="error" type="string"/>
+        <property name="rowsAffected" type="int"/>
+    </transfer>
+
+    <transfer name="DataImportCsvCopyRequest" strict="true">
+        <property name="sourceFilePath" type="string"/>
+        <property name="targetFilePath" type="string"/>
+        <property name="filters" type="array" singular="filter"/>
+        <property name="columnMapping" type="array" singular="columnMap"/>
+        <property name="valueReplacements" type="array" singular="valueReplacement"/>
+        <property name="mode" type="string"/>
+        <property name="filterLogic" type="string"/>
+    </transfer>
+
+    <transfer name="DataImportCsvCopyResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="error" type="string"/>
+        <property name="sourceFilePath" type="string"/>
+        <property name="targetFilePath" type="string"/>
+        <property name="rowsCopied" type="int"/>
+        <property name="mode" type="string"/>
+        <property name="filterLogic" type="string"/>
+        <property name="validationErrors" type="array" singular="validationError"/>
+    </transfer>
+
+    <transfer name="DataImportCsvWriteResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="error" type="string"/>
+        <property name="filePath" type="string"/>
+        <property name="rowsWritten" type="int"/>
+        <property name="totalRowsBeforeAppend" type="int"/>
+        <property name="totalRowsAfterAppend" type="int"/>
+        <property name="validationErrors" type="array" singular="validationError"/>
+    </transfer>
+
+    <transfer name="DataImportCsvDeleteRequest" strict="true">
+        <property name="filePath" type="string"/>
+        <property name="filters" type="array" singular="filter"/>
+        <property name="filterLogic" type="string"/>
+    </transfer>
+
+    <transfer name="DataImportCsvDeleteResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="error" type="string"/>
+        <property name="filePath" type="string"/>
+        <property name="rowsDeleted" type="int"/>
+        <property name="totalRowsBefore" type="int"/>
+        <property name="totalRowsRemaining" type="int"/>
+        <property name="filterLogic" type="string"/>
+        <property name="validationErrors" type="array" singular="validationError"/>
+    </transfer>
+
+    <transfer name="FilterValidationResponse" strict="true">
+        <property name="isValid" type="bool"/>
+        <property name="error" type="string"/>
+        <property name="errors" type="array" singular="error"/>
+    </transfer>
+
 </transfers>

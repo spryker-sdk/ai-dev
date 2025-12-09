@@ -11,6 +11,14 @@ use Spryker\Zed\Kernel\AbstractBundleConfig;
 
 class AiDevConfig extends AbstractBundleConfig
 {
+    public const string CSV_MODE_APPEND = 'a';
+
+    public const string CSV_MODE_OVERWRITE = 'w';
+
+    public const string FILTER_LOGIC_AND = 'AND';
+
+    public const string FILTER_LOGIC_OR = 'OR';
+
     /**
      * @var array
      */

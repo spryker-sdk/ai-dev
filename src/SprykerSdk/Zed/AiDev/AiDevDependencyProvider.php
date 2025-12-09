@@ -9,9 +9,17 @@ namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\CopyDataImportCsvWithMappingAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DeleteDataImportCsvRowsAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DownloadGoogleSpreadsheetAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetDataImportCsvContentAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetDataImportCsvFilesAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByStateAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\WriteDataImportCsvContentAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -22,14 +30,45 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
 
     public const string PLUGINS_MCP_TOOL = 'PLUGINS_MCP_TOOL';
 
-    /**
-     * @param \Spryker\Zed\Kernel\Container $container
-     *
-     * @return \Spryker\Zed\Kernel\Container
-     */
+    public const string SERVICE_AI_DEV = 'SERVICE_AI_DEV';
+
+    public const string SERVICE_UTIL_DATA_READER = 'SERVICE_UTIL_DATA_READER';
+
+    public const string FACADE_OMS = 'FACADE_OMS';
+
     public function provideBusinessLayerDependencies(Container $container): Container
     {
         $container = parent::provideBusinessLayerDependencies($container);
+        $container = $this->addAiDevService($container);
+        $container = $this->addUtilDataReaderService($container);
+        $container = $this->addOmsFacade($container);
+
+        return $container;
+    }
+
+    protected function addAiDevService(Container $container): Container
+    {
+        $container->set(static::SERVICE_AI_DEV, function (Container $container) {
+            return $container->getLocator()->aiDev()->service();
+        });
+
+        return $container;
+    }
+
+    protected function addUtilDataReaderService(Container $container): Container
+    {
+        $container->set(static::SERVICE_UTIL_DATA_READER, function (Container $container) {
+            return $container->getLocator()->utilDataReader()->service();
+        });
+
+        return $container;
+    }
+
+    protected function addOmsFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_OMS, function (Container $container) {
+            return $container->getLocator()->oms()->facade();
+        });
 
         return $container;
     }
@@ -78,6 +117,14 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new GetTransferStructureByNamespaceAiDevMcpToolPlugin(),
             new GetTransferStructureByNameAiDevMcpToolPlugin(),
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
+            new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
+            new GetOmsTransitionsByStateAiDevMcpToolPlugin(),
+            new GetDataImportCsvFilesAiDevMcpToolPlugin(),
+            new GetDataImportCsvContentAiDevMcpToolPlugin(),
+            new WriteDataImportCsvContentAiDevMcpToolPlugin(),
+            new DeleteDataImportCsvRowsAiDevMcpToolPlugin(),
+            new CopyDataImportCsvWithMappingAiDevMcpToolPlugin(),
+            new DownloadGoogleSpreadsheetAiDevMcpToolPlugin(),
         ];
     }
 }
