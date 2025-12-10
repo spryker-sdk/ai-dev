@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerSdk\Zed\AiDev\Business\Prompts;
 
 use RuntimeException;
+use Throwable;
 
 class GitHubPromptsFetcher implements PromptsFetcherInterface
 {
@@ -38,7 +39,7 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
                 $prompt = $this->markdownPromptParser->parsePromptFile($content, $filename);
 
                 $prompts[] = $prompt;
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 continue;
             }
         }
@@ -69,7 +70,7 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
             $paths = array_filter(array_map('trim', explode("\n", $content)));
 
             return array_values($paths);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             return [];
         }
     }
