@@ -13,13 +13,9 @@ use RuntimeException;
 
 class GitHubPromptsFetcher implements PromptsFetcherInterface
 {
-    protected const string GITHUB_OWNER = 'spryker-dev';
+    protected const string GITHUB_RAW_BASE_URL = 'https://raw.githubusercontent.com/spryker-dev/prompt-library/refs/heads/main/prompts';
 
-    protected const string GITHUB_REPO = 'prompt-library';
-
-    protected const string GITHUB_BASE_PATH = 'prompts';
-
-    protected const string GITHUB_API_URL = 'https://api.github.com';
+    protected const string GITHUB_SITEMAP_URL = 'https://raw.githubusercontent.com/spryker-dev/prompt-library/refs/heads/main/prompts/sitemap.txt';
 
     public function __construct(protected MarkdownPromptParserInterface $markdownPromptParser)
     {
@@ -30,20 +26,52 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
      */
     public function getAllPrompts(): array
     {
-        $files = $this->getGitHubFilesRecursive(static::GITHUB_OWNER, static::GITHUB_REPO, static::GITHUB_BASE_PATH);
+        $paths = $this->fetchSitemapPaths();
         $prompts = [];
 
-        foreach ($files as $file) {
-            if ($file['type'] !== 'file' || !str_ends_with($file['name'], '.md')) {
+        foreach ($paths as $path) {
+            try {
+                $rawUrl = sprintf('%s/%s', static::GITHUB_RAW_BASE_URL, ltrim($path, '/'));
+                $content = $this->fetchFileContent($rawUrl);
+
+                $filename = basename($path);
+                $prompt = $this->markdownPromptParser->parsePromptFile($content, $filename);
+
+                $prompts[] = $prompt;
+            } catch (\Throwable $exception) {
                 continue;
             }
-
-            $content = $this->fetchFileContent($file['download_url']);
-            $prompt = $this->markdownPromptParser->parsePromptFile($content, $file['name']);
-            $prompts[] = $prompt;
         }
 
         return $prompts;
+    }
+
+    /**
+     * @return array<string>
+     */
+    protected function fetchSitemapPaths(): array
+    {
+        try {
+            $options = [
+                'http' => [
+                    'method' => 'GET',
+                    'header' => 'User-Agent: Spryker-MCP-Server',
+                ],
+            ];
+
+            $context = stream_context_create($options);
+            $content = file_get_contents(static::GITHUB_SITEMAP_URL, false, $context);
+
+            if ($content === false) {
+                return [];
+            }
+
+            $paths = array_filter(array_map('trim', explode("\n", $content)));
+
+            return array_values($paths);
+        } catch (\Throwable $exception) {
+            return [];
+        }
     }
 
     /**
