@@ -12,7 +12,7 @@ composer require spryker-sdk/ai-dev
 
 ## Documentation
 
-[Spryker Documentation Ai Dev Module Overview](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-overview)
+[Spryker Documentation Ai Dev Module Overview](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-overview.html)
 
 ## Debugging MCP Server
 
