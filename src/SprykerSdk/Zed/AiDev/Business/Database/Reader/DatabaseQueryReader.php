@@ -17,15 +17,21 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
 {
     protected const int DEFAULT_ROW_LIMIT = 1000;
 
-    protected const string ERROR_NOT_READ_ONLY = 'Only read-only queries are allowed (SELECT, SHOW, DESCRIBE, EXPLAIN)';
+    protected const string ERROR_NOT_READ_ONLY = 'Only read-only queries are allowed. Query must start with one of: SELECT, SHOW, DESCRIBE, or EXPLAIN.';
 
     protected const string ERROR_MULTIPLE_STATEMENTS = 'Multiple statements are not allowed';
 
     protected const string ERROR_EXECUTION = 'Query execution failed';
 
+    protected const string ERROR_QUERY_IS_EMPTY = 'Query is empty';
+
     public function executeQuery(string $query): string
     {
         $query = trim($query);
+
+        if ($query === '') {
+            return $this->buildErrorResponse(static::ERROR_EXECUTION, static::ERROR_QUERY_IS_EMPTY);
+        }
 
         if (!$this->isReadOnlyQuery($query)) {
             return $this->buildErrorResponse(static::ERROR_NOT_READ_ONLY);

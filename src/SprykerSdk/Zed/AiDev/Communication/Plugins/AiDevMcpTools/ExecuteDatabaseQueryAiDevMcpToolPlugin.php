@@ -22,7 +22,7 @@ class ExecuteDatabaseQueryAiDevMcpToolPlugin extends AbstractPlugin implements A
 {
     public function getDescription(): string
     {
-        return 'Tool to execute read-only database queries (SELECT statements only). Returns data in JSON format with {data, error} structure. Automatically applies a limit of 1000 rows if not specified. Useful for exploring database schema, checking table structures, and querying current data state.';
+        return 'Tool to execute read-only database queries (SELECT, SHOW, DESCRIBE, and EXPLAIN statements only). Query must start with one of: SELECT, SHOW, DESCRIBE, or EXPLAIN. Returns data in JSON format with {data, error} structure. Automatically applies a limit of 1000 rows if not specified. Useful for exploring database schema, checking table structures, and querying current data state.';
     }
 
     public function getName(): string
