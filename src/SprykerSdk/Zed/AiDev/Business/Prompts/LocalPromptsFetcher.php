@@ -17,6 +17,10 @@ use SprykerSdk\Zed\AiDev\AiDevConfig;
 
 class LocalPromptsFetcher implements PromptsFetcherInterface
 {
+    /**
+     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
+     * @param \SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface $markdownPromptParser
+     */
     public function __construct(
         protected AiDevConfig $config,
         protected MarkdownPromptParserInterface $markdownPromptParser,
@@ -71,6 +75,13 @@ class LocalPromptsFetcher implements PromptsFetcherInterface
         return $files;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @throws \RuntimeException
+     *
+     * @return string
+     */
     protected function fetchFileContent(string $filePath): string
     {
         $content = file_get_contents($filePath);

@@ -16,6 +16,8 @@ interface AiDevFacadeInterface
      * - Writes GeneratedPrompts class to target directory
      *
      * @api
+     *
+     * @return void
      */
     public function generatePrompts(): void;
 }

@@ -27,11 +27,17 @@ use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface;
  */
 class AiDevBusinessFactory extends AbstractBusinessFactory
 {
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface
+     */
     public function createGitHubPromptsFetcher(): PromptsFetcherInterface
     {
         return new GitHubPromptsFetcher($this->createMarkdownPromptParser());
     }
 
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface
+     */
     public function createLocalPromptsFetcher(): PromptsFetcherInterface
     {
         return new LocalPromptsFetcher(
@@ -51,11 +57,17 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         ];
     }
 
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface
+     */
     public function createMarkdownPromptParser(): MarkdownPromptParserInterface
     {
         return new MarkdownPromptParser();
     }
 
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface
+     */
     public function createPromptsGenerator(): PromptsGeneratorInterface
     {
         return new PromptsGenerator(
@@ -64,6 +76,9 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface
+     */
     public function createOmsTransitionsReader(): OmsTransitionsReaderInterface
     {
         return new OmsTransitionsReader(
@@ -71,6 +86,9 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
+    /**
+     * @return \Spryker\Zed\Oms\Business\OmsFacadeInterface
+     */
     public function getOmsFacade(): OmsFacadeInterface
     {
         return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_OMS);
