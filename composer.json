@@ -8,13 +8,13 @@
         "php-mcp/server": "^3.3",
         "spryker/kernel": "^3.30.0",
         "spryker/oms": ">=8.0.0",
+        "spryker/sales": "*",
+        "spryker/symfony": "*",
         "spryker/transfer": "^3.27.0"
     },
     "require-dev": {
         "phpstan/phpstan": "1.12.29",
-        "spryker-sdk/phpstan-spryker": "^0.4.3",
-        "spryker/code-sniffer": "^0.17.30",
-        "spryker/development": "*"
+        "spryker/code-sniffer": "^0.17.30"
     },
     "autoload": {
         "psr-4": {
