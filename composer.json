@@ -24,9 +24,9 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "scripts": {
-        "cs-check": "phpcs -p -s --standard=vendor/spryker/development/ruleset.xml src/",
+        "cs-check": "phpcs -p -s --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/",
         "architecture-check": "phpmd src/ text vendor/spryker/development/resources/phpmd/ruleset.xml --minimumpriority 2",
-        "cs-fix": "phpcbf -p --standard=vendor/spryker/development/ruleset.xml src/",
+        "cs-fix": "phpcbf -p --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/",
         "stan": "phpstan analyse src"
     },
     "extra": {
