@@ -27,6 +27,11 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
 
     public const string FACADE_OMS = 'FACADE_OMS';
 
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     public function provideBusinessLayerDependencies(Container $container): Container
     {
         $container = parent::provideBusinessLayerDependencies($container);
@@ -35,6 +40,11 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
         return $container;
     }
 
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     protected function addOmsFacade(Container $container): Container
     {
         $container->set(static::FACADE_OMS, function (Container $container) {
@@ -44,6 +54,11 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
         return $container;
     }
 
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     public function provideCommunicationLayerDependencies(Container $container): Container
     {
         $container = parent::provideCommunicationLayerDependencies($container);
@@ -53,6 +68,11 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
         return $container;
     }
 
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     protected function addMcpPromptPlugins(Container $container): Container
     {
         $container->set(static::PLUGINS_MCP_PROMPT, function () {
@@ -70,6 +90,11 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
         return [];
     }
 
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     protected function addMcpToolPlugins(Container $container): Container
     {
         $container->set(static::PLUGINS_MCP_TOOL, function () {

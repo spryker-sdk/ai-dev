@@ -19,10 +19,18 @@ class OmsTransitionsReader implements OmsTransitionsReaderInterface
 
     protected const string STATE_NAMES = 'stateNames';
 
+    /**
+     * @param \Spryker\Zed\Oms\Business\OmsFacadeInterface $omsFacade
+     */
     public function __construct(protected OmsFacadeInterface $omsFacade)
     {
     }
 
+    /**
+     * @param string $orderReference
+     *
+     * @return string
+     */
     public function getOrderOmsTransitions(string $orderReference): string
     {
         $orderData = $this->getProcessAndStateNamesByOrderReference($orderReference);
@@ -33,6 +41,12 @@ class OmsTransitionsReader implements OmsTransitionsReaderInterface
         return $this->buildTransitionsResponse($orderData[static::PROCESS_NAME], $orderData[static::STATE_NAMES]);
     }
 
+    /**
+     * @param string $stateName
+     * @param string $processName
+     *
+     * @return string
+     */
     public function getOmsTransitionsByState(string $stateName, string $processName = ''): string
     {
         return $this->buildTransitionsResponse($processName, [$stateName]);

@@ -18,6 +18,9 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
 
     protected const string GITHUB_SITEMAP_URL = 'https://raw.githubusercontent.com/spryker-dev/prompt-library/refs/heads/main/prompts/sitemap.txt';
 
+    /**
+     * @param \SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface $markdownPromptParser
+     */
     public function __construct(protected MarkdownPromptParserInterface $markdownPromptParser)
     {
     }
@@ -128,6 +131,13 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
         return $files;
     }
 
+    /**
+     * @param string $downloadUrl
+     *
+     * @throws \RuntimeException
+     *
+     * @return string
+     */
     protected function fetchFileContent(string $downloadUrl): string
     {
         $options = [

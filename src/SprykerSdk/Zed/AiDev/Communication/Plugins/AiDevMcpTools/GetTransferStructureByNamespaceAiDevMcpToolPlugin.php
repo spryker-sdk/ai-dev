@@ -23,16 +23,27 @@ class GetTransferStructureByNamespaceAiDevMcpToolPlugin extends AbstractPlugin i
      */
     private const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
 
+    /**
+     * @return string
+     */
     public function getName(): string
     {
         return 'getTransferStructureByNamespace';
     }
 
+    /**
+     * @return string
+     */
     public function getDescription(): string
     {
         return 'Tool to get transfer structure by namespace. Uses reflection to get transfer metadata.';
     }
 
+    /**
+     * @param string $namespace
+     *
+     * @return string
+     */
     public function getTransferStructureByNamespace(string $namespace): string
     {
         if (!class_exists($namespace)) {
