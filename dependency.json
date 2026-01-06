@@ -1,5 +1,9 @@
 {
     "include": {
         "spryker/transfer": "Provides transfer objects definition with strict types and `::get*OrFail()` functionality."
+    },
+    "include-dev": {
+        "spryker-sdk/phpstan-spryker": "Provides Spryker specific rules for PHPStan.",
+        "spryker/development": "Provides rules for architecture and code style checks."
     }
 }

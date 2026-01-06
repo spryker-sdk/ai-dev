@@ -8,6 +8,8 @@
         "php-mcp/server": "^3.3",
         "spryker/kernel": "^3.30.0",
         "spryker/oms": ">=8.0.0",
+        "spryker/sales": "*",
+        "spryker/symfony": "*",
         "spryker/transfer": "^3.27.0"
     },
     "require-dev": {
