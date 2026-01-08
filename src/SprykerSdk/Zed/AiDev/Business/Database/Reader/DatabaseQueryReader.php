@@ -19,8 +19,6 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
 
     protected const string ERROR_NOT_READ_ONLY = 'Only read-only queries are allowed. Query must start with one of: SELECT, SHOW, DESCRIBE, or EXPLAIN.';
 
-    protected const string ERROR_MULTIPLE_STATEMENTS = 'Multiple statements are not allowed';
-
     protected const string ERROR_EXECUTION = 'Query execution failed';
 
     protected const string ERROR_QUERY_IS_EMPTY = 'Query is empty';
@@ -35,10 +33,6 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
 
         if (!$this->isReadOnlyQuery($query)) {
             return $this->buildErrorResponse(static::ERROR_NOT_READ_ONLY);
-        }
-
-        if ($this->hasMultipleStatements($query)) {
-            return $this->buildErrorResponse(static::ERROR_MULTIPLE_STATEMENTS);
         }
 
         $limitedQuery = $this->applyLimit($query);
@@ -64,37 +58,6 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
             || str_starts_with($normalizedQuery, 'SHOW ')
             || str_starts_with($normalizedQuery, 'DESCRIBE ')
             || str_starts_with($normalizedQuery, 'EXPLAIN ');
-    }
-
-    protected function hasMultipleStatements(string $query): bool
-    {
-        $trimmedQuery = rtrim($query, " \t\n\r\0\x0B;");
-        $length = strlen($trimmedQuery);
-        $inSingleQuote = false;
-        $inDoubleQuote = false;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $trimmedQuery[$i];
-            $prevChar = $i > 0 ? $trimmedQuery[$i - 1] : '';
-
-            if ($char === "'" && $prevChar !== '\\' && !$inDoubleQuote) {
-                $inSingleQuote = !$inSingleQuote;
-
-                continue;
-            }
-
-            if ($char === '"' && $prevChar !== '\\' && !$inSingleQuote) {
-                $inDoubleQuote = !$inDoubleQuote;
-
-                continue;
-            }
-
-            if ($char === ';' && !$inSingleQuote && !$inDoubleQuote) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     protected function applyLimit(string $query): string
