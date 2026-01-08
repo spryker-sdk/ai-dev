@@ -14,13 +14,25 @@ composer require spryker-sdk/ai-dev --dev
 docker/sdk console transfer:generate
 ```
 
-## Quick Start
+Register the console commands in your `ConsoleDependencyProvider`:
 
-Start the MCP server:
+```php
+use SprykerSdk\Zed\AiDev\Communication\Console\GeneratePromptsConsole;
+use SprykerSdk\Zed\AiDev\Communication\Console\McpServerConsole;
 
-```bash
-docker/sdk console ai-dev:mcp-server -q
+protected function getConsoleCommands(Container $container): array
+{
+       if (class_exists(GeneratePromptsConsole::class)) {
+           $commands[] = new GeneratePromptsConsole();
+       }
+
+       if (class_exists(McpServerConsole::class)) {
+           $commands[] = new McpServerConsole();
+       }
+}
 ```
+
+## Quick Start
 
 Connect to AI assistants:
 
