@@ -88,6 +88,9 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface
+     */
     public function createDatabaseQueryReader(): DatabaseQueryReaderInterface
     {
         return new DatabaseQueryReader();

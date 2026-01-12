@@ -23,6 +23,11 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
 
     protected const string ERROR_QUERY_IS_EMPTY = 'Query is empty';
 
+    /**
+     * @param string $query
+     *
+     * @return string
+     */
     public function executeQuery(string $query): string
     {
         $query = trim($query);
@@ -50,6 +55,11 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
         }
     }
 
+    /**
+     * @param string $query
+     *
+     * @return bool
+     */
     protected function isReadOnlyQuery(string $query): bool
     {
         $normalizedQuery = strtoupper(preg_replace('/\s+/', ' ', $query));
@@ -60,6 +70,11 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
             || str_starts_with($normalizedQuery, 'EXPLAIN ');
     }
 
+    /**
+     * @param string $query
+     *
+     * @return string
+     */
     protected function applyLimit(string $query): string
     {
         $normalizedQuery = strtoupper($query);
@@ -88,6 +103,12 @@ class DatabaseQueryReader implements DatabaseQueryReaderInterface
         ], JSON_PRETTY_PRINT);
     }
 
+    /**
+     * @param string $error
+     * @param string $details
+     *
+     * @return string
+     */
     protected function buildErrorResponse(string $error, string $details = ''): string
     {
         $errorMessage = $error;
