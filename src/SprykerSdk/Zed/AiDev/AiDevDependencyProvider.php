@@ -9,6 +9,7 @@ namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\ExecuteDatabaseQueryAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByStateAiDevMcpToolPlugin;
@@ -114,6 +115,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
             new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
             new GetOmsTransitionsByStateAiDevMcpToolPlugin(),
+            new ExecuteDatabaseQueryAiDevMcpToolPlugin(),
         ];
     }
 }

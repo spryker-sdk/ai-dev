@@ -12,6 +12,8 @@ namespace SprykerSdk\Zed\AiDev\Business;
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
 use Spryker\Zed\Oms\Business\OmsFacadeInterface;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
+use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReader;
+use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
@@ -84,6 +86,14 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         return new OmsTransitionsReader(
             $this->getOmsFacade(),
         );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface
+     */
+    public function createDatabaseQueryReader(): DatabaseQueryReaderInterface
+    {
+        return new DatabaseQueryReader();
     }
 
     /**

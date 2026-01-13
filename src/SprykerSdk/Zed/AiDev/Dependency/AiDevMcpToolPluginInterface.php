@@ -11,7 +11,8 @@ interface AiDevMcpToolPluginInterface
 {
     /**
      * Specification:
-     * - Returns the name of the MCP prompt.
+     * - Returns the name of callable method of the MCP prompt.
+     * - This name is also used as the name of the MCP prompt.
      *
      * @api
      *
