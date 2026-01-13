@@ -38,7 +38,7 @@ Connect to AI assistants:
 
 **Claude Code**
 ```bash
-claude mcp add spryker-project "$(pwd)/docker/sdk console ai-dev:mcp-server -q"
+claude mcp add spryker-project  -- $(pwd)/docker/sdk console ai-dev:mcp-server -q
 ```
 
 **Claude Desktop** - Add to `claude_desktop_config.json`:
