@@ -14,6 +14,8 @@ use Throwable;
 
 class GitHubPromptsFetcher implements PromptsFetcherInterface
 {
+    protected const string GITHUB_API_URL = 'https://api.github.com';
+
     protected const string GITHUB_RAW_BASE_URL = 'https://raw.githubusercontent.com/spryker-dev/prompt-library/refs/heads/main/prompts';
 
     protected const string GITHUB_SITEMAP_URL = 'https://raw.githubusercontent.com/spryker-dev/prompt-library/refs/heads/main/prompts/sitemap.txt';

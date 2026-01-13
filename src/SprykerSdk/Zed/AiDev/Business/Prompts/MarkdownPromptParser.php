@@ -38,7 +38,7 @@ class MarkdownPromptParser implements MarkdownPromptParserInterface
     /**
      * @param string $content
      *
-     * @return array<string>
+     * @return array<string, string|array<string>>
      */
     protected function parseFrontmatter(string $content): array
     {
@@ -65,7 +65,11 @@ class MarkdownPromptParser implements MarkdownPromptParserInterface
                 continue;
             }
 
-            if (!is_array($frontmatter[$currentKey])) {
+            if (is_string($frontmatter[$currentKey] ?? null)) {
+                $frontmatter[$currentKey] = [];
+            }
+
+            if (!isset($frontmatter[$currentKey])) {
                 $frontmatter[$currentKey] = [];
             }
 

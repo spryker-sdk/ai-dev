@@ -5,6 +5,8 @@
  * Use of this software requires acceptance of the Evaluation License Agreement. See LICENSE file.
  */
 
+declare(strict_types = 1);
+
 namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
@@ -12,8 +14,11 @@ use Spryker\Zed\Kernel\Container;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByStateAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModuleMapAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModulesAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SearchAlgoliaDocumentationAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -25,6 +30,8 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     public const string PLUGINS_MCP_TOOL = 'PLUGINS_MCP_TOOL';
 
     public const string FACADE_OMS = 'FACADE_OMS';
+
+    public const string FACADE_MODULE_FINDER = 'FACADE_MODULE_FINDER';
 
     /**
      * @param \Spryker\Zed\Kernel\Container $container
@@ -58,11 +65,26 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
      *
      * @return \Spryker\Zed\Kernel\Container
      */
+    protected function addModuleFinderFacade(Container $container): Container
+    {
+        $container->set(static::FACADE_MODULE_FINDER, function (Container $container) {
+            return $container->getLocator()->moduleFinder()->facade();
+        });
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     *
+     * @return \Spryker\Zed\Kernel\Container
+     */
     public function provideCommunicationLayerDependencies(Container $container): Container
     {
         $container = parent::provideCommunicationLayerDependencies($container);
         $container = $this->addMcpPromptPlugins($container);
         $container = $this->addMcpToolPlugins($container);
+        $container = $this->addModuleFinderFacade($container);
 
         return $container;
     }
@@ -114,6 +136,9 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
             new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
             new GetOmsTransitionsByStateAiDevMcpToolPlugin(),
+            new SearchAlgoliaDocumentationAiDevMcpToolPlugin(),
+            new GetSprykerModulesAiDevMcpToolPlugin(),
+            new GetSprykerModuleMapAiDevMcpToolPlugin(),
         ];
     }
 }

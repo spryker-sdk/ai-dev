@@ -21,17 +21,17 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
     /**
      * @var string
      */
-    private const TRANSFER_SUFFIX = 'Transfer';
+    protected const TRANSFER_SUFFIX = 'Transfer';
 
     /**
      * @var string
      */
-    private const TRANSFER_NAMESPACE_PREFIX = 'Generated\\Shared\\Transfer\\';
+    protected const TRANSFER_NAMESPACE_PREFIX = 'Generated\\Shared\\Transfer\\';
 
     /**
      * @var array
      */
-    private const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
+    protected const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
 
     /**
      * @return string

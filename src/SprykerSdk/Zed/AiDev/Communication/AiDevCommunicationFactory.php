@@ -8,6 +8,7 @@
 namespace SprykerSdk\Zed\AiDev\Communication;
 
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
+use Spryker\Zed\ModuleFinder\Business\ModuleFinderFacadeInterface;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
 
 /**
@@ -30,5 +31,13 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
     public function getMcpToolPlugins(): array
     {
         return $this->getProvidedDependency(AiDevDependencyProvider::PLUGINS_MCP_TOOL);
+    }
+
+    /**
+     * @return \Spryker\Zed\ModuleFinder\Business\ModuleFinderFacadeInterface
+     */
+    public function getModuleFinderFacade(): ModuleFinderFacadeInterface
+    {
+        return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_MODULE_FINDER);
     }
 }
