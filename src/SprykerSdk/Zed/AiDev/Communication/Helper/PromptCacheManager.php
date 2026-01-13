@@ -117,7 +117,7 @@ class PromptCacheManager
      *
      * @return bool
      */
-    private static function matchesQuery(array $prompt, string $queryLower): bool
+    protected static function matchesQuery(array $prompt, string $queryLower): bool
     {
         if (isset($prompt['title']) && mb_strpos(mb_strtolower($prompt['title']), $queryLower) !== false) {
             return true;

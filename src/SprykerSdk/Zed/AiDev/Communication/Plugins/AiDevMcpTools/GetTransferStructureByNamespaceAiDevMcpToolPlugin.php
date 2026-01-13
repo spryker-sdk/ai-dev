@@ -21,7 +21,7 @@ class GetTransferStructureByNamespaceAiDevMcpToolPlugin extends AbstractPlugin i
     /**
      * @var array
      */
-    private const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
+    protected const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
 
     /**
      * @return string
