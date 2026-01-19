@@ -17,6 +17,8 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Namespace_;
 use PhpParser\NodeTraverser;
 use PhpParser\ParserFactory;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
@@ -97,8 +99,8 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         'clients' => '*ClientInterface.php',
         'services' => '*ServiceInterface.php',
         'configs' => '*Config.php',
-        'pluginInterfaces' => '**/*PluginInterface.php',
-        'plugins' => 'Communication/**/*Plugin.php',
+        'pluginInterfaces' => '*PluginInterface.php',
+        'plugins' => '*Plugin.php',
     ];
 
     /**
@@ -466,7 +468,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
             );
         }
 
-        $pluginInterfaceFiles = glob($path . '/' . static::FILE_PATTERNS['pluginInterfaces']) ?: [];
+        $pluginInterfaceFiles = $this->findFilesRecursively($path, static::FILE_PATTERNS['pluginInterfaces']);
 
         foreach ($pluginInterfaceFiles as $file) {
             $moduleMap['pluginInterfaces'] = array_merge(
@@ -475,7 +477,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
             );
         }
 
-        $pluginFiles = glob($path . '/' . static::FILE_PATTERNS['plugins']) ?: [];
+        $pluginFiles = $this->findFilesRecursively($path, static::FILE_PATTERNS['plugins']);
 
         foreach ($pluginFiles as $file) {
             $moduleMap['plugins'] = array_merge(
@@ -600,7 +602,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
                 continue;
             }
 
-            $pluginInterfaceFiles = glob($path . '/' . static::FILE_PATTERNS['pluginInterfaces']) ?: [];
+            $pluginInterfaceFiles = $this->findFilesRecursively($path, static::FILE_PATTERNS['pluginInterfaces']);
 
             foreach ($pluginInterfaceFiles as $file) {
                 $moduleMap['pluginInterfaces'] = array_merge(
@@ -609,6 +611,33 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
                 );
             }
         }
+    }
+
+    /**
+     * @param string $directory
+     * @param string $pattern
+     *
+     * @return array<string>
+     */
+    protected function findFilesRecursively(string $directory, string $pattern): array
+    {
+        if (!is_dir($directory)) {
+            return [];
+        }
+
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST,
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && fnmatch($pattern, $file->getFilename())) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
     }
 
     /**
