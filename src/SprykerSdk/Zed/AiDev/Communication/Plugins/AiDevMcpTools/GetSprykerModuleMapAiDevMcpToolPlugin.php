@@ -27,7 +27,7 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    public bool $isCacheEnabled = true;
+    public bool $isCacheEnabled = false;
 
     protected const string CACHE_DIR = APPLICATION_ROOT_DIR . '/data/cache/module-map';
 
@@ -37,6 +37,16 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
      * @var array<string>
      */
     protected const PROJECT_PATH_PATTERNS = [
+
+        // project modules
+        'src/*/Zed/%s',
+        'src/*/Client/%s',
+        'src/*/Service/%s',
+        'src/*/Shared/%s',
+        'src/*/Yves/%s',
+        'src/*/Glue/%s',
+
+        // Pyz modules for core namespaces
         'src/Pyz/%s/src/Pyz/Zed/%s',
         'src/Pyz/%s/src/Pyz/Client/%s',
         'src/Pyz/%s/src/Pyz/Service/%s',
@@ -61,71 +71,22 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
      * @var array<string>
      */
     protected const VENDOR_PATH_PATTERNS = [
-        'src/Spryker/%s/src/Spryker/Zed/%s',
-        'src/Spryker/%s/src/Spryker/Client/%s',
-        'src/Spryker/%s/src/Spryker/Service/%s',
-        'src/Spryker/%s/src/Spryker/Shared/%s',
-        'src/Spryker/%s/src/Spryker/Yves/%s',
-        'src/Spryker/%s/src/Spryker/Glue/%s',
-        'src/SprykerShop/%s/src/SprykerShop/Zed/%s',
-        'src/SprykerShop/%s/src/SprykerShop/Yves/%s',
-        'src/SprykerShop/%s/src/SprykerShop/Glue/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Zed/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Client/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Service/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Shared/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Yves/%s',
-        'src/SprykerEco/%s/src/SprykerEco/Glue/%s',
-        'src/SprykerSdk/%s/src/SprykerSdk/Zed/%s',
-        'src/SprykerSdk/%s/src/SprykerSdk/Client/%s',
-        'src/SprykerSdk/%s/src/SprykerSdk/Service/%s',
-        'src/SprykerSdk/%s/src/SprykerSdk/Shared/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Zed/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Client/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Service/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Shared/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Yves/%s',
-        'src/SprykerFeature/%s/src/SprykerFeature/Glue/%s',
-        'src/SprykerConfig/%s/src/SprykerConfig/Zed/%s',
-        'src/SprykerConfig/%s/src/SprykerConfig/Shared/%s',
-        'src/SprykerMiddleware/%s/src/SprykerMiddleware/Zed/%s',
-        'src/SprykerMiddleware/%s/src/SprykerMiddleware/Service/%s',
-        'src/SprykerMiddleware/%s/src/SprykerMiddleware/Shared/%s',
+        'src/Spryker*/%s/src/Spryker*/*/%s',
     ];
 
     /**
      * @var array<string>
      */
     protected const VENDOR_DIRECTORY_PATTERNS = [
-        'vendor/spryker-sdk/*/src/SprykerSdk/Zed/%s',
-        'vendor/spryker-sdk/*/src/SprykerSdk/Client/%s',
-        'vendor/spryker-sdk/*/src/SprykerSdk/Service/%s',
-        'vendor/spryker-sdk/*/src/SprykerSdk/Shared/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Zed/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Client/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Service/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Shared/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Yves/%s',
-        'vendor/spryker-eco/*/src/SprykerEco/Glue/%s',
-        'vendor/spryker-shop/*/src/SprykerShop/Yves/%s',
-        'vendor/spryker-shop/*/src/SprykerShop/Zed/%s',
-        'vendor/spryker-feature/*/src/SprykerFeature/Zed/%s',
-        'vendor/spryker-feature/*/src/SprykerFeature/Client/%s',
-        'vendor/spryker-feature/*/src/SprykerFeature/Service/%s',
-        'vendor/spryker-feature/*/src/SprykerFeature/Shared/%s',
-        'vendor/spryker-middleware/*/src/SprykerMiddleware/Zed/%s',
-        'vendor/spryker-middleware/*/src/SprykerMiddleware/Service/%s',
+        'vendor/spryker*/*/src/Spryker*/*/%s',
     ];
 
     /**
      * @var array<string>
      */
     protected const EXTENSION_MODULE_PATTERNS = [
-        'src/Spryker/%sExtension/src/Spryker/Zed/%sExtension',
-        'src/SprykerEco/%sExtension/src/SprykerEco/Zed/%sExtension',
-        'src/SprykerSdk/%sExtension/src/SprykerSdk/Zed/%sExtension',
-        'src/SprykerFeature/%sExtension/src/SprykerFeature/Zed/%sExtension',
-        'vendor/spryker/spryker/Bundles/%sExtension/src/Spryker/Zed/%sExtension',
+        'src/Spryker*/%sExtension/src/Spryker*/*/%sExtension',
+        'vendor/spryker*/*-extension/src/Spryker*/*/%sExtension',
     ];
 
     /**
@@ -136,8 +97,8 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         'clients' => '*ClientInterface.php',
         'services' => '*ServiceInterface.php',
         'configs' => '*Config.php',
-        'pluginInterfaces' => 'Dependency/Plugin/*PluginInterface.php',
-        'plugins' => 'Communication/Plugin/**/*Plugin.php',
+        'pluginInterfaces' => '**/*PluginInterface.php',
+        'plugins' => 'Communication/**/*Plugin.php',
     ];
 
     /**
@@ -406,7 +367,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
             }
         }
 
-        $customExtensionPattern = sprintf('src/*/%sExtension/src/*/Zed/%sExtension', $extensionModuleName, $extensionModuleName);
+        $customExtensionPattern = sprintf('src/*/%sExtension/src/*/*/%sExtension', $extensionModuleName, $extensionModuleName);
         $matches = glob(APPLICATION_ROOT_DIR . '/' . $customExtensionPattern, 0);
 
         if ($matches) {
@@ -429,11 +390,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         }
 
         $vendorExtensionPatterns = [
-            sprintf('vendor/spryker/*-extension/src/Spryker/Zed/%sExtension', $extensionModuleName),
-            sprintf('vendor/spryker-shop/*-extension/src/SprykerShop/Yves/%sExtension', $extensionModuleName),
-            sprintf('vendor/spryker-shop/*-extension/src/SprykerShop/Zed/%sExtension', $extensionModuleName),
-            sprintf('vendor/spryker-eco/*-extension/src/SprykerEco/Zed/%sExtension', $extensionModuleName),
-            sprintf('vendor/spryker-sdk/*-extension/src/SprykerSdk/Zed/%sExtension', $extensionModuleName),
+            sprintf('vendor/spryker*/*-extension/src/Spryker*/*/%sExtension', $extensionModuleName),
         ];
 
         foreach ($vendorExtensionPatterns as $pattern) {
