@@ -33,7 +33,7 @@ class DeleteCsvRowsAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcp
      */
     public function getDescription(): string
     {
-        return 'Delete rows from CSV file based on filter criteria. All criteria use AND logic (all must match to delete row). Creates backup by default. Supported operators: equals, not_equals, in, not_in, contains, not_contains, starts_with, ends_with, empty, not_empty. Safety check prevents deleting all rows. Parameters: filePath (required), criteria (array of {column, operator, value}), createBackup (default true).';
+        return 'Delete rows from CSV file based on filter criteria. All criteria use AND logic (all must match to delete row). Creates backup by default. Supported operators: equals, not_equals, in, not_in, contains, not_contains, starts_with, ends_with, empty, not_empty. Safety check prevents deleting all rows. Parameters: filePath (required, relative path to CSV file), criteria (array of {column, operator, value}), createBackup (default true).';
     }
 
     /**

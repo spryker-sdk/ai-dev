@@ -34,7 +34,7 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
      */
     public function getDescription(): string
     {
-        return 'Transform source CSV data and append to target CSV file. Maps columns from source to target, filters rows based on criteria, applies value transformations (find/replace), and appends results. Only mapped columns are copied; unmapped target columns get empty values. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required), targetPath (required), columnMappings (object: sourceCol => targetCol), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), createBackup (default true).';
+        return 'Transform source CSV data and append to target CSV file. Maps columns from source to target, filters rows based on criteria, applies value transformations (find/replace), and appends results. Only mapped columns are copied; unmapped target columns get empty values. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required, relative path to source CSV file), targetPath (required, relative path to target CSV file), columnMappings (object: sourceCol => targetCol), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), createBackup (default true).';
     }
 
     /**
@@ -47,11 +47,11 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
             'properties' => [
                 'sourcePath' => [
                     'type' => 'string',
-                    'description' => 'Path to source CSV file',
+                    'description' => 'Relative path to source CSV file',
                 ],
                 'targetPath' => [
                     'type' => 'string',
-                    'description' => 'Path to target CSV file to append to',
+                    'description' => 'Relative path to target CSV file to append to',
                 ],
                 'columnMappings' => [
                     'type' => 'object',

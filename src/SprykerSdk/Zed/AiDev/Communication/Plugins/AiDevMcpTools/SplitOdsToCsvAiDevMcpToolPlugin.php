@@ -33,7 +33,7 @@ class SplitOdsToCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcp
      */
     public function getDescription(): string
     {
-        return 'Split an ODS (OpenDocument Spreadsheet) file into separate CSV files, one per sheet. Skips empty sheets and returns details about created files. Parameters: odsFilePath (required, absolute path to .ods file), outputDirectory (required, directory where CSV files will be written).';
+        return 'Split an ODS (OpenDocument Spreadsheet) file into separate CSV files, one per sheet. Skips empty sheets and returns details about created files. Parameters: odsFilePath (required, relative path to .ods file), outputDirectory (required, relative path to directory where CSV files will be written).';
     }
 
     /**
