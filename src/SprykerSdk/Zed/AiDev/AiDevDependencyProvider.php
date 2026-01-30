@@ -11,6 +11,8 @@ namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\AnalyzeCsvFileAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DeleteCsvRowsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\ExecuteDatabaseQueryAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
@@ -20,6 +22,7 @@ use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModulesAi
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SearchAlgoliaDocumentationAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\TransformAndAppendCsvAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -141,6 +144,9 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new SearchAlgoliaDocumentationAiDevMcpToolPlugin(),
             new GetSprykerModulesAiDevMcpToolPlugin(),
             new GetSprykerModuleMapAiDevMcpToolPlugin(),
+            new AnalyzeCsvFileAiDevMcpToolPlugin(),
+            new DeleteCsvRowsAiDevMcpToolPlugin(),
+            new TransformAndAppendCsvAiDevMcpToolPlugin(),
         ];
     }
 }

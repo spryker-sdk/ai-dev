@@ -4,6 +4,7 @@
     "description": "AiDev module",
     "license": "proprietary",
     "require": {
+        "league/csv": "^9.0",
         "nikic/php-parser": ">=5.0",
         "php": ">=8.3",
         "php-mcp/server": "^3.3",

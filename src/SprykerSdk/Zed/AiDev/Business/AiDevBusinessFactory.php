@@ -14,6 +14,18 @@ use Spryker\Zed\Oms\Business\OmsFacadeInterface;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
 use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReader;
 use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvAnalyzer;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvAnalyzerInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvReader;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvRowDeleter;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvRowDeleterInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvTransformer;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvTransformerInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriter;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
@@ -102,5 +114,65 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function getOmsFacade(): OmsFacadeInterface
     {
         return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_OMS);
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface
+     */
+    public function createCsvReader(): CsvReaderInterface
+    {
+        return new CsvReader();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface
+     */
+    public function createCsvWriter(): CsvWriterInterface
+    {
+        return new CsvWriter(
+            $this->createCsvReader(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface
+     */
+    public function createFilterEvaluator(): FilterEvaluatorInterface
+    {
+        return new FilterEvaluator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvAnalyzerInterface
+     */
+    public function createCsvAnalyzer(): CsvAnalyzerInterface
+    {
+        return new CsvAnalyzer(
+            $this->createCsvReader(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvRowDeleterInterface
+     */
+    public function createCsvRowDeleter(): CsvRowDeleterInterface
+    {
+        return new CsvRowDeleter(
+            $this->createCsvReader(),
+            $this->createCsvWriter(),
+            $this->createFilterEvaluator(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvTransformerInterface
+     */
+    public function createCsvTransformer(): CsvTransformerInterface
+    {
+        return new CsvTransformer(
+            $this->createCsvReader(),
+            $this->createCsvWriter(),
+            $this->createFilterEvaluator(),
+        );
     }
 }
