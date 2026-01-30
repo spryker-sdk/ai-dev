@@ -21,6 +21,8 @@ class CsvWriter implements CsvWriterInterface
     }
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
@@ -51,6 +53,8 @@ class CsvWriter implements CsvWriterInterface
     }
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $filePath
      * @param array<int, array<string, mixed>> $rows
      * @param bool $createBackup

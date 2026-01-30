@@ -28,6 +28,8 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $sourcePath
      * @param string $targetPath
      * @param array<string, string> $columnMappings

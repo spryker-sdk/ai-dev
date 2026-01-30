@@ -12,6 +12,8 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 interface CsvTransformerInterface
 {
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $sourcePath
      * @param string $targetPath
      * @param array<string, string> $columnMappings

@@ -12,6 +12,8 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 interface CsvWriterInterface
 {
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
@@ -22,6 +24,8 @@ interface CsvWriterInterface
     public function write(string $filePath, array $headers, array $rows, bool $createBackup = true): ?string;
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $filePath
      * @param array<int, array<string, mixed>> $rows
      * @param bool $createBackup

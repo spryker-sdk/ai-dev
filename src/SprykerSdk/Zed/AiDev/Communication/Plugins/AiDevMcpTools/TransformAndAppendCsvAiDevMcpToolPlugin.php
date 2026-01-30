@@ -95,6 +95,8 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
     }
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $sourcePath
      * @param string $targetPath
      * @param array<string, string> $columnMappings

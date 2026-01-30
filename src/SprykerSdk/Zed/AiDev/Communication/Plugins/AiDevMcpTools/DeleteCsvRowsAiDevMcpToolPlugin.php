@@ -37,6 +37,8 @@ class DeleteCsvRowsAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcp
     }
 
     /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
      * @param string $filePath
      * @param array<int, array<string, mixed>> $criteria
      * @param bool $createBackup
