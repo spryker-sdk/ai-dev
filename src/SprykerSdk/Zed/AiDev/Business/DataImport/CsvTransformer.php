@@ -15,6 +15,11 @@ class CsvTransformer implements CsvTransformerInterface
 {
     use JsonResponseTrait;
 
+    /**
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
+     */
     public function __construct(
         protected CsvReaderInterface $csvReader,
         protected CsvWriterInterface $csvWriter,
@@ -75,6 +80,12 @@ class CsvTransformer implements CsvTransformerInterface
         }
     }
 
+    /**
+     * @param string $sourcePath
+     * @param string $targetPath
+     *
+     * @return string|null
+     */
     protected function validateFiles(string $sourcePath, string $targetPath): ?string
     {
         if (!file_exists($sourcePath)) {

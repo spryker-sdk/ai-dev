@@ -15,6 +15,11 @@ class CsvRowDeleter implements CsvRowDeleterInterface
 {
     use JsonResponseTrait;
 
+    /**
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
+     */
     public function __construct(
         protected CsvReaderInterface $csvReader,
         protected CsvWriterInterface $csvWriter,

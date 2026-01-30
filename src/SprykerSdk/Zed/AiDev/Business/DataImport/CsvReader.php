@@ -41,6 +41,11 @@ class CsvReader implements CsvReaderInterface
         return $headers;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return int
+     */
     public function getRowCount(string $filePath): int
     {
         $cacheKey = $this->getCacheKey($filePath);
@@ -86,6 +91,11 @@ class CsvReader implements CsvReaderInterface
         return iterator_to_array($records, false);
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return string
+     */
     public function detectEncoding(string $filePath): string
     {
         $cacheKey = $this->getCacheKey($filePath);
@@ -114,6 +124,11 @@ class CsvReader implements CsvReaderInterface
         return $encoding;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return string
+     */
     public function detectDelimiter(string $filePath): string
     {
         $cacheKey = $this->getCacheKey($filePath);
@@ -142,6 +157,11 @@ class CsvReader implements CsvReaderInterface
         return $detectedDelimiter;
     }
 
+    /**
+     * @param string $line
+     *
+     * @return string
+     */
     protected function detectDelimiterFromLine(string $line): string
     {
         $delimiterCounts = [];
@@ -161,6 +181,11 @@ class CsvReader implements CsvReaderInterface
         return $detectedDelimiter;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return \League\Csv\Reader
+     */
     protected function createReader(string $filePath): Reader
     {
         $csv = Reader::from($filePath, 'r');
@@ -176,6 +201,11 @@ class CsvReader implements CsvReaderInterface
         return $csv;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return string
+     */
     protected function getCacheKey(string $filePath): string
     {
         return md5($filePath . filemtime($filePath));

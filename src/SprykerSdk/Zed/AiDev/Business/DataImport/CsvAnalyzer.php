@@ -15,6 +15,9 @@ class CsvAnalyzer implements CsvAnalyzerInterface
 {
     use JsonResponseTrait;
 
+    /**
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
+     */
     public function __construct(protected CsvReaderInterface $csvReader)
     {
     }

@@ -48,6 +48,11 @@ class FilterEvaluator implements FilterEvaluatorInterface
         return true;
     }
 
+    /**
+     * @param string $operator
+     *
+     * @return bool
+     */
     public function isValidOperator(string $operator): bool
     {
         return in_array($operator, static::SUPPORTED_OPERATORS, true);

@@ -13,6 +13,9 @@ use League\Csv\Writer;
 
 class CsvWriter implements CsvWriterInterface
 {
+    /**
+     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
+     */
     public function __construct(protected CsvReaderInterface $csvReader)
     {
     }
@@ -63,15 +66,20 @@ class CsvWriter implements CsvWriterInterface
         }
 
         $headers = $this->csvReader->getHeaders($filePath);
-        $existingRows = $this->csvReader->getRows($filePath);
+        $delimiter = $this->csvReader->detectDelimiter($filePath);
+        $writer = Writer::from($filePath, 'a');
+        $writer->setDelimiter($delimiter);
 
-        $allRows = array_merge($existingRows, $rows);
-
-        $this->write($filePath, $headers, $allRows, false);
+        $writer->insertAll($this->prepareRows($rows, $headers));
 
         return $backupPath;
     }
 
+    /**
+     * @param string $filePath
+     *
+     * @return string
+     */
     protected function createBackup(string $filePath): string
     {
         $backupPath = $filePath . CsvConstants::BACKUP_EXTENSION;

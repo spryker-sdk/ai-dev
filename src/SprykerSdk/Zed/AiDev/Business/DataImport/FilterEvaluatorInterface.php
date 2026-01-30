@@ -19,6 +19,11 @@ interface FilterEvaluatorInterface
      */
     public function evaluate(array $row, array $criteria): bool;
 
+    /**
+     * @param string $operator
+     *
+     * @return bool
+     */
     public function isValidOperator(string $operator): bool;
 
     /**
