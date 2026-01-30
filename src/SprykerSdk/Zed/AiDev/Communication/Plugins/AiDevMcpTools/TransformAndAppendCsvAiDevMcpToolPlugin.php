@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools;
 
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
+use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolInputSchemaPluginInterface;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
 /**
@@ -18,7 +19,7 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
  */
-class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
+class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface, AiDevMcpToolInputSchemaPluginInterface
 {
     /**
      * @return string
@@ -34,6 +35,63 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
     public function getDescription(): string
     {
         return 'Transform source CSV data and append to target CSV file. Maps columns from source to target, filters rows based on criteria, applies value transformations (find/replace), and appends results. Only mapped columns are copied; unmapped target columns get empty values. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required), targetPath (required), columnMappings (object: sourceCol => targetCol), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), createBackup (default true).';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getInputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'sourcePath' => [
+                    'type' => 'string',
+                    'description' => 'Path to source CSV file',
+                ],
+                'targetPath' => [
+                    'type' => 'string',
+                    'description' => 'Path to target CSV file to append to',
+                ],
+                'columnMappings' => [
+                    'type' => 'object',
+                    'description' => 'Object mapping source column names to target column names',
+                    'additionalProperties' => [
+                        'type' => 'string',
+                    ],
+                ],
+                'rowFilters' => [
+                    'type' => 'array',
+                    'description' => 'Optional filters to apply to rows',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'column' => ['type' => 'string'],
+                            'operator' => ['type' => 'string'],
+                            'value' => ['type' => ['string', 'number', 'boolean']],
+                        ],
+                    ],
+                ],
+                'valueTransformations' => [
+                    'type' => 'array',
+                    'description' => 'Optional value transformations (find/replace)',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'column' => ['type' => 'string'],
+                            'find' => ['type' => 'string'],
+                            'replace' => ['type' => 'string'],
+                        ],
+                    ],
+                ],
+                'createBackup' => [
+                    'type' => 'boolean',
+                    'description' => 'Whether to create a backup of the target file',
+                    'default' => true,
+                ],
+            ],
+            'required' => ['sourcePath', 'targetPath', 'columnMappings'],
+        ];
     }
 
     /**

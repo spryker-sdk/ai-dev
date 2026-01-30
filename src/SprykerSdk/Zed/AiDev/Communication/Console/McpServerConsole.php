@@ -11,6 +11,7 @@ use PhpMcp\Server\Server;
 use PhpMcp\Server\Transports\StdioServerTransport;
 use Spryker\Zed\Kernel\BundleConfigResolverAwareTrait;
 use Spryker\Zed\Kernel\Communication\Console\Console;
+use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolInputSchemaPluginInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -70,10 +71,16 @@ class McpServerConsole extends Console
             }
 
             foreach ($this->getFactory()->getMcpToolPlugins() as $toolPlugin) {
+                $inputSchema = $toolPlugin instanceof AiDevMcpToolInputSchemaPluginInterface
+                    ? $toolPlugin->getInputSchema()
+                    : null;
+
                 $serverBuilder->withTool(
                     [$toolPlugin::class, $toolPlugin->getName()],
                     $toolPlugin->getName(),
                     $toolPlugin->getDescription(),
+                    null,
+                    $inputSchema,
                 );
             }
 

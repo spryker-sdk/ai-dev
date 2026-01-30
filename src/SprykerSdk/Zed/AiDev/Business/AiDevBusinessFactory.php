@@ -26,6 +26,10 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriter;
 use SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface;
 use SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluator;
 use SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\OdsReader;
+use SprykerSdk\Zed\AiDev\Business\DataImport\OdsReaderInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitter;
+use SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitterInterface;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
@@ -173,6 +177,25 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
             $this->createCsvReader(),
             $this->createCsvWriter(),
             $this->createFilterEvaluator(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\OdsReaderInterface
+     */
+    public function createOdsReader(): OdsReaderInterface
+    {
+        return new OdsReader();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitterInterface
+     */
+    public function createOdsSplitter(): OdsSplitterInterface
+    {
+        return new OdsSplitter(
+            $this->createOdsReader(),
+            $this->createCsvWriter(),
         );
     }
 }
