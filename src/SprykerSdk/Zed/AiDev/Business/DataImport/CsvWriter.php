@@ -124,7 +124,7 @@ class CsvWriter implements CsvWriterInterface
      *
      * @return void
      */
-    protected function ensureFileEndsWithNewline(string $filePath): void
+    public function ensureFileEndsWithNewline(string $filePath): void
     {
         if (!file_exists($filePath) || filesize($filePath) === 0) {
             return;

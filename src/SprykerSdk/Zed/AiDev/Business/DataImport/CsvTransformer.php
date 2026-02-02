@@ -93,6 +93,8 @@ class CsvTransformer implements CsvTransformerInterface
             $hasNewColumns = count($finalHeaders) > count($targetHeaders);
 
             if ($hasNewColumns) {
+                $this->csvWriter->ensureFileEndsWithNewline($targetPath);
+
                 $existingRows = $this->csvReader->getRows($targetPath);
                 $existingRowsWithNewColumns = $this->addMissingColumns($existingRows, $finalHeaders);
                 $allRows = array_merge($existingRowsWithNewColumns, $result['transformed_rows']);
