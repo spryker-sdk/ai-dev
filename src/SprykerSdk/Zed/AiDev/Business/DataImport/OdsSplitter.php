@@ -175,9 +175,10 @@ class OdsSplitter implements OdsSplitterInterface
 
             if ($result['success']) {
                 $filesCreated[] = $result['filePath'];
-            } else {
-                $sheetsSkipped[] = $result['sheetName'];
+
+                continue;
             }
+            $sheetsSkipped[] = $result['sheetName'];
         }
 
         return [
@@ -352,7 +353,7 @@ class OdsSplitter implements OdsSplitterInterface
      */
     protected function trimTrailingEmptyColumns(array $headers): array
     {
-        while (count($headers) > 0 && end($headers) === '') {
+        while (end($headers) === '') {
             array_pop($headers);
         }
 
