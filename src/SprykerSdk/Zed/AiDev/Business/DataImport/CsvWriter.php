@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
 use League\Csv\Writer;
+use RuntimeException;
 
 class CsvWriter implements CsvWriterInterface
 {
@@ -27,6 +28,8 @@ class CsvWriter implements CsvWriterInterface
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
      * @param bool $createBackup
+     *
+     * @throws \RuntimeException
      *
      * @return string|null
      */
@@ -48,7 +51,7 @@ class CsvWriter implements CsvWriterInterface
         $writer->insertAll($this->prepareRows($rows, $headers));
 
         if (!rename($tempPath, $filePath)) {
-            throw new \RuntimeException(sprintf('Failed to rename temp file "%s" to "%s"', $tempPath, $filePath));
+            throw new RuntimeException(sprintf('Failed to rename temp file "%s" to "%s"', $tempPath, $filePath));
         }
 
         return $backupPath;
