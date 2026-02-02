@@ -259,6 +259,10 @@ class OdsSplitter implements OdsSplitterInterface
             return false;
         }
 
+        $headers = $this->trimTrailingEmptyColumns($headers);
+        $headers = $this->ensureUniqueHeaders($headers);
+        $rows = $this->trimRowsToHeaderLength($rows, count($headers));
+
         $associativeRows = $this->convertToAssociativeRows($rows, $headers);
 
         $this->csvWriter->write($csvFilePath, $headers, $associativeRows, false);
@@ -339,5 +343,61 @@ class OdsSplitter implements OdsSplitterInterface
         }
 
         return $sanitized;
+    }
+
+    /**
+     * @param array<string> $headers
+     *
+     * @return array<string>
+     */
+    protected function trimTrailingEmptyColumns(array $headers): array
+    {
+        while (count($headers) > 0 && end($headers) === '') {
+            array_pop($headers);
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @param array<string> $headers
+     *
+     * @return array<string>
+     */
+    protected function ensureUniqueHeaders(array $headers): array
+    {
+        $seen = [];
+        $result = [];
+
+        foreach ($headers as $header) {
+            $originalHeader = $header;
+            $counter = 1;
+
+            while (isset($seen[$header])) {
+                $header = $originalHeader === ''
+                    ? sprintf('column_%d', $counter)
+                    : sprintf('%s_%d', $originalHeader, $counter);
+                $counter++;
+            }
+
+            $seen[$header] = true;
+            $result[] = $header;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<array<string>> $rows
+     * @param int $headerLength
+     *
+     * @return array<array<string>>
+     */
+    protected function trimRowsToHeaderLength(array $rows, int $headerLength): array
+    {
+        return array_map(
+            fn (array $row): array => array_slice($row, 0, $headerLength),
+            $rows
+        );
     }
 }
