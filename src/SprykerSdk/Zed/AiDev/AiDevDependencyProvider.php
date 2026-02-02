@@ -23,7 +23,7 @@ use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructur
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SearchAlgoliaDocumentationAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SplitOdsToCsvAiDevMcpToolPlugin;
-use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\TransformAndAppendCsvAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\TransformCsvAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -147,7 +147,7 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new GetSprykerModuleMapAiDevMcpToolPlugin(),
             new AnalyzeCsvFileAiDevMcpToolPlugin(),
             new DeleteCsvRowsAiDevMcpToolPlugin(),
-            new TransformAndAppendCsvAiDevMcpToolPlugin(),
+            new TransformCsvAiDevMcpToolPlugin(),
             new SplitOdsToCsvAiDevMcpToolPlugin(),
         ];
     }
