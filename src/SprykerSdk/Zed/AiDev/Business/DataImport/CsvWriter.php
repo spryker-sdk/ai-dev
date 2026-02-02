@@ -47,7 +47,9 @@ class CsvWriter implements CsvWriterInterface
         $writer->insertOne($headers);
         $writer->insertAll($this->prepareRows($rows, $headers));
 
-        rename($tempPath, $filePath);
+        if (!rename($tempPath, $filePath)) {
+            throw new \RuntimeException(sprintf('Failed to rename temp file "%s" to "%s"', $tempPath, $filePath));
+        }
 
         return $backupPath;
     }
