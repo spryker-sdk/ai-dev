@@ -35,21 +35,33 @@ class CsvTransformer implements CsvTransformerInterface
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
+     * @param string $mode
      * @param bool $createBackup
      *
      * @return string
      */
-    public function transformAndAppend(
+    public function transform(
         string $sourcePath,
         string $targetPath,
         array $columnMappings,
         array $rowFilters = [],
         array $valueTransformations = [],
+        array $defaultValues = [],
+        string $mode = CsvConstants::MODE_APPEND,
         bool $createBackup = true
     ): string {
         $validationError = $this->validateFiles($sourcePath, $targetPath);
         if ($validationError !== null) {
             return $validationError;
+        }
+
+        if (!in_array($mode, CsvConstants::SUPPORTED_MODES, true)) {
+            return $this->errorResponse(
+                CsvConstants::OPERATION_FAILED,
+                sprintf('Invalid mode "%s"', $mode),
+                ['mode' => $mode, 'supported_modes' => CsvConstants::SUPPORTED_MODES],
+            );
         }
 
         try {
@@ -60,6 +72,7 @@ class CsvTransformer implements CsvTransformerInterface
                 $columnMappings,
                 $rowFilters,
                 $valueTransformations,
+                $defaultValues,
                 $sourceHeaders,
                 $targetHeaders,
             );
@@ -68,7 +81,13 @@ class CsvTransformer implements CsvTransformerInterface
             }
 
             $sourceRows = $this->csvReader->getRows($sourcePath);
-            $result = $this->processRows($sourceRows, $columnMappings, $rowFilters, $valueTransformations, $targetHeaders);
+            $result = $this->processRows($sourceRows, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $targetHeaders);
+
+            if ($mode === CsvConstants::MODE_REPLACE) {
+                $backupPath = $this->csvWriter->write($targetPath, $targetHeaders, $result['transformed_rows'], $createBackup);
+
+                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $targetHeaders, $backupPath);
+            }
 
             $backupPath = $this->csvWriter->append($targetPath, $result['transformed_rows'], $createBackup);
 
@@ -109,6 +128,7 @@ class CsvTransformer implements CsvTransformerInterface
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
      * @param array<string> $sourceHeaders
      * @param array<string> $targetHeaders
      *
@@ -118,6 +138,7 @@ class CsvTransformer implements CsvTransformerInterface
         array $columnMappings,
         array $rowFilters,
         array $valueTransformations,
+        array $defaultValues,
         array $sourceHeaders,
         array $targetHeaders,
     ): ?string {
@@ -137,6 +158,11 @@ class CsvTransformer implements CsvTransformerInterface
             return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Value transformations validation failed', ['errors' => $transformationErrors]);
         }
 
+        $defaultValueErrors = $this->validateDefaultValues($defaultValues, $targetHeaders);
+        if ($defaultValueErrors) {
+            return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Default values validation failed', ['errors' => $defaultValueErrors]);
+        }
+
         return null;
     }
 
@@ -145,6 +171,7 @@ class CsvTransformer implements CsvTransformerInterface
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
      * @param array<string> $targetHeaders
      *
      * @return array<string, mixed>
@@ -154,6 +181,7 @@ class CsvTransformer implements CsvTransformerInterface
         array $columnMappings,
         array $rowFilters,
         array $valueTransformations,
+        array $defaultValues,
         array $targetHeaders,
     ): array {
         $transformedRows = [];
@@ -168,6 +196,7 @@ class CsvTransformer implements CsvTransformerInterface
             }
 
             $targetRow = $this->mapRow($sourceRow, $columnMappings, $targetHeaders);
+            $targetRow = $this->applyDefaultValues($targetRow, $defaultValues);
 
             if ($valueTransformations) {
                 $targetRow = $this->transformRow($targetRow, $valueTransformations);
@@ -307,5 +336,39 @@ class CsvTransformer implements CsvTransformerInterface
         }
 
         return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $defaultValues
+     * @param array<string> $targetHeaders
+     *
+     * @return array<string>
+     */
+    protected function validateDefaultValues(array $defaultValues, array $targetHeaders): array
+    {
+        $errors = [];
+
+        foreach ($defaultValues as $column => $value) {
+            if (!in_array($column, $targetHeaders, true)) {
+                $errors[] = sprintf('Default value column "%s" not found in target headers', $column);
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $defaultValues
+     *
+     * @return array<string, mixed>
+     */
+    protected function applyDefaultValues(array $row, array $defaultValues): array
+    {
+        foreach ($defaultValues as $column => $value) {
+            $row[$column] = $value;
+        }
+
+        return $row;
     }
 }

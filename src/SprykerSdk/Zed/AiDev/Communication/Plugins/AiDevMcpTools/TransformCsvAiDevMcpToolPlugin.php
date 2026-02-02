@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools;
 
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
+use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolInputSchemaPluginInterface;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
@@ -19,14 +20,14 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
  */
-class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface, AiDevMcpToolInputSchemaPluginInterface
+class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface, AiDevMcpToolInputSchemaPluginInterface
 {
     /**
      * @return string
      */
     public function getName(): string
     {
-        return 'transformAndAppendCsv';
+        return 'transformCsv';
     }
 
     /**
@@ -34,7 +35,7 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
      */
     public function getDescription(): string
     {
-        return 'Transform source CSV data and append to target CSV file. Maps columns from source to target, filters rows based on criteria, applies value transformations (find/replace), and appends results. Only mapped columns are copied; unmapped target columns get empty values. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required, relative path to source CSV file), targetPath (required, relative path to target CSV file), columnMappings (object: sourceCol => targetCol), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), createBackup (default true).';
+        return 'Transform source CSV data and write to target CSV file. IMPORTANT: All file paths must be relative to the project root. Maps columns from source to target, filters rows based on criteria, applies value transformations (find/replace), sets default values for target columns. Mode can be "append" (add to existing) or "replace" (overwrite file). Only mapped columns are copied; unmapped target columns get empty values unless defaultValues specified. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required, relative path), targetPath (required, relative path), columnMappings (object: sourceCol => targetCol), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), defaultValues (optional object: targetCol => value), mode (default "append"), createBackup (default true).';
     }
 
     /**
@@ -84,6 +85,19 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
                         ],
                     ],
                 ],
+                'defaultValues' => [
+                    'type' => 'object',
+                    'description' => 'Optional default values for target columns (targetCol => value)',
+                    'additionalProperties' => [
+                        'type' => ['string', 'number', 'boolean'],
+                    ],
+                ],
+                'mode' => [
+                    'type' => 'string',
+                    'description' => 'Operation mode: "append" (add to existing rows) or "replace" (overwrite file)',
+                    'enum' => ['append', 'replace'],
+                    'default' => 'append',
+                ],
                 'createBackup' => [
                     'type' => 'boolean',
                     'description' => 'Whether to create a backup of the target file',
@@ -102,20 +116,24 @@ class TransformAndAppendCsvAiDevMcpToolPlugin extends AbstractPlugin implements 
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
+     * @param string $mode
      * @param bool $createBackup
      *
      * @return string
      */
-    public function transformAndAppendCsv(
+    public function transformCsv(
         string $sourcePath,
         string $targetPath,
         array $columnMappings,
         array $rowFilters = [],
         array $valueTransformations = [],
+        array $defaultValues = [],
+        string $mode = CsvConstants::MODE_APPEND,
         bool $createBackup = true
     ): string {
         return $this->getBusinessFactory()
             ->createCsvTransformer()
-            ->transformAndAppend($sourcePath, $targetPath, $columnMappings, $rowFilters, $valueTransformations, $createBackup);
+            ->transform($sourcePath, $targetPath, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $mode, $createBackup);
     }
 }

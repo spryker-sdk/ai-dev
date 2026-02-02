@@ -64,4 +64,16 @@ class CsvConstants
     public const string BACKUP_EXTENSION = '.backup';
 
     public const string TEMP_EXTENSION = '.tmp';
+
+    public const string MODE_APPEND = 'append';
+
+    public const string MODE_REPLACE = 'replace';
+
+    /**
+     * @var array<string>
+     */
+    public const array SUPPORTED_MODES = [
+        self::MODE_APPEND,
+        self::MODE_REPLACE,
+    ];
 }

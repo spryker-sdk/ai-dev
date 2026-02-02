@@ -19,16 +19,20 @@ interface CsvTransformerInterface
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
+     * @param string $mode
      * @param bool $createBackup
      *
      * @return string
      */
-    public function transformAndAppend(
+    public function transform(
         string $sourcePath,
         string $targetPath,
         array $columnMappings,
         array $rowFilters = [],
         array $valueTransformations = [],
+        array $defaultValues = [],
+        string $mode = CsvConstants::MODE_APPEND,
         bool $createBackup = true
     ): string;
 }

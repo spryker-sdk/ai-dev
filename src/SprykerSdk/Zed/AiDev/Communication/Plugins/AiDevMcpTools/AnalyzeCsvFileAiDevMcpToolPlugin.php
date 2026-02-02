@@ -33,7 +33,7 @@ class AnalyzeCsvFileAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMc
      */
     public function getDescription(): string
     {
-        return 'Analyze CSV file metadata without loading full content. Returns headers, row count, sample rows, and optional column analysis (unique values, null counts). Use this before transforming or deleting data to understand file structure. Parameters: filePath (required, relative path to CSV file), sampleRows (default 5), analyzeColumns (optional array of column names to inspect).';
+        return 'Analyze CSV file metadata without loading full content. IMPORTANT: File path must be relative to project root. Returns headers, row count, sample rows, and optional column analysis (unique values, null counts). Use this before transforming or deleting data to understand file structure. Parameters: filePath (required, relative path), sampleRows (default 5), analyzeColumns (optional array of column names to inspect).';
     }
 
     /**

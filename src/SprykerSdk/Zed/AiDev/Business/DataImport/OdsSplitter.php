@@ -397,7 +397,7 @@ class OdsSplitter implements OdsSplitterInterface
     {
         return array_map(
             fn (array $row): array => array_slice($row, 0, $headerLength),
-            $rows
+            $rows,
         );
     }
 }
