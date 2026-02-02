@@ -73,7 +73,6 @@ class CsvTransformer implements CsvTransformerInterface
                 $columnMappings,
                 $rowFilters,
                 $valueTransformations,
-                $defaultValues,
                 $sourceHeaders,
                 $targetHeaders,
             );
@@ -142,7 +141,6 @@ class CsvTransformer implements CsvTransformerInterface
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
-     * @param array<string, mixed> $defaultValues
      * @param array<string> $sourceHeaders
      * @param array<string> $targetHeaders
      *
@@ -152,7 +150,6 @@ class CsvTransformer implements CsvTransformerInterface
         array $columnMappings,
         array $rowFilters,
         array $valueTransformations,
-        array $defaultValues,
         array $sourceHeaders,
         array $targetHeaders,
     ): ?string {
