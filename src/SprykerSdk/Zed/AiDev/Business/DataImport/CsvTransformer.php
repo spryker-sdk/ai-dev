@@ -67,6 +67,7 @@ class CsvTransformer implements CsvTransformerInterface
         try {
             $sourceHeaders = $this->csvReader->getHeaders($sourcePath);
             $targetHeaders = $this->csvReader->getHeaders($targetPath);
+            $finalHeaders = $this->mergeHeadersWithMappingsAndDefaults($targetHeaders, $columnMappings, $defaultValues);
 
             $validationError = $this->validateTransformationParameters(
                 $columnMappings,
@@ -81,17 +82,28 @@ class CsvTransformer implements CsvTransformerInterface
             }
 
             $sourceRows = $this->csvReader->getRows($sourcePath);
-            $result = $this->processRows($sourceRows, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $targetHeaders);
+            $result = $this->processRows($sourceRows, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $finalHeaders);
 
             if ($mode === CsvConstants::MODE_REPLACE) {
-                $backupPath = $this->csvWriter->write($targetPath, $targetHeaders, $result['transformed_rows'], $createBackup);
+                $backupPath = $this->csvWriter->write($targetPath, $finalHeaders, $result['transformed_rows'], $createBackup);
 
-                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $targetHeaders, $backupPath);
+                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
+            }
+
+            $hasNewColumns = count($finalHeaders) > count($targetHeaders);
+
+            if ($hasNewColumns) {
+                $existingRows = $this->csvReader->getRows($targetPath);
+                $existingRowsWithNewColumns = $this->addMissingColumns($existingRows, $finalHeaders);
+                $allRows = array_merge($existingRowsWithNewColumns, $result['transformed_rows']);
+                $backupPath = $this->csvWriter->write($targetPath, $finalHeaders, $allRows, $createBackup);
+
+                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
             }
 
             $backupPath = $this->csvWriter->append($targetPath, $result['transformed_rows'], $createBackup);
 
-            return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $targetHeaders, $backupPath);
+            return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
         } catch (Exception $e) {
             return $this->errorResponse(
                 CsvConstants::OPERATION_FAILED,
@@ -156,11 +168,6 @@ class CsvTransformer implements CsvTransformerInterface
         $transformationErrors = $this->validateTransformations($valueTransformations, array_values($columnMappings));
         if ($transformationErrors) {
             return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Value transformations validation failed', ['errors' => $transformationErrors]);
-        }
-
-        $defaultValueErrors = $this->validateDefaultValues($defaultValues, $targetHeaders);
-        if ($defaultValueErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Default values validation failed', ['errors' => $defaultValueErrors]);
         }
 
         return null;
@@ -326,10 +333,6 @@ class CsvTransformer implements CsvTransformerInterface
         $errors = [];
 
         foreach ($mappings as $targetColumn => $sourceColumn) {
-            if (!in_array($targetColumn, $targetColumns, true)) {
-                $errors[] = sprintf('Invalid target column "%s" in mapping', $targetColumn);
-            }
-
             if (!in_array($sourceColumn, $sourceColumns, true)) {
                 $errors[] = sprintf('Invalid source column "%s" in mapping for target "%s"', $sourceColumn, $targetColumn);
             }
@@ -339,22 +342,43 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param array<string, mixed> $defaultValues
      * @param array<string> $targetHeaders
+     * @param array<string, string> $columnMappings
+     * @param array<string, mixed> $defaultValues
      *
      * @return array<string>
      */
-    protected function validateDefaultValues(array $defaultValues, array $targetHeaders): array
-    {
-        $errors = [];
+    protected function mergeHeadersWithMappingsAndDefaults(
+        array $targetHeaders,
+        array $columnMappings,
+        array $defaultValues
+    ): array {
+        $newColumnsFromMappings = array_diff(array_values($columnMappings), $targetHeaders);
+        $newColumnsFromDefaults = array_diff(array_keys($defaultValues), $targetHeaders);
+        $allNewColumns = array_unique(array_merge($newColumnsFromMappings, $newColumnsFromDefaults));
 
-        foreach ($defaultValues as $column => $value) {
-            if (!in_array($column, $targetHeaders, true)) {
-                $errors[] = sprintf('Default value column "%s" not found in target headers', $column);
+        return array_merge($targetHeaders, $allNewColumns);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @param array<string> $finalHeaders
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function addMissingColumns(array $rows, array $finalHeaders): array
+    {
+        $result = [];
+
+        foreach ($rows as $row) {
+            $newRow = [];
+            foreach ($finalHeaders as $header) {
+                $newRow[$header] = $row[$header] ?? '';
             }
+            $result[] = $newRow;
         }
 
-        return $errors;
+        return $result;
     }
 
     /**
