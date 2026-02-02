@@ -20,6 +20,7 @@ interface CsvTransformerInterface
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
+     * @param array<string> $columnsToRemove
      * @param string $mode
      * @param bool $createBackup
      *
@@ -32,6 +33,7 @@ interface CsvTransformerInterface
         array $rowFilters = [],
         array $valueTransformations = [],
         array $defaultValues = [],
+        array $columnsToRemove = [],
         string $mode = CsvConstants::MODE_APPEND,
         bool $createBackup = true
     ): string;

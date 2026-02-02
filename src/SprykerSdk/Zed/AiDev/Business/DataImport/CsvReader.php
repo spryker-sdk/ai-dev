@@ -15,28 +15,15 @@ use League\Csv\Statement;
 class CsvReader implements CsvReaderInterface
 {
     /**
-     * @var array<string, array<string, mixed>>
-     */
-    protected array $cache = [];
-
-    /**
      * @param string $filePath
      *
      * @return array<string>
      */
     public function getHeaders(string $filePath): array
     {
-        $cacheKey = $this->getCacheKey($filePath);
-
-        if (isset($this->cache[$cacheKey]['headers'])) {
-            return $this->cache[$cacheKey]['headers'];
-        }
-
         $csv = $this->createReader($filePath);
         $csv->setHeaderOffset(0);
         $headers = $csv->getHeader();
-
-        $this->cache[$cacheKey]['headers'] = $headers;
 
         return $headers;
     }
@@ -48,18 +35,10 @@ class CsvReader implements CsvReaderInterface
      */
     public function getRowCount(string $filePath): int
     {
-        $cacheKey = $this->getCacheKey($filePath);
-
-        if (isset($this->cache[$cacheKey]['rowCount'])) {
-            return $this->cache[$cacheKey]['rowCount'];
-        }
-
         $csv = $this->createReader($filePath);
         $csv->setHeaderOffset(0);
 
         $rowCount = count($csv);
-
-        $this->cache[$cacheKey]['rowCount'] = $rowCount;
 
         return $rowCount;
     }
@@ -98,12 +77,6 @@ class CsvReader implements CsvReaderInterface
      */
     public function detectEncoding(string $filePath): string
     {
-        $cacheKey = $this->getCacheKey($filePath);
-
-        if (isset($this->cache[$cacheKey]['encoding'])) {
-            return $this->cache[$cacheKey]['encoding'];
-        }
-
         $content = file_get_contents($filePath);
 
         if ($content === false) {
@@ -111,15 +84,11 @@ class CsvReader implements CsvReaderInterface
         }
 
         if (mb_check_encoding($content, CsvConstants::DEFAULT_ENCODING)) {
-            $this->cache[$cacheKey]['encoding'] = CsvConstants::DEFAULT_ENCODING;
-
             return CsvConstants::DEFAULT_ENCODING;
         }
 
         $detectedEncoding = mb_detect_encoding($content, CsvConstants::SUPPORTED_ENCODINGS, true);
         $encoding = $detectedEncoding !== false ? $detectedEncoding : CsvConstants::DEFAULT_ENCODING;
-
-        $this->cache[$cacheKey]['encoding'] = $encoding;
 
         return $encoding;
     }
@@ -131,12 +100,6 @@ class CsvReader implements CsvReaderInterface
      */
     public function detectDelimiter(string $filePath): string
     {
-        $cacheKey = $this->getCacheKey($filePath);
-
-        if (isset($this->cache[$cacheKey]['delimiter'])) {
-            return $this->cache[$cacheKey]['delimiter'];
-        }
-
         $handle = fopen($filePath, 'r');
 
         if ($handle === false) {
@@ -151,8 +114,6 @@ class CsvReader implements CsvReaderInterface
         }
 
         $detectedDelimiter = $this->detectDelimiterFromLine($firstLine);
-
-        $this->cache[$cacheKey]['delimiter'] = $detectedDelimiter;
 
         return $detectedDelimiter;
     }
@@ -199,15 +160,5 @@ class CsvReader implements CsvReaderInterface
         }
 
         return $csv;
-    }
-
-    /**
-     * @param string $filePath
-     *
-     * @return string
-     */
-    protected function getCacheKey(string $filePath): string
-    {
-        return md5($filePath . filemtime($filePath));
     }
 }

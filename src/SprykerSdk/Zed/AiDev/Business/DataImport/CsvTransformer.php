@@ -36,6 +36,7 @@ class CsvTransformer implements CsvTransformerInterface
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
+     * @param array<string> $columnsToRemove
      * @param string $mode
      * @param bool $createBackup
      *
@@ -48,14 +49,10 @@ class CsvTransformer implements CsvTransformerInterface
         array $rowFilters = [],
         array $valueTransformations = [],
         array $defaultValues = [],
+        array $columnsToRemove = [],
         string $mode = CsvConstants::MODE_APPEND,
         bool $createBackup = true
     ): string {
-        $validationError = $this->validateFiles($sourcePath, $targetPath);
-        if ($validationError !== null) {
-            return $validationError;
-        }
-
         if (!in_array($mode, CsvConstants::SUPPORTED_MODES, true)) {
             return $this->errorResponse(
                 CsvConstants::OPERATION_FAILED,
@@ -65,6 +62,22 @@ class CsvTransformer implements CsvTransformerInterface
         }
 
         try {
+            if ($mode === CsvConstants::MODE_UPDATE) {
+                if (!file_exists($targetPath)) {
+                    return $this->errorResponse(CsvConstants::FILE_NOT_FOUND, 'Target file does not exist', ['file_path' => $targetPath]);
+                }
+                if (!is_writable($targetPath)) {
+                    return $this->errorResponse(CsvConstants::FILE_NOT_WRITABLE, 'Target file is not writable', ['file_path' => $targetPath]);
+                }
+
+                return $this->handleUpdateMode($targetPath, $rowFilters, $valueTransformations, $defaultValues, $columnsToRemove, $createBackup);
+            }
+
+            $validationError = $this->validateFiles($sourcePath, $targetPath);
+            if ($validationError !== null) {
+                return $validationError;
+            }
+
             $sourceHeaders = $this->csvReader->getHeaders($sourcePath);
             $targetHeaders = $this->csvReader->getHeaders($targetPath);
             $finalHeaders = $this->mergeHeadersWithMappingsAndDefaults($targetHeaders, $columnMappings, $defaultValues);
@@ -496,5 +509,82 @@ class CsvTransformer implements CsvTransformerInterface
         }
 
         return $row;
+    }
+
+    /**
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
+     *
+     * @param string $targetPath
+     * @param array<int, array<string, mixed>> $rowFilters
+     * @param array<int, array<string, mixed>> $valueTransformations
+     * @param array<string, mixed> $defaultValues
+     * @param array<string> $columnsToRemove
+     * @param bool $createBackup
+     *
+     * @return string
+     */
+    protected function handleUpdateMode(
+        string $targetPath,
+        array $rowFilters,
+        array $valueTransformations,
+        array $defaultValues,
+        array $columnsToRemove,
+        bool $createBackup
+    ): string {
+        $targetHeaders = $this->csvReader->getHeaders($targetPath);
+
+        $columnsRemovedCount = 0;
+        if ($columnsToRemove) {
+            $invalidColumns = array_diff($columnsToRemove, $targetHeaders);
+            if ($invalidColumns) {
+                return $this->errorResponse(
+                    CsvConstants::COLUMN_NOT_FOUND,
+                    'Cannot remove columns that do not exist',
+                    ['invalid_columns' => array_values($invalidColumns)],
+                );
+            }
+            $targetHeaders = array_values(array_diff($targetHeaders, $columnsToRemove));
+            $columnsRemovedCount = count($columnsToRemove);
+        }
+
+        $filterErrors = $this->filterEvaluator->validateCriteria($rowFilters, $targetHeaders);
+        if ($filterErrors) {
+            return $this->errorResponse(CsvConstants::INVALID_FILTERS, 'Row filters validation failed', ['errors' => $filterErrors]);
+        }
+
+        $transformationErrors = $this->validateTransformations($valueTransformations, $targetHeaders);
+        if ($transformationErrors) {
+            return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Value transformations validation failed', ['errors' => $transformationErrors]);
+        }
+
+        $targetRows = $this->csvReader->getRows($targetPath);
+        $updatedRows = [];
+        $updatedCount = 0;
+
+        foreach ($targetRows as $row) {
+            if ($columnsToRemove) {
+                foreach ($columnsToRemove as $columnToRemove) {
+                    unset($row[$columnToRemove]);
+                }
+            }
+
+            if ($this->filterEvaluator->evaluate($row, $rowFilters)) {
+                $row = $this->applyDefaultValues($row, $defaultValues);
+                if ($valueTransformations) {
+                    $row = $this->transformRow($row, $valueTransformations);
+                }
+                $updatedCount++;
+            }
+            $updatedRows[] = $row;
+        }
+
+        $backupPath = $this->csvWriter->write($targetPath, $targetHeaders, $updatedRows, $createBackup);
+
+        return $this->successResponse([
+            'rows_updated' => $updatedCount,
+            'columns_removed' => $columnsRemovedCount,
+            'total_rows' => count($targetRows),
+            'backup_path' => $backupPath,
+        ]);
     }
 }

@@ -69,12 +69,15 @@ class CsvConstants
 
     public const string MODE_REPLACE = 'replace';
 
+    public const string MODE_UPDATE = 'update';
+
     /**
      * @var array<string>
      */
     public const array SUPPORTED_MODES = [
         self::MODE_APPEND,
         self::MODE_REPLACE,
+        self::MODE_UPDATE,
     ];
 
     public const string OPERATION_ADD = 'add';
