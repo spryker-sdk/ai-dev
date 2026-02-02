@@ -76,4 +76,22 @@ class CsvConstants
         self::MODE_APPEND,
         self::MODE_REPLACE,
     ];
+
+    public const string OPERATION_ADD = 'add';
+
+    public const string OPERATION_SUBTRACT = 'subtract';
+
+    public const string OPERATION_MULTIPLY = 'multiply';
+
+    public const string OPERATION_DIVIDE = 'divide';
+
+    /**
+     * @var array<string>
+     */
+    public const array SUPPORTED_OPERATIONS = [
+        self::OPERATION_ADD,
+        self::OPERATION_SUBTRACT,
+        self::OPERATION_MULTIPLY,
+        self::OPERATION_DIVIDE,
+    ];
 }

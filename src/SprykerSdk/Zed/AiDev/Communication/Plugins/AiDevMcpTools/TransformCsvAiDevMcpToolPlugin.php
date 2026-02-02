@@ -35,7 +35,7 @@ class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpT
      */
     public function getDescription(): string
     {
-        return 'Transform source CSV data and write to target CSV file. IMPORTANT: All file paths must be relative to the project root. Maps columns from source to target (can map to new columns that don\'t exist yet), filters rows based on criteria, applies value transformations (find/replace), sets default values for target columns. New columns specified in columnMappings or defaultValues are automatically added to target. Mode can be "append" (add to existing) or "replace" (overwrite file). Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required, relative path), targetPath (required, relative path), columnMappings (object: sourceCol => targetCol, target can be new column), rowFilters (optional array), valueTransformations (optional array of {column, find, replace}), defaultValues (optional object: targetCol => value for unmapped/new columns), mode (default "append"), createBackup (default true).';
+        return 'Transform source CSV data and write to target CSV file. IMPORTANT: All file paths must be relative to the project root. Maps columns from source to target (can map to new columns that don\'t exist yet), filters rows based on criteria, applies value transformations (find/replace or math operations), sets default values for target columns. New columns specified in columnMappings or defaultValues are automatically added to target. Mode can be "append" (add to existing) or "replace" (overwrite file). Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required, relative path), targetPath (required, relative path), columnMappings (object: sourceCol => targetCol, target can be new column), rowFilters (optional array), valueTransformations (optional array of {column, find, replace} for string replacement OR {column, operation, value, sourceColumn} for math operations: add, subtract, multiply, divide), defaultValues (optional object: targetCol => value for unmapped/new columns), mode (default "append"), createBackup (default true).';
     }
 
     /**
@@ -75,13 +75,16 @@ class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpT
                 ],
                 'valueTransformations' => [
                     'type' => 'array',
-                    'description' => 'Optional value transformations (find/replace)',
+                    'description' => 'Optional value transformations: string replacement {column, find, replace} or math operations {column, operation, value, sourceColumn}',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'column' => ['type' => 'string'],
-                            'find' => ['type' => 'string'],
-                            'replace' => ['type' => 'string'],
+                            'column' => ['type' => 'string', 'description' => 'Target column name'],
+                            'find' => ['type' => 'string', 'description' => 'String to find (for replacement)'],
+                            'replace' => ['type' => 'string', 'description' => 'String to replace with (for replacement)'],
+                            'operation' => ['type' => 'string', 'enum' => ['add', 'subtract', 'multiply', 'divide'], 'description' => 'Math operation'],
+                            'value' => ['type' => 'number', 'description' => 'Value for math operation'],
+                            'sourceColumn' => ['type' => 'string', 'description' => 'Source column for math operation (defaults to column)'],
                         ],
                     ],
                 ],

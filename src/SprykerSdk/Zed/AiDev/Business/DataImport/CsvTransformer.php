@@ -277,13 +277,64 @@ class CsvTransformer implements CsvTransformerInterface
     {
         foreach ($transformations as $transformation) {
             $column = $transformation['column'];
-            $find = $transformation['find'];
-            $replace = $transformation['replace'];
 
-            if (isset($row[$column])) {
-                $row[$column] = str_replace($find, $replace, (string)$row[$column]);
+            if (isset($transformation['operation'])) {
+                $row = $this->applyMathOperation($row, $transformation);
+
+                continue;
+            }
+
+            if (isset($transformation['find']) && isset($transformation['replace'])) {
+                $row = $this->applyStringReplacement($row, $column, $transformation['find'], $transformation['replace']);
             }
         }
+
+        return $row;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param string $column
+     * @param string $find
+     * @param string $replace
+     *
+     * @return array<string, mixed>
+     */
+    protected function applyStringReplacement(array $row, string $column, string $find, string $replace): array
+    {
+        if (isset($row[$column])) {
+            $row[$column] = str_replace($find, $replace, (string)$row[$column]);
+        }
+
+        return $row;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $transformation
+     *
+     * @return array<string, mixed>
+     */
+    protected function applyMathOperation(array $row, array $transformation): array
+    {
+        $column = $transformation['column'];
+        $operation = $transformation['operation'];
+        $value = $transformation['value'];
+        $sourceColumn = $transformation['sourceColumn'] ?? $column;
+
+        if (!isset($row[$sourceColumn])) {
+            return $row;
+        }
+
+        $sourceValue = is_numeric($row[$sourceColumn]) ? (float)$row[$sourceColumn] : 0;
+
+        $row[$column] = match ($operation) {
+            CsvConstants::OPERATION_ADD => $sourceValue + $value,
+            CsvConstants::OPERATION_SUBTRACT => $sourceValue - $value,
+            CsvConstants::OPERATION_MULTIPLY => $sourceValue * $value,
+            CsvConstants::OPERATION_DIVIDE => $value != 0 ? $sourceValue / $value : $sourceValue,
+            default => $row[$column] ?? '',
+        };
 
         return $row;
     }
@@ -305,17 +356,69 @@ class CsvTransformer implements CsvTransformerInterface
                 continue;
             }
 
-            if (!isset($transformation['find'])) {
-                $errors[] = sprintf('Transformation at index %d is missing "find" field', $index);
+            $isMathOperation = isset($transformation['operation']);
+            $isStringReplacement = isset($transformation['find']) || isset($transformation['replace']);
+
+            if (!$isMathOperation && !$isStringReplacement) {
+                $errors[] = sprintf('Transformation at index %d must have either {find, replace} or {operation, value}', $index);
+
+                continue;
             }
 
-            if (!isset($transformation['replace'])) {
-                $errors[] = sprintf('Transformation at index %d is missing "replace" field', $index);
+            if ($isStringReplacement) {
+                $errors = array_merge($errors, $this->validateStringReplacement($transformation, $index, $mappedColumns));
             }
 
-            if (!in_array($transformation['column'], $mappedColumns, true)) {
-                $errors[] = sprintf('Transformation column "%s" not found in column mappings', $transformation['column']);
+            if ($isMathOperation) {
+                $errors = array_merge($errors, $this->validateMathOperation($transformation, $index));
             }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $transformation
+     * @param int $index
+     * @param array<string> $mappedColumns
+     *
+     * @return array<string>
+     */
+    protected function validateStringReplacement(array $transformation, int $index, array $mappedColumns): array
+    {
+        $errors = [];
+
+        if (!isset($transformation['find'])) {
+            $errors[] = sprintf('Transformation at index %d is missing "find" field', $index);
+        }
+
+        if (!isset($transformation['replace'])) {
+            $errors[] = sprintf('Transformation at index %d is missing "replace" field', $index);
+        }
+
+        if (!in_array($transformation['column'], $mappedColumns, true)) {
+            $errors[] = sprintf('String replacement column "%s" not found in column mappings', $transformation['column']);
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $transformation
+     * @param int $index
+     *
+     * @return array<string>
+     */
+    protected function validateMathOperation(array $transformation, int $index): array
+    {
+        $errors = [];
+
+        if (!isset($transformation['value'])) {
+            $errors[] = sprintf('Math operation at index %d is missing "value" field', $index);
+        }
+
+        if (!in_array($transformation['operation'], CsvConstants::SUPPORTED_OPERATIONS, true)) {
+            $errors[] = sprintf('Invalid operation "%s" at index %d', $transformation['operation'] ?? 'null', $index);
         }
 
         return $errors;

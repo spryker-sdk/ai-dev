@@ -69,6 +69,8 @@ class CsvWriter implements CsvWriterInterface
             $backupPath = $this->createBackup($filePath);
         }
 
+        $this->ensureFileEndsWithNewline($filePath);
+
         $headers = $this->csvReader->getHeaders($filePath);
         $delimiter = $this->csvReader->detectDelimiter($filePath);
         $writer = Writer::from($filePath, 'a');
@@ -113,5 +115,32 @@ class CsvWriter implements CsvWriterInterface
         }
 
         return $prepared;
+    }
+
+    /**
+     * @param string $filePath
+     *
+     * @return void
+     */
+    protected function ensureFileEndsWithNewline(string $filePath): void
+    {
+        if (!file_exists($filePath) || filesize($filePath) === 0) {
+            return;
+        }
+
+        $handle = fopen($filePath, 'r+');
+        if ($handle === false) {
+            return;
+        }
+
+        fseek($handle, -1, SEEK_END);
+        $lastChar = fread($handle, 1);
+
+        if ($lastChar !== "\n") {
+            fseek($handle, 0, SEEK_END);
+            fwrite($handle, "\n");
+        }
+
+        fclose($handle);
     }
 }
