@@ -39,12 +39,5 @@ interface CsvReaderInterface
      *
      * @return string
      */
-    public function detectEncoding(string $filePath): string;
-
-    /**
-     * @param string $filePath
-     *
-     * @return string
-     */
     public function detectDelimiter(string $filePath): string;
 }

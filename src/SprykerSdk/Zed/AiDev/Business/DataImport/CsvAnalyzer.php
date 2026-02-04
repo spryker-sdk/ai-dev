@@ -10,10 +10,15 @@ declare(strict_types=1);
 namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
 use Exception;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\FileValidationTrait;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\JsonResponseTrait;
 
 class CsvAnalyzer implements CsvAnalyzerInterface
 {
     use JsonResponseTrait;
+    use FileValidationTrait;
+
+    private const int SAMPLE_SECTIONS = 3;
 
     /**
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
@@ -31,18 +36,14 @@ class CsvAnalyzer implements CsvAnalyzerInterface
      */
     public function analyze(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string
     {
-        if (!file_exists($filePath)) {
-            return $this->errorResponse(
-                CsvConstants::FILE_NOT_FOUND,
-                sprintf('File not found: %s', $filePath),
-            );
+        $validationError = $this->validateFileExists($filePath);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
 
-        if (!is_readable($filePath)) {
-            return $this->errorResponse(
-                CsvConstants::FILE_NOT_READABLE,
-                sprintf('File is not readable: %s', $filePath),
-            );
+        $validationError = $this->validateFileReadable($filePath);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
 
         try {
@@ -109,7 +110,7 @@ class CsvAnalyzer implements CsvAnalyzerInterface
      */
     protected function getSamplesFromLargeFile(string $filePath, int $rowCount, int $sampleRows): array
     {
-        $samplesPerSection = (int)ceil($sampleRows / 3);
+        $samplesPerSection = (int)ceil($sampleRows / static::SAMPLE_SECTIONS);
 
         $beginning = $this->csvReader->getRows($filePath, 0, $samplesPerSection);
 

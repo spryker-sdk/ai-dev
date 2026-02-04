@@ -15,47 +15,11 @@ use ZipArchive;
 
 class OdsReader implements OdsReaderInterface
 {
-    protected const string NAMESPACE_TABLE = 'urn:oasis:names:tc:opendocument:xmlns:table:1.0';
-
-    protected const string NAMESPACE_OFFICE = 'urn:oasis:names:tc:opendocument:xmlns:office:1.0';
-
-    protected const string NAMESPACE_TEXT = 'urn:oasis:names:tc:opendocument:xmlns:text:1.0';
-
-    protected const string ODS_CONTENT_FILE = 'content.xml';
-
-    protected const string XPATH_TABLE_ROW = './/table:table-row';
-
-    protected const string XPATH_TABLE_CELL = './/table:table-cell';
-
-    protected const string XPATH_TEXT_PARAGRAPH = './/text:p';
-
-    protected const string VALUE_TYPE_STRING = 'string';
-
-    protected const string VALUE_TYPE_FLOAT = 'float';
-
-    protected const string VALUE_TYPE_PERCENTAGE = 'percentage';
-
-    protected const string VALUE_TYPE_CURRENCY = 'currency';
-
-    protected const string VALUE_TYPE_DATE = 'date';
-
-    protected const string VALUE_TYPE_TIME = 'time';
-
-    protected const string VALUE_TYPE_BOOLEAN = 'boolean';
-
-    protected const string BOOLEAN_TRUE = 'true';
-
-    protected const string BOOLEAN_VALUE_TRUE = '1';
-
-    protected const string BOOLEAN_VALUE_FALSE = '0';
-
-    protected const int REPEAT_OFFSET = 1;
-
-    /**
-     * @param string $filePath
-     *
-     * @return \SimpleXMLElement
-     */
+ /**
+  * @param string $filePath
+  *
+  * @return \SimpleXMLElement
+  */
     public function extractContent(string $filePath): SimpleXMLElement
     {
         $this->validateOdsFile($filePath);
@@ -77,7 +41,7 @@ class OdsReader implements OdsReaderInterface
     public function extractRows(SimpleXMLElement $sheet): array
     {
         $this->registerNamespaces($sheet);
-        $tableRows = $sheet->xpath(static::XPATH_TABLE_ROW);
+        $tableRows = $sheet->xpath(OdsConstants::XPATH_TABLE_ROW);
 
         if ($tableRows === false) {
             return [];
@@ -104,7 +68,7 @@ class OdsReader implements OdsReaderInterface
     public function getCellValue(SimpleXMLElement $cell): string
     {
         $this->registerNamespaces($cell);
-        $attributes = $cell->attributes(static::NAMESPACE_OFFICE);
+        $attributes = $cell->attributes(OdsConstants::NAMESPACE_OFFICE);
 
         if (!isset($attributes['value-type'])) {
             return '';
@@ -164,12 +128,12 @@ class OdsReader implements OdsReaderInterface
             );
         }
 
-        $content = $zip->getFromName(static::ODS_CONTENT_FILE);
+        $content = $zip->getFromName(OdsConstants::ODS_CONTENT_FILE);
         $zip->close();
 
         if ($content === false) {
             throw new RuntimeException(
-                sprintf('Failed to extract %s from ODS file', static::ODS_CONTENT_FILE),
+                sprintf('Failed to extract %s from ODS file', OdsConstants::ODS_CONTENT_FILE),
             );
         }
 
@@ -204,16 +168,16 @@ class OdsReader implements OdsReaderInterface
     protected function extractValueByType(string $valueType, SimpleXMLElement $attributes, SimpleXMLElement $cell): string
     {
         switch ($valueType) {
-            case static::VALUE_TYPE_STRING:
+            case OdsConstants::VALUE_TYPE_STRING:
                 return $this->extractStringValue($attributes, $cell);
-            case static::VALUE_TYPE_FLOAT:
-            case static::VALUE_TYPE_PERCENTAGE:
-            case static::VALUE_TYPE_CURRENCY:
+            case OdsConstants::VALUE_TYPE_FLOAT:
+            case OdsConstants::VALUE_TYPE_PERCENTAGE:
+            case OdsConstants::VALUE_TYPE_CURRENCY:
                 return (string)($attributes['value'] ?? '');
-            case static::VALUE_TYPE_DATE:
-            case static::VALUE_TYPE_TIME:
+            case OdsConstants::VALUE_TYPE_DATE:
+            case OdsConstants::VALUE_TYPE_TIME:
                 return (string)($attributes['date-value'] ?? '');
-            case static::VALUE_TYPE_BOOLEAN:
+            case OdsConstants::VALUE_TYPE_BOOLEAN:
                 return $this->extractBooleanValue($attributes);
             default:
                 return '';
@@ -244,7 +208,7 @@ class OdsReader implements OdsReaderInterface
      */
     protected function extractTextContent(SimpleXMLElement $cell): string
     {
-        $textNodes = $cell->xpath(static::XPATH_TEXT_PARAGRAPH);
+        $textNodes = $cell->xpath(OdsConstants::XPATH_TEXT_PARAGRAPH);
 
         if ($textNodes === false) {
             return '';
@@ -266,9 +230,9 @@ class OdsReader implements OdsReaderInterface
     {
         $boolValue = (string)($attributes['boolean-value'] ?? '');
 
-        return $boolValue === static::BOOLEAN_TRUE
-            ? static::BOOLEAN_VALUE_TRUE
-            : static::BOOLEAN_VALUE_FALSE;
+        return $boolValue === OdsConstants::BOOLEAN_TRUE
+            ? OdsConstants::BOOLEAN_VALUE_TRUE
+            : OdsConstants::BOOLEAN_VALUE_FALSE;
     }
 
     /**
@@ -279,7 +243,7 @@ class OdsReader implements OdsReaderInterface
     protected function extractRowCells(SimpleXMLElement $tableRow): array
     {
         $this->registerNamespaces($tableRow);
-        $tableCells = $tableRow->xpath(static::XPATH_TABLE_CELL);
+        $tableCells = $tableRow->xpath(OdsConstants::XPATH_TABLE_CELL);
 
         if ($tableCells === false) {
             return [];
@@ -308,7 +272,7 @@ class OdsReader implements OdsReaderInterface
         $cellValue = $this->getCellValue($tableCell);
         $repeats = $this->getColumnRepeats($tableCell);
 
-        return array_fill(0, $repeats + static::REPEAT_OFFSET, $cellValue);
+        return array_fill(0, $repeats + OdsConstants::REPEAT_OFFSET, $cellValue);
     }
 
     /**
@@ -318,13 +282,13 @@ class OdsReader implements OdsReaderInterface
      */
     protected function getColumnRepeats(SimpleXMLElement $tableCell): int
     {
-        $attributes = $tableCell->attributes(static::NAMESPACE_TABLE);
+        $attributes = $tableCell->attributes(OdsConstants::NAMESPACE_TABLE);
 
         if (!isset($attributes['number-columns-repeated'])) {
             return 0;
         }
 
-        return (int)$attributes['number-columns-repeated'] - static::REPEAT_OFFSET;
+        return (int)$attributes['number-columns-repeated'] - OdsConstants::REPEAT_OFFSET;
     }
 
     /**
@@ -334,19 +298,11 @@ class OdsReader implements OdsReaderInterface
      */
     protected function trimTrailingEmptyRows(array $rows): array
     {
-        if ($rows === []) {
-            return $rows;
+        while ($rows !== [] && $this->isRowEmpty(end($rows))) {
+            array_pop($rows);
         }
 
-        $lastRow = end($rows);
-
-        if (!$this->isRowEmpty($lastRow)) {
-            return $rows;
-        }
-
-        array_pop($rows);
-
-        return $this->trimTrailingEmptyRows($rows);
+        return $rows;
     }
 
     /**
@@ -372,8 +328,8 @@ class OdsReader implements OdsReaderInterface
      */
     protected function registerNamespaces(SimpleXMLElement $xml): void
     {
-        $xml->registerXPathNamespace('table', static::NAMESPACE_TABLE);
-        $xml->registerXPathNamespace('office', static::NAMESPACE_OFFICE);
-        $xml->registerXPathNamespace('text', static::NAMESPACE_TEXT);
+        $xml->registerXPathNamespace('table', OdsConstants::NAMESPACE_TABLE);
+        $xml->registerXPathNamespace('office', OdsConstants::NAMESPACE_OFFICE);
+        $xml->registerXPathNamespace('text', OdsConstants::NAMESPACE_TEXT);
     }
 }

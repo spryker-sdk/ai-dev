@@ -22,27 +22,18 @@ class CsvWriter implements CsvWriterInterface
     }
 
     /**
-     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
-     *
      * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
-     * @param bool $createBackup
      *
      * @throws \RuntimeException
      *
-     * @return string|null
+     * @return void
      */
-    public function write(string $filePath, array $headers, array $rows, bool $createBackup = true): ?string
+    public function write(string $filePath, array $headers, array $rows): void
     {
-        $backupPath = null;
-
-        if ($createBackup && file_exists($filePath)) {
-            $backupPath = $this->createBackup($filePath);
-        }
-
         $tempPath = $filePath . CsvConstants::TEMP_EXTENSION;
-        $delimiter = file_exists($filePath) ? $this->csvReader->detectDelimiter($filePath) : CsvConstants::DEFAULT_DELIMITER;
+        $delimiter = $this->getDelimiterForWrite($filePath);
 
         $writer = Writer::from($tempPath, 'w');
         $writer->setDelimiter($delimiter);
@@ -53,37 +44,25 @@ class CsvWriter implements CsvWriterInterface
         if (!rename($tempPath, $filePath)) {
             throw new RuntimeException(sprintf('Failed to rename temp file "%s" to "%s"', $tempPath, $filePath));
         }
-
-        return $backupPath;
     }
 
     /**
-     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
-     *
      * @param string $filePath
      * @param array<int, array<string, mixed>> $rows
-     * @param bool $createBackup
      *
-     * @return string|null
+     * @return void
      */
-    public function append(string $filePath, array $rows, bool $createBackup = true): ?string
+    public function append(string $filePath, array $rows): void
     {
-        $backupPath = null;
-
-        if ($createBackup && file_exists($filePath)) {
-            $backupPath = $this->createBackup($filePath);
-        }
-
         $this->ensureFileEndsWithNewline($filePath);
 
         $headers = $this->csvReader->getHeaders($filePath);
         $delimiter = $this->csvReader->detectDelimiter($filePath);
+
         $writer = Writer::from($filePath, 'a');
         $writer->setDelimiter($delimiter);
 
         $writer->insertAll($this->prepareRows($rows, $headers));
-
-        return $backupPath;
     }
 
     /**
@@ -91,12 +70,13 @@ class CsvWriter implements CsvWriterInterface
      *
      * @return string
      */
-    protected function createBackup(string $filePath): string
+    protected function getDelimiterForWrite(string $filePath): string
     {
-        $backupPath = $filePath . CsvConstants::BACKUP_EXTENSION;
-        copy($filePath, $backupPath);
+        if (!file_exists($filePath)) {
+            return CsvConstants::DEFAULT_DELIMITER;
+        }
 
-        return $backupPath;
+        return $this->csvReader->detectDelimiter($filePath);
     }
 
     /**
@@ -125,6 +105,8 @@ class CsvWriter implements CsvWriterInterface
     /**
      * @param string $filePath
      *
+     * @throws \RuntimeException
+     *
      * @return void
      */
     public function ensureFileEndsWithNewline(string $filePath): void
@@ -135,7 +117,7 @@ class CsvWriter implements CsvWriterInterface
 
         $handle = fopen($filePath, 'r+');
         if ($handle === false) {
-            return;
+            throw new RuntimeException(sprintf('Failed to open file "%s" for newline check', $filePath));
         }
 
         fseek($handle, -1, SEEK_END);

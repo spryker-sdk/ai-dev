@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace SprykerSdk\Zed\AiDev\Business\DataImport;
+namespace SprykerSdk\Zed\AiDev\Business\DataImport\Trait;
 
 trait JsonResponseTrait
 {

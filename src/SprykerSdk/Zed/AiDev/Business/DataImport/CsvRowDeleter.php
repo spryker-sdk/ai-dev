@@ -10,10 +10,13 @@ declare(strict_types=1);
 namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
 use Exception;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\FileValidationTrait;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\JsonResponseTrait;
 
 class CsvRowDeleter implements CsvRowDeleterInterface
 {
     use JsonResponseTrait;
+    use FileValidationTrait;
 
     /**
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
@@ -38,12 +41,14 @@ class CsvRowDeleter implements CsvRowDeleterInterface
      */
     public function deleteRows(string $filePath, array $criteria, bool $createBackup = true): string
     {
-        if (!file_exists($filePath)) {
-            return $this->errorResponse(CsvConstants::FILE_NOT_FOUND, 'File does not exist', ['file_path' => $filePath]);
+        $validationError = $this->validateFileExists($filePath, CsvConstants::FILE_NOT_FOUND, 'File does not exist', ['file_path' => $filePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
 
-        if (!is_writable($filePath)) {
-            return $this->errorResponse(CsvConstants::FILE_NOT_WRITABLE, 'File is not writable', ['file_path' => $filePath]);
+        $validationError = $this->validateFileWritable($filePath, CsvConstants::FILE_NOT_WRITABLE, 'File is not writable', ['file_path' => $filePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
 
         try {
@@ -74,7 +79,12 @@ class CsvRowDeleter implements CsvRowDeleterInterface
                 ]);
             }
 
-            $backupPath = $this->csvWriter->write($filePath, $headers, $filterResult['remaining_rows'], $createBackup);
+            $backupPath = null;
+            if ($createBackup) {
+                $backupPath = $this->createBackup($filePath);
+            }
+
+            $this->csvWriter->write($filePath, $headers, $filterResult['remaining_rows']);
 
             return $this->successResponse([
                 'rows_before' => count($rows),
@@ -112,5 +122,23 @@ class CsvRowDeleter implements CsvRowDeleterInterface
             'remaining_rows' => $remainingRows,
             'deleted_count' => $deletedCount,
         ];
+    }
+
+    /**
+     * @param string $filePath
+     *
+     * @throws \Exception
+     *
+     * @return string
+     */
+    protected function createBackup(string $filePath): string
+    {
+        $backupPath = $filePath . CsvConstants::BACKUP_EXTENSION;
+
+        if (!copy($filePath, $backupPath)) {
+            throw new Exception(sprintf('Failed to create backup at %s', $backupPath));
+        }
+
+        return $backupPath;
     }
 }

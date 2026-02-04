@@ -30,6 +30,23 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\OdsReader;
 use SprykerSdk\Zed\AiDev\Business\DataImport\OdsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitter;
 use SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitterInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\ColumnMappingOperation;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\ColumnRemovalOperation;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\DefaultValuesOperation;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\TransformationOperation;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AppendStrategy;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\ReplaceStrategy;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\UpdateStrategy;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ColumnMappingValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ColumnRemovalValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\FilterValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ModeValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\SourceFileValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\TargetFileValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\TransformationValidator;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReader;
 use SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Prompts\GitHubPromptsFetcher;
@@ -177,7 +194,106 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
             $this->createCsvReader(),
             $this->createCsvWriter(),
             $this->createFilterEvaluator(),
+            $this->getRowOperations(),
+            $this->createTransformStrategies(),
+            $this->createCsvValidators(),
         );
+    }
+
+    /**
+     * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface>
+     */
+    protected function getRowOperations(): array
+    {
+        return [
+            $this->createColumnRemovalOperation(),
+            $this->createColumnMappingOperation(),
+            $this->createDefaultValuesOperation(),
+            $this->createTransformationOperation(),
+        ];
+    }
+
+    /**
+     * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy>
+     */
+    protected function createTransformStrategies(): array
+    {
+        return [
+            $this->createAppendStrategy(),
+            $this->createReplaceStrategy(),
+            $this->createUpdateStrategy(),
+        ];
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
+     */
+    protected function createAppendStrategy(): AbstractTransformStrategy
+    {
+        return new AppendStrategy(
+            $this->createCsvReader(),
+            $this->createCsvWriter(),
+            $this->createFilterEvaluator(),
+            $this->getRowOperations(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
+     */
+    protected function createReplaceStrategy(): AbstractTransformStrategy
+    {
+        return new ReplaceStrategy(
+            $this->createCsvReader(),
+            $this->createCsvWriter(),
+            $this->createFilterEvaluator(),
+            $this->getRowOperations(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
+     */
+    protected function createUpdateStrategy(): AbstractTransformStrategy
+    {
+        return new UpdateStrategy(
+            $this->createCsvReader(),
+            $this->createCsvWriter(),
+            $this->createFilterEvaluator(),
+            $this->getRowOperations(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
+     */
+    protected function createColumnRemovalOperation(): RowOperationInterface
+    {
+        return new ColumnRemovalOperation();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
+     */
+    protected function createColumnMappingOperation(): RowOperationInterface
+    {
+        return new ColumnMappingOperation();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
+     */
+    protected function createDefaultValuesOperation(): RowOperationInterface
+    {
+        return new DefaultValuesOperation();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
+     */
+    protected function createTransformationOperation(): RowOperationInterface
+    {
+        return new TransformationOperation();
     }
 
     /**
@@ -197,5 +313,79 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
             $this->createOdsReader(),
             $this->createCsvWriter(),
         );
+    }
+
+    /**
+     * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface>
+     */
+    protected function createCsvValidators(): array
+    {
+        return [
+            $this->createModeValidator(),
+            $this->createTargetFileValidator(),
+            $this->createSourceFileValidator(),
+            $this->createColumnMappingValidator(),
+            $this->createFilterValidator(),
+            $this->createTransformationValidator(),
+            $this->createColumnRemovalValidator(),
+        ];
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createModeValidator(): ValidatorInterface
+    {
+        return new ModeValidator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createTargetFileValidator(): ValidatorInterface
+    {
+        return new TargetFileValidator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createSourceFileValidator(): ValidatorInterface
+    {
+        return new SourceFileValidator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createColumnMappingValidator(): ValidatorInterface
+    {
+        return new ColumnMappingValidator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createFilterValidator(): ValidatorInterface
+    {
+        return new FilterValidator(
+            $this->createFilterEvaluator(),
+        );
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createTransformationValidator(): ValidatorInterface
+    {
+        return new TransformationValidator();
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
+     */
+    protected function createColumnRemovalValidator(): ValidatorInterface
+    {
+        return new ColumnRemovalValidator();
     }
 }

@@ -12,20 +12,17 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 use Exception;
 use RuntimeException;
 use SimpleXMLElement;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\FileValidationTrait;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\JsonResponseTrait;
 
 class OdsSplitter implements OdsSplitterInterface
 {
     use JsonResponseTrait;
-
-    protected const string NAMESPACE_TABLE = 'urn:oasis:names:tc:opendocument:xmlns:table:1.0';
+    use FileValidationTrait;
 
     protected const string ERROR_CODE_RUNTIME = 'runtime_error';
 
     protected const string ERROR_CODE_UNEXPECTED = 'unexpected_error';
-
-    protected const string DEFAULT_SHEET_NAME = 'Sheet';
-
-    protected const int DIRECTORY_PERMISSIONS = 0755;
 
     protected const int TOTAL_SHEETS_EMPTY = 0;
 
@@ -47,9 +44,22 @@ class OdsSplitter implements OdsSplitterInterface
      */
     public function split(string $odsFilePath, string $outputDirectory): string
     {
-        try {
-            $this->validateAndPrepareOutputDirectory($outputDirectory);
+        $validationError = $this->validateFileExists($odsFilePath, OdsConstants::FILE_NOT_FOUND, 'ODS file not found', ['file_path' => $odsFilePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
 
+        $validationError = $this->validateFileReadable($odsFilePath, OdsConstants::FILE_NOT_READABLE, 'ODS file is not readable', ['file_path' => $odsFilePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
+        $validationError = $this->validateAndPrepareOutputDirectory($outputDirectory);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
+        try {
             $sheets = $this->extractSheets($odsFilePath);
 
             if ($sheets === []) {
@@ -77,56 +87,60 @@ class OdsSplitter implements OdsSplitterInterface
     /**
      * @param string $outputDirectory
      *
-     * @return void
+     * @return array<string, mixed>|null
      */
-    protected function validateAndPrepareOutputDirectory(string $outputDirectory): void
+    protected function validateAndPrepareOutputDirectory(string $outputDirectory): ?array
     {
-        $this->ensureDirectoryExists($outputDirectory);
-        $this->ensureDirectoryIsWritable($outputDirectory);
+        $error = $this->ensureDirectoryExists($outputDirectory);
+        if ($error !== null) {
+            return $error;
+        }
+
+        return $this->ensureDirectoryIsWritable($outputDirectory);
     }
 
     /**
      * @param string $outputDirectory
      *
-     * @throws \RuntimeException
-     *
-     * @return void
+     * @return array<string, mixed>|null
      */
-    protected function ensureDirectoryExists(string $outputDirectory): void
+    protected function ensureDirectoryExists(string $outputDirectory): ?array
     {
         if (is_dir($outputDirectory)) {
-            return;
+            return null;
         }
 
-        if (mkdir($outputDirectory, static::DIRECTORY_PERMISSIONS, true)) {
-            return;
+        if (mkdir($outputDirectory, OdsConstants::DIRECTORY_PERMISSIONS, true)) {
+            return null;
         }
 
         if (is_dir($outputDirectory)) {
-            return;
+            return null;
         }
 
-        throw new RuntimeException(
-            sprintf('Cannot create output directory: %s', $outputDirectory),
-        );
+        return [
+            'code' => OdsConstants::DIRECTORY_CREATE_FAILED,
+            'message' => sprintf('Cannot create output directory: %s', $outputDirectory),
+            'details' => ['directory' => $outputDirectory],
+        ];
     }
 
     /**
      * @param string $outputDirectory
      *
-     * @throws \RuntimeException
-     *
-     * @return void
+     * @return array<string, mixed>|null
      */
-    protected function ensureDirectoryIsWritable(string $outputDirectory): void
+    protected function ensureDirectoryIsWritable(string $outputDirectory): ?array
     {
         if (is_writable($outputDirectory)) {
-            return;
+            return null;
         }
 
-        throw new RuntimeException(
-            sprintf('Output directory is not writable: %s', $outputDirectory),
-        );
+        return [
+            'code' => OdsConstants::DIRECTORY_NOT_WRITABLE,
+            'message' => sprintf('Output directory is not writable: %s', $outputDirectory),
+            'details' => ['directory' => $outputDirectory],
+        ];
     }
 
     /**
@@ -321,10 +335,10 @@ class OdsSplitter implements OdsSplitterInterface
      */
     protected function getSheetName(SimpleXMLElement $sheet): string
     {
-        $attributes = $sheet->attributes(static::NAMESPACE_TABLE);
+        $attributes = $sheet->attributes(OdsConstants::NAMESPACE_TABLE);
 
         if (!isset($attributes['name'])) {
-            return static::DEFAULT_SHEET_NAME;
+            return OdsConstants::DEFAULT_SHEET_NAME;
         }
 
         return (string)$attributes['name'];
@@ -361,6 +375,27 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
+     * @param string $originalHeader
+     * @param array<string, bool> $seen
+     *
+     * @return string
+     */
+    protected function generateUniqueHeader(string $originalHeader, array $seen): string
+    {
+        $header = $originalHeader;
+        $counter = 1;
+
+        while (isset($seen[$header])) {
+            $header = $originalHeader === ''
+                ? sprintf('column_%d', $counter)
+                : sprintf('%s_%d', $originalHeader, $counter);
+            $counter++;
+        }
+
+        return $header;
+    }
+
+    /**
      * @param array<string> $headers
      *
      * @return array<string>
@@ -370,19 +405,10 @@ class OdsSplitter implements OdsSplitterInterface
         $seen = [];
         $result = [];
 
-        foreach ($headers as $header) {
-            $originalHeader = $header;
-            $counter = 1;
-
-            while (isset($seen[$header])) {
-                $header = $originalHeader === ''
-                    ? sprintf('column_%d', $counter)
-                    : sprintf('%s_%d', $originalHeader, $counter);
-                $counter++;
-            }
-
-            $seen[$header] = true;
-            $result[] = $header;
+        foreach ($headers as $originalHeader) {
+            $uniqueHeader = $this->generateUniqueHeader($originalHeader, $seen);
+            $seen[$uniqueHeader] = true;
+            $result[] = $uniqueHeader;
         }
 
         return $result;

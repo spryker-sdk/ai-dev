@@ -9,23 +9,23 @@ declare(strict_types=1);
 
 namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
+use League\Csv\Info;
 use League\Csv\Reader;
 use League\Csv\Statement;
 
 class CsvReader implements CsvReaderInterface
 {
-    /**
-     * @param string $filePath
-     *
-     * @return array<string>
-     */
+ /**
+  * @param string $filePath
+  *
+  * @return array<string>
+  */
     public function getHeaders(string $filePath): array
     {
         $csv = $this->createReader($filePath);
         $csv->setHeaderOffset(0);
-        $headers = $csv->getHeader();
 
-        return $headers;
+        return $csv->getHeader();
     }
 
     /**
@@ -38,9 +38,7 @@ class CsvReader implements CsvReaderInterface
         $csv = $this->createReader($filePath);
         $csv->setHeaderOffset(0);
 
-        $rowCount = count($csv);
-
-        return $rowCount;
+        return count($csv);
     }
 
     /**
@@ -75,71 +73,23 @@ class CsvReader implements CsvReaderInterface
      *
      * @return string
      */
-    public function detectEncoding(string $filePath): string
-    {
-        $content = file_get_contents($filePath);
-
-        if ($content === false) {
-            return CsvConstants::DEFAULT_ENCODING;
-        }
-
-        if (mb_check_encoding($content, CsvConstants::DEFAULT_ENCODING)) {
-            return CsvConstants::DEFAULT_ENCODING;
-        }
-
-        $detectedEncoding = mb_detect_encoding($content, CsvConstants::SUPPORTED_ENCODINGS, true);
-        $encoding = $detectedEncoding !== false ? $detectedEncoding : CsvConstants::DEFAULT_ENCODING;
-
-        return $encoding;
-    }
-
-    /**
-     * @param string $filePath
-     *
-     * @return string
-     */
     public function detectDelimiter(string $filePath): string
     {
-        $handle = fopen($filePath, 'r');
+        $csv = Reader::from($filePath, 'r');
+        $delimiterStats = Info::getDelimiterStats($csv, CsvConstants::SUPPORTED_DELIMITERS, 5);
 
-        if ($handle === false) {
+        if (!$delimiterStats) {
             return CsvConstants::DEFAULT_DELIMITER;
         }
 
-        $firstLine = fgets($handle);
-        fclose($handle);
+        arsort($delimiterStats);
+        $delimiter = array_key_first($delimiterStats);
 
-        if ($firstLine === false) {
+        if ($delimiterStats[$delimiter] === 0) {
             return CsvConstants::DEFAULT_DELIMITER;
         }
 
-        $detectedDelimiter = $this->detectDelimiterFromLine($firstLine);
-
-        return $detectedDelimiter;
-    }
-
-    /**
-     * @param string $line
-     *
-     * @return string
-     */
-    protected function detectDelimiterFromLine(string $line): string
-    {
-        $delimiterCounts = [];
-
-        foreach (CsvConstants::SUPPORTED_DELIMITERS as $delimiter) {
-            $delimiterCounts[$delimiter] = substr_count($line, $delimiter);
-        }
-
-        arsort($delimiterCounts);
-
-        $detectedDelimiter = array_key_first($delimiterCounts);
-
-        if ($delimiterCounts[$detectedDelimiter] === 0) {
-            return CsvConstants::DEFAULT_DELIMITER;
-        }
-
-        return $detectedDelimiter;
+        return $delimiter;
     }
 
     /**
@@ -150,14 +100,8 @@ class CsvReader implements CsvReaderInterface
     protected function createReader(string $filePath): Reader
     {
         $csv = Reader::from($filePath, 'r');
-
         $delimiter = $this->detectDelimiter($filePath);
         $csv->setDelimiter($delimiter);
-
-        $encoding = $this->detectEncoding($filePath);
-        if ($encoding !== CsvConstants::DEFAULT_ENCODING) {
-            $csv->addStreamFilter(sprintf('convert.iconv.%s/%s', $encoding, CsvConstants::DEFAULT_ENCODING));
-        }
 
         return $csv;
     }

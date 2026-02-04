@@ -10,6 +10,11 @@ declare(strict_types=1);
 namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
 use Exception;
+use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\JsonResponseTrait;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext;
 
 class CsvTransformer implements CsvTransformerInterface
 {
@@ -19,11 +24,17 @@ class CsvTransformer implements CsvTransformerInterface
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
+     * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface> $rowOperations
+     * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy> $transformStrategies
+     * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface> $validators
      */
     public function __construct(
         protected CsvReaderInterface $csvReader,
         protected CsvWriterInterface $csvWriter,
         protected FilterEvaluatorInterface $filterEvaluator,
+        protected array $rowOperations,
+        protected array $transformStrategies,
+        protected array $validators,
     ) {
     }
 
@@ -51,73 +62,42 @@ class CsvTransformer implements CsvTransformerInterface
         array $defaultValues = [],
         array $columnsToRemove = [],
         string $mode = CsvConstants::MODE_APPEND,
-        bool $createBackup = true
+        bool $createBackup = true,
     ): string {
-        if (!in_array($mode, CsvConstants::SUPPORTED_MODES, true)) {
-            return $this->errorResponse(
-                CsvConstants::OPERATION_FAILED,
-                sprintf('Invalid mode "%s"', $mode),
-                ['mode' => $mode, 'supported_modes' => CsvConstants::SUPPORTED_MODES],
-            );
-        }
-
         try {
-            if ($mode === CsvConstants::MODE_UPDATE) {
-                if (!file_exists($targetPath)) {
-                    return $this->errorResponse(CsvConstants::FILE_NOT_FOUND, 'Target file does not exist', ['file_path' => $targetPath]);
-                }
-                if (!is_writable($targetPath)) {
-                    return $this->errorResponse(CsvConstants::FILE_NOT_WRITABLE, 'Target file is not writable', ['file_path' => $targetPath]);
-                }
-
-                return $this->handleUpdateMode($targetPath, $rowFilters, $valueTransformations, $defaultValues, $columnsToRemove, $createBackup);
-            }
-
-            $validationError = $this->validateFiles($sourcePath, $targetPath);
-            if ($validationError !== null) {
-                return $validationError;
-            }
-
-            $sourceHeaders = $this->csvReader->getHeaders($sourcePath);
-            $targetHeaders = $this->csvReader->getHeaders($targetPath);
-            $finalHeaders = $this->mergeHeadersWithMappingsAndDefaults($targetHeaders, $columnMappings, $defaultValues);
-
-            $validationError = $this->validateTransformationParameters(
+            $validationError = $this->validateRequest(
+                $mode,
+                $sourcePath,
+                $targetPath,
                 $columnMappings,
                 $rowFilters,
                 $valueTransformations,
-                $sourceHeaders,
-                $targetHeaders,
+                $columnsToRemove,
             );
             if ($validationError !== null) {
                 return $validationError;
             }
 
-            $sourceRows = $this->csvReader->getRows($sourcePath);
-            $result = $this->processRows($sourceRows, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $finalHeaders);
-
-            if ($mode === CsvConstants::MODE_REPLACE) {
-                $backupPath = $this->csvWriter->write($targetPath, $finalHeaders, $result['transformed_rows'], $createBackup);
-
-                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
+            $backupPath = null;
+            if ($createBackup) {
+                $backupPath = $this->createBackup($targetPath);
             }
 
-            $hasNewColumns = count($finalHeaders) > count($targetHeaders);
+            $context = $this->prepareContext(
+                $sourcePath,
+                $targetPath,
+                $columnMappings,
+                $rowFilters,
+                $valueTransformations,
+                $defaultValues,
+                $columnsToRemove,
+            );
 
-            if ($hasNewColumns) {
-                $this->csvWriter->ensureFileEndsWithNewline($targetPath);
+            $strategy = $this->getTransformStrategy($mode);
+            $result = $strategy->execute($context);
+            $result['backup_path'] = $backupPath;
 
-                $existingRows = $this->csvReader->getRows($targetPath);
-                $existingRowsWithNewColumns = $this->addMissingColumns($existingRows, $finalHeaders);
-                $allRows = array_merge($existingRowsWithNewColumns, $result['transformed_rows']);
-                $backupPath = $this->csvWriter->write($targetPath, $finalHeaders, $allRows, $createBackup);
-
-                return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
-            }
-
-            $backupPath = $this->csvWriter->append($targetPath, $result['transformed_rows'], $createBackup);
-
-            return $this->buildSuccessResponse($result, $columnMappings, $sourceHeaders, $finalHeaders, $backupPath);
+            return $this->buildResponse($result);
         } catch (Exception $e) {
             return $this->errorResponse(
                 CsvConstants::OPERATION_FAILED,
@@ -128,332 +108,151 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
+     * @param string $mode
      * @param string $sourcePath
      * @param string $targetPath
-     *
-     * @return string|null
-     */
-    protected function validateFiles(string $sourcePath, string $targetPath): ?string
-    {
-        if (!file_exists($sourcePath)) {
-            return $this->errorResponse(CsvConstants::FILE_NOT_FOUND, 'Source file does not exist', ['file_path' => $sourcePath]);
-        }
-
-        if (!file_exists($targetPath)) {
-            return $this->errorResponse(CsvConstants::FILE_NOT_FOUND, 'Target file does not exist', ['file_path' => $targetPath]);
-        }
-
-        if (!is_writable($targetPath)) {
-            return $this->errorResponse(CsvConstants::FILE_NOT_WRITABLE, 'Target file is not writable', ['file_path' => $targetPath]);
-        }
-
-        return null;
-    }
-
-    /**
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
-     * @param array<string> $sourceHeaders
-     * @param array<string> $targetHeaders
+     * @param array<string> $columnsToRemove
      *
      * @return string|null
      */
-    protected function validateTransformationParameters(
+    protected function validateRequest(
+        string $mode,
+        string $sourcePath,
+        string $targetPath,
         array $columnMappings,
         array $rowFilters,
         array $valueTransformations,
-        array $sourceHeaders,
-        array $targetHeaders,
+        array $columnsToRemove,
     ): ?string {
-        $mappingsForValidation = array_flip($columnMappings);
-        $mappingErrors = $this->validateColumnMappings($mappingsForValidation, $sourceHeaders, $targetHeaders);
-        if ($mappingErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_MAPPINGS, 'Column mappings validation failed', ['errors' => $mappingErrors]);
-        }
+        $context = new ValidationContext(
+            mode: $mode,
+            sourcePath: $sourcePath,
+            targetPath: $targetPath,
+            columnMappings: $columnMappings,
+            rowFilters: $rowFilters,
+            valueTransformations: $valueTransformations,
+            defaultValues: [],
+            columnsToRemove: $columnsToRemove,
+            csvReader: $this->csvReader,
+        );
 
-        $filterErrors = $this->filterEvaluator->validateCriteria($rowFilters, $sourceHeaders);
-        if ($filterErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_FILTERS, 'Row filters validation failed', ['errors' => $filterErrors]);
-        }
+        foreach ($this->validators as $validator) {
+            if (!$validator->isApplicable($context)) {
+                continue;
+            }
 
-        $transformationErrors = $this->validateTransformations($valueTransformations, array_values($columnMappings));
-        if ($transformationErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Value transformations validation failed', ['errors' => $transformationErrors]);
+            $error = $validator->validate($context);
+            if ($error !== null) {
+                return $this->errorResponse($error['code'], $error['message'], $error['details']);
+            }
         }
 
         return null;
     }
 
     /**
-     * @param array<int, array<string, mixed>> $sourceRows
+     * @param string $sourcePath
+     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
-     * @param array<string> $targetHeaders
+     * @param array<string> $columnsToRemove
      *
-     * @return array<string, mixed>
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext
      */
-    protected function processRows(
-        array $sourceRows,
+    protected function prepareContext(
+        string $sourcePath,
+        string $targetPath,
         array $columnMappings,
         array $rowFilters,
         array $valueTransformations,
         array $defaultValues,
-        array $targetHeaders,
-    ): array {
-        $transformedRows = [];
-        $filteredOutCount = 0;
-        $transformationsApplied = 0;
+        array $columnsToRemove,
+    ): TransformContext {
+        $targetHeaders = $this->csvReader->getHeaders($targetPath);
+        $sourceHeaders = null;
+        $sourceRows = null;
+        $targetRows = null;
+        $finalHeaders = $targetHeaders;
 
-        foreach ($sourceRows as $sourceRow) {
-            if (!$this->filterEvaluator->evaluate($sourceRow, $rowFilters)) {
-                $filteredOutCount++;
-
-                continue;
-            }
-
-            $targetRow = $this->mapRow($sourceRow, $columnMappings, $targetHeaders);
-            $targetRow = $this->applyDefaultValues($targetRow, $defaultValues);
-
-            if ($valueTransformations) {
-                $targetRow = $this->transformRow($targetRow, $valueTransformations);
-                $transformationsApplied++;
-            }
-
-            $transformedRows[] = $targetRow;
+        if ($sourcePath !== '') {
+            $sourceHeaders = $this->csvReader->getHeaders($sourcePath);
+            $sourceRows = $this->csvReader->getRows($sourcePath);
+            $finalHeaders = $this->mergeHeadersWithMappingsAndDefaults($targetHeaders, $columnMappings, $defaultValues);
         }
 
-        return [
-            'transformed_rows' => $transformedRows,
-            'filtered_out_count' => $filteredOutCount,
-            'transformations_applied' => $transformationsApplied,
-        ];
+        if ($sourcePath === '') {
+            $finalHeaders = $this->removeColumns($columnsToRemove, $targetHeaders);
+            $targetRows = $this->csvReader->getRows($targetPath);
+        }
+
+        $config = new RowProcessingConfig(
+            columnMappings: $columnMappings,
+            finalHeaders: $finalHeaders,
+            columnsToRemove: $columnsToRemove,
+            defaultValues: $defaultValues,
+            valueTransformations: $valueTransformations,
+            rowFilters: $rowFilters,
+        );
+
+        return new TransformContext(
+            targetPath: $targetPath,
+            config: $config,
+            sourceRows: $sourceRows,
+            sourceHeaders: $sourceHeaders,
+            targetHeaders: $targetHeaders,
+            targetRows: $targetRows,
+        );
+    }
+
+    /**
+     * @param string $filePath
+     *
+     * @throws \Exception
+     *
+     * @return string|null
+     */
+    protected function createBackup(string $filePath): ?string
+    {
+        $backupPath = $filePath . CsvConstants::BACKUP_EXTENSION;
+
+        if (!copy($filePath, $backupPath)) {
+            throw new Exception(sprintf('Failed to create backup at %s', $backupPath));
+        }
+
+        return $backupPath;
+    }
+
+    /**
+     * @param string $mode
+     *
+     * @throws \Exception
+     *
+     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
+     */
+    protected function getTransformStrategy(string $mode): AbstractTransformStrategy
+    {
+        foreach ($this->transformStrategies as $strategy) {
+            if ($strategy->isApplicable($mode)) {
+                return $strategy;
+            }
+        }
+
+        throw new Exception(sprintf('No strategy found for mode "%s"', $mode));
     }
 
     /**
      * @param array<string, mixed> $result
-     * @param array<string, string> $columnMappings
-     * @param array<string> $sourceHeaders
-     * @param array<string> $targetHeaders
-     * @param string|null $backupPath
      *
      * @return string
      */
-    protected function buildSuccessResponse(
-        array $result,
-        array $columnMappings,
-        array $sourceHeaders,
-        array $targetHeaders,
-        ?string $backupPath,
-    ): string {
-        $unmappedSourceColumns = array_diff($sourceHeaders, array_keys($columnMappings));
-        $unmappedTargetColumns = array_diff($targetHeaders, array_values($columnMappings));
-
-        return $this->successResponse([
-            'rows_appended' => count($result['transformed_rows']),
-            'rows_filtered_out' => $result['filtered_out_count'],
-            'transformations_applied' => $result['transformations_applied'],
-            'unmapped_source_columns' => array_values($unmappedSourceColumns),
-            'unmapped_target_columns' => array_values($unmappedTargetColumns),
-            'backup_path' => $backupPath,
-        ]);
-    }
-
-    /**
-     * @param array<string, mixed> $sourceRow
-     * @param array<string, string> $columnMappings
-     * @param array<string> $targetHeaders
-     *
-     * @return array<string, mixed>
-     */
-    protected function mapRow(array $sourceRow, array $columnMappings, array $targetHeaders): array
+    protected function buildResponse(array $result): string
     {
-        $targetRow = array_fill_keys($targetHeaders, '');
-
-        foreach ($columnMappings as $sourceColumn => $targetColumn) {
-            $targetRow[$targetColumn] = $sourceRow[$sourceColumn] ?? '';
-        }
-
-        return $targetRow;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<int, array<string, mixed>> $transformations
-     *
-     * @return array<string, mixed>
-     */
-    protected function transformRow(array $row, array $transformations): array
-    {
-        foreach ($transformations as $transformation) {
-            $column = $transformation['column'];
-
-            if (isset($transformation['operation'])) {
-                $row = $this->applyMathOperation($row, $transformation);
-
-                continue;
-            }
-
-            if (isset($transformation['find']) && isset($transformation['replace'])) {
-                $row = $this->applyStringReplacement($row, $column, $transformation['find'], $transformation['replace']);
-            }
-        }
-
-        return $row;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param string $column
-     * @param string $find
-     * @param string $replace
-     *
-     * @return array<string, mixed>
-     */
-    protected function applyStringReplacement(array $row, string $column, string $find, string $replace): array
-    {
-        if (isset($row[$column])) {
-            $row[$column] = str_replace($find, $replace, (string)$row[$column]);
-        }
-
-        return $row;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $transformation
-     *
-     * @return array<string, mixed>
-     */
-    protected function applyMathOperation(array $row, array $transformation): array
-    {
-        $column = $transformation['column'];
-        $operation = $transformation['operation'];
-        $value = $transformation['value'];
-        $sourceColumn = $transformation['sourceColumn'] ?? $column;
-
-        if (!isset($row[$sourceColumn])) {
-            return $row;
-        }
-
-        $sourceValue = is_numeric($row[$sourceColumn]) ? (float)$row[$sourceColumn] : 0;
-
-        $row[$column] = match ($operation) {
-            CsvConstants::OPERATION_ADD => $sourceValue + $value,
-            CsvConstants::OPERATION_SUBTRACT => $sourceValue - $value,
-            CsvConstants::OPERATION_MULTIPLY => $sourceValue * $value,
-            CsvConstants::OPERATION_DIVIDE => $value != 0 ? $sourceValue / $value : $sourceValue,
-            default => $row[$column] ?? '',
-        };
-
-        return $row;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $transformations
-     * @param array<string> $mappedColumns
-     *
-     * @return array<string>
-     */
-    protected function validateTransformations(array $transformations, array $mappedColumns): array
-    {
-        $errors = [];
-
-        foreach ($transformations as $index => $transformation) {
-            if (!isset($transformation['column'])) {
-                $errors[] = sprintf('Transformation at index %d is missing "column" field', $index);
-
-                continue;
-            }
-
-            $isMathOperation = isset($transformation['operation']);
-            $isStringReplacement = isset($transformation['find']) || isset($transformation['replace']);
-
-            if (!$isMathOperation && !$isStringReplacement) {
-                $errors[] = sprintf('Transformation at index %d must have either {find, replace} or {operation, value}', $index);
-
-                continue;
-            }
-
-            if ($isStringReplacement) {
-                $errors = array_merge($errors, $this->validateStringReplacement($transformation, $index, $mappedColumns));
-            }
-
-            if ($isMathOperation) {
-                $errors = array_merge($errors, $this->validateMathOperation($transformation, $index));
-            }
-        }
-
-        return $errors;
-    }
-
-    /**
-     * @param array<string, mixed> $transformation
-     * @param int $index
-     * @param array<string> $mappedColumns
-     *
-     * @return array<string>
-     */
-    protected function validateStringReplacement(array $transformation, int $index, array $mappedColumns): array
-    {
-        $errors = [];
-
-        if (!isset($transformation['find'])) {
-            $errors[] = sprintf('Transformation at index %d is missing "find" field', $index);
-        }
-
-        if (!isset($transformation['replace'])) {
-            $errors[] = sprintf('Transformation at index %d is missing "replace" field', $index);
-        }
-
-        if (!in_array($transformation['column'], $mappedColumns, true)) {
-            $errors[] = sprintf('String replacement column "%s" not found in column mappings', $transformation['column']);
-        }
-
-        return $errors;
-    }
-
-    /**
-     * @param array<string, mixed> $transformation
-     * @param int $index
-     *
-     * @return array<string>
-     */
-    protected function validateMathOperation(array $transformation, int $index): array
-    {
-        $errors = [];
-
-        if (!isset($transformation['value'])) {
-            $errors[] = sprintf('Math operation at index %d is missing "value" field', $index);
-        }
-
-        if (!in_array($transformation['operation'], CsvConstants::SUPPORTED_OPERATIONS, true)) {
-            $errors[] = sprintf('Invalid operation "%s" at index %d', $transformation['operation'] ?? 'null', $index);
-        }
-
-        return $errors;
-    }
-
-    /**
-     * @param array<string, string> $mappings
-     * @param array<string> $sourceColumns
-     * @param array<string> $targetColumns
-     *
-     * @return array<string>
-     */
-    protected function validateColumnMappings(array $mappings, array $sourceColumns, array $targetColumns): array
-    {
-        $errors = [];
-
-        foreach ($mappings as $targetColumn => $sourceColumn) {
-            if (!in_array($sourceColumn, $sourceColumns, true)) {
-                $errors[] = sprintf('Invalid source column "%s" in mapping for target "%s"', $sourceColumn, $targetColumn);
-            }
-        }
-
-        return $errors;
+        return $this->successResponse($result);
     }
 
     /**
@@ -466,7 +265,7 @@ class CsvTransformer implements CsvTransformerInterface
     protected function mergeHeadersWithMappingsAndDefaults(
         array $targetHeaders,
         array $columnMappings,
-        array $defaultValues
+        array $defaultValues,
     ): array {
         $newColumnsFromMappings = array_diff(array_values($columnMappings), $targetHeaders);
         $newColumnsFromDefaults = array_diff(array_keys($defaultValues), $targetHeaders);
@@ -476,115 +275,17 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param array<int, array<string, mixed>> $rows
-     * @param array<string> $finalHeaders
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function addMissingColumns(array $rows, array $finalHeaders): array
-    {
-        $result = [];
-
-        foreach ($rows as $row) {
-            $newRow = [];
-            foreach ($finalHeaders as $header) {
-                $newRow[$header] = $row[$header] ?? '';
-            }
-            $result[] = $newRow;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $defaultValues
-     *
-     * @return array<string, mixed>
-     */
-    protected function applyDefaultValues(array $row, array $defaultValues): array
-    {
-        foreach ($defaultValues as $column => $value) {
-            $row[$column] = $value;
-        }
-
-        return $row;
-    }
-
-    /**
-     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
-     *
-     * @param string $targetPath
-     * @param array<int, array<string, mixed>> $rowFilters
-     * @param array<int, array<string, mixed>> $valueTransformations
-     * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param bool $createBackup
+     * @param array<string> $targetHeaders
      *
-     * @return string
+     * @return array<string>
      */
-    protected function handleUpdateMode(
-        string $targetPath,
-        array $rowFilters,
-        array $valueTransformations,
-        array $defaultValues,
-        array $columnsToRemove,
-        bool $createBackup
-    ): string {
-        $targetHeaders = $this->csvReader->getHeaders($targetPath);
-
-        $columnsRemovedCount = 0;
-        if ($columnsToRemove) {
-            $invalidColumns = array_diff($columnsToRemove, $targetHeaders);
-            if ($invalidColumns) {
-                return $this->errorResponse(
-                    CsvConstants::COLUMN_NOT_FOUND,
-                    'Cannot remove columns that do not exist',
-                    ['invalid_columns' => array_values($invalidColumns)],
-                );
-            }
-            $targetHeaders = array_values(array_diff($targetHeaders, $columnsToRemove));
-            $columnsRemovedCount = count($columnsToRemove);
+    protected function removeColumns(array $columnsToRemove, array $targetHeaders): array
+    {
+        if (!$columnsToRemove) {
+            return $targetHeaders;
         }
 
-        $filterErrors = $this->filterEvaluator->validateCriteria($rowFilters, $targetHeaders);
-        if ($filterErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_FILTERS, 'Row filters validation failed', ['errors' => $filterErrors]);
-        }
-
-        $transformationErrors = $this->validateTransformations($valueTransformations, $targetHeaders);
-        if ($transformationErrors) {
-            return $this->errorResponse(CsvConstants::INVALID_TRANSFORMATIONS, 'Value transformations validation failed', ['errors' => $transformationErrors]);
-        }
-
-        $targetRows = $this->csvReader->getRows($targetPath);
-        $updatedRows = [];
-        $updatedCount = 0;
-
-        foreach ($targetRows as $row) {
-            if ($columnsToRemove) {
-                foreach ($columnsToRemove as $columnToRemove) {
-                    unset($row[$columnToRemove]);
-                }
-            }
-
-            if ($this->filterEvaluator->evaluate($row, $rowFilters)) {
-                $row = $this->applyDefaultValues($row, $defaultValues);
-                if ($valueTransformations) {
-                    $row = $this->transformRow($row, $valueTransformations);
-                }
-                $updatedCount++;
-            }
-            $updatedRows[] = $row;
-        }
-
-        $backupPath = $this->csvWriter->write($targetPath, $targetHeaders, $updatedRows, $createBackup);
-
-        return $this->successResponse([
-            'rows_updated' => $updatedCount,
-            'columns_removed' => $columnsRemovedCount,
-            'total_rows' => count($targetRows),
-            'backup_path' => $backupPath,
-        ]);
+        return array_values(array_diff($targetHeaders, $columnsToRemove));
     }
 }
