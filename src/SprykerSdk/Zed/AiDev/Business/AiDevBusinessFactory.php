@@ -203,7 +203,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface>
      */
-    protected function getRowOperations(): array
+    public function getRowOperations(): array
     {
         return [
             $this->createColumnRemovalOperation(),
@@ -216,7 +216,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy>
      */
-    protected function createTransformStrategies(): array
+    public function createTransformStrategies(): array
     {
         return [
             $this->createAppendStrategy(),
@@ -228,7 +228,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
      */
-    protected function createAppendStrategy(): AbstractTransformStrategy
+    public function createAppendStrategy(): AbstractTransformStrategy
     {
         return new AppendStrategy(
             $this->createCsvReader(),
@@ -241,7 +241,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
      */
-    protected function createReplaceStrategy(): AbstractTransformStrategy
+    public function createReplaceStrategy(): AbstractTransformStrategy
     {
         return new ReplaceStrategy(
             $this->createCsvReader(),
@@ -254,7 +254,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
      */
-    protected function createUpdateStrategy(): AbstractTransformStrategy
+    public function createUpdateStrategy(): AbstractTransformStrategy
     {
         return new UpdateStrategy(
             $this->createCsvReader(),
@@ -267,7 +267,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
      */
-    protected function createColumnRemovalOperation(): RowOperationInterface
+    public function createColumnRemovalOperation(): RowOperationInterface
     {
         return new ColumnRemovalOperation();
     }
@@ -275,7 +275,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
      */
-    protected function createColumnMappingOperation(): RowOperationInterface
+    public function createColumnMappingOperation(): RowOperationInterface
     {
         return new ColumnMappingOperation();
     }
@@ -283,7 +283,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
      */
-    protected function createDefaultValuesOperation(): RowOperationInterface
+    public function createDefaultValuesOperation(): RowOperationInterface
     {
         return new DefaultValuesOperation();
     }
@@ -291,7 +291,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
      */
-    protected function createTransformationOperation(): RowOperationInterface
+    public function createTransformationOperation(): RowOperationInterface
     {
         return new TransformationOperation();
     }
@@ -318,7 +318,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return array<\SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface>
      */
-    protected function createCsvValidators(): array
+    public function createCsvValidators(): array
     {
         return [
             $this->createModeValidator(),
@@ -334,7 +334,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createModeValidator(): ValidatorInterface
+    public function createModeValidator(): ValidatorInterface
     {
         return new ModeValidator();
     }
@@ -342,7 +342,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createTargetFileValidator(): ValidatorInterface
+    public function createTargetFileValidator(): ValidatorInterface
     {
         return new TargetFileValidator();
     }
@@ -350,7 +350,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createSourceFileValidator(): ValidatorInterface
+    public function createSourceFileValidator(): ValidatorInterface
     {
         return new SourceFileValidator();
     }
@@ -358,7 +358,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createColumnMappingValidator(): ValidatorInterface
+    public function createColumnMappingValidator(): ValidatorInterface
     {
         return new ColumnMappingValidator();
     }
@@ -366,7 +366,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createFilterValidator(): ValidatorInterface
+    public function createFilterValidator(): ValidatorInterface
     {
         return new FilterValidator(
             $this->createFilterEvaluator(),
@@ -376,7 +376,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createTransformationValidator(): ValidatorInterface
+    public function createTransformationValidator(): ValidatorInterface
     {
         return new TransformationValidator();
     }
@@ -384,7 +384,7 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     /**
      * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
      */
-    protected function createColumnRemovalValidator(): ValidatorInterface
+    public function createColumnRemovalValidator(): ValidatorInterface
     {
         return new ColumnRemovalValidator();
     }

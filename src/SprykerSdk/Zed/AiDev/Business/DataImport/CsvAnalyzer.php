@@ -36,6 +36,16 @@ class CsvAnalyzer implements CsvAnalyzerInterface
      */
     public function analyze(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string
     {
+        $validationError = $this->validateInputParameters($sampleRows, $analyzeColumns);
+        if ($validationError !== null) {
+            return $validationError;
+        }
+
+        $validationError = $this->validateFilePath($filePath);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
         $validationError = $this->validateFileExists($filePath);
         if ($validationError !== null) {
             return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
@@ -83,6 +93,35 @@ class CsvAnalyzer implements CsvAnalyzerInterface
                 sprintf('Error reading CSV file: %s', $e->getMessage()),
             );
         }
+    }
+
+    /**
+     * @param int $sampleRows
+     * @param array<string> $analyzeColumns
+     *
+     * @return string|null
+     */
+    protected function validateInputParameters(int $sampleRows, array $analyzeColumns): ?string
+    {
+        if ($sampleRows < 1) {
+            return $this->errorResponse(
+                CsvConstants::INVALID_CSV_FORMAT,
+                'Sample rows must be at least 1',
+                ['sample_rows' => $sampleRows],
+            );
+        }
+
+        foreach ($analyzeColumns as $column) {
+            if (!is_string($column)) {
+                return $this->errorResponse(
+                    CsvConstants::INVALID_CSV_FORMAT,
+                    'All column names must be strings',
+                    ['invalid_column' => $column],
+                );
+            }
+        }
+
+        return null;
     }
 
     /**

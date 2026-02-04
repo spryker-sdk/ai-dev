@@ -37,16 +37,9 @@ class CsvConstants
 
     public const string OPERATION_FAILED = 'OPERATION_FAILED';
 
-    public const string DEFAULT_ENCODING = 'UTF-8';
+    public const string INVALID_PATH = 'INVALID_PATH';
 
-    /**
-     * @var array<string>
-     */
-    public const array SUPPORTED_ENCODINGS = [
-        'UTF-8',
-        'ISO-8859-1',
-        'Windows-1252',
-    ];
+    public const string PATH_TRAVERSAL_DETECTED = 'PATH_TRAVERSAL_DETECTED';
 
     /**
      * @var array<string>

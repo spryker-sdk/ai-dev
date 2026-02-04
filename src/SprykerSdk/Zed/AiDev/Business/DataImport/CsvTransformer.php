@@ -13,12 +13,14 @@ use Exception;
 use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
 use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy;
 use SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext;
+use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\FileValidationTrait;
 use SprykerSdk\Zed\AiDev\Business\DataImport\Trait\JsonResponseTrait;
 use SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext;
 
 class CsvTransformer implements CsvTransformerInterface
 {
     use JsonResponseTrait;
+    use FileValidationTrait;
 
     /**
      * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
@@ -65,6 +67,18 @@ class CsvTransformer implements CsvTransformerInterface
         bool $createBackup = true,
     ): string {
         try {
+            if ($sourcePath !== '') {
+                $pathError = $this->validateFilePath($sourcePath);
+                if ($pathError !== null) {
+                    return $this->errorResponse($pathError['code'], $pathError['message'], $pathError['details']);
+                }
+            }
+
+            $pathError = $this->validateFilePath($targetPath);
+            if ($pathError !== null) {
+                return $this->errorResponse($pathError['code'], $pathError['message'], $pathError['details']);
+            }
+
             $validationError = $this->validateRequest(
                 $mode,
                 $sourcePath,
@@ -218,7 +232,21 @@ class CsvTransformer implements CsvTransformerInterface
      */
     protected function createBackup(string $filePath): ?string
     {
-        $backupPath = $filePath . CsvConstants::BACKUP_EXTENSION;
+        if (!is_file($filePath)) {
+            throw new Exception(sprintf('Cannot create backup: source file does not exist: %s', $filePath));
+        }
+
+        if (!is_readable($filePath)) {
+            throw new Exception(sprintf('Cannot create backup: source file is not readable: %s', $filePath));
+        }
+
+        $timestamp = date('YmdHis');
+        $backupPath = sprintf('%s.backup_%s', $filePath, $timestamp);
+
+        $backupDir = dirname($backupPath);
+        if (!is_writable($backupDir)) {
+            throw new Exception(sprintf('Cannot create backup: directory is not writable: %s', $backupDir));
+        }
 
         if (!copy($filePath, $backupPath)) {
             throw new Exception(sprintf('Failed to create backup at %s', $backupPath));

@@ -81,4 +81,81 @@ trait FileValidationTrait
 
         return null;
     }
+
+    /**
+     * @param string $filePath
+     * @param string $errorCode
+     * @param array<string, mixed> $details
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function validateFilePath(
+        string $filePath,
+        string $errorCode = CsvConstants::INVALID_PATH,
+        array $details = []
+    ): ?array {
+        if (strpos($filePath, '..') !== false) {
+            return [
+                'code' => CsvConstants::PATH_TRAVERSAL_DETECTED,
+                'message' => 'Path contains directory traversal sequence (..), use relative paths within project directory',
+                'details' => array_merge(['path' => $filePath], $details),
+            ];
+        }
+
+        if ($this->isAbsolutePath($filePath)) {
+            return [
+                'code' => $errorCode,
+                'message' => 'Absolute paths are not allowed, use relative paths from project root',
+                'details' => array_merge(['path' => $filePath], $details),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $directoryPath
+     * @param string $errorCode
+     * @param array<string, mixed> $details
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function validateDirectoryPath(
+        string $directoryPath,
+        string $errorCode = CsvConstants::INVALID_PATH,
+        array $details = []
+    ): ?array {
+        $pathError = $this->validateFilePath($directoryPath, $errorCode, $details);
+        if ($pathError !== null) {
+            return $pathError;
+        }
+
+        if (is_dir($directoryPath) && !is_writable($directoryPath)) {
+            return [
+                'code' => CsvConstants::FILE_NOT_WRITABLE,
+                'message' => sprintf('Directory is not writable: %s', $directoryPath),
+                'details' => array_merge(['directory' => $directoryPath], $details),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return bool
+     */
+    protected function isAbsolutePath(string $path): bool
+    {
+        if (isset($path[0]) && $path[0] === '/') {
+            return true;
+        }
+
+        if (preg_match('/^[A-Z]:/i', $path)) {
+            return true;
+        }
+
+        return false;
+    }
 }

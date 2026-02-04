@@ -41,6 +41,11 @@ class CsvRowDeleter implements CsvRowDeleterInterface
      */
     public function deleteRows(string $filePath, array $criteria, bool $createBackup = true): string
     {
+        $validationError = $this->validateFilePath($filePath);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
         $validationError = $this->validateFileExists($filePath, CsvConstants::FILE_NOT_FOUND, 'File does not exist', ['file_path' => $filePath]);
         if ($validationError !== null) {
             return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);

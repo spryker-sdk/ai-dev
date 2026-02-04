@@ -57,5 +57,5 @@ class OdsConstants
 
     public const string DIRECTORY_CREATE_FAILED = 'directory_create_failed';
 
-    public const string DIRECTORY_NOT_WRITABLE = 'directory_not_writable';
+    public const string INVALID_PATH = 'invalid_path';
 }

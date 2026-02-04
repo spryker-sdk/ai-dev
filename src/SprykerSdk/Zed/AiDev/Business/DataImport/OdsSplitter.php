@@ -44,12 +44,22 @@ class OdsSplitter implements OdsSplitterInterface
      */
     public function split(string $odsFilePath, string $outputDirectory): string
     {
+        $validationError = $this->validateFilePath($odsFilePath, OdsConstants::INVALID_PATH, ['file_path' => $odsFilePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
         $validationError = $this->validateFileExists($odsFilePath, OdsConstants::FILE_NOT_FOUND, 'ODS file not found', ['file_path' => $odsFilePath]);
         if ($validationError !== null) {
             return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
 
         $validationError = $this->validateFileReadable($odsFilePath, OdsConstants::FILE_NOT_READABLE, 'ODS file is not readable', ['file_path' => $odsFilePath]);
+        if ($validationError !== null) {
+            return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
+        }
+
+        $validationError = $this->validateDirectoryPath($outputDirectory, OdsConstants::INVALID_PATH, ['directory' => $outputDirectory]);
         if ($validationError !== null) {
             return $this->errorResponse($validationError['code'], $validationError['message'], $validationError['details']);
         }
@@ -106,6 +116,11 @@ class OdsSplitter implements OdsSplitterInterface
      */
     protected function ensureDirectoryExists(string $outputDirectory): ?array
     {
+        $pathError = $this->validateFilePath($outputDirectory, OdsConstants::INVALID_PATH, ['directory' => $outputDirectory]);
+        if ($pathError !== null) {
+            return $pathError;
+        }
+
         if (is_dir($outputDirectory)) {
             return null;
         }
