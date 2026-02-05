@@ -33,6 +33,15 @@ class TargetFileValidator implements ValidatorInterface
      */
     public function validate(ValidationContext $context): ?array
     {
+        $pathError = $this->validateFilePath(
+            $context->targetPath,
+            CsvConstants::INVALID_PATH,
+            ['file_path' => $context->targetPath],
+        );
+        if ($pathError !== null) {
+            return $pathError;
+        }
+
         $error = $this->validateFileExists(
             $context->targetPath,
             CsvConstants::FILE_NOT_FOUND,

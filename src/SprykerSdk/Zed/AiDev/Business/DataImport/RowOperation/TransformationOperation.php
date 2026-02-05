@@ -83,7 +83,7 @@ class TransformationOperation implements RowOperationInterface
         $value = $transformation['value'];
         $sourceColumn = $transformation['sourceColumn'] ?? $column;
 
-        if (!isset($row[$sourceColumn])) {
+        if (!array_key_exists($sourceColumn, $row)) {
             return $row;
         }
 

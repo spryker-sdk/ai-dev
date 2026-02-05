@@ -94,6 +94,14 @@ trait FileValidationTrait
         string $errorCode = CsvConstants::INVALID_PATH,
         array $details = []
     ): ?array {
+        if ($filePath === '') {
+            return [
+                'code' => $errorCode,
+                'message' => 'File path cannot be empty',
+                'details' => array_merge(['path' => $filePath], $details),
+            ];
+        }
+
         if (strpos($filePath, '..') !== false) {
             return [
                 'code' => CsvConstants::PATH_TRAVERSAL_DETECTED,

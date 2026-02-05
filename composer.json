@@ -18,6 +18,8 @@
         "spryker/transfer": ">=3.27.0"
     },
     "require-dev": {
+        "codeception/codeception": "^5.3",
+        "codeception/module-asserts": "^3.3",
         "phpstan/phpstan": ">=1.12.29",
         "spryker-sdk/phpstan-spryker": ">=0.4.3",
         "spryker/code-sniffer": ">=0.17.30",
@@ -26,6 +28,11 @@
     "autoload": {
         "psr-4": {
             "SprykerSdk\\": "src/SprykerSdk/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SprykerSdkTest\\": "tests/SprykerSdkTest/"
         }
     },
     "minimum-stability": "dev",

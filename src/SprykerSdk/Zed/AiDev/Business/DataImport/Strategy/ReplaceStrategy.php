@@ -28,7 +28,8 @@ class ReplaceStrategy extends AbstractTransformStrategy
      */
     public function execute(TransformContext $context): array
     {
-        $result = $this->processRows($context->sourceRows, $context->config);
+        $rowsToProcess = $context->sourceRows ?? $context->targetRows;
+        $result = $this->processRows($rowsToProcess, $context->config);
 
         $this->csvWriter->write(
             $context->targetPath,
@@ -36,7 +37,9 @@ class ReplaceStrategy extends AbstractTransformStrategy
             $result['rows'],
         );
 
-        $unmappedSource = array_diff($context->sourceHeaders, array_keys($context->config->columnMappings));
+        $unmappedSource = $context->sourceHeaders !== null
+            ? array_diff($context->sourceHeaders, array_keys($context->config->columnMappings))
+            : [];
         $unmappedTarget = array_diff($context->targetHeaders, array_values($context->config->columnMappings));
 
         return [

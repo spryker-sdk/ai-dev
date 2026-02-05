@@ -67,18 +67,6 @@ class CsvTransformer implements CsvTransformerInterface
         bool $createBackup = true,
     ): string {
         try {
-            if ($sourcePath !== '') {
-                $pathError = $this->validateFilePath($sourcePath);
-                if ($pathError !== null) {
-                    return $this->errorResponse($pathError['code'], $pathError['message'], $pathError['details']);
-                }
-            }
-
-            $pathError = $this->validateFilePath($targetPath);
-            if ($pathError !== null) {
-                return $this->errorResponse($pathError['code'], $pathError['message'], $pathError['details']);
-            }
-
             $validationError = $this->validateRequest(
                 $mode,
                 $sourcePath,
@@ -190,7 +178,6 @@ class CsvTransformer implements CsvTransformerInterface
         $targetHeaders = $this->csvReader->getHeaders($targetPath);
         $sourceHeaders = null;
         $sourceRows = null;
-        $targetRows = null;
         $finalHeaders = $targetHeaders;
 
         if ($sourcePath !== '') {
@@ -201,8 +188,9 @@ class CsvTransformer implements CsvTransformerInterface
 
         if ($sourcePath === '') {
             $finalHeaders = $this->removeColumns($columnsToRemove, $targetHeaders);
-            $targetRows = $this->csvReader->getRows($targetPath);
         }
+
+        $targetRows = $this->csvReader->getRows($targetPath);
 
         $config = new RowProcessingConfig(
             columnMappings: $columnMappings,
