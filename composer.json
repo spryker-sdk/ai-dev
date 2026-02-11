@@ -4,8 +4,8 @@
     "description": "AiDev module",
     "license": "proprietary",
     "require": {
-        "php": ">=8.3",
         "nikic/php-parser": ">=5.0",
+        "php": ">=8.3",
         "php-mcp/server": "^3.3",
         "spryker/csv": "^3.0",
         "spryker/guzzle": ">=2.0.0",
