@@ -4,10 +4,10 @@
     "description": "AiDev module",
     "license": "proprietary",
     "require": {
-        "league/csv": "^9.0",
         "nikic/php-parser": ">=5.0",
         "php": ">=8.3",
         "php-mcp/server": "^3.3",
+        "spryker/csv": "*",
         "spryker/guzzle": ">=2.0.0",
         "spryker/kernel": ">=3.30.0",
         "spryker/module-finder": ">=1.0.0",
@@ -18,12 +18,11 @@
         "spryker/transfer": ">=3.27.0"
     },
     "require-dev": {
-        "codeception/codeception": "^5.3",
-        "codeception/module-asserts": "^3.3",
         "phpstan/phpstan": ">=1.12.29",
         "spryker-sdk/phpstan-spryker": ">=0.4.3",
         "spryker/code-sniffer": ">=0.17.30",
-        "spryker/development": "*"
+        "spryker/development": "*",
+        "spryker/testify": "*"
     },
     "autoload": {
         "psr-4": {
