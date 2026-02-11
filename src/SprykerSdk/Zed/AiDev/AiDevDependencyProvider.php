@@ -18,7 +18,6 @@ use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsBy
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModuleMapAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModulesAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
-use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SearchAlgoliaDocumentationAiDevMcpToolPlugin;
 
 /**
@@ -132,7 +131,6 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     protected function getMcpToolPlugins(): array
     {
         return [
-            new GetTransferStructureByNamespaceAiDevMcpToolPlugin(),
             new GetTransferStructureByNameAiDevMcpToolPlugin(),
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
             new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
