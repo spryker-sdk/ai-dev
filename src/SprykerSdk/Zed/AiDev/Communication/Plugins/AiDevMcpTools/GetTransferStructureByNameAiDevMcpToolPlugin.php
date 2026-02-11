@@ -31,7 +31,7 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
     /**
      * @var array
      */
-    protected const METADATA_FIELDS_TO_REMOVE = ['name_underscore', 'type_shim', 'is_strict', 'is_nullable'];
+    protected const array ALLOWED_METADATA_FIELDS = ['type', 'is_collection', 'is_transfer', 'is_strict'];
 
     /**
      * @return string
@@ -70,7 +70,7 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
             return 'Transfer metadata is not an array';
         }
 
-        $cleanedMetadata = $this->cleanMetadata($metadata);
+        $cleanedMetadata = $this->getFieldsFromMetadata($metadata);
 
         return json_encode([
             'class' => $reflectionClass->getShortName(),
@@ -98,14 +98,16 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
      *
      * @return array<int|string, mixed>
      */
-    private function cleanMetadata(array $metadata): array
+    private function getFieldsFromMetadata(array $metadata): array
     {
-        foreach ($metadata as &$value) {
-            foreach (static::METADATA_FIELDS_TO_REMOVE as $field) {
-                unset($value[$field]);
-            }
+        $result = [];
+
+        $fieldsFlipped = array_flip(static::ALLOWED_METADATA_FIELDS);
+
+        foreach ($metadata as $name => $value) {
+            $result[$name] = array_intersect_key($value, $fieldsFlipped);
         }
 
-        return $metadata;
+        return $result;
     }
 }
