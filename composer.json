@@ -18,7 +18,7 @@
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1.0",
-        "spryker-sdk/phpstan-spryker": ">=0.4.3",
+        "spryker-sdk/phpstan-spryker": "dev-feature/frw-10644/master-upgraded-phpstan",
         "spryker/code-sniffer": ">=0.17.30",
         "spryker/development": "*"
     },
