@@ -7,6 +7,7 @@
         "nikic/php-parser": ">=5.0",
         "php": ">=8.3",
         "php-mcp/server": "^3.3",
+        "spryker/csv": "^3.0",
         "spryker/guzzle": ">=2.0.0",
         "spryker/kernel": ">=3.30.0",
         "spryker/module-finder": ">=1.0.0",
@@ -20,19 +21,25 @@
         "phpstan/phpstan": ">=1.12.29",
         "spryker-sdk/phpstan-spryker": ">=0.4.3",
         "spryker/code-sniffer": ">=0.17.30",
-        "spryker/development": "*"
+        "spryker/development": "*",
+        "spryker/testify": "*"
     },
     "autoload": {
         "psr-4": {
             "SprykerSdk\\": "src/SprykerSdk/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "SprykerSdkTest\\": "tests/SprykerSdkTest/"
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "scripts": {
-        "cs-check": "phpcs -p -s --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/",
+        "cs-check": "phpcs -p -s --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/ tests/",
         "architecture-check": "phpmd src/ text vendor/spryker/development/resources/phpmd/ruleset.xml --minimumpriority 2",
-        "cs-fix": "phpcbf -p --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/",
+        "cs-fix": "phpcbf -p --standard=vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml src/ tests/",
         "stan": "phpstan analyse src"
     },
     "extra": {

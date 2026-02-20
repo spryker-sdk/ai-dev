@@ -11,6 +11,8 @@ namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
 use Spryker\Zed\Kernel\Container;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\AnalyzeCsvFileAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\DeleteCsvRowsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\ExecuteDatabaseQueryAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetInterfaceMethodsAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsByOrderAiDevMcpToolPlugin;
@@ -18,8 +20,9 @@ use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetOmsTransitionsBy
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModuleMapAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetSprykerModulesAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNameAiDevMcpToolPlugin;
-use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\GetTransferStructureByNamespaceAiDevMcpToolPlugin;
 use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SearchAlgoliaDocumentationAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\SplitOdsToCsvAiDevMcpToolPlugin;
+use SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools\TransformCsvAiDevMcpToolPlugin;
 
 /**
  * @method \SprykerSdk\Zed\AiDev\AiDevConfig getConfig()
@@ -132,7 +135,6 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
     protected function getMcpToolPlugins(): array
     {
         return [
-            new GetTransferStructureByNamespaceAiDevMcpToolPlugin(),
             new GetTransferStructureByNameAiDevMcpToolPlugin(),
             new GetInterfaceMethodsAiDevMcpToolPlugin(),
             new GetOmsTransitionsByOrderAiDevMcpToolPlugin(),
@@ -141,6 +143,10 @@ class AiDevDependencyProvider extends AbstractBundleDependencyProvider
             new SearchAlgoliaDocumentationAiDevMcpToolPlugin(),
             new GetSprykerModulesAiDevMcpToolPlugin(),
             new GetSprykerModuleMapAiDevMcpToolPlugin(),
+            new AnalyzeCsvFileAiDevMcpToolPlugin(),
+            new DeleteCsvRowsAiDevMcpToolPlugin(),
+            new TransformCsvAiDevMcpToolPlugin(),
+            new SplitOdsToCsvAiDevMcpToolPlugin(),
         ];
     }
 }
