@@ -15,7 +15,7 @@ class AiDevConfig extends AbstractBundleConfig
      * @var array
      */
     protected const MCP_SERVER_INFO = [
-        'name' => 'AI Synapse',
+        'name' => 'AI Dev Sdk',
         'version' => '0.1.0',
     ];
 
@@ -47,5 +47,31 @@ class AiDevConfig extends AbstractBundleConfig
     public function getPromptsDirectory(): string
     {
         return APPLICATION_ROOT_DIR . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'prompts';
+    }
+
+    /**
+     * Specification:
+     * - Returns absolute path to the bundled AGENTS example markdown file.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getAgentsExampleFilePath(): string
+    {
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/agents/AGENTS.example.md';
+    }
+
+    /**
+     * Specification:
+     * - Returns the project root directory where the generated file will be written.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getAgentsFileOutputDirectory(): string
+    {
+        return APPLICATION_ROOT_DIR;
     }
 }
