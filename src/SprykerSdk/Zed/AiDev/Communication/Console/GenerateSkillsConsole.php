@@ -108,6 +108,11 @@ class GenerateSkillsConsole extends Console
         return static::CODE_SUCCESS;
     }
 
+    /**
+     * @param string $tool
+     *
+     * @return string
+     */
     protected function resolveOutputDirectory(string $tool): string
     {
         return match ($tool) {
@@ -118,6 +123,12 @@ class GenerateSkillsConsole extends Console
         };
     }
 
+    /**
+     * @param string $source
+     * @param string $destination
+     *
+     * @return void
+     */
     protected function copyDirectory(string $source, string $destination): void
     {
         if (!is_dir($destination)) {
