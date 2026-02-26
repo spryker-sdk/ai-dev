@@ -19,7 +19,7 @@ class GenerateAgentsFileConsole extends Console
 {
     protected const string COMMAND_NAME = 'ai-dev:generate-agents-file';
 
-    protected const string COMMAND_DESCRIPTION = 'Generate an example AGENTS.md or CLAUDE.md context file for AI agents.';
+    protected const string COMMAND_DESCRIPTION = 'Generate an example AGENTS.md or CLAUDE.md context file for AI agents for Spryker project development.';
 
     protected const string FORMAT_AGENTS = 'AGENTS.md';
 
@@ -29,7 +29,7 @@ class GenerateAgentsFileConsole extends Console
      * @var array<string, string>
      */
     protected const array FORMAT_DESCRIPTIONS = [
-        self::FORMAT_AGENTS => 'Universal format (agents.md) https://agents.md . Supported by: Codex, Jules, Cursor, Devin, GitHub Copilot, Windsurf, Aider, goose, VS Code, Zed, Warp, Amp, RooCode, Gemini CLI, and more.',
+        self::FORMAT_AGENTS => 'Universal format (agents.md) https://agents.md . Supported by: Codex, OpenCode, Cursor, GitHub Copilot, Windsurf, VS Code, and more.',
         self::FORMAT_CLAUDE => 'Claude Code only (Anthropic). Supported by: Claude Code CLI.',
     ];
 

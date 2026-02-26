@@ -74,4 +74,17 @@ class AiDevConfig extends AbstractBundleConfig
     {
         return APPLICATION_ROOT_DIR;
     }
+
+    /**
+     * Specification:
+     * - Returns absolute path to the bundled skill examples directory.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getSkillsExamplesDirectory(): string
+    {
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/agents/skill-examples';
+    }
 }
