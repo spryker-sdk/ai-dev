@@ -35,11 +35,6 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 - Explicit over magic. No hidden behaviors or implicit conversions.
 - Document public methods and transfers. Avoid unnecessary DB calls.
 
-## Development Use Cases
-- **Project**: project-specific guidelines
-- **Module**: reusable third-party modules (stricter)
-- **Core module**: Spryker core contributions (strictest)
-
 ---
 
 # Project Organization
@@ -52,6 +47,20 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 | `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | Project-level overrides/extensions of Pyz or core modules |
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
+
+## Vendor Modules — Examples & Patterns Source
+
+Spryker modules reside in `vendor/` and are the primary reference for examples and patterns:
+
+| Vendor path | Namespace | Purpose |
+|---|---|---|
+| `vendor/spryker/spryker/Bundles/` | `Spryker\*` | Core backend modules |
+| `vendor/spryker-shop/spryker-shop/Bundles/` | `SprykerShop\*` | Storefront modules |
+| `vendor/spryker-feature/` | `SprykerFeature\*` | Feature integration modules |
+| `vendor/spryker-eco/` | `SprykerEco\*` | Third-party eco-system integrations |
+
+**CRITICAL**: Look in `vendor/spryker*` as well as in `src` for existing patterns, conventions, and implementation examples before writing new code.
+Core modules are the authoritative source of truth for Spryker architecture.
 
 ## Tests
 
@@ -90,7 +99,7 @@ Communication/[Module]CommunicationFactory.php
 Business/[Dir]/{[Model]Interface,[Model]}.php
 Business/{[Module]BusinessFactory,[Module]Facade,[Module]FacadeInterface}.php
 Persistence/{[Module]EntityManager[Interface],[Module]Repository[Interface],[Module]QueryContainer,[Module]PersistenceFactory}.php
-Persistence/Propel/{Abstract[Table].php, AbstractSpy[Table]Query.php, Mapper/[Module]Mapper.php, Schema/[org]_[domain].schema.xml}
+Persistence/Propel/ Mapper/[Module]Mapper.php, Schema/[org]_[domain].schema.xml}
 Dependency/{Client,Facade,QueryContainer,Service}/[Module]To[Module]Interface.php
 Dependency/Plugin/[Name]PluginInterface.php
 [Module]{Config,DependencyProvider}.php
