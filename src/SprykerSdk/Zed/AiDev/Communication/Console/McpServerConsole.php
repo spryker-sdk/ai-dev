@@ -53,12 +53,6 @@ class McpServerConsole extends Console
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
-            $this->ensurePromptsGenerated();
-        } catch (Throwable) {
-            // Ignore errors
-        }
-
-        try {
             $serverBuilder = Server::make()
                 ->withServerInfo(...$this->getFactory()->getConfig()->getMcpServerInfo());
 
@@ -99,17 +93,5 @@ class McpServerConsole extends Console
         }
 
         return static::CODE_SUCCESS;
-    }
-
-    /**
-     * @return void
-     */
-    protected function ensurePromptsGenerated(): void
-    {
-        $promptsDirectory = $this->getConfig()->getPromptClassTargetDirectory();
-
-        if (!is_dir($promptsDirectory) || count(glob($promptsDirectory . '*.php')) === 0) {
-            $this->getFacade()->generatePrompts();
-        }
     }
 }
