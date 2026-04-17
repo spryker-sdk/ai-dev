@@ -54,8 +54,8 @@ Spryker modules reside in `vendor/` and are the primary reference for examples a
 
 | Vendor path | Namespace | Purpose |
 |---|---|---|
-| `vendor/spryker/spryker/Bundles/` | `Spryker\*` | Core backend modules |
-| `vendor/spryker-shop/spryker-shop/Bundles/` | `SprykerShop\*` | Storefront modules |
+| `vendor/spryker/` | `Spryker\*` | Core backend modules |
+| `vendor/spryker-shop/` | `SprykerShop\*` | Storefront modules |
 | `vendor/spryker-feature/` | `SprykerFeature\*` | Feature integration modules |
 | `vendor/spryker-eco/` | `SprykerEco\*` | Third-party eco-system integrations |
 
@@ -68,16 +68,17 @@ Core modules are the authoritative source of truth for Spryker architecture.
 
 ## Configuration Files
 
-| Path | Purpose |
-|---|---|
-| `config/Shared/config_default.php` | Environment-specific application config |
-| `config/Shared/config_local.php` | Local overrides |
-| `config/Zed/oms/` | OMS process/state/transition definitions |
-| `config/Zed/StateMachine/` | State machine configurations |
-| `config/Zed/cronjobs/` | Cron job definitions and schedules |
-| `config/Zed/navigation*.xml` | Backoffice navigation/menu structure |
-| `data/import/` | Data import files for setup or testing |
-| `data/export/` | Data export files for backup or migration |
+| Path                              | Purpose                                          |
+|-----------------------------------|--------------------------------------------------|
+| `config/Shared/config_default.php` | Environment-specific application config          |
+| `config/Shared/config_local.php`  | Local overrides                                  |
+| `config/Zed/oms/`                 | OMS process/state/transition definitions         |
+| `config/Zed/StateMachine/`        | State machine configurations                     |
+| `config/Zed/cronjobs/`            | Cron job definitions and schedules               |
+| `config/Zed/navigation*.xml`      | Backoffice navigation/menu structure             |
+| `data/import/`                    | Data import files for setup or testing           |
+| `data/export/`                    | Data export files for backup or migration        |
+| `data/configuration/`             | Project level Backoofice configuration managment |
 
 ---
 
@@ -208,8 +209,15 @@ Transfer/[module].transfer.xml
 - Use `container::set()` with late-binding closure.
 - Use `Container::factory()` for per-injection instances (e.g., Query Objects).
 - Always call parent provide method first.
-- Wire by layer method: `provideBusinessLayerDependencies`, `provideCommunicationLayerDependencies`, `providePersistenceLayerDependencies`, `provideDependencies`, `provideBackendDependencies`, `provideServiceLayerDependencies`.
+- Wire by layer method: `provideBusinessLayerDependencies`, `provideCommunicationLayerDependencies`, `providePersistenceLayerDependencies`, `provideDependencies`, `provideBackendDependencies`, `provideServiceLayerDependencies` overriding parent methods.
 - Constant naming: `[COMPONENT_NAME]_[MODULE_NAME]` or `PLUGINS_[PLUGIN_INTERFACE_NAME]`.
+- **CRITICAL**: Bridges are deprecated. Never create or extends Bridges, never use Bridges to pass dependencies in Dependency Provider
+Correct set dependecy example:
+```php
+$container->set(static::FACADE_ANY_MODULE, function (Container $container) {
+      return $container->getLocator()->anyModule()->facade(); // never use Bridges
+});
+```
 
 ## Entity
 - Generated via Persistence Schema; never leaked beyond persistence layer / facade level.
@@ -263,7 +271,7 @@ Transfer/[module].transfer.xml
 - Atomic design: atoms → molecules → organisms → templates → views.
 
 ## Repository
-- READ only; returns Transfer Objects or native types.
+- READ only; always returns Transfer Objects or native types.
 - Accessible from same module's Communication and Business layers.
 
 ## Module Configuration
