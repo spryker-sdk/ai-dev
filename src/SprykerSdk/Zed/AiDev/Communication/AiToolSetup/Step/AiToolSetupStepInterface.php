@@ -7,6 +7,7 @@
 
 namespace SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step;
 
+use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode;
 use Symfony\Component\Console\Output\OutputInterface;
 
 interface AiToolSetupStepInterface
@@ -35,19 +36,19 @@ interface AiToolSetupStepInterface
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listTargetPaths(string $tool, bool $asExample = true): array;
+    public function listTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
      * @param string $tool
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return void
      */
-    public function execute(string $tool, OutputInterface $output, array $skipPaths = [], bool $asExample = true): void;
+    public function execute(string $tool, OutputInterface $output, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): void;
 }

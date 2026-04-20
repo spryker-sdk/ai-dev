@@ -9,6 +9,7 @@ namespace SprykerSdk\Zed\AiDev\Communication\Console;
 
 use Spryker\Zed\Kernel\Communication\Console\Console;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface;
+use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AiToolSetupStepInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -57,7 +58,7 @@ class AiToolSetupConsole extends Console
             return static::CODE_ERROR;
         }
 
-        $asExample = $this->resolveExampleMode($tool, $output);
+        $mode = $this->resolveExampleMode($tool, $output);
         $generator = $this->getFactory()->createAiToolArtifactGenerator();
 
         foreach ($this->getFactory()->getAiToolSetupSteps() as $step) {
@@ -67,8 +68,8 @@ class AiToolSetupConsole extends Console
                 continue;
             }
 
-            $skipPaths = $this->resolveSkipPaths($step->listTargetPaths($effectiveTool, $asExample), $output, $generator);
-            $step->execute($effectiveTool, $output, $skipPaths, $asExample);
+            $skipPaths = $this->resolveSkipPaths($step->listTargetPaths($effectiveTool, $mode), $output, $generator);
+            $step->execute($effectiveTool, $output, $skipPaths, $mode);
         }
 
         $output->writeln('');
@@ -182,9 +183,9 @@ class AiToolSetupConsole extends Console
      * @param string $tool
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      *
-     * @return bool
+     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode
      */
-    protected function resolveExampleMode(string $tool, OutputInterface $output): bool
+    protected function resolveExampleMode(string $tool, OutputInterface $output): ArtifactMode
     {
         $artifactConfig = $this->getFactory()->getConfig()->getToolArtifacts($tool);
         $agentsFile = (string)$artifactConfig['agents_file'];
@@ -197,7 +198,7 @@ class AiToolSetupConsole extends Console
         $output->writeln(sprintf('  <comment>Example</comment>      [N]: example.%s, %s/propel-schema-example, %s-example/dependency-provider.md  <comment>(rename when ready)</comment>', $agentsFile, $skillsDir, $rulesDir));
         $output->writeln('');
 
-        return !$this->confirm('Generate as ready to use?', static::DEFAULT_NO);
+        return $this->confirm('Generate as ready to use?', static::DEFAULT_NO) ? ArtifactMode::Real : ArtifactMode::Example;
     }
 
     /**

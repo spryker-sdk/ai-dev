@@ -26,11 +26,11 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listRuleTargetPaths(string $tool, bool $asExample = true): array
+    public function listRuleTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
 
@@ -38,7 +38,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
             return [];
         }
 
-        $targetDir = $this->resolveRulesTargetDir($artifactConfig['rules_dir'], $asExample);
+        $targetDir = $this->resolveRulesTargetDir($artifactConfig['rules_dir'], $mode);
         $suffix = (string)$artifactConfig['rules_file_suffix'];
 
         return $this->resolveRuleTargetPaths($targetDir, $suffix);
@@ -47,13 +47,13 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @throws \RuntimeException
      *
      * @return array<string>
      */
-    public function generateRules(string $tool, array $skipPaths = [], bool $asExample = true): array
+    public function generateRules(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
 
@@ -61,7 +61,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
             return [];
         }
 
-        $targetDir = $this->resolveRulesTargetDir($artifactConfig['rules_dir'], $asExample);
+        $targetDir = $this->resolveRulesTargetDir($artifactConfig['rules_dir'], $mode);
         $suffix = (string)$artifactConfig['rules_file_suffix'];
         $generated = [];
 
@@ -93,16 +93,16 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return string
      */
-    public function listAgentsFileTargetPath(string $tool, bool $asExample = true): string
+    public function listAgentsFileTargetPath(string $tool, ArtifactMode $mode = ArtifactMode::Real): string
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
         $agentsFile = (string)$artifactConfig['agents_file'];
         $absoluteBase = $this->projectRoot . DIRECTORY_SEPARATOR . $agentsFile;
-        $fileName = $asExample ? 'example.' . basename($agentsFile) : basename($agentsFile);
+        $fileName = $mode === ArtifactMode::Example ? 'example.' . basename($agentsFile) : basename($agentsFile);
 
         return dirname($absoluteBase) . DIRECTORY_SEPARATOR . $fileName;
     }
@@ -110,15 +110,15 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @throws \RuntimeException
      *
      * @return string|null
      */
-    public function generateAgentsFile(string $tool, array $skipPaths = [], bool $asExample = true): ?string
+    public function generateAgentsFile(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): ?string
     {
-        $examplePath = $this->listAgentsFileTargetPath($tool, $asExample);
+        $examplePath = $this->listAgentsFileTargetPath($tool, $mode);
 
         if (in_array($examplePath, $skipPaths, true)) {
             return null;
@@ -148,26 +148,26 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listSkillsTargetPaths(string $tool, bool $asExample = true): array
+    public function listSkillsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
         $targetDir = $this->projectRoot . DIRECTORY_SEPARATOR . (string)$artifactConfig['skills_dir'];
 
-        return $this->resolveSkillTargetPaths($targetDir, $asExample);
+        return $this->resolveSkillTargetPaths($targetDir, $mode);
     }
 
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function generateSkills(string $tool, array $skipPaths = [], bool $asExample = true): array
+    public function generateSkills(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
         $targetDir = $this->projectRoot . DIRECTORY_SEPARATOR . (string)$artifactConfig['skills_dir'];
@@ -180,7 +180,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
                 continue;
             }
 
-            $dirName = $asExample ? $item->getFilename() . '-example' : $item->getFilename();
+            $dirName = $mode === ArtifactMode::Example ? $item->getFilename() . '-example' : $item->getFilename();
             $targetSkillDir = sprintf('%s%s%s', $targetDir, DIRECTORY_SEPARATOR, $dirName);
 
             $this->assertPathIsWithinProjectRoot($targetSkillDir);
@@ -264,13 +264,13 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 
     /**
      * @param string $rulesDir
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return string
      */
-    protected function resolveRulesTargetDir(string $rulesDir, bool $asExample): string
+    protected function resolveRulesTargetDir(string $rulesDir, ArtifactMode $mode): string
     {
-        $dir = $asExample ? $rulesDir . '-example' : $rulesDir;
+        $dir = $mode === ArtifactMode::Example ? $rulesDir . '-example' : $rulesDir;
 
         return $this->projectRoot . DIRECTORY_SEPARATOR . $dir;
     }
@@ -300,11 +300,11 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 
     /**
      * @param string $targetDir
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    protected function resolveSkillTargetPaths(string $targetDir, bool $asExample): array
+    protected function resolveSkillTargetPaths(string $targetDir, ArtifactMode $mode): array
     {
         $paths = [];
 
@@ -313,7 +313,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
                 continue;
             }
 
-            $dirName = $asExample ? $item->getFilename() . '-example' : $item->getFilename();
+            $dirName = $mode === ArtifactMode::Example ? $item->getFilename() . '-example' : $item->getFilename();
 
             $paths[] = sprintf('%s%s%s', $targetDir, DIRECTORY_SEPARATOR, $dirName);
         }

@@ -11,54 +11,54 @@ interface AiToolArtifactGeneratorInterface
 {
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listRuleTargetPaths(string $tool, bool $asExample = true): array;
+    public function listRuleTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function generateRules(string $tool, array $skipPaths = [], bool $asExample = true): array;
+    public function generateRules(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return string
      */
-    public function listAgentsFileTargetPath(string $tool, bool $asExample = true): string;
+    public function listAgentsFileTargetPath(string $tool, ArtifactMode $mode = ArtifactMode::Real): string;
 
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return string|null
      */
-    public function generateAgentsFile(string $tool, array $skipPaths = [], bool $asExample = true): ?string;
+    public function generateAgentsFile(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): ?string;
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listSkillsTargetPaths(string $tool, bool $asExample = true): array;
+    public function listSkillsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
      * @param string $tool
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function generateSkills(string $tool, array $skipPaths = [], bool $asExample = true): array;
+    public function generateSkills(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
      * @param string $absolutePath

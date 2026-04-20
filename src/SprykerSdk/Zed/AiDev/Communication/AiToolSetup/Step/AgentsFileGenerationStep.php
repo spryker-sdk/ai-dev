@@ -9,6 +9,7 @@ namespace SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step;
 
 use SprykerSdk\Zed\AiDev\AiDevConfig;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface;
+use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class AgentsFileGenerationStep implements AiToolSetupStepInterface
@@ -59,26 +60,26 @@ class AgentsFileGenerationStep implements AiToolSetupStepInterface
 
     /**
      * @param string $tool
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
-    public function listTargetPaths(string $tool, bool $asExample = true): array
+    public function listTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
     {
-        return [$this->generator->listAgentsFileTargetPath($tool, $asExample)];
+        return [$this->generator->listAgentsFileTargetPath($tool, $mode)];
     }
 
     /**
      * @param string $tool
      * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param array<string> $skipPaths
-     * @param bool $asExample
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return void
      */
-    public function execute(string $tool, OutputInterface $output, array $skipPaths = [], bool $asExample = true): void
+    public function execute(string $tool, OutputInterface $output, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): void
     {
-        $path = $this->generator->generateAgentsFile($tool, $skipPaths, $asExample);
+        $path = $this->generator->generateAgentsFile($tool, $skipPaths, $mode);
 
         if ($path === null) {
             return;
@@ -86,7 +87,7 @@ class AgentsFileGenerationStep implements AiToolSetupStepInterface
 
         $output->writeln(sprintf('<info>Generated agents file:</info> <fg=cyan>%s</>', $this->generator->toRelativePath($path)));
 
-        if ($asExample) {
+        if ($mode === ArtifactMode::Example) {
             $agentsFileName = (string)$this->config->getToolArtifacts($tool)['agents_file'];
 
             $output->writeln(sprintf('<comment>Rename it to "%s" when ready to use.</comment>', $agentsFileName));
