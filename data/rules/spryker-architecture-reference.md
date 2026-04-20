@@ -91,7 +91,7 @@ src/Pyz/Yves/{ModuleName}/Theme/*/styles/
 config/Shared/config_default.php             — main application config (all environments)
 config/Shared/config_default-docker.*.php    — environment-specific overrides
 config/Shared/config_local.php               — local developer overrides (not committed)
-config/Shared/stores.php                     — store definitions
+config/Shared/stores.php                     — store definitions (only relevant when Dynamic Multi-Store is disabled)
 config/Zed/oms/                              — OMS process XML definitions
 config/Zed/StateMachine/                     — state machine XML definitions
 config/Zed/cronjobs/jenkins.php              — cron job schedules

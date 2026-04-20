@@ -20,7 +20,7 @@ globs: "**/*.php"
 | **String concatenation**          | Prefer sprintf.                                                                                                                          | E.g., use `sprintf('Message with data %s', $data)` over `"Message with data {$data}"`             |
 | **Interfaces**                    | Interfaces are NOT required unless the class is explicitly designed for polymorphic injection or extension. Exception: Facades, Services, Clients, and Plugins MUST always have a corresponding interface. | Do not create an interface just to have one implementation.                                       |
 | **Visibility**                    | Use private scope where appropriate.                                                                                                     | Project code is not required to be extendable by customers. Use private to make code more strict. |
-| **Type Declarations**             | Use PHP 8.4 native types for all declarations.                                                                                           | ✅ `private int $foo` ❌ `/** @var int */ protected $foo`                                           |
+| **Type Declarations**             | Use PHP 8.4 native types for all declarations.                                                                                           | GOOD: `private int $foo` BAD: `/** @var int */ protected $foo`                                     |
 
 # DocBlocks
 
@@ -36,7 +36,6 @@ Critical instructions:
 
 They are only allowed to:
 - Use doc-blocks for array/iterable element types: `@param array<\Generated\Shared\Transfer\OrderTransfer> $orders`, `@return array<int, \Generated\Shared\Transfer\ProductTransfer>`
-- Use `{@inheritDoc}` on implementations of interface methods
 - Add a doc-block with a description when explaining non-obvious business logic
 
 They are NOT allowed to:
@@ -101,29 +100,22 @@ public function indexOrders(array $orders): array
 {
 }
 
-// GOOD - implementation uses inheritDoc
-/**
- * {@inheritDoc}
- */
-public function expandProduct(ProductTransfer $productTransfer): ProductTransfer
-{
-}
 ```
 
 # Bad & Good Practices
 
 ## If/Else
 
-**NEVER use if/else constructs.** Always prefer early returns, early continues, or default value overrides.
+**Prefer avoiding if/else constructs** when early returns, early continues, or default value overrides make the intent clearer. Use judgment — forced avoidance of if/else can make complex logic harder to read.
 
-❌ BAD - If/Else
-✅ GOOD - Early return
+BAD - If/Else
+GOOD - Early return
 
-❌ BAD - If/Else for assignment
-✅ GOOD - Default value override
+BAD - If/Else for assignment
+GOOD - Default value override
 
-❌ BAD - If/Else in loop
-✅ GOOD - Early continue
+BAD - If/Else in loop
+GOOD - Early continue
 
 WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
 - Redundant doc-blocks add noise without adding information, making code harder to read

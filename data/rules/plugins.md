@@ -4,7 +4,7 @@ description: Use when writing or reviewing a Plugin class. Enforces that Plugins
 ---
 
 **Architecture rule**
-Spryker Plugins MUST NOT contain business logic.
+Spryker Plugins SHOULD NOT contain business logic.
 
 Critical instructions:
 - If business logic is found, it must be moved to a Model in the Business layer
@@ -18,7 +18,6 @@ They are only allowed to:
 
 They are NOT allowed to:
 - Perform calculations or validations
-- Call repositories or entities directly
 - Contain domain decision logic
 - Use any condition statements to control business flow
 - Instantiate new business objects (except transfer creation)

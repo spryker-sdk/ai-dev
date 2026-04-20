@@ -9,6 +9,7 @@ Controllers MUST only adapt requests and delegate to Facade or Client, containin
 Critical instructions:
 - Controllers MUST delegate to Facade or Client, never call Repository or EntityManager directly
 - Use castId() for integer ID extraction from request parameters
+- All request parameters MUST be validated before use; pass only validated parameters to Facade or Client
 - Controllers MUST NOT contain business logic, validation, or data transformation
 - Form handling logic is allowed within Controllers
 - Call models from the same layer if necessary to map or prepare data

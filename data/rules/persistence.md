@@ -10,9 +10,7 @@ The persistence layer is the only place that touches the database. Everything ou
 
 - Entities MUST NOT leave the Persistence layer — use Mapper to convert to/from Transfer Objects
 - Public methods MUST accept and return Transfer Objects or primitives only
-- No business logic, validation, or complex transformations in any persistence class
 - Prefer bulk operations over single-record operations for performance
-- All SQL and schema definitions MUST be compatible with MySQL, MariaDB, and PostgreSQL — no `GROUP_CONCAT`, `IFNULL`, backtick quoting, or other database-specific syntax
 
 ## Repository (read-only)
 
@@ -24,7 +22,7 @@ The persistence layer is the only place that touches the database. Everything ou
 
 - Methods MUST be write-only: `create*`, `update*`, `delete*`, `save*`
 - Use Mapper to convert Transfer Objects to Entities before persistence
-- Populate generated IDs back to the returned Transfer Object
+- After saving, Propel sets the auto-increment ID on the entity; copy it back to the returned Transfer Object so callers receive the new record ID
 - MUST NOT be called directly from other modules
 
 ## Query Objects

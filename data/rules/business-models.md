@@ -16,4 +16,3 @@ Models in Business, Service, and Client layers MUST have a single responsibility
 
 - Use Repository/EntityManager from the same module
 - Cross-module calls MUST go through injected Facades wired via DependencyProvider and Factory — never direct model access
-- Caching MUST be at infrastructure level (Repository), not in business models
