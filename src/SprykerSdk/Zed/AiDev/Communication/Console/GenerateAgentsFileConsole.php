@@ -15,6 +15,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @method \SprykerSdk\Zed\AiDev\Communication\AiDevCommunicationFactory getFactory()
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
  */
+/**
+ * @deprecated Use \SprykerSdk\Zed\AiDev\Communication\Console\AiToolSetupConsole instead.
+ */
 class GenerateAgentsFileConsole extends Console
 {
     protected const string COMMAND_NAME = 'ai-dev:generate-agents-file';

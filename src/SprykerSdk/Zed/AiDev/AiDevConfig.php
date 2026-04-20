@@ -19,6 +19,81 @@ class AiDevConfig extends AbstractBundleConfig
         'version' => '0.1.0',
     ];
 
+    protected const string TOOL_CLAUDE_CODE = 'Claude Code';
+
+    protected const string TOOL_WINDSURF = 'Windsurf';
+
+    protected const string TOOL_COPILOT = 'GitHub Copilot';
+
+    protected const string TOOL_CURSOR = 'Cursor';
+
+    protected const string TOOL_OPENCODE = 'OpenCode';
+
+    protected const string TOOL_CODEX = 'Codex CLI';
+
+    /**
+     * Detection order: indicator path (relative to project root) => tool name.
+     * First match wins; .codex requires an extra confirmation step in the command.
+     *
+     * @var array<string, string>
+     */
+    protected const array TOOL_DETECTION_MAP = [
+        '.claude' => self::TOOL_CLAUDE_CODE,
+        '.windsurf' => self::TOOL_WINDSURF,
+        '.github' => self::TOOL_COPILOT,
+        '.cursor' => self::TOOL_CURSOR,
+        'opencode.json' => self::TOOL_OPENCODE,
+        '.codex' => self::TOOL_CODEX,
+    ];
+
+    /**
+     * Per-tool artifact configuration.
+     * rules_dir: null means rules generation is skipped for that tool.
+     * rules_file_suffix: suffix applied to the source filename (source .md extension is stripped first).
+     * agents_file: path relative to project root.
+     * skills_dir: path relative to project root.
+     *
+     * @var array<string, array<string, string|null>>
+     */
+    protected const array TOOL_ARTIFACT_MAP = [
+        self::TOOL_CLAUDE_CODE => [
+            'rules_dir' => '.claude/rules',
+            'rules_file_suffix' => '.md',
+            'agents_file' => 'CLAUDE.md',
+            'skills_dir' => '.claude/skills',
+        ],
+        self::TOOL_WINDSURF => [
+            'rules_dir' => '.windsurf/rules',
+            'rules_file_suffix' => '.md',
+            'agents_file' => '.windsurfrules',
+            'skills_dir' => '.windsurf/skills',
+        ],
+        self::TOOL_COPILOT => [
+            'rules_dir' => '.github/instructions',
+            'rules_file_suffix' => '.instructions.md',
+            'agents_file' => '.github/copilot-instructions.md',
+            'skills_dir' => '.github/skills',
+        ],
+        self::TOOL_CURSOR => [
+            'rules_dir' => '.cursor/rules',
+            'rules_file_suffix' => '.mdc',
+            'agents_file' => 'AGENTS.md',
+            'skills_dir' => '.cursor/skills',
+        ],
+        self::TOOL_OPENCODE => [
+            'rules_dir' => '.opencode/rules',
+            'rules_file_suffix' => '.md',
+            'agents_file' => 'AGENTS.md',
+            'skills_dir' => '.agents/skills',
+        ],
+        self::TOOL_CODEX => [
+            'rules_dir' => null,
+            'rules_file_suffix' => null,
+            'agents_file' => 'AGENTS.md',
+            'skills_dir' => '.agents/skills',
+        ],
+    ];
+
     /**
      * @api
      *
@@ -86,5 +161,72 @@ class AiDevConfig extends AbstractBundleConfig
     public function getSkillsExamplesDirectory(): string
     {
         return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/agents/skill-examples';
+    }
+
+    /**
+     * Specification:
+     * - Returns the ordered map of indicator path => tool name used for auto-detection.
+     *
+     * @api
+     *
+     * @return array<string, string>
+     */
+    public function getToolDetectionMap(): array
+    {
+        return static::TOOL_DETECTION_MAP;
+    }
+
+    /**
+     * Specification:
+     * - Returns per-tool artifact configuration (rules dir, agents file, skills dir).
+     *
+     * @api
+     *
+     * @param string $tool
+     *
+     * @return array<string, string|null>
+     */
+    public function getToolArtifacts(string $tool): array
+    {
+        return static::TOOL_ARTIFACT_MAP[$tool] ?? [];
+    }
+
+    /**
+     * Specification:
+     * - Returns the absolute path to the bundled rules source directory.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getRulesSourceDirectory(): string
+    {
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/rules';
+    }
+
+    /**
+     * Specification:
+     * - Returns the tool name that requires extra confirmation on detection.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getToolRequiringConfirmation(): string
+    {
+        return static::TOOL_CODEX;
+    }
+
+    /**
+     * @api
+     *
+     * @return array<string>
+     */
+    public function getRuleCompatibleTools(): array
+    {
+        return array_values(array_keys(array_filter(
+            static::TOOL_ARTIFACT_MAP,
+            static fn (array $config): bool => $config['rules_dir'] !== null,
+        )));
     }
 }
