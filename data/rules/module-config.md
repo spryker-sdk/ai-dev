@@ -1,7 +1,7 @@
 ---
 name: module-config
 description: Use when defining or modifying module configuration — Constants.php in the Shared layer or Config.php per layer. Enforces constant placement, layer-specific Config method conventions, and project-level override patterns.
-globs: "src/Pyz/**/*{Constants,Config}.php"
+paths: "src/**/*{Constants,Config}.php"
 ---
 
 **Architecture rule**

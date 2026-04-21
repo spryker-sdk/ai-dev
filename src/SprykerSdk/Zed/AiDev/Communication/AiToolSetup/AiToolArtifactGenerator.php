@@ -17,10 +17,12 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     /**
      * @param string $projectRoot
      * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformerInterface $frontmatterTransformer
      */
     public function __construct(
         protected string $projectRoot,
         protected AiDevConfig $config,
+        protected RuleFrontmatterTransformerInterface $frontmatterTransformer,
     ) {
     }
 
@@ -81,8 +83,17 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
                 continue;
             }
 
-            if (!copy($item->getPathname(), $targetPath)) {
-                throw new RuntimeException(sprintf('Failed to copy "%s" to "%s".', $item->getPathname(), $targetPath));
+            $content = file_get_contents($item->getPathname());
+
+            if ($content === false) {
+                throw new RuntimeException(sprintf('Failed to read rule source "%s".', $item->getPathname()));
+            }
+
+            $spec = $this->config->getToolFrontmatterSpec($tool);
+            $transformed = $this->frontmatterTransformer->transform($content, $spec);
+
+            if (file_put_contents($targetPath, $transformed) === false) {
+                throw new RuntimeException(sprintf('Failed to write rule to "%s".', $targetPath));
             }
 
             $generated[] = $targetPath;
@@ -103,7 +114,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         $agentsFile = (string)$artifactConfig['agents_file'];
         $absoluteBase = $this->projectRoot . DIRECTORY_SEPARATOR . $agentsFile;
         $fileName = $mode === ArtifactMode::Example ? 'example.' . basename($agentsFile) : basename($agentsFile);
-
+        
         return dirname($absoluteBase) . DIRECTORY_SEPARATOR . $fileName;
     }
 

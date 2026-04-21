@@ -32,6 +32,69 @@ class AiDevConfig extends AbstractBundleConfig
     protected const string TOOL_CODEX = 'Codex CLI';
 
     /**
+     * Per-tool frontmatter transformation spec applied when publishing source rules.
+     *
+     * scope_key:            target field name for the file scope pattern (null = omit the field entirely)
+     * keep_name:            include the `name` field in the output
+     * keep_description:     include the `description` field in the output
+     * trigger_with_scope:   value for the `trigger` field when the rule has a paths value (null = omit)
+     * trigger_no_scope:     value for the `trigger` field when the rule has no paths value (null = omit)
+     * fallback_scope:       scope value used when the source rule has no paths field (null = omit)
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    protected const array TOOL_FRONTMATTER_SPEC = [
+        self::TOOL_CLAUDE_CODE => [
+            'scope_key' => 'paths',
+            'keep_name' => false,
+            'keep_description' => false,
+            'trigger_with_scope' => null,
+            'trigger_no_scope' => null,
+            'fallback_scope' => null,
+        ],
+        self::TOOL_WINDSURF => [
+            'scope_key' => 'globs',
+            'keep_name' => false,
+            'keep_description' => true,
+            'trigger_with_scope' => 'glob',
+            'trigger_no_scope' => 'always_on',
+            'fallback_scope' => null,
+        ],
+        self::TOOL_COPILOT => [
+            'scope_key' => 'applyTo',
+            'keep_name' => false,
+            'keep_description' => false,
+            'trigger_with_scope' => null,
+            'trigger_no_scope' => null,
+            'fallback_scope' => '**',
+        ],
+        self::TOOL_CURSOR => [
+            'scope_key' => 'globs',
+            'keep_name' => true,
+            'keep_description' => true,
+            'trigger_with_scope' => null,
+            'trigger_no_scope' => null,
+            'fallback_scope' => null,
+        ],
+        self::TOOL_OPENCODE => [
+            'scope_key' => 'globs',
+            'keep_name' => true,
+            'keep_description' => true,
+            'trigger_with_scope' => null,
+            'trigger_no_scope' => null,
+            'fallback_scope' => null,
+        ],
+        self::TOOL_CODEX => [
+            'scope_key' => null,
+            'keep_name' => false,
+            'keep_description' => false,
+            'trigger_with_scope' => null,
+            'trigger_no_scope' => null,
+            'fallback_scope' => null,
+        ],
+    ];
+
+    /**
      * Detection order: indicator path (relative to project root) => tool name.
      * First match wins; .codex requires an extra confirmation step in the command.
      *
@@ -215,6 +278,22 @@ class AiDevConfig extends AbstractBundleConfig
     public function getToolRequiringConfirmation(): string
     {
         return static::TOOL_CODEX;
+    }
+
+    /**
+     * Specification:
+     * - Returns the frontmatter transformation spec for the given tool.
+     * - Returns an empty array when no spec is defined for the tool.
+     *
+     * @api
+     *
+     * @param string $tool
+     *
+     * @return array<string, mixed>
+     */
+    public function getToolFrontmatterSpec(string $tool): array
+    {
+        return static::TOOL_FRONTMATTER_SPEC[$tool] ?? [];
     }
 
     /**

@@ -1,7 +1,7 @@
 ---
 name: mapper-pattern
 description: Use when writing or reviewing a Mapper class. Enforces that Mappers transform data only — both source AND target are passed as parameters, stateless, no queries or lazy loading, no business logic.
-globs: "src/Pyz/**/*Mapper.php"
+paths: "src/**/*Mapper.php"
 ---
 
 **Architecture rule**

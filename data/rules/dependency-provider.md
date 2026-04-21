@@ -1,6 +1,7 @@
 ---
 name: dependency-provider
 description: Use when writing or modifying a DependencyProvider or wiring dependencies between modules.
+paths: "src/**/*DependencyProvider.php"
 ---
 
 **Architecture rule**

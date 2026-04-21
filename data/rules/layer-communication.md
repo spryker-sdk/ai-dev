@@ -1,7 +1,7 @@
 ---
 name: layer-communication
 description: Use when writing or reviewing any PHP code that crosses layer boundaries. Enforces the strict hierarchy Presentation → Communication → Business → Persistence — no upward access, cross-module calls via Facade only.
-globs: "src/Pyz/**/*.php"
+paths: "src/**/*.php"
 ---
 
 **Architecture rule**
@@ -26,6 +26,7 @@ They are NOT allowed to:
 - Business layer accessing Presentation/Communication
 - Direct cross-module Business model access
 - Skipping layer boundaries
+- Propel entities leaving the Persistence layer — use Mapper to convert to/from Transfer Objects before returning
 
 WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
 - Rule in [public documentation](https://docs.spryker.com/docs/dg/dev/architecture/module-api/definition-api.html)

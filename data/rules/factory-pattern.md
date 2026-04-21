@@ -1,7 +1,7 @@
 ---
 name: factory-pattern
 description: Use when writing or reviewing a Factory class. Enforces create* prefix for new instances, get* prefix for shared dependencies, no business logic, and access to dependencies via getProvidedDependency().
-globs: "src/Pyz/**/*Factory.php"
+paths: "src/**/*Factory.php"
 ---
 
 **Architecture rule**

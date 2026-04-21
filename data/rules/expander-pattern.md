@@ -1,7 +1,7 @@
 ---
 name: expander-pattern
 description: Use when writing or reviewing an Expander class. Enforces that Expanders enrich incoming Transfer Objects in place, remain stateless, handle null or missing data gracefully, and return the same instance they received.
-globs: "src/Pyz/Zed/*/Business/**/*Expander.php"
+paths: "src/**/Zed/*/Business/**/*Expander.php"
 ---
 
 **Architecture rule**

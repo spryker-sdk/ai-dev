@@ -1,6 +1,7 @@
 ---
 name: upgradability
 description: Use when writing or reviewing any Spryker project code that extends or customizes core modules — including plugins, facades, models, configuration, and DependencyProviders. Enforces upgrade-safe customization strategies to keep the project compatible with the Spryker Code Upgrader.
+paths: "**/*.{php,js,ts,jsx,tsx,twig}"
 ---
 
 **Upgradability rule**
@@ -36,6 +37,5 @@ Use the least invasive strategy that fulfills the requirement:
 
 ## Keeping upgrades safe
 
-- Keep Spryker packages on the latest minor within a major — delayed updates compound upgrade effort significantly
 - Avoid locking transitive Spryker dependencies in `composer.json`; let Composer resolve compatible versions
 - Dev packages (`spryker/*-dev`) MUST NOT be present in production `require` — use `require-dev` only

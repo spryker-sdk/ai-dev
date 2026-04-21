@@ -1,6 +1,7 @@
 ---
 name: controller
 description: Use when writing, reviewing, or modifying any Controller class. Enforces the thin-controller pattern — delegate to Facade/Client/Service only, no business logic, no direct persistence access.
+paths: "src/**/*Controller.php"
 ---
 
 **Architecture rule**

@@ -1,6 +1,7 @@
 ---
 name: client-zed-communication
 description: Use when writing or reviewing communication between Yves/Glue and Zed through the Client layer via Zed Stub and GatewayController.
+paths: "src/**/Yves/**/*.php,src/**/Glue/**/*.php,src/**/Client/**/*.php,src/**/Zed/**/Communication/Controller/GatewayController.php"
 ---
 
 **Architecture rule**

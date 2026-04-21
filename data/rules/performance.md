@@ -1,6 +1,7 @@
 ---
 name: performance
 description: Use when writing or reviewing performance-sensitive Spryker code — storefront reads, database writes, batch processing, or key-value storage access. Enforces architecture boundaries, batching patterns, and efficient Redis/Valkey usage.
+paths: "**/*.{php,js,ts,jsx,tsx,twig}"
 ---
 
 **Performance rule**

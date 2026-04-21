@@ -1,7 +1,7 @@
 ---
 name: php-code-style
 description: Use when writing or editing any PHP file. Enforces PHP 8.4 native types over DocBlocks, minimalist DocBlock rules, no if/else (early returns instead), max nesting level 2, sprintf over concatenation, and private visibility preference for project code.
-globs: "**/*.php"
+paths: "**/*.php"
 ---
 
 # General Principle
@@ -9,6 +9,9 @@ globs: "**/*.php"
 **Always apply rules over existing patterns.** When writing new code, follow the rules — not what you see in the surrounding file. Existing code may predate these rules or simply be wrong. Never use "the existing code does it this way" as justification for skipping a rule. Only mirror an existing pattern if no rule covers the situation and the pattern is clearly intentional.
 
 # PHP Code & Structure
+
+These rules MUST be applied to ALL code you write or modify, regardless of the style used in the surrounding or existing code.
+Do NOT follow patterns from legacy code that conflict with these rules.
 
 | Rule Category                     | Directive                                                                                                                                | Details & Rationale                                                                               |
 |:----------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------|

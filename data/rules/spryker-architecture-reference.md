@@ -1,6 +1,7 @@
 ---
 name: spryker-architecture-reference
 description: Use as a reference when navigating Spryker module structure, layer organization, or file-path patterns. Explains Zed/Yves/Client/Service/Shared/Glue layers, the src/Pyz project namespace, and where different file types belong.
+paths: "**/*.{php,xml,json,twig,js,ts,scss}"
 ---
 # Spryker Architecture Reference
 

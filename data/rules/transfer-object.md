@@ -1,7 +1,7 @@
 ---
 name: transfer-object
 description: Use when creating or modifying a transfer XML file. Enforces singular names with Transfer suffix, singular attribute names for array bundles, strict="true", and reserved suffixes (Entity, Attributes, ApiAttributes, BackendApiAttributes).
-globs: "src/Pyz/**/*.transfer.xml"
+paths: "src/**/*.transfer.xml"
 ---
 
 **Architecture rule**

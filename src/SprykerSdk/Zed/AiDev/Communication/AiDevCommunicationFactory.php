@@ -14,6 +14,7 @@ use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGenerator;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolDetector;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolDetectorInterface;
+use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformer;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsFileGenerationStep;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\RulesGenerationStep;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\SkillsGenerationStep;
@@ -61,7 +62,7 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
      */
     public function createAiToolArtifactGenerator(): AiToolArtifactGeneratorInterface
     {
-        return new AiToolArtifactGenerator(APPLICATION_ROOT_DIR, $this->getConfig());
+        return new AiToolArtifactGenerator(APPLICATION_ROOT_DIR, $this->getConfig(), new RuleFrontmatterTransformer());
     }
 
     /**

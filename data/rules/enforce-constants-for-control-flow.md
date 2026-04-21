@@ -1,6 +1,7 @@
 ---
 name: enforce-constants-for-control-flow
 description: Use when writing or reviewing PHP code. Enforces that domain-meaningful string literals used in control flow, comparisons, or property assignments must be extracted into constants. Exception messages and sprintf format strings are exempt.
+paths: "src/**/*.php"
 ---
 
 **Architecture rule**

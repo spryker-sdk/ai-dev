@@ -1,6 +1,7 @@
 ---
 name: form-data-loading-performance
 description: Use when designing or reviewing any form field populated from a database query (dropdowns, selects, choice fields). Before implementation, evaluate expected data volume and choose one of four strategies — configurable limit, async autocomplete, structurally bounded, or paginated picker.
+paths: "src/**/Zed/**/Communication/Form/**/*.php,src/**/Yves/**/Form/**/*.php"
 ---
 
 **Architecture rule**

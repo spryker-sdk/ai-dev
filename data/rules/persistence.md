@@ -1,6 +1,7 @@
 ---
 name: persistence
 description: Use when writing or reviewing any persistence layer class (Repository, EntityManager, Entity, Query Object) or a Propel schema file.
+paths: "src/**/Persistence/**/*.php,src/**/Persistence/Propel/Schema/*.schema.xml"
 ---
 
 **Architecture rule**
@@ -8,7 +9,6 @@ The persistence layer is the only place that touches the database. Everything ou
 
 ## General Rules
 
-- Entities MUST NOT leave the Persistence layer — use Mapper to convert to/from Transfer Objects
 - Public methods MUST accept and return Transfer Objects or primitives only
 - Prefer bulk operations over single-record operations for performance
 

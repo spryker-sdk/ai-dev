@@ -1,7 +1,7 @@
 ---
 name: owasp
 description: Use during any code review and when writing code that handles user input, authentication, data storage, or external calls. Enforces OWASP Top 10 categories as blocking issues — flag injection, access control, cryptographic, auth, and logging failures.
-globs: "**/*.{php,js,ts,jsx,tsx}"
+paths: "**/*.{php,js,ts,jsx,tsx}"
 ---
 
 **Security rule**

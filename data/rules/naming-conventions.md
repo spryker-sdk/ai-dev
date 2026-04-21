@@ -1,6 +1,7 @@
 ---
 name: naming-conventions
 description: Use when naming any class, method, variable, or constant. Enforces Spryker suffix conventions (Facade, Factory, Repository, Controller, Plugin), forbids Executor/Handler/Worker, discourages Manager/Helper, and locks method and variable patterns (find/get/has, idX, isX/hasX).
+paths: "src/**/*.php"
 ---
 
 **Architecture rule**
