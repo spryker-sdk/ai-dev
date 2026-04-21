@@ -12,7 +12,10 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
     protected const string FRONTMATTER_PATTERN = '/^---\r?\n(.*?)\r?\n---\r?\n(.*)/s';
 
     /**
-     * {@inheritDoc}
+     * @param string $content
+     * @param array<string, mixed> $spec
+     *
+     * @return string
      */
     public function transform(string $content, array $spec): string
     {
