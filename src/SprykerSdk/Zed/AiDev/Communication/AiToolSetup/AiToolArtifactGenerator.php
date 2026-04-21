@@ -114,7 +114,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         $agentsFile = (string)$artifactConfig['agents_file'];
         $absoluteBase = $this->projectRoot . DIRECTORY_SEPARATOR . $agentsFile;
         $fileName = $mode === ArtifactMode::Example ? 'example.' . basename($agentsFile) : basename($agentsFile);
-        
+
         return dirname($absoluteBase) . DIRECTORY_SEPARATOR . $fileName;
     }
 

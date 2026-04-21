@@ -34,12 +34,12 @@ class AiDevConfig extends AbstractBundleConfig
     /**
      * Per-tool frontmatter transformation spec applied when publishing source rules.
      *
-     * scope_key:            target field name for the file scope pattern (null = omit the field entirely)
-     * keep_name:            include the `name` field in the output
-     * keep_description:     include the `description` field in the output
-     * trigger_with_scope:   value for the `trigger` field when the rule has a paths value (null = omit)
-     * trigger_no_scope:     value for the `trigger` field when the rule has no paths value (null = omit)
-     * fallback_scope:       scope value used when the source rule has no paths field (null = omit)
+     * scope_key: target field name for the file scope pattern (null = omit the field entirely)
+     * keep_name: include the `name` field in the output
+     * keep_description: include the `description` field in the output
+     * trigger_with_scope: value for the `trigger` field when the rule has a paths value (null = omit)
+     * trigger_no_scope: value for the `trigger` field when the rule has no paths value (null = omit)
+     * fallback_scope: scope value used when the source rule has no paths field (null = omit)
      *
      * @var array<string, array<string, mixed>>
      */
