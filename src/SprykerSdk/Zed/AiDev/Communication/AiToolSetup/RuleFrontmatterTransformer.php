@@ -127,9 +127,21 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
         $lines = [];
 
         foreach ($fields as $key => $value) {
-            $lines[] = sprintf('%s: "%s"', $key, $value);
+            $lines[] = $this->requiresQuoting($value)
+                ? sprintf('%s: "%s"', $key, $value)
+                : sprintf('%s: %s', $key, $value);
         }
 
         return sprintf("---\n%s\n---\n%s", implode("\n", $lines), $body);
+    }
+
+    /**
+     * @param string $value
+     *
+     * @return bool
+     */
+    protected function requiresQuoting(string $value): bool
+    {
+        return (bool)preg_match('/[\s:,\[\]{}#&*!|>\'"%@`]/', $value);
     }
 }
