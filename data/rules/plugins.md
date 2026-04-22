@@ -1,7 +1,7 @@
 ---
 name: plugins
 description: Use when writing or reviewing a Plugin class. Enforces that Plugins only wire or adapt — no business logic, no persistence access, delegate to Facade or injected dependencies.
-paths: "src/**/Plugin/**/*Plugin.php"
+paths: "src/**/*Plugin.php"
 ---
 
 **Architecture rule**

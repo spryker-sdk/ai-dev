@@ -21,6 +21,7 @@ The persistence layer is the only place that touches the database. Everything ou
 ## EntityManager (write-only)
 
 - Methods MUST be write-only: `create*`, `update*`, `delete*`, `save*`
+- May read existing entities internally when required for the write operation — avoid an extra Repository call for intermediate reads within a write flow
 - Use Mapper to convert Transfer Objects to Entities before persistence
 - After saving, Propel sets the auto-increment ID on the entity; copy it back to the returned Transfer Object so callers receive the new record ID
 - MUST NOT be called directly from other modules
@@ -38,3 +39,17 @@ The persistence layer is the only place that touches the database. Everything ou
 - Define explicit field lengths — `VARCHAR(255)` is forbidden unless the field genuinely requires that length
 - Column length can only be increased, never decreased
 - Define indexes for performance-critical columns
+- All foreign keys must be NOT NULL unless explicitly optional
+- Boolean columns must use is_ or has_ prefix
+- Foreign‑key columns must end with _id
+- Columns used for filtering or sorting must be indexed
+- Index names must follow idx_[table]_[column]
+- Unique constraints must follow uq_[table]_[column]
+- Avoid engine‑specific types such as MySQL ENUM or SET
+- Use DECIMAL(p, s) for measurable values
+- Never use floating‑point types for monetary data
+- Table prefixes must follow spy_ (core) and pyz_ (project)
+- Use UTF‑8 / utf8mb4; avoid database‑specific collations
+- New columns must allow NULL or have safe defaults
+- Column renaming or narrowing requires backward‑compatible migrations
+- Avoid reserved SQL keywords in all column names

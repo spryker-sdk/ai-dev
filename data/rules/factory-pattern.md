@@ -25,6 +25,7 @@ They are NOT allowed to:
 - Contain business logic or calculations
 - Use method prefixes other than create*/get*
 - Perform data transformations
+- Pass the Factory instance as a constructor parameter to the model
 
 WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
 - Clear create*/get* pattern communicates instantiation strategy

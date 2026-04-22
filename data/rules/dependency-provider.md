@@ -131,7 +131,7 @@ class CartBusinessFactory extends SprykerCartBusinessFactory
 }
 ```
 
-> **Note:** Bridges are a core-level concept only. At the project level, never extend or subclass a core Bridge class — instead follow the pattern above: extend the bridge *interface* in the consuming module, extend the *facade* in the providing module, and wire directly via the locator.
+> **Note:** Bridges are a deprecated concept. At the project level, never extend or subclass a core Bridge class — instead follow the pattern above: extend the bridge *interface* in the consuming module, extend the *facade* in the providing module, and wire directly via the locator.
 
 WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
 - Rule in [public documentation](https://docs.spryker.com/docs/dg/dev/backend-development/zed/dependency-provider.html)
