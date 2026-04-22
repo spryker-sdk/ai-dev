@@ -17,7 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @method \SprykerSdk\Zed\AiDev\Business\AiDevFacadeInterface getFacade()
  */
 /**
- * @deprecated Use \SprykerSdk\Zed\AiDev\Communication\Console\AiToolSetupConsole instead.
+ * @deprecated Use {@link \SprykerSdk\Zed\AiDev\Communication\Console\AiToolSetupConsole} instead.
  */
 class GenerateSkillsConsole extends Console
 {
