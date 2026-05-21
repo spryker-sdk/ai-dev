@@ -416,11 +416,13 @@ In **3–5 lines**, tell the user:
 - What was installed (package + version).
 - Which file was edited and how many consoles were added (state the *actual* file edited — Pyz or the project-namespace override).
 - That the MCP server is registered under the project root folder name (state the actual name used).
-- That the user must **restart Claude Code** (or open a new session in this project directory) for the Spryker MCP tools to become available in-session — the running session will not pick them up automatically.
 - The outcome of Step 5 — list each of the two artifacts (`CLAUDE.md`, rules) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`.
+- ALWAYS highlight that the user must **restart Claude Code /exit** (or open a new session in this project directory) for the Spryker MCP tools to become available in-session — the running session will not pick them up automatically.
+- Suggest setup improvents:
+  - Setup plugin with Language Server php-lsp@claude-plugins-official https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md
+  - Setup MCP server for Context7 to work with Spryker documentation https://docs.spryker.com/docs/dg/dev/ai/ai-assistants/context7-mcp-server
 
 Do **not** print a long summary or restate the steps. The user can read the diff.
-
 
 ## What to refuse / escalate
 
