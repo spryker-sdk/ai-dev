@@ -16,7 +16,7 @@
             },
             "category": "development",
             "source": "./plugins/spryker-ai-dev-sdk",
-            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev"
+            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-claude-code-plugin"
         }
     ]
 }
