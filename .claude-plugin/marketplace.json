@@ -1,0 +1,22 @@
+{
+    "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+    "name": "spryker-plugins-official",
+    "description": "Directory of plugins maintained by Spryker Systems GmbH.",
+    "owner": {
+        "name": "Spryker Systems GmbH",
+        "email": "support@spryker.com"
+    },
+    "plugins": [
+        {
+            "name": "spryker-ai-dev-sdk",
+            "description": "Set of setup tools and skills for Spryker project development.",
+            "author": {
+                "name": "Spryker Systems GmbH",
+                "email": "support@spryker.com"
+            },
+            "category": "development",
+            "source": "./plugins/spryker-ai-dev-sdk",
+            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev"
+        }
+    ]
+}

@@ -14,12 +14,10 @@ composer require spryker-sdk/ai-dev --dev
 docker/sdk console transfer:generate
 ```
 
-Register the console commands in your `ConsoleDependencyProvider`:
+Register the console commands in your `ConsoleDependencyProvider`. The `class_exists()` guards keep the project bootable on environments where the dev dependency is absent (e.g. production):
 
 ```php
-use SprykerSdk\Zed\AiDev\Communication\Console\GenerateAgentsFileConsole;
-use SprykerSdk\Zed\AiDev\Communication\Console\GeneratePromptsConsole;
-use SprykerSdk\Zed\AiDev\Communication\Console\GenerateSkillsConsole;
+use SprykerSdk\Zed\AiDev\Communication\Console\AiToolSetupConsole;
 use SprykerSdk\Zed\AiDev\Communication\Console\McpServerConsole;
 
 protected function getConsoleCommands(Container $container): array
@@ -28,19 +26,13 @@ protected function getConsoleCommands(Container $container): array
         $commands[] = new McpServerConsole();
     }
 
-    if (class_exists(GenerateAgentsFileConsole::class)) {
-        $commands[] = new GenerateAgentsFileConsole();
-    }
-
-    if (class_exists(GenerateSkillsConsole::class)) {
-        $commands[] = new GenerateSkillsConsole();
-    }
-
-    if (class_exists(GeneratePromptsConsole::class)) {
-        $commands[] = new GeneratePromptsConsole();
+    if (class_exists(AiToolSetupConsole::class)) {
+        $commands[] = new AiToolSetupConsole();
     }
 }
 ```
+
+> The previously documented `GenerateAgentsFileConsole`, `GenerateSkillsConsole`, and `GeneratePromptsConsole` commands are outdated. Their functionality is delivered through the Claude plugin (see below) and `ai-dev:setup` — do not wire them.
 
 ## Quick Start
 
@@ -63,6 +55,44 @@ claude mcp add spryker-project  -- $(pwd)/docker/sdk console ai-dev:mcp-server -
 }
 ```
 
+## Claude Plugin
+
+This repository also ships a Claude Code plugin — `spryker-ai-dev-sdk` — that bundles Spryker-aware skills (e.g. `propel-schema`, `data-import`, `code-review`, `cypress-e2e-test`, `codecept-functional`, `static-validation`, `yves-atomic-frontend`, `ai-dev-setup`) and a `spryker-code-reviewer` agent. Source layout:
+
+- `.claude-plugin/marketplace.json` — marketplace manifest (`spryker-plugins-official`).
+- `plugins/spryker-ai-dev-sdk/.claude-plugin/plugin.json` — plugin manifest.
+- `plugins/spryker-ai-dev-sdk/skills/<name>/SKILL.md` — individual skills.
+- `plugins/spryker-ai-dev-sdk/agents/*.md` — bundled subagents.
+
+### Install from the Spryker marketplace
+
+Inside Claude Code:
+
+```text
+/plugin marketplace add spryker-sdk/ai-dev
+/plugin install spryker-ai-dev-sdk@spryker-plugins-official
+```
+
+After install, restart the Claude Code session for the new skills and agents to appear. Verify with `/plugin` (Claude Code lists installed plugins) and by invoking a user-facing skill such as `/ai-dev-setup`.
+
+### Test the plugin locally
+
+Useful while developing skills or agents in this repo without publishing first.
+
+1. Launch Claude Code with the plugin loaded directly from this checkout:
+
+   ```bash
+   claude --plugin-dir /absolute/path/to/vendor/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk
+   ```
+
+   The path must point at the plugin directory (the one containing `.claude-plugin/plugin.json`), not at the repository root.
+
+2. Verify the plugin is loaded with `/plugin` and by invoking a user-facing skill such as `/ai-dev-setup`.
+
+3. After editing a `SKILL.md` or an agent definition, restart the session — skill frontmatter is parsed at load time and is not hot-reloaded.
+
+Reference: [Discover plugins — Claude Code docs](https://code.claude.com/docs/en/discover-plugins).
+
 ## Prompts
 
 Prompts are auto-generated from the [Spryker Prompt Library](https://github.com/spryker-dev/prompt-library) on first run. To regenerate:
@@ -76,6 +106,7 @@ docker/sdk console ai-dev:generate-prompts
 For detailed setup, configuration, and extension points:
 - [AI Dev Overview](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-overview.html)
 - [MCP Server Configuration](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html)
+- [Claude Code — Discover plugins](https://code.claude.com/docs/en/discover-plugins)
 
 ## Debugging
 
