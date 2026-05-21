@@ -1,8 +1,6 @@
 ---
 name: spryker-code-reviewer
 description: Review code for compliance with Spryker standards
-color: blue
-permissionMode: bypassPermissions
 ---
 
 # Workflow

@@ -310,11 +310,9 @@ The onboarder installs two project-level artifacts: `CLAUDE.md` at the project r
 Source-of-truth content for both artifacts lives in the package install at `vendor/spryker-sdk/ai-dev/data/`:
 
 - `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md` — bundled agents/CLAUDE file
-- `vendor/spryker-sdk/ai-dev/data/rules/*.md` — bundled rule files (typically ~19 files in v0.5.x)
+- `vendor/spryker-sdk/ai-dev/data/rules/*.md` — bundled rule files
 
 The package also ships an interactive console command — `docker/sdk cli console ai-dev:setup` — that walks through copying these into the project. **Prefer `ai-dev:setup` when it exists** so the package owns the placement logic. Some package versions do not yet ship a setup command, or ship one that prompts in a way that doesn't fit the agent's per-artifact consent flow. In that case, fall back to a direct `cp` from `vendor/spryker-sdk/ai-dev/data/`.
-
-> Note for skill maintainers: earlier revisions of this skill referenced `${CLAUDE_PLUGIN_ROOT}/bin/install-agents-md.sh` and `${CLAUDE_PLUGIN_ROOT}/bin/install-rules.sh`. Those scripts do NOT ship with `spryker-sdk/ai-dev 0.5.x`. Do not invoke them blindly — `test -x` the path first and fall back to `ai-dev:setup` or `cp` if absent.
 
 ### Resolve the bundled-content source
 
