@@ -223,7 +223,7 @@ class AiDevConfig extends AbstractBundleConfig
      */
     public function getSkillsExamplesDirectory(): string
     {
-        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev/skills';
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/skills';
     }
 
     /**
