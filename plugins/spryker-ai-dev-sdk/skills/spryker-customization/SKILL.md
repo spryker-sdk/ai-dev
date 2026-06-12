@@ -24,6 +24,15 @@ Before any planning, get two things from the user — together, in one round.
 - **PoC** — fast, throwaway. Hardcoded values OK. No tests. **The entry-point class absorbs the canonical chain** — for whatever domain (cart calculator plugin, BO controller, GLUE resource, storefront widget, OMS condition, etc.), put the logic directly in the entry-point class. No supporting classes (Calculator, Saver, Remover, Mapper, Adapter, FormHandler, etc. — names vary by domain) when the entry-point can do the job. No interfaces for single-implementation classes. Target: 1–2 PHP classes per feature.
 - **MVP** — canonical Spryker patterns. Use the framework's plugin chains, factory expanders, project-layer transfer XML. **No hardcoded values** — config or DI. Locale completeness for all configured stores. ACL coverage for admin-touching features. The diff should survive a senior code review. (Tests are a separate skippable phase — see 0b below.)
 
+**Visual quality applies to BOTH bars — feature is not done if it can't be demoed.** "PoC" describes code complexity (minimum files, hardcoded values), NOT visual polish. **Every new UI element — badge, label, button, form field, banner, widget, table column, indicator — must visually fit the existing shop design.** A new line of plain unstyled text on a polished Spryker page IS NOT a passing PoC, it's a broken feature that happens to compile. Concretely:
+
+- **Reuse existing atomic components first** (`Theme/default/components/atoms/*`, `.../molecules/*`, `.../organisms/*`) rather than writing standalone HTML. If a "badge" atom exists, use it; don't recreate one.
+- **Match surrounding styling** — if a checkout step uses specific button atoms, a new button there uses the same atom. If product info uses a specific label pattern, a new label uses that pattern.
+- **No new visual idioms without justification** — if the project's PDP price block uses a specific layout, don't introduce a totally different layout for an additional price line.
+- **The `yves-atomic-frontend` skill** exists for exactly this — invoke it via the `Skill` tool when adding Yves UI components, so the new element extends the atomic design system properly.
+
+This rule has the same weight in PoC as in MVP: a demo where the new feature looks like it doesn't belong fails the demo regardless of how well the underlying logic works.
+
 Infer from the user's wording when possible (*"PoC" / "demo" / "throwaway"* → PoC; *"production" / "real project" / "MVP"* → MVP). When ambiguous, ask.
 
 ### 0b. Phases to run
@@ -37,7 +46,8 @@ The workflow has these phases. **Show the user the list, mark each ON/OFF with s
 | Tests (write tests for non-trivial logic alongside the edit) | **on for MVP, off for PoC** | User will write tests later, or the feature isn't stable enough to test yet |
 | Refresh (post-change console / composer commands via `spryker-refresher`) | **on** | User wants to inspect the diff first, run commands manually |
 | Verification (per-AC via `spryker-verifier`) | **on** | User will verify manually, or AC list is too ambiguous to verify automatically |
-| Self-correction on red ACs (`spryker-debugger` + retry) | **on if verification is on** | User wants to see red ACs and decide manually, no automatic retries |
+| QA-thorough coverage (expand ACs into 4-bucket test plan via `spryker-qa-coverage` skill before verifier runs) | **on for MVP, off for PoC** | PoC verifies literal ACs only — thoroughness is overkill. MVP wants Happy + Negative + Authorization + Corner coverage. |
+| Self-correction on red ACs (`spryker-issue-diagnoser` + retry) | **on if verification is on** | User wants to see red ACs and decide manually, no automatic retries |
 | Static validation (lint / phpcs / phpstan via the `static-validation` skill) | **on** | Catches style, architecture, and type errors automatically before commit. Skip only for very small / throwaway changes. |
 | Code review (post-edit diff review via `spryker-code-reviewer`) | **off** | Opt-in. Adds a structured-review pass after edits — useful for MVP, optional for PoC. |
 | Demo artifact capture (`spryker-screenshot-collector`) | **off** | Opt-in only on explicit request |
@@ -63,7 +73,7 @@ Read the PRD / acceptance criteria. **Restate them as a numbered AC checklist**,
 
 ## Step 3: Plan
 
-**Before planning, ALWAYS invoke `spryker-feature-expert`** for every Spryker domain the PRD touches. **Do not grep, sed, awk, or otherwise inspect `vendor/spryker/` or transfer XMLs yourself, ever.** That includes: looking up which fields a transfer has (use `mcp__spryker-project__getTransferStructureByName` via feature-expert), looking up which methods an interface exposes (`getInterfaceMethodsByNamespace`), looking up which modules exist (`getSprykerModules`), or reading docs. If the expert's first answer isn't enough, ask the expert a more specific follow-up — don't fall back to manual grep. If the PRD touches multiple domains, **issue the feature-expert calls in parallel** — one Agent tool call per domain, all in a single message.
+**Before planning, ALWAYS invoke `spryker-feature-expert`** for every Spryker domain the PRD touches. **Do not grep, sed, awk, or otherwise inspect `vendor/spryker/` or transfer XMLs yourself, ever.** That includes: looking up which fields a transfer has (use `getTransferStructureByName` via feature-expert), looking up which methods an interface exposes (`getInterfaceMethodsByNamespace`), looking up which modules exist (`getSprykerModules`), or reading docs. If the expert's first answer isn't enough, ask the expert a more specific follow-up — don't fall back to manual grep. If the PRD touches multiple domains, **issue the feature-expert calls in parallel** — one Agent tool call per domain, all in a single message.
 
 Build the plan from the expert findings. For each AC, the plan covers:
 
@@ -134,10 +144,14 @@ Apply changes per the chosen quality bar.
 **Common rules (both bars):**
 
 - **Project layer only** — under the project's namespace directories in `src/`. Never `vendor/`. The `PreToolUse` hook will block vendor writes; don't even attempt.
+- **Never add, remove, or edit any file inside generated directories** — `src/Generated/`, `src/Orm/`, and any `*/Generated/*` path. These are produced by codegen commands (`transfer:generate`, `propel:install`, scope-collection, IDE-auto-completion, etc.) and are rewritten on every Step 5 refresh; any manual edit is lost. **To change a transfer field**, edit `*.transfer.xml` in the project layer — the corresponding `src/Generated/Shared/Transfer/*.php` regenerates automatically. **To change an entity**, edit `*.schema.xml` in the project layer — the corresponding `src/Orm/Propel/*` regenerates automatically. **Self-correction signal:** if you find yourself about to `Edit` or `Write` a path under `src/Generated/` or `src/Orm/`, **stop** — you're editing the wrong file. Find the XML source instead.
 - **Track which files you edited** during this step — you'll need the list for refresh in step 5 and for staging in step 8.
 - **Do not research Spryker yourself.** If a question came up during editing that needs Spryker domain knowledge, invoke `spryker-feature-expert` again rather than grepping `vendor/spryker/` directly.
 - **Do not manipulate CSV files.** If the change involves data, delegate to `spryker-data-seeder`.
 - **Do not touch the database directly.** No raw SQL through any route; the DB is state Spryker manages.
+- **If you get stuck on *"why is this code doing X at runtime"* during the build** — and the answer isn't in the logs or DB state already — invoke the `ai-runtime-debugging` skill (via the `Skill` tool). It teaches the `[AI-DEBUG]` tagged-log pattern (and optional XDebug step-debug if a debugger MCP is installed) for inspecting runtime state. Use sparingly; remove all instrumentation before Step 7b.
+- **Do NOT invoke the `static-validation` skill at this step.** Its own description fires aggressively on any PHP edit, but static-validation must run only at Step 7b — running it now fights the self-correct loop and lets `phpcbf` reformat code before verification ever sees it. Wait.
+- **Visual fit is mandatory for any new UI element.** When adding a badge, label, button, form field, banner, widget, table column, or any other visible UI piece — to Yves, Zed, Merchant Portal — **invoke the `yves-atomic-frontend` skill** (via the `Skill` tool) for guidance on extending the project's atomic design system properly. Reuse existing atoms/molecules/organisms from `Theme/default/components/` rather than writing standalone HTML. The output must look like part of the shop, not like raw text pasted onto a polished page. This rule applies equally to PoC and MVP — *"PoC"* is about code minimum, not visual minimum.
 
 **PoC quality bar:** minimum files, hardcoded values OK, skip plugin/expander indirection when a direct edit works, no tests, no locale completeness beyond default, no ACL ceremony beyond what an AC demands.
 
@@ -145,38 +159,147 @@ Apply changes per the chosen quality bar.
 
 ## Step 5: Post-change commands
 
-Invoke **`spryker-refresher`** (via `Agent` tool, `subagent_type="spryker-refresher"`) and pass it the list of files you just edited. It owns the file-pattern → command mapping drawn from this project's install recipes and runs them in dependency order (composer dumpautoload via `docker/sdk cli composer`, codegen via `docker/sdk console`, schema, cache clears, frontend builds, cache warmups).
+**MUST invoke the `spryker-refresher` Skill** (via the `Skill` tool — note: this is a Skill, not an Agent; do not use `subagent_type`) and pass it the list of files you just edited. The skill is loaded into your context and you then execute its file-pattern → command mapping directly. **Do not improvise the command chain** — follow the skill's mapping table. The skill encodes the file-pattern → command mapping drawn from this project's install recipes (composer dumpautoload, codegen, schema, cache clears including the critical `cache:class-resolver:build` for project-layer overrides, frontend builds, cache warmups).
 
-If `spryker-refresher` returns a non-zero exit on any command, treat it like a red AC: invoke `spryker-debugger` with the failure context before retrying.
+**Self-correction signal.** If you catch yourself about to run a `docker/sdk console <command>` directly during Step 5 — because *"it's just one command"* or *"I know what's needed"* — **stop**. Invoke the refresher with the file list. The refresher catches mandatory commands (notably `cache:class-resolver:build`) that the orchestrator commonly forgets when inlining.
+
+If `spryker-refresher` returns a non-zero exit on any command, treat it like a red AC: invoke `spryker-issue-diagnoser` with the failure context before retrying.
+
+**Do NOT invoke the `static-validation` skill at this step either.** Its broad trigger phrase ("after any PHP code changes") will tempt the orchestrator to fire it here too — don't. It runs only at Step 7b.
+
+**Cache pre-warm before Step 6 fan-out.** Spryker's first hit to a page is slow (cold Twig template cache + cold router cache + ESI fragment fetches); subsequent hits are 5-10× faster. Before invoking the verifier on N cases, hit each unique affected page **once** via `navigate` to warm its cache. Throw the result away — it's just for warm-up. Pages to consider:
+
+- Each Yves page the feature touches (PDP / cart / checkout step / customer area page)
+- Each Zed BO page the feature touches (admin form / detail page)
+- Each storefront page that displays the feature's data (homepage if a banner is there, etc.)
+
+A 2-second warmup phase saves 5-10s per case afterwards — wins fast on any feature with multiple test cases.
 
 ## Step 6: Per-AC verification
 
-Invoke **`spryker-verifier`** for the AC checklist. Verifier returns green/red per AC plus raw evidence.
+### Step 6a: Frontend smoke check (always, if any Yves changes were made)
 
-**Parallelise where ACs are independent.** If two or more ACs exercise different surfaces (e.g. one is BO-side, another is storefront-side) or different entities and have no ordering dependency between them, invoke `spryker-verifier` once per AC in a single message — one Agent tool call per AC, issued in parallel.
+**Before running any other verification or functional tests**, do a quick smoke check that the frontend is functional. Running facade-level tests or per-AC verification on a broken frontend wastes minutes on results that don't reflect a working feature (facade tests can pass even if the UI is broken).
 
-If a verification needs test data that doesn't exist (a specific entity with specific attributes referenced by the AC), invoke **`spryker-data-seeder`** first to seed the minimum entities, then run verifier.
+Invoke `spryker-verifier` with a single "smoke" task:
 
-## Step 7: Self-correct red ACs (bounded retries)
+- Navigate to the most-affected Yves page (the PDP, cart, or checkout step the feature touches).
+- Navigate to the most-affected BO page (the admin form / detail page the feature touches), if any.
+- For each, assert: HTTP 200 + no JS console errors + the bundle contains a sentinel from the new code (use the bundle-grep technique from verifier's "Verification techniques").
 
-For each red AC, up to **N = 2 retries** per AC:
+**If the smoke check fails** (page 500s, JS console errors, missing bundle symbol):
+- Stop Step 6 immediately. Do NOT proceed to the test plan / functional tests / verifier per case.
+- Hand the failure context to `spryker-issue-diagnoser` (Step 7's diagnose-and-fix loop).
+- After the diagnoser-and-fix loop converges, re-run the smoke check from the top of Step 6a.
 
-1. Invoke **`spryker-debugger`** with the verifier's failure context to get a root cause and suggested direction.
-2. Apply the **smallest edit** that addresses the root cause. Stay in project layer. Track the new edits.
-3. Re-run `spryker-refresher` if the edit implied new post-change commands.
-4. Re-verify just that AC via `spryker-verifier`.
+**If the smoke check passes**, proceed to Step 6b.
 
-After 2 retries on the same AC: stop trying. Mark as `failed-after-retries` and surface it in the final report. The user decides whether to take over manually or ask for a different approach.
+Skip Step 6a only if the feature has zero Yves changes (pure BO / backend / console).
 
-## Step 7b: Static validation + code review (final code-quality pass, if those phases are on)
+### Step 6b: Per-case verification (the main pass)
 
-Once the self-correction loop has finished — the code is now stable — run the final code-quality checks before the commit gate. Run these on the **final** set of edited files, not an interim version.
+**If the QA-thorough phase is on** (default for MVP):
+
+1. Invoke the `spryker-qa-coverage` Skill (via the `Skill` tool) and pass it the AC list from Step 1.
+2. The skill returns a structured test plan with cases bucketed as Happy / Negative / Authorization / Corner — each case tagged with its lightest verification mode (DB / Console / API / Chrome / Mailpit / Queue-UI / Redis-UI).
+3. **Order matters**: run **UI / Chrome cases first** for the Happy bucket (they cheap-fail if something visual is broken), then API/DB/Console cases, then Negative/Authorization/Corner.
+4. **Login session pre-warm + reuse.** Before fan-out: group the Chrome cases by required user (Admin / Buyer / Buyer_With_Limit / Approver / Merchant user / etc.). For each unique required user, log in once via Chrome — that browser tab is now the "warm session" for that user. When invoking `spryker-verifier` per case, **pass the live browser/tab and a hint *"this browser is already logged in as <user>"* in the verifier's prompt** so the verifier skips its own login (saves ~5s per case). The verifier respects the hint per its body's instructions.
+5. Invoke `spryker-verifier` per test case from the plan. Parallelise across independent cases within a bucket (one Agent tool call per case, issued in a single message). Each case becomes its own green/red verdict with evidence.
+6. **Functional tests** (facade-level codecept tests, when the tests phase is on) run **after** the UI verification cases — never before. If UI Happy cases are red, don't run functional tests; the feature isn't ready.
+
+**If the QA-thorough phase is off** (default for PoC):
+
+Invoke `spryker-verifier` per literal AC from Step 1 — no expansion. Order: UI ACs first, then API/DB/console ACs. Functional tests (if the tests phase is on) run last, after all UI ACs are green.
+
+**In both modes**, if a verification needs test data that doesn't exist (a specific entity with specific attributes referenced by the case), invoke **`spryker-data-seeder`** first to seed the minimum entities, then run verifier.
+
+## Step 7: Self-correct red ACs (iterate until green or stuck)
+
+The default disposition is **persistence**: the loop runs until every red AC (and every red test, if the tests phase is on) goes green, OR a stuck signal fires. Do **not** stop after a fixed number of retries — that's the wrong gate.
+
+### Inputs to the loop
+
+- The verifier's red ACs (from Step 6) + any test failures.
+- An **attempt log** you maintain across iterations — per AC, the list of `{iteration, diagnosed root cause, files touched, fix summary, post-verify verdict}` tuples. This is critical: pass it to `spryker-issue-diagnoser` on every iteration so it doesn't repeat itself.
+
+### Per iteration (for each red AC)
+
+1. Invoke **`spryker-issue-diagnoser`** with: the latest verifier failure detail **plus the attempt log so far**. The diagnoser uses prior attempts to avoid re-proposing what already failed.
+2. **If the diagnoser reports *"insufficient signal — need runtime instrumentation"***, invoke the **`ai-runtime-debugging`** skill before applying any fix (add `[AI-DEBUG]`-tagged logs at the suspected code path, re-trigger the flow, read logs back). Once you have runtime evidence, return to step 1 with the new information.
+3. Apply the **smallest edit** that addresses the diagnosed root cause. Stay in project layer. Append the edit to the attempt log.
+4. Re-run `spryker-refresher` if the edit implied new post-change commands.
+5. Re-verify just that AC via `spryker-verifier`. Append the verdict to the attempt log.
+6. **If green** → AC done; move to next red AC (or to Step 7b if none left).
+7. **If still red** → check stuck conditions before next iteration (below).
+
+### Tests in the loop (when tests phase is on)
+
+Run the project's test suite as part of Step 6's verification pass, and treat failures like red ACs — iterate per test until green using the same loop. "Done" requires *all* AC verdicts green AND all tests green.
+
+### Stuck signals — exit the loop and escalate to the user
+
+The loop exits to the user (does not silently give up) when **any** of these fire:
+
+- **Repeat root cause + repeat fix failure.** The diagnoser reported the same root cause as the previous iteration AND the same fix shape was applied AND verification stayed red. (One iteration's progress is normal; two identical = stuck.)
+- **Repeat-file-same-edit no-progress.** Two consecutive iterations touched the same file with the same edit type and the verifier verdict didn't change.
+- **Persistent insufficient-signal.** The diagnoser returned *"insufficient signal"* twice in a row AFTER `ai-runtime-debugging` was already used — the instrumentation isn't surfacing what we need; further iteration won't help.
+- **Hard failsafe — iteration count reaches N = 10 on the same AC.** This is a runaway-loop backstop, not a normal exit. Should rarely fire; if it does, treat as stuck.
+
+### When stuck — escalate, don't silently fail
+
+Surface to the user:
+- Which AC(s) are stuck.
+- Concise list of what was tried (the attempt log, summarized to one line per iteration).
+- The diagnoser's latest hypothesis.
+- A specific ask: *"I've tried X, Y, Z — none worked. Should I (a) try a different angle, (b) accept this AC as failed and proceed to commit gate with caveats, or (c) hand over for you to take it manually?"*
+
+Wait for the user's answer before doing anything else. Do not mark the AC `failed-after-retries` unilaterally — the user decides.
+
+### What this changes from "bounded retries"
+
+- The **default mode is persistence**, not give-up-at-N.
+- The loop has **specific exit signals** (each is a real signal that further iteration won't help), not a counter.
+- The user **only sees a prompt when there's actually nothing more to try**, not at an arbitrary retry boundary.
+- The **attempt log carries across iterations**, so the diagnoser has memory of prior failures within the same workflow run.
+
+### Do NOT invoke `static-validation` inside this loop
+
+The static-validation skill's trigger ("after any PHP code changes") will tempt the orchestrator to fire it on each retry iteration's edit. **Don't.** Static-validation runs only at Step 7b, against the final stable diff. Running it inside the self-correct loop:
+- Lets `phpcbf` reformat interim code that the verifier hasn't yet checked
+- Adds new lint findings to a loop that's already iterating
+- Burns time on a moving target
+
+## Step 7b: Cleanup + static validation + code review (final pre-commit pass)
+
+Once the self-correction loop has finished — the code is now stable — run the final pre-commit pass. Run these on the **final** set of edited files, not an interim version. **This is the ONLY step in the workflow where `static-validation` runs.** If you've been holding off on it during Steps 4/5/7 (correctly — see those steps' guards), this is the moment.
+
+**Instrumentation cleanup (always, if `ai-runtime-debugging` was used at any point in Step 4 or Step 7).** Strip every trace of debug instrumentation **before** static validation runs — otherwise phpstan or the reviewer will flag it:
+
+```bash
+grep -rn '\[AI-DEBUG\]' src/ tests/        # any tagged log lines still in source?
+grep -rn '@group AITestCase' src/ tests/   # any temporary test-grouping tags?
+git diff -- src/ | grep -E '^\+.*(LoggerTrait|file_put_contents.*ai-debug)'  # `use LoggerTrait;` or fallback writes added during debugging?
+```
+
+Any match → remove that line (or `git checkout --` the file if every change in it was instrumentation). Re-run `spryker-refresher` if you removed code that affects autoload or DI.
 
 **Static validation (if the phase is on):** invoke the **`static-validation`** skill (via the `Skill` tool — it's a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
 
 **Code review (if the phase is on):** invoke `spryker-code-reviewer` after static validation passes — that way the reviewer sees a clean diff, not one cluttered with automated fixes. The reviewer's findings go into the final report.
 
-If both phases are off, skip this step entirely.
+If both phases are off (and no instrumentation was added), skip this step entirely. **If instrumentation was added, do the cleanup pass even when both quality phases are off** — instrumentation must not reach the commit.
+
+## Step 7c: Demo artifact capture (if the screenshots phase is on)
+
+**Run this BEFORE the commit gate**, not after — the captures become part of the implementation report the user reviews when deciding to commit.
+
+If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"`) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
+
+Include the returned paths in the **Evidence** column of the Step 8 final report (under the AC the screenshot illustrates), so the user can open them in `~/Downloads/` before deciding whether to commit.
+
+If the screenshots phase is off, skip this step entirely.
+
+**Do not capture screenshots after the commit.** Once the commit gate has fired, the workflow is done; further screenshot capture is a separate user request, not a workflow phase.
 
 ## Step 8: Final report and commit gate
 
@@ -222,7 +345,6 @@ Branch `ai-customize/<slug>`. <X of N> ACs green. Commit?
 
 The point: refusing the commit shouldn't lose the staging work or leave the user with a confusing dirty tree to interpret.
 
-**Optional:** after a successful commit, if the user explicitly asks for demo material, invoke `spryker-screenshot-collector` to capture artifacts.
 
 ## Subagent delegation cheatsheet
 
@@ -231,11 +353,21 @@ All of these live under `.claude/agents/`. Invoke via the `Agent` tool with `sub
 | Subagent | When to invoke |
 |---|---|
 | `spryker-feature-expert` | Before planning — *"how does this feature work?"*, *"how is X configured in this project?"*, *"what's the extension point for Y?"*. Parallel-invoke for multiple Spryker domains. |
-| `spryker-refresher` | After edits — runs the post-change console / composer chain. |
 | `spryker-verifier` | After refresh — per-AC verification (parallel for independent ACs). |
-| `spryker-debugger` | When verifier returns red or refresher fails — diagnose root cause before retrying. |
+| `spryker-issue-diagnoser` | When verifier returns red or refresher fails — diagnose root cause before retrying. |
 | `spryker-data-seeder` | When a verification needs test data that doesn't yet exist. |
-| `spryker-screenshot-collector` | Only on explicit user request after green — capture demo artifacts. |
+| `spryker-screenshot-collector` | Step 7c (before commit) when the screenshots phase is on — capture demo artifacts so they're part of the final report the user reviews before deciding to commit. |
+
+## Skill delegation cheatsheet
+
+These are **skills** (loaded into the main session), not subagents. Invoke via the `Skill` tool — never via `Agent`.
+
+| Skill | When to invoke |
+|---|---|
+| `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
+| `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list into a 4-bucket test plan before invoking the verifier. |
+| `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
+| `static-validation` | Step 7b — lint / phpcs / phpstan over the final diff before commit. |
 
 ## What you do NOT do
 
@@ -254,3 +386,5 @@ All of these live under `.claude/agents/`. Invoke via the `Agent` tool with `sub
 - Do not run `docker/sdk reset` or any environment-destructive command.
 - Do not produce MVP-grade ceremony when the chosen bar is PoC. If you have more than ~5 PHP classes in a PoC, you're building MVP — re-cut.
 - Do not produce PoC-grade shortcuts when the chosen bar is MVP. Canonical patterns are non-negotiable for MVP.
+- Do not leave `[AI-DEBUG]` logs, `use LoggerTrait;` lines you added for debugging, `file_put_contents('/data/data/tmp/ai-debug.log', ...)` fallback writes, or `@group AITestCase` tags in committed code. Strip everything in Step 7b's cleanup pass.
+- **Do not invoke the `static-validation` skill before Step 7b.** Its description triggers aggressively on any PHP edit, but the workflow owns the timing: only Step 7b runs static-validation, against the final stable diff. If you catch yourself reaching for it after Step 4 (edit), Step 5 (refresh), or any iteration of Step 7 (self-correct) — stop. Same applies to `phpcbf` / `phpcs` / `phpstan` invoked any other way.

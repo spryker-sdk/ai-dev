@@ -44,8 +44,24 @@ Spryker projects keep import CSVs and YAML import configs under `data/import/`. 
 
 Claude runs on the host, so all Spryker console commands use the host wrapper: `docker/sdk console <command>`.
 
-- `docker/sdk console data:import -t` — runs the canonical import. **Always pass `-t` (`--throw-exception`)** so any row-level error surfaces as a non-zero exit instead of being silently swallowed. Without `-t`, an importer can "succeed" while rejecting individual rows — the seeder would then think the seed landed when it didn't.
-- `docker/sdk console data:import:<entity> -t` — runs a single entity importer. Same `-t` requirement (verify the importer exists via `docker/sdk console list` first; the `data:import:*` family is extensive but not every entity has its own importer).
+Three forms exist for running data imports. **Always pass `-t` (`--throw-exception`)** — without it, importers can "succeed" while silently rejecting individual rows, and the seeder would think the seed landed when it didn't.
+
+**Use this hierarchy in order:**
+
+1. **`docker/sdk console data:import <entity-name> -t`** ← **default choice**
+   - `<entity-name>` is a `data_entity:` value from `data/import/*.yml` (e.g. `data/import/common/full_*.yml`, `data/import/common/minimal.yml`, etc.) or from `config/install/*.yml`.
+   - This invokes the catch-all importer scoped to one entity using the EXISTING YAML config. Works for **any** entity that has a `data_entity:` entry, even if no dedicated subcommand exists.
+   - **This is the form that uses the existing config and never requires you to create a new one.**
+
+2. **`docker/sdk console data:import:<entity> -t`** — alternative form
+   - Some entities register a dedicated subcommand (e.g. `data:import:product-abstract`, `data:import:glossary`). Functionally equivalent to form 1 for those entities.
+   - Verify the subcommand exists via `docker/sdk console list` before using.
+   - Not every entity has one; if it doesn't, **fall back to form 1**, do NOT create a new importer.
+
+3. **`docker/sdk console data:import -t`** — full chain
+   - Runs every importer in the active install recipe. Heavy; use only when you genuinely need a full re-import (rare in seeding scenarios).
+
+**Never create a new `data:import:*` subcommand, new install-recipe YAML, or new DataImportConfig class to work around a missing entity importer.** If form 1 doesn't work for the entity, the entity name isn't in any `data/import/*.yml` — at that point, stop and report; do not improvise a config. Creating a new importer is the `data-import` skill's job and is out of scope here.
 
 ## Approach
 
@@ -53,7 +69,7 @@ Claude runs on the host, so all Spryker console commands use the host wrapper: `
 2. **Locate the canonical CSVs.** `Glob` / `Read` under `data/import/` to find them. `analyzeCsvFile` on each to learn the schema — never assume.
 3. **Verify FK preconditions.** For each row you'll add: do the referenced entities exist? Identify the relevant table by reading the schema XML for the data type — check every project-namespace directory under `src/` (from `composer.json` `autoload.psr-4`), then `src/Orm/Propel/Schema/`, then the owning vendor module's schema. Query it via `executeDatabaseQuery`. If the FK target doesn't exist, decide whether to seed it too, or report `precondition_failed` and stop. Be cautious — seeding deep chains is out of scope; flag them.
 4. **Append rows via `transformCsv APPEND`.** Pass structured data, not hand-typed CSV. Let the tool handle columns, escaping, BOM. Confirm the backup was created.
-5. **Run the relevant import** with `-t` so errors surface. `docker/sdk console data:import:<entity> -t` if a per-entity importer exists (verify via `docker/sdk console list`); otherwise the full `docker/sdk console data:import -t`. Capture exit code and tail of import output.
+5. **Run the relevant import** with `-t` so errors surface. **Default to `docker/sdk console data:import <entity-name> -t`**, where `<entity-name>` is the `data_entity:` value already defined in `data/import/*.yml` or `config/install/*.yml`. Use `data:import:<entity>` only if a dedicated subcommand exists (verify via `docker/sdk console list`). Use the bare `data:import -t` only when a full re-import is genuinely needed. Capture exit code and tail of import output.
 6. **Verify the seed landed.** `executeDatabaseQuery` against the target table to confirm the rows are present with the expected attributes. If the rows are in the DB but not visible where they should be (storefront / search / cache), that's not a seeder problem — it's a bug elsewhere; flag it for the caller and stop.
 7. **Report what was created** — entity IDs / SKUs / keys — so the caller can reference them in assertions.
 
@@ -105,3 +121,4 @@ If import fails, return exit code, tail of import output, and stop. Do not silen
 - Do not seed deep FK chains. If a row depends on five other entities that don't exist, return `precondition_failed` and let the caller decide.
 - Do not retry past one import failure. Report the failure and stop.
 - Do not fire publisher / search-index / sync events as part of seeding. The importer should handle propagation. If the seed lands in the DB but doesn't appear where expected, that's a bug to surface — not something the seeder should paper over.
+- **Do not prepend `cd /absolute/path/to/this-project && ...` to any `Bash` command.** The harness already runs every `Bash` invocation in the project root, so cd-ing back is redundant AND it shifts the command to a different allowlist pattern, causing permission prompts on commands (like `docker/sdk console data:import ...`) that would otherwise auto-approve. Use relative paths for in-project work. Relative subdir cd is fine when actually needed. For files outside the project, pass the absolute path as a tool argument to native `Read` / `Glob`, don't `cd` there.

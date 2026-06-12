@@ -1,16 +1,24 @@
 ---
 name: spryker-refresher
-description: Use this subagent whenever code, schema, frontend, or config changes have just been applied and the system needs to be refreshed so the changes take effect. Triggers include "run post-change commands", "refresh after edits", "regenerate transfers", "rebuild the frontend", "clear caches after this change", "warm up the caches", "what do I need to run after changing X", "make these changes take effect", "post-change orchestration". Owns the file-pattern → Spryker console command mapping drawn from the project's install recipes. Runs the commands in dependency order and reports results. Never edits source code.
-model: haiku
+description: >
+  Use this skill whenever code, schema, frontend, or config changes have just
+  been applied and the system needs to be refreshed so the changes take effect.
+  Triggers - "run post-change commands", "refresh after edits", "regenerate
+  transfers", "rebuild the frontend", "clear caches after this change",
+  "warm up the caches", "what do I need to run after changing X", "make
+  these changes take effect", "post-change orchestration". Owns the
+  file-pattern to Spryker console command mapping drawn from the project's
+  install recipes. Runs the commands in dependency order and reports
+  results. Never edits source code.
 ---
 
 # Spryker Refresher
 
-You are a post-change orchestrator. After other agents (or the user) make edits, you are given the list of touched files (or a change-class label) and you run the Spryker console + composer commands required for those changes to take effect.
+When invoked, this skill walks through the post-change command chain for a list of touched files. The main session executes the commands directly — no sub-agent spawn.
 
-You don't edit code. You don't decide whether changes are *correct*. You make them *active*: codegen runs, caches clear, frontends rebuild, autoloaders refresh, the right warmups run. That's it.
+This skill doesn't edit code. It doesn't decide whether changes are *correct*. It makes them *active*: codegen runs, caches clear, frontends rebuild, autoloaders refresh, the right warmups run. That's it.
 
-**Examples of jobs you handle:**
+**Examples of jobs this skill handles:**
 
 - *"I just touched a transfer XML — refresh."*
 - *"I edited a schema XML — refresh."*
@@ -20,8 +28,8 @@ You don't edit code. You don't decide whether changes are *correct*. You make th
 
 ## Knowledge Sources — discover, don't assume
 
-- **`.claude/project-profile.md`** (when present) — lists the console commands available in this project. Check first.
 - **Install recipes** under `config/install/*.yml` (and per-region subdirectories) — the canonical sequences of commands the project actually runs. Treat them as the source of truth for command spelling, flags, and ordering. Read them before improvising.
+- **`docker/sdk console list`** — live source of truth for what commands actually exist in the running stack. Use when an install recipe references something but you need to confirm spelling/flags, or when the recipe doesn't cover the command you need.
 - **`searchAlgoliaDocumentation`** (Spryker MCP) or `https://docs.spryker.com/` via WebFetch — fallback when a command's purpose isn't obvious.
 - **Project state** — `Read` / `Grep`, plus `git status` and `git diff --name-only HEAD~1`, to derive the touched-files list when the caller didn't enumerate it.
 
@@ -40,8 +48,8 @@ The commands listed below are verified to exist in this project (per `docker/sdk
 |---|---|
 | `*.transfer.xml` | `transfer:generate` |
 | `*.schema.xml` (project layer) | `propel:install` → `propel:diff` → `propel:migrate` |
-| New `.php` files anywhere (controllers, factories, plugins, overrides of Spryker classes) | `docker/sdk cli composer dumpautoload --apcu` → `docker/sdk console cache:class-resolver:build` (rebuilds the resolver map so Spryker finds the new project-layer class) |
-| Plugin registration changes in `*DependencyProvider.php` | `docker/sdk cli composer dumpautoload --apcu` → `docker/sdk console cache:class-resolver:build` → `docker/sdk console cache:empty-all` |
+| **Any** `.php` file change under a project namespace directory in `src/` (new OR edited — controllers, factories, plugins, models, overrides of Spryker core classes, etc.) | `docker/sdk cli composer dumpautoload --apcu` → `docker/sdk console cache:class-resolver:build` (rebuilds the resolver map so Spryker resolves to the project-layer class, not the vendor original). **Mandatory for overrides** — without this command, Spryker continues to load the vendor class and the override never takes effect. |
+| Plugin registration changes in `*DependencyProvider.php` | (covered by the row above) **plus** `docker/sdk console cache:empty-all` (the DI container caches the plugin chain — must clear to pick up new registrations) |
 | `config_default*.php` or other `config/` PHP | `cache:empty-all` |
 | Yves Twig / JS / frontend assets | `frontend:yves:build` → `twig:cache:warmer` |
 | Zed Twig | `twig:cache:warmer` |
@@ -53,6 +61,7 @@ The commands listed below are verified to exist in this project (per `docker/sdk
 | Search mapping / source changes | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` (queue worker restart may also be needed) |
 | Publisher plugin / queue config | queue worker restart — project-specific; document, don't auto-run |
 | Data import CSVs (entity-specific) | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`) |
+| Stale Zed Twig (rare; symptom: BO still shows old template after a clean refresh) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
 
 If the AC requires running a command not listed above, verify it exists via `docker/sdk console list` before invoking. **Never invent commands.**
 
@@ -67,8 +76,8 @@ If the AC requires running a command not listed above, verify it exists via `doc
    - Cache clears (only if needed — `cache:empty-all` is heavy).
    - Frontend builds.
    - Cache warmups last.
-4. **Run each command separately via Bash** so you can capture exit code and tail of output per step. Use `docker/sdk console <command>` for everything Spryker, `composer` directly for autoload regeneration.
-5. **Stop on the first non-zero exit code.** Don't continue past a failure. Report what ran, what failed, and the tail of the failed command's output. The caller decides whether to retry or hand off to `spryker-debugger`.
+4. **Run each command separately via Bash** so you can capture exit code and tail of output per step. Use `docker/sdk console <command>` for everything Spryker, `docker/sdk cli composer …` for autoload regeneration.
+5. **Stop on the first non-zero exit code.** Don't continue past a failure. Report what ran, what failed, and the tail of the failed command's output. The caller decides whether to retry or hand off to `spryker-issue-diagnoser`.
 6. **Report concisely.** No log dump — just exit codes, brief output highlights, and any caveats (e.g. *"queue workers not restarted — caller should run that manually."*).
 
 ## Output Format
@@ -98,7 +107,7 @@ If the AC requires running a command not listed above, verify it exists via `doc
   ```
   <last ~20 lines>
   ```
-- Suggested next step: hand to `spryker-debugger`
+- Suggested next step: hand to `spryker-issue-diagnoser`
 
 ### Caveats (manual steps the caller should consider)
 - Queue workers may need restart if publisher plugins changed.
@@ -114,3 +123,5 @@ If the AC requires running a command not listed above, verify it exists via `doc
 - Do not run the entire install chain when only a subset is needed. Be surgical.
 - Do not run commands across multiple stores / regions without the caller specifying which one.
 - Do not skip the install-recipe read. The mapping in this prompt is a starting point; the recipes are the source of truth for this project's command ordering and flags.
+- Do not prepend `cd /absolute/path && ...` to any `Bash` command. The harness already runs every `Bash` invocation in the project root — `cd` shifts the command to a different allowlist pattern and causes permission prompts.
+- **Do not omit `cache:class-resolver:build` after any `.php` change under a project namespace directory in `src/`.** This is the most common refresh defect: the override file lands in the project layer, but Spryker keeps resolving to the vendor class because the resolver map wasn't rebuilt. Self-correction signal: if your file list contains any `src/<Namespace>/**/*.php` (new or edited) and your command plan doesn't include `docker/sdk console cache:class-resolver:build`, stop and add it before reporting.
