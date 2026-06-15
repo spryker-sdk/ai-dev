@@ -7,6 +7,7 @@
 
 namespace SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step;
 
+use SprykerSdk\Zed\AiDev\AiDevConfig;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -15,9 +16,12 @@ class AgentsGenerationStep implements AiToolSetupStepInterface
 {
     /**
      * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface $generator
+     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
      */
-    public function __construct(protected AiToolArtifactGeneratorInterface $generator)
-    {
+    public function __construct(
+        protected AiToolArtifactGeneratorInterface $generator,
+        protected AiDevConfig $config,
+    ) {
     }
 
     /**
@@ -35,7 +39,7 @@ class AgentsGenerationStep implements AiToolSetupStepInterface
      */
     public function canExecuteForTool(string $tool): bool
     {
-        return true;
+        return ($this->config->getToolArtifacts($tool)['agents_dir'] ?? null) !== null;
     }
 
     /**
@@ -43,7 +47,7 @@ class AgentsGenerationStep implements AiToolSetupStepInterface
      */
     public function getFallbackToolOptions(): array
     {
-        return [];
+        return $this->config->getAgentsCompatibleTools();
     }
 
     /**

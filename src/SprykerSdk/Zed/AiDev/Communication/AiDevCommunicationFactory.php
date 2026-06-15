@@ -117,6 +117,6 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
      */
     protected function createAgentsGenerationStep(): AgentsGenerationStep
     {
-        return new AgentsGenerationStep($this->createAiToolArtifactGenerator());
+        return new AgentsGenerationStep($this->createAiToolArtifactGenerator(), $this->getConfig());
     }
 }

@@ -124,7 +124,7 @@ class AiToolSetupConsole extends Console
             return $this->confirm(sprintf('%s?', $step->getLabel()), static::DEFAULT_YES) ? $tool : null;
         }
 
-        return $this->resolveRulesFallbackTool($step, $tool, $output);
+        return $this->resolveFallbackTool($step, $tool, $output);
     }
 
     /**
@@ -134,9 +134,11 @@ class AiToolSetupConsole extends Console
      *
      * @return string|null
      */
-    protected function resolveRulesFallbackTool(AiToolSetupStepInterface $step, string $tool, OutputInterface $output): ?string
+    protected function resolveFallbackTool(AiToolSetupStepInterface $step, string $tool, OutputInterface $output): ?string
     {
-        $output->writeln(sprintf('<comment>No rule generation available for %s.</comment>', $tool));
+        $artifact = strtolower(trim(str_ireplace('Generate', '', $step->getLabel())));
+
+        $output->writeln(sprintf('<comment>%s is not supported for %s.</comment>', ucfirst($artifact), $tool));
 
         $fallbackOptions = $step->getFallbackToolOptions();
 
@@ -144,11 +146,11 @@ class AiToolSetupConsole extends Console
             return null;
         }
 
-        if (!$this->confirm('Generate rules in another tool\'s format instead?', static::DEFAULT_NO)) {
+        if (!$this->confirm(sprintf('Generate %s in another tool\'s format instead?', $artifact), static::DEFAULT_NO)) {
             return null;
         }
 
-        return $this->select('Select tool format for rules:', $fallbackOptions, $fallbackOptions[0]);
+        return $this->select(sprintf('Select tool format for %s:', $artifact), $fallbackOptions, $fallbackOptions[0]);
     }
 
     /**
