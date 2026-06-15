@@ -152,6 +152,7 @@ Apply changes per the chosen quality bar.
 - **If you get stuck on *"why is this code doing X at runtime"* during the build** — and the answer isn't in the logs or DB state already — invoke the `ai-runtime-debugging` skill (via the `Skill` tool). It teaches the `[AI-DEBUG]` tagged-log pattern (and optional XDebug step-debug if a debugger MCP is installed) for inspecting runtime state. Use sparingly; remove all instrumentation before Step 7b.
 - **Do NOT invoke the `static-validation` skill at this step.** Its own description fires aggressively on any PHP edit, but static-validation must run only at Step 7b — running it now fights the self-correct loop and lets `phpcbf` reformat code before verification ever sees it. Wait.
 - **Visual fit is mandatory for any new UI element.** When adding a badge, label, button, form field, banner, widget, table column, or any other visible UI piece — to Yves, Zed, Merchant Portal — **invoke the `yves-atomic-frontend` skill** (via the `Skill` tool) for guidance on extending the project's atomic design system properly. Reuse existing atoms/molecules/organisms from `Theme/default/components/` rather than writing standalone HTML. The output must look like part of the shop, not like raw text pasted onto a polished page. This rule applies equally to PoC and MVP — *"PoC"* is about code minimum, not visual minimum.
+- **No defensive comments.** Don't add inline comments or PHPDoc to justify what the code does, why a review flag was addressed, or what an identifier means — well-named identifiers and the PR description carry that information. Specifically forbidden: class-level docblocks (already covered above), multi-line inline comments, references to recent reviews / fixes / iterations (*"addressed CR feedback"*, *"fixes #123"*, *"after refactor"*, *"per static-validation"*), explanations of *"why this approach over the obvious one"*, and `// TODO` markers that exist only because the model wasn't sure what to do. If the *why* is non-obvious enough to need text, that's a signal the code needs restructuring, not commenting. Self-correction signal: if you're about to type the words *"because"*, *"to handle"*, *"workaround for"*, *"to satisfy"*, *"per review"*, or *"fixes"* inside a comment — **stop**, the comment shouldn't be there.
 
 **PoC quality bar:** minimum files, hardcoded values OK, skip plugin/expander indirection when a direct edit works, no tests, no locale completeness beyond default, no ACL ceremony beyond what an AC demands.
 
@@ -286,6 +287,25 @@ Any match → remove that line (or `git checkout --` the file if every change in
 **Static validation (if the phase is on):** invoke the **`static-validation`** skill (via the `Skill` tool — it's a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
 
 **Code review (if the phase is on):** invoke `spryker-code-reviewer` after static validation passes — that way the reviewer sees a clean diff, not one cluttered with automated fixes. The reviewer's findings go into the final report.
+
+### Handling code review findings — fix root cause, never work around
+
+For each finding the reviewer surfaces:
+
+- **If a clean fix is local** (rename, extract method, reorder, tighten a type, move a constant, replace a magic literal with a named constant): apply it. Do NOT add a comment explaining the change — the next reviewer reading clean code won't need it; the model would just be narrating its own correction.
+- **If the fix requires more scope than the workflow has touched so far** — e.g. a finding about a vendor-side issue, an architectural concern beyond the current diff, a missing test infrastructure piece, a different module that would need parallel changes — **STOP**. Do NOT mask the finding with an `if` / `try` / `catch` / sentinel value / special-case branch / null-check that hides the symptom while leaving the root cause in place. **Workarounds are forbidden.** Surface to the user instead:
+
+  > *"The reviewer flagged X. Cleanly fixing this requires Y, which is outside the diff we've made so far. Options: (a) expand scope and fix properly — adds ~N files / module Z; (b) document the limitation and leave the finding open; (c) revert the change that surfaced the finding."*
+
+- **Never add defensive commentary** — see Step 4's "No defensive comments" rule. After the review fix, the diff should look like clean code, not like clean code with apologetic comments. If a future reader needs the *why*, they read the PR description.
+
+**Self-correction signals when handling review:**
+- About to write `if ($x === null || $y instanceof FooException)` to make the reviewer's complaint go away? → that's masking, not fixing. Stop.
+- About to add `/** @internal addressed code review finding ... */` or `// Per review: ...`? → that's narration, not code. Stop.
+- About to add a `try / catch` that swallows the exception silently? → that's workaround, not fix. Stop.
+- About to extract a method just to give the masking logic a name? → still masking. Stop.
+
+If the finding can't be fixed cleanly within the workflow's scope, **escalate** — don't pretend.
 
 If both phases are off (and no instrumentation was added), skip this step entirely. **If instrumentation was added, do the cleanup pass even when both quality phases are off** — instrumentation must not reach the commit.
 
