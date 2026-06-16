@@ -40,7 +40,7 @@ Result: you can't reproduce the stuck state you were trying to diagnose, and eve
 **Workflow:**
 1. `docker/sdk jobs stop` — pause Jenkins.
 2. Inspect the relevant state (DB tables, queue, Redis, logs).
-3. When you need a worker / publisher / OMS check to fire, run it manually and once: `docker/sdk console queue:task:start --once`, `docker/sdk console publish:trigger-events`, `docker/sdk console oms:check-condition`, etc.
+3. When you need a worker / publisher / OMS check to fire, run it manually: `docker/sdk console queue:worker:start --stop-when-empty` (drains all queues and exits), `docker/sdk console publish:trigger-events`, `docker/sdk console oms:check-condition`, etc. Use `queue:task:start <queue-name>` instead when you want to process a single specific queue.
 4. Inspect again. Iterate.
 5. `docker/sdk jobs start` when you're done — restores normal background processing.
 
@@ -80,7 +80,11 @@ Confirm the directory structure with `ls data/logs/` first — projects sometime
 - **`executeDatabaseQuery`** (Spryker MCP) is the **only allowed way** to query the database. Use it for any DB state inspection a diagnosis needs.
 - For unknown table names, query `information_schema.tables` to enumerate `spy_*` tables that exist, then read the schema XML for column structure.
 - Do **not** run raw SQL via `Bash`, `docker/sdk cli`, `docker exec ... psql/mysql/mariadb`, PHP PDO/Doctrine in heredocs, or any other bypass — regardless of MCP availability.
-- **Fallback when MCP unavailable:** (a) work from logs alone where they're sufficient; (b) ask the user to run a specific SQL query and paste the result; (c) if neither is possible, report *"DB MCP not available — diagnosis limited to logs and observable state"* and continue with what you can.
+- **Fallback when the Spryker MCP is unavailable:** include this exact suggestion in your report so the user knows how to fix the cause (not just the symptom):
+
+  > *"The Spryker MCP server isn't available in this session. To enable `executeDatabaseQuery` and the other MCP tools, see [the Spryker AI Dev MCP Server setup doc](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html) — installation is one command from the project root: `claude mcp add spryker-project \"$(pwd)/docker/sdk console ai-dev:mcp-server -q\"`. Meanwhile I'll continue with logs and ask you to run any DB queries I need."*
+
+  Then proceed with the best-effort path: (a) work from logs alone where they're sufficient; (b) ask the user to run a specific SQL query and paste the result; (c) if neither is possible, report *"DB MCP not available — diagnosis limited to logs and observable state"* and continue with what you can.
 
 ### Spryker debugging surfaces — verified tables and flows
 
@@ -154,7 +158,7 @@ This check is the cheapest in the diagnosis tree — do it before logs, before D
 
 **Published-data symptom — check P&S workers first.** When the symptom is *"data updated in BO but storefront still shows old"*, after browser-cache is ruled out, check whether publishers/workers fired:
 - Queue worker process: `docker ps | grep queue` (or check Jenkins / `docker/sdk jobs` state)
-- Manually trigger and re-check: `docker/sdk console publish:trigger-events` then `docker/sdk console queue:task:start --once`
+- Manually trigger and re-check: `docker/sdk console publish:trigger-events` then `docker/sdk console queue:worker:start --stop-when-empty` (drains all queues and exits)
 - If after running these the storefront catches up, the worker was the gap — no Spryker bug, just background processing was stalled.
 
 **HTTP-disk-cache + Zed Twig pathCache trap.** When *"my frontend change isn't showing after a clean rebuild"*:

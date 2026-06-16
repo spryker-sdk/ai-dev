@@ -1,19 +1,16 @@
 # Narrowing test execution (Part 3)
 
-This file is the detail reference for **narrowing test runs** with `docker/sdk testing`. Useful when debugging through tests (you almost never want the full suite) — but also useful any time you want to run one method instead of the whole class.
+This file is the detail reference for **narrowing test runs in a Spryker project**. It assumes:
+
+- You are working in a **project** (e.g. a B2B/B2C demoshop based on Spryker), NOT inside a core Spryker module under `vendor/spryker/`.
+- Project tests live under `tests/<NamespaceTest>/<Layer>/<Module>/` — typically `tests/PyzTest/Zed/Foo` (test namespace comes from `composer.json autoload-dev.psr-4`; common form is `PyzTest\\`, but the project may use a different namespace).
+- The runner is `docker/sdk testing` (the host-side wrapper for codecept-in-the-cli-container).
+
+If you're working inside a core Spryker module (rare on project teams), the conventions differ — test root is `vendor/spryker/<module>/tests/SprykerTest/...` and you run codecept directly inside that package. This skill is **not** for that case.
 
 `docker/sdk testing` accepts both Codeception's positional `<Suite> <ClassName>:<method>` form and `-g <Group>`. Pick the smaller hammer.
 
-## Where do project tests live?
-
-The test root depends on what kind of code you're testing:
-
-| You're testing… | Test root | Notes |
-|---|---|---|
-| Project code (this project's `src/<Namespace>/`) | `tests/<NamespaceTest>/<Layer>/<Module>/` — typically `tests/PyzTest/Zed/Foo` | The test namespace comes from `composer.json` `autoload-dev.psr-4` (this project: `PyzTest\`). If the project has more than one project namespace, each may have its own test root — check `autoload-dev`. |
-| Core Spryker module (`vendor/spryker/<module>/`) | `vendor/spryker/<module>/tests/SprykerTest/<Layer>/<Module>/` | Only relevant if you're working inside a core package — uncommon in a project workflow. |
-
-The examples below use `tests/PyzTest/Zed/Foo` for the project case. Substitute your real path.
+The examples below use `tests/PyzTest/Zed/Foo` for the project case. Substitute your project's actual test namespace path.
 
 ## Single test or method (positional)
 

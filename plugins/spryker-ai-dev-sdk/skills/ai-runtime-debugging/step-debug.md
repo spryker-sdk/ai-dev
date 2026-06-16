@@ -88,7 +88,7 @@ Tool names below are shown as generic verbs (`<set_breakpoint>`, `<wait_for_paus
 | HTTP request (Yves / Glue / Backoffice) | Send cookie `XDEBUG_SESSION=<anything>` with the request (e.g. `curl -b 'XDEBUG_SESSION=PHPSTORM' ...`) — Spryker uses `xdebug.start_with_request=trigger` |
 | Console command | `docker/sdk cli -x console <command>` (the `-x` injects the trigger env var) |
 | Codeception / PHPUnit test | `docker/sdk testing -x codecept run ...` |
-| Queue worker | `docker/sdk cli -x console queue:task:start --once` |
+| Queue worker | `docker/sdk cli -x console queue:worker:start --stop-when-empty` (drains queues then exits; or use `queue:task:start <queue-name>` to target one queue) |
 
 For narrowing test runs (positional filter, `-g`, `@depends` gotcha), see `test-narrowing.md`.
 

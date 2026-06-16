@@ -33,52 +33,71 @@ This skill doesn't edit code. It doesn't decide whether changes are *correct*. I
 - **`searchAlgoliaDocumentation`** (Spryker MCP) or `https://docs.spryker.com/` via WebFetch — fallback when a command's purpose isn't obvious.
 - **Project state** — `Read` / `Grep`, plus `git status` and `git diff --name-only HEAD~1`, to derive the touched-files list when the caller didn't enumerate it.
 
-Claude runs on the host, not in the container. **Use these two invocation forms — and only these:**
+Claude runs on the host, not in the container. Use these invocation forms:
 
-- **Spryker console commands → `docker/sdk console <command>`** (no `cli`, no `vendor/bin/console`). Example: `docker/sdk console cache:empty-all`. **Never** `docker/sdk cli console <cmd>` (wrong — that's a malformed concatenation, not a valid docker/sdk syntax) and **never** bare `vendor/bin/console <cmd>` (won't reach the container from the host).
-- **Composer → `docker/sdk cli composer <args>`** (runs composer inside the container). Example: `docker/sdk cli composer dumpautoload --apcu`. **Never** bare `composer <args>` (assumes composer is installed on the host, which it may not be).
-
-If you find yourself typing `docker/sdk cli console …`, `vendor/bin/console …`, or bare `composer …`, **stop** — you've picked the wrong form.
+- Spryker console commands → `docker/sdk console <command>`
+- Composer → `docker/sdk cli composer <args>`
 
 ## Touched-file → command mapping
 
-The commands listed below are verified to exist in this project (per `docker/sdk console list`). Always cross-check against the relevant install recipe for the **ordering and flags** this project actually uses — recipes are authoritative; the table just narrows the search.
+Commands below exist in this project (verified via `docker/sdk console list`). Install recipes under `config/install/*.yml` are authoritative for this project's ordering and flags — read them before improvising. The table just narrows the search.
 
-| Touched files | Commands (in order) |
+Each row's trigger is independent. Apply every row whose trigger matches a file in your change set.
+
+| Trigger | Commands |
 |---|---|
-| `*.transfer.xml` | `transfer:generate` |
-| `*.schema.xml` (project layer) | `propel:install` → `propel:diff` → `propel:migrate` |
-| **Any** `.php` file change under a project namespace directory in `src/` (new OR edited — controllers, factories, plugins, models, overrides of Spryker core classes, etc.) | `docker/sdk cli composer dumpautoload --apcu` → `docker/sdk console cache:class-resolver:build` (rebuilds the resolver map so Spryker resolves to the project-layer class, not the vendor original). **Mandatory for overrides** — without this command, Spryker continues to load the vendor class and the override never takes effect. |
-| Plugin registration changes in `*DependencyProvider.php` | (covered by the row above) **plus** `docker/sdk console cache:empty-all` (the DI container caches the plugin chain — must clear to pick up new registrations) |
-| `config_default*.php` or other `config/` PHP | `cache:empty-all` |
-| Yves Twig / JS / frontend assets | `frontend:yves:build` → `twig:cache:warmer` |
-| Zed Twig | `twig:cache:warmer` |
-| `navigation.xml` | `navigation:cache:remove` → `navigation:build-cache` |
-| Glue / SAPI / BAPI route or `*RestApi*` plugin | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
-| Router-related (controllers, route files) | `router:cache:warm-up` (Zed) and/or `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` |
-| OMS XML (`config/Zed/oms/*.xml`) | `oms:process-cache:warm-up` (and `cache:empty-all` if other state cleared) |
-| Glossary CSV | `data:import:glossary` |
-| Search mapping / source changes | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` (queue worker restart may also be needed) |
-| Publisher plugin / queue config | queue worker restart — project-specific; document, don't auto-run |
-| Data import CSVs (entity-specific) | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`) |
-| Stale Zed Twig (rare; symptom: BO still shows old template after a clean refresh) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
+| `*.transfer.xml` changed | `transfer:generate` |
+| `*.schema.xml` changed (project layer) | `propel:install` |
+| A `.php` file is **added, renamed, moved, or deleted** under a project namespace in `src/` | `composer dumpautoload --apcu` |
+| A `.php` file under a project namespace is added or deleted whose **fully-qualified class name matches an existing vendor class** (the file is a project-layer override — same FQCN minus the `Spryker\` vs project root) | `cache:class-resolver:build` |
+| `*DependencyProvider.php` changed (plugin chain edit, body or new file) | `cache:empty-all` |
+| `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
+| Yves Twig / JS / SCSS changed | `frontend:yves:build` → `twig:cache:warmer` |
+| Zed Twig / JS / SCSS changed | `frontend:zed:build` → `twig:cache:warmer` |
+| Merchant Portal Twig / JS / SCSS changed | `frontend:mp:build` → `twig:cache:warmer` |
+| `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
+| Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
+| `RouteProvider` plugin or route configuration file added / changed / deleted (NOT controller body edits) | `router:cache:warm-up` (Zed) and/or the per-application variant — `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` — for the applications the route belongs to |
+| OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
+| Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` |
+| Search schema / index-map file changed (project-layer JSON under `src/<Namespace>/Shared/Search/Schema/*.json`) | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` |
+| Data import CSV changed (entity-specific) | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`) |
+| Publisher plugin / queue config changed | Queue workers need a manual restart — project-specific. Document in the report; don't auto-run. |
+| BO showing stale template after a clean refresh (rare) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
 
-If the AC requires running a command not listed above, verify it exists via `docker/sdk console list` before invoking. **Never invent commands.**
+If a command not in the table seems needed, verify it exists in `docker/sdk console list` first.
 
 ## Approach
 
-1. **Receive change context** — explicit file list from the caller is best. If only a verbal description, derive the list via `git diff --name-only HEAD~1` or `git status`. If you can't figure out what changed, stop and ask the caller.
-2. **Classify each touched file** against the mapping above. Group commands by what they target (codegen, schema, autoload, cache clear, cache warmup, frontend build, data import).
-3. **Determine order:**
-   - `docker/sdk cli composer dumpautoload --apcu` first if any `.php` was added/moved.
-   - Codegen next (transfers, scope-collection, etc.).
-   - Schema (propel) next.
-   - Cache clears (only if needed — `cache:empty-all` is heavy).
-   - Frontend builds.
-   - Cache warmups last.
-4. **Run each command separately via Bash** so you can capture exit code and tail of output per step. Use `docker/sdk console <command>` for everything Spryker, `docker/sdk cli composer …` for autoload regeneration.
-5. **Stop on the first non-zero exit code.** Don't continue past a failure. Report what ran, what failed, and the tail of the failed command's output. The caller decides whether to retry or hand off to `spryker-issue-diagnoser`.
-6. **Report concisely.** No log dump — just exit codes, brief output highlights, and any caveats (e.g. *"queue workers not restarted — caller should run that manually."*).
+1. **Get the file list.** Caller-supplied is best. Otherwise: `git status` / `git diff --name-only HEAD~1`. If you can't figure it out, ask.
+
+2. **Match each file to table rows.** Skip rows whose trigger isn't in your list.
+
+3. **Order the resulting commands** (this matches the pattern in `config/install/development.yml` and similar recipes — clear-then-codegen-then-build-then-resolve-then-import-then-frontend):
+
+   1. **Cache removes** — `cache:empty-all`, `navigation:cache:remove`, `rest-api:remove-validation-cache`, `search:source-map:remove`. Clear old cached state before new state is written.
+   2. **Codegen** — `transfer:generate`, `propel:install`.
+   3. **Autoload** — `composer dumpautoload --apcu`.
+   4. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`.
+   5. **Class resolver build** — `cache:class-resolver:build`. Runs after the class layout AND caches are in their final state.
+   6. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely.
+   7. **Frontend builds** — `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
+
+   Each step runs only if its commands appeared in your matched set from step 2. Install recipes (`config/install/*.yml`) are authoritative — if a recipe orders commands differently for this project, defer to the recipe.
+
+4. **Run each command separately via Bash** so you capture exit code and tail of output per step.
+
+5. **Stop on the first non-zero exit.** Report what ran, what failed, and the tail. Caller decides retry vs hand-off to `spryker-issue-diagnoser`.
+
+6. **Report concisely** — exit codes, brief output highlights, and caveats (e.g. *"queue workers need a manual restart — publisher plugin changed"*).
+
+## Constraints
+
+- Read source files only — never edit them.
+- Destructive commands (anything from `destructive*.yml`, anything that drops/truncates/wipes data or storage, `docker/sdk reset`) are out of scope.
+- Run only the commands needed for the actual file list — never the full install chain.
+- Use relative paths from the project root for any Bash invocation.
+- If the caller hasn't specified a store / region for a multi-region command, ask.
 
 ## Output Format
 
@@ -96,9 +115,9 @@ If the AC requires running a command not listed above, verify it exists via `doc
 ### Execution
 | # | Command | Exit | Notes |
 |---|---------|------|-------|
-| 1 | `docker/sdk cli composer dumpautoload --apcu` | 0 | regenerated classmap (in container) |
-| 2 | `docker/sdk console <discovered command from install recipe>` | 0 | |
-| 3 | `docker/sdk console <next discovered command>` | 0 | |
+| 1 | `docker/sdk console transfer:generate` | 0 | regenerated transfer classes |
+| 2 | `docker/sdk cli composer dumpautoload --apcu` | 0 | classmap refreshed |
+| 3 | `docker/sdk console frontend:yves:build` | 0 | yves assets rebuilt |
 
 ### Failures (if any)
 - Command: <full command>
