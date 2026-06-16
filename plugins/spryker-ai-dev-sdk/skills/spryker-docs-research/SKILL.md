@@ -1,0 +1,100 @@
+---
+name: spryker-docs-research
+description: Research and summarize official Spryker public documentation — module behavior, configuration options, API/Glue references, architecture concepts, supported actors, feature/PBC names, and integration/installation guides. Use this whenever a task needs to understand how a Spryker feature, module, or pattern works according to the official docs BEFORE planning, writing a PRD, or implementing — for example "how does the OMS state machine work", "what are the installation steps for MerchantPortal", "is this behavior supported in Spryker", or any time you're about to describe Spryker behavior from memory. The product-requirement-document skill invokes this to ground PRDs in documented reality. Searches docs via MCP tools (Algolia, context7) or a no-MCP curl fallback and returns relevant documented content with source links. Docs-only — it does NOT read the installed codebase, modules, transfers, or endpoint paths.
+---
+
+## Why this exists
+
+Spryker is large, versioned, and convention-heavy. Guessing feature names, supported capabilities, actors, or documented behavior from memory produces requirements and plans that don't match the real platform. This skill grounds feature work in the **official public documentation** — the authoritative statement of what Spryker supports and recommends.
+
+Run this research **first**, before any design, planning, or code investigation, so everything downstream is anchored in documented reality.
+
+**Scope:** public documentation only. This skill does not read the installed codebase, modules, transfers, or endpoints — that belongs to a separate code-investigation step. Its job is to establish the official concept, terminology, supported actors, and documented behavior.
+
+## Required tools — check availability first
+
+This skill depends on MCP tools. **At the start, verify each is available. If any is missing, tell the user explicitly and suggest enabling it before continuing** — degraded research leads to wrong requirements.
+
+Tools are referenced below by **tool name + the kind of MCP server that provides them**. Match tools by their **tool name**, not by a server name — **MCP server names are install-specific** (either may be named differently on a given setup). How a tool is invoked is also client-specific (e.g. some clients namespace it as `mcp__<server>__<tool>`); use whatever calling convention your client uses for the named tool.
+
+| Tool | Provided by | Purpose | If missing, say |
+|------|------------|---------|-----------------|
+| `searchAlgoliaDocumentation` | Spryker tooling server | Search official docs (returns doc paths + GitHub URLs) | "Algolia doc search unavailable — enable the Spryker tooling MCP server." |
+| `query-docs` | docs server (often `context7`) | Query the official Spryker docs corpus. **Always pass the fixed library ID `/spryker/spryker-docs`** (from `https://context7.com/spryker/spryker-docs`) — never call `resolve-library-id`. | "The docs MCP server (e.g. `context7`) isn't connected — enable it for richer documentation research." |
+
+Do not silently skip a missing tool. Note it, then proceed with whatever remains and flag the gap in your findings.
+
+**No MCP server at all?** You can still research: option (c) below searches the docs over plain `curl` against the public Algolia DocSearch API — no MCP required. Prefer the MCP tools when connected (richer, no public-key dependency); fall back to (c) otherwise.
+
+## Research workflow
+
+Goal: understand the official concept, terminology, supported actors, and documented capabilities. Three complementary search options are available — use whichever are available, and combine them: Algolia finds the exact doc pages, the docs corpus gives conceptual depth and examples, and the direct HTTP search (option c) works with **no MCP server at all** (just `curl`), making it the reliable fallback when the MCP tools aren't connected.
+
+**a) Algolia doc search (MCP)** — `searchAlgoliaDocumentation` (Spryker tooling server). Use **2–3 keyword queries** (the tool ranks short queries best). Run several focused searches rather than one long one:
+- One for the domain concept (e.g. `cms block content`)
+- One for the actor/area if relevant (e.g. `back office agent`)
+- One for the API surface if relevant (e.g. `glue rest checkout`)
+
+Pick only the relevant results and fetch their content from `github_api_url` (raw doc markdown) when you need detail.
+
+**b) Docs corpus query (MCP)** — for conceptual depth and code examples, query the official corpus with `query-docs` (docs server, often `context7`). **Always pass `libraryId: "/spryker/spryker-docs"` directly** (the fixed Spryker docs library, from `https://context7.com/spryker/spryker-docs`). **Never call `resolve-library-id`** — the ID is known and constant, resolving wastes a call and risks selecting the wrong library. Keep to ≤3 queries; make each specific (e.g. "How does Spryker model agent assist for customers in the Back Office").
+
+**c) Direct docs search via curl (no MCP needed)** — `https://docs.spryker.com/search.html` is an Algolia DocSearch front end; its async JS calls the public Algolia search API after page load. Call that API directly with `curl` (the search-only API key is public, embedded in the page, rate-limited). This needs no MCP server, returns real doc URLs **and full page content in one call**, and accepts natural-language queries:
+
+```bash
+curl -s 'https://SF7W0R2XNG-dsn.algolia.net/1/indexes/spryker_full_content/query' \
+  -H 'X-Algolia-Application-Id: SF7W0R2XNG' \
+  -H 'X-Algolia-API-Key: 8cbd2a0a179df1123898430a33e6938b' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"prepare an order for shipment","hitsPerPage":5,"attributesToRetrieve":["hierarchy","url","content"],"attributesToSnippet":["content:40"]}'
+```
+- Use the **`spryker_full_content`** index — it returns URLs + full content (the lighter `spryker` index is weaker). Parse `hits[].url` and `hits[].content`.
+- The `appId` / `apiKey` / index name above are the **current public values, scraped from the page** — they can rotate. If a call returns `403`/`Invalid Application-ID or API key`, **re-scrape fresh values** and retry:
+  ```bash
+  curl -s 'https://docs.spryker.com/search.html' | grep -ioE "(appId|apiKey|indexName)[: ]+'[A-Za-z0-9_]+'"
+  ```
+- Keep to a few queries (public rate-limited key). Don't paste the key anywhere outside this doc-search use.
+
+From this research, **extract the actual documentation content that is relevant to the task** — not just a one-line summary. Pull the passages, steps, lists, config snippets, and constraints the docs state, and keep each tied to the **source URL** it came from. Fetch full page content (via `query-docs`, the Algolia `content` field, or `WebFetch` on the doc URL) when a snippet isn't enough to answer the task.
+
+## Output format
+
+Return the relevant **documentation content + its source link** — enough that the caller can act on it without re-opening the docs — followed by a short brief. Reproduce the substance (steps, requirements, supported options, constraints), not just headings:
+
+```markdown
+## Spryker Documentation Research: <topic>
+
+**Tool availability:** <list any missing tools, or "all available">
+
+### Relevant documentation
+
+#### <Doc page title>
+**Source:** <doc url>
+
+<The content from this page that is relevant to the task — the actual steps / requirements / supported options / constraints / config the docs state, quoted or closely paraphrased. Include enough that the caller can act on it. Keep code/config snippets verbatim.>
+
+#### <Next relevant doc page title>
+**Source:** <doc url>
+
+<relevant content…>
+
+### Brief (synthesis)
+- Feature/PBC name: <name>
+- Supported actors: <from docs>
+- Key behavior / constraints: <the essentials, each traceable to a Source above>
+- Documented endpoints / APIs (if any): <resource> — <doc url>
+
+### Open questions / gaps
+- <anything the docs don't answer, that needs codebase investigation or a user decision>
+```
+
+Every piece of content carries its **Source** URL. Reproduce documentation substance faithfully (don't water it down to bullet headings), but stay within fair-use — quote what's needed for the task, summarise the rest, and never invent content the docs don't state. Clearly separate what is **documented** from what the docs leave open (flag the latter under Open questions — do not fill it from memory).
+
+## Principles
+
+- **Docs before opinion.** Never describe Spryker behavior from memory when the documentation can confirm it.
+- **Always Return comprehensive relevant content, not just pointers.** Hand back the relevant documentation substance (steps, requirements, options, constraints, config) so the caller can act on it — each tied to its source link — rather than a list of URLs to go read.
+- **Short Algolia queries** (2–3 words) outperform long ones.
+- **Cite sources.** Every piece of content and every claim carries its doc URL.
+- **Public docs only.** If a question needs the installed code (exact module names, transfer fields, real endpoint paths), say so in "Open questions / gaps" — that is out of scope here and belongs to a code-investigation step.
+- **Surface gaps loudly.** A missing tool or an unanswered question is a finding, not something to paper over.
