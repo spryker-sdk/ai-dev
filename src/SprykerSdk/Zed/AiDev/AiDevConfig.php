@@ -115,7 +115,7 @@ class AiDevConfig extends AbstractBundleConfig
      * rules_file_suffix: suffix applied to the source filename (source .md extension is stripped first).
      * agents_file: path relative to project root.
      * skills_dir: path relative to project root.
-     * agents_dir: path relative to project root.
+     * agents_dir: path relative to project root. null means agents generation is skipped for that tool.
      *
      * @var array<string, array<string, string|null>>
      */
@@ -153,14 +153,14 @@ class AiDevConfig extends AbstractBundleConfig
             'rules_file_suffix' => '.md',
             'agents_file' => 'AGENTS.md',
             'skills_dir' => '.agents/skills',
-            'agents_dir' => '.agents/agents',
+            'agents_dir' => '.opencode/agents',
         ],
         self::TOOL_CODEX => [
             'rules_dir' => null,
             'rules_file_suffix' => null,
             'agents_file' => 'AGENTS.md',
             'skills_dir' => '.agents/skills',
-            'agents_dir' => '.agents/agents',
+            'agents_dir' => null,
         ],
     ];
 
@@ -326,6 +326,19 @@ class AiDevConfig extends AbstractBundleConfig
         return array_values(array_keys(array_filter(
             static::TOOL_ARTIFACT_MAP,
             static fn (array $config): bool => $config['rules_dir'] !== null,
+        )));
+    }
+
+    /**
+     * @api
+     *
+     * @return array<string>
+     */
+    public function getAgentsCompatibleTools(): array
+    {
+        return array_values(array_keys(array_filter(
+            static::TOOL_ARTIFACT_MAP,
+            static fn (array $config): bool => ($config['agents_dir'] ?? null) !== null,
         )));
     }
 }

@@ -63,6 +63,30 @@ Three forms exist for running data imports. **Always pass `-t` (`--throw-excepti
 
 **Never create a new `data:import:*` subcommand, new install-recipe YAML, or new DataImportConfig class to work around a missing entity importer.** If form 1 doesn't work for the entity, the entity name isn't in any `data/import/*.yml` — at that point, stop and report; do not improvise a config. Creating a new importer is the `data-import` skill's job and is out of scope here.
 
+### Stop the queue consumer before running data import
+
+Spryker's queue consumer can read partial CSV state mid-import and produce inconsistent published data. **Before any of the three import forms above**, pause Jenkins so workers don't fire while the importer is writing:
+
+```bash
+docker/sdk jobs stop
+```
+
+Run the data import. Once it completes cleanly, restart workers — the event-behavior listeners that fired during import already queued their events in `spy_event_behavior_entity_change`, and the restarted worker will process them:
+
+```bash
+docker/sdk jobs start
+```
+
+If `docker/sdk jobs stop` isn't available in this project (older `docker/sdk` versions), pause the relevant queue worker process(es) manually before importing.
+
+**Alternative path** (when stopping the queue isn't an option — e.g. shared environment): keep the consumer running, run the import, then explicitly trigger events afterwards to ensure everything the importer touched is republished:
+
+```bash
+docker/sdk console publish:trigger-events
+```
+
+This second path trades a slightly longer storefront-stale window and the small risk of a mid-import inconsistency window, against not having to stop the consumer. Use only if you can't take path 1.
+
 ## Approach
 
 1. **Parse the requirement.** What entities are needed, how many, with which attributes? Identify the entity types (product, customer, quote request, …) and the CSV file(s) those map to.
