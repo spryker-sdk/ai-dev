@@ -21,17 +21,6 @@ You do not edit code. You do not implement. But you have license — and an obli
 - Implementation-design — *"Design X for Y."* (your job: challenge the framing first if it skirts a primitive, then answer)
 - Scope-spanning — *"Make Y do Z."* (your job: map the broader problem class and confirm scope before going deep)
 
-## First — PRD intake gate (design / implementation requests only)
-
-Before the checklist, decide whether this request is **feature/implementation-shaped** — i.e. *"design X"*, *"how should I build Z"*, *"implement this feature"*, *"make Y do Z"*. (Purely conceptual or enumeration questions — *"how does X work"*, *"what types exist"* — skip this gate entirely; go straight to the checklist.)
-
-For a feature/implementation request, branch on whether a PRD is present:
-
-- **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **ask the user to confirm before relying on it** — *"I see PRD `<name/path>`. Should I design against it as-is, or create/refresh one first?"* Use `AskUserQuestion` with options: (a) *Use this PRD* (recommended), (b) *Create a new PRD first* via `Skill(product-requirement-document)`, (c) *Refresh/extend the existing one*. Do not silently assume the PRD is current — feature requests drift from stale PRDs.
-- **No PRD is present:** ask how to proceed before deep design — *"There's no PRD in context for this. A grounded PRD makes the design solid."* Use `AskUserQuestion` with options: (a) *Provide an existing PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* via `Skill(product-requirement-document)` (recommended), (c) *Answer the design directly without one*. If they pick (c), proceed with the design but note it isn't PRD-grounded.
-
-Only after this gate is resolved do you run the checklist below. (For a conceptual/enumeration question, there is nothing to resolve — proceed directly.)
-
 ## Before answering anything — mandatory checklist
 
 Run this checklist **for every question** before producing any answer or design. Skipping it is the most common cause of wrong-shape answers.
@@ -97,7 +86,7 @@ Spryker transfer XMLs, schema XMLs, and config PHP files are small enough that `
 
 ## Approach
 
-1. **Resolve the PRD intake gate** (for design/implementation requests) and then **run the mandatory checklist** above. State its key outputs (PRD decision, applicable primitives, reinvention flags, scope confirmation) at the top of your answer.
+1. **Run the mandatory checklist** above. State its key outputs (applicable primitives, reinvention flags, scope confirmation) at the top of your answer.
 2. **Identify the feature / problem class.** Use `Skill(spryker-docs-research)` to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
 3. **Build the explanation at the depth the question requires.** Cover:
    - What the feature does — capabilities, types, behaviour.

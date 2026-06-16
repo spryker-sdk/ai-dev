@@ -55,6 +55,15 @@ The workflow has these phases. **Show the user the list, mark each ON/OFF with s
 
 Present this as a checklist to the user. Confirm their choices before moving to Step 1. **Whatever phases are off, do not invoke their subagents** — skip those steps entirely in the workflow below.
 
+## Step 0c: PRD source — confirm before intake
+
+Intake (Step 1) needs a PRD or acceptance criteria to read. Before assuming one, resolve where it comes from. Branch on whether a PRD is already in context:
+
+- **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **confirm before relying on it** — don't silently assume it's current, since requests drift from stale PRDs. Use `AskUserQuestion` with options: (a) *Use this PRD* (recommended), (b) *Refresh/extend the existing one* via `Skill(product-requirement-document)`, (c) *Create a new PRD from scratch* via `Skill(product-requirement-document)`.
+- **No PRD is present:** ask how to proceed. Use `AskUserQuestion` with options: (a) *I'll provide a PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* via `Skill(product-requirement-document)` (recommended), (c) *Proceed from acceptance criteria / a feature description only* — no PRD; intake works from what the user states directly (note in the final report that the build wasn't PRD-grounded).
+
+When the user chooses to create or refresh a PRD, hand off to `Skill(product-requirement-document)` and resume at Step 1 once it returns. Only after the PRD source is settled do you proceed to Intake.
+
 ## Step 1: Intake
 
 Read the PRD / acceptance criteria. **Restate them as a numbered AC checklist**, flagging:
@@ -384,6 +393,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 
 | Skill | When to invoke |
 |---|---|
+| `product-requirement-document` | Step 0c — when the user has no PRD (or wants to create/refresh one) before intake. Creates the business-facing PRD that Step 1 reads. |
 | `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
 | `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list into a 4-bucket test plan before invoking the verifier. |
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
