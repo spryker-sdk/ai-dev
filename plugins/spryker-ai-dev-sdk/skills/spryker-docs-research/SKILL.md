@@ -28,7 +28,7 @@ Do not silently skip a missing tool. Note it, then proceed with whatever remains
 
 ## Research workflow
 
-Goal: understand the official concept, terminology, supported actors, and documented capabilities. Three complementary search options are available — use whichever are available, and combine them: Algolia finds the exact doc pages, the docs corpus gives conceptual depth and examples, and the direct HTTP search (option c) works with **no MCP server at all** (just `curl`), making it the reliable fallback when the MCP tools aren't connected.
+Goal: understand the official concept, terminology, supported actors, and documented capabilities. Two complementary search options are available — use whichever are available, and combine them: Algolia finds the exact doc pages, and the docs corpus gives conceptual depth and examples.
 
 **a) Algolia doc search (MCP)** — `searchAlgoliaDocumentation` (Spryker tooling server). Use **2–3 keyword queries** (the tool ranks short queries best). Run several focused searches rather than one long one:
 - One for the domain concept (e.g. `cms block content`)
@@ -39,23 +39,7 @@ Pick only the relevant results and fetch their content from `github_api_url` (ra
 
 **b) Docs corpus query (MCP)** — for conceptual depth and code examples, query the official corpus with `query-docs` (docs server, often `context7`). **Always pass `libraryId: "/spryker/spryker-docs"` directly** (the fixed Spryker docs library, from `https://context7.com/spryker/spryker-docs`). **Never call `resolve-library-id`** — the ID is known and constant, resolving wastes a call and risks selecting the wrong library. Keep to ≤3 queries; make each specific (e.g. "How does Spryker model agent assist for customers in the Back Office").
 
-**c) Direct docs search via curl (no MCP needed)** — `https://docs.spryker.com/search.html` is an Algolia DocSearch front end; its async JS calls the public Algolia search API after page load. Call that API directly with `curl` (the search-only API key is public, embedded in the page, rate-limited). This needs no MCP server, returns real doc URLs **and full page content in one call**, and accepts natural-language queries:
-
-```bash
-curl -s 'https://SF7W0R2XNG-dsn.algolia.net/1/indexes/spryker_full_content/query' \
-  -H 'X-Algolia-Application-Id: SF7W0R2XNG' \
-  -H 'X-Algolia-API-Key: 8cbd2a0a179df1123898430a33e6938b' \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"prepare an order for shipment","hitsPerPage":5,"attributesToRetrieve":["hierarchy","url","content"],"attributesToSnippet":["content:40"]}'
-```
-- Use the **`spryker_full_content`** index — it returns URLs + full content (the lighter `spryker` index is weaker). Parse `hits[].url` and `hits[].content`.
-- The `appId` / `apiKey` / index name above are the **current public values, scraped from the page** — they can rotate. If a call returns `403`/`Invalid Application-ID or API key`, **re-scrape fresh values** and retry:
-  ```bash
-  curl -s 'https://docs.spryker.com/search.html' | grep -ioE "(appId|apiKey|indexName)[: ]+'[A-Za-z0-9_]+'"
-  ```
-- Keep to a few queries (public rate-limited key). Don't paste the key anywhere outside this doc-search use.
-
-From this research, **extract the actual documentation content that is relevant to the task** — not just a one-line summary. Pull the passages, steps, lists, config snippets, and constraints the docs state, and keep each tied to the **source URL** it came from. Fetch full page content (via `query-docs`, the Algolia `content` field, or `WebFetch` on the doc URL) when a snippet isn't enough to answer the task.
+From this research, **extract the actual documentation content that is relevant to the task** — not just a one-line summary. Pull the passages, steps, lists, config snippets, and constraints the docs state, and keep each tied to the **source URL** it came from. Fetch full page content (via `query-docs` or `WebFetch` on the doc URL) when a snippet isn't enough to answer the task.
 
 ## Output format
 

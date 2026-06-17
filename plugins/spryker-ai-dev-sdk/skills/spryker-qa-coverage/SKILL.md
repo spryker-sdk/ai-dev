@@ -34,7 +34,7 @@ It deliberately stays in the QA lane:
 QA isn't only a final gate. This skill runs in two modes; choose by what the user is asking for and scale the effort accordingly.
 
 ### Full QA (default)
-A feature is complete (or the user explicitly wants thorough QA). Run the **full workflow below**: all four test-case buckets, every actor the feature touches, **save the checklist/test-case artifact**, and produce the **written report**. This is the durable QA record.
+A feature is complete (or the user explicitly wants thorough QA). Run the **full workflow below**: the test-case buckets that apply to each story (scaled to its risk, not a fixed matrix), every actor the feature touches, **save the checklist/test-case artifact**, and produce the **written report**. This is the durable QA record.
 
 ### Smoke test (light, no artifact, no report)
 For **mid-development sanity checks** and **post-refactor regression checks** — "does this still work", "did my refactor break anything", "quick check the slice I just built". **No PRD needed** — derive the key paths straight from what the user changed or described (the file/area touched, the flow they name). The point is fast feedback, not a paper trail, so:
@@ -76,7 +76,7 @@ When in doubt, run inline — losing context is a worse failure than a slightly 
 
 ### Step 1 — Build the test checklist and test cases
 
-For each user story / acceptance criterion, derive test cases. Cover four buckets so corner cases aren't an afterthought:
+For each user story / acceptance criterion, derive test cases from these four buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
 
 - **Happy path** — the documented behavior works for the intended actor.
 - **Negative / validation** — missing or malformed input, wrong values, empty state, "no results".
