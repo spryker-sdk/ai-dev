@@ -55,6 +55,15 @@ The workflow has these phases. **Show the user the list, mark each ON/OFF with s
 
 Present this as a checklist to the user. Confirm their choices before moving to Step 1. **Whatever phases are off, do not invoke their subagents** — skip those steps entirely in the workflow below.
 
+## Step 0c: PRD source — confirm before intake
+
+Intake (Step 1) needs a PRD or acceptance criteria to read. Before assuming one, resolve where it comes from. Branch on whether a PRD is already in context:
+
+- **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **confirm before relying on it** — don't silently assume it's current, since requests drift from stale PRDs. Use `AskUserQuestion` with options: (a) *Use this PRD* (recommended), (b) *Refresh/extend the existing one* via `Skill(product-requirement-document)`, (c) *Create a new PRD from scratch* via `Skill(product-requirement-document)`.
+- **No PRD is present:** ask how to proceed. Use `AskUserQuestion` with options: (a) *I'll provide a PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* via `Skill(product-requirement-document)` (recommended), (c) *Proceed from acceptance criteria / a feature description only* — no PRD; intake works from what the user states directly (note in the final report that the build wasn't PRD-grounded).
+
+When the user chooses to create or refresh a PRD, hand off to `Skill(product-requirement-document)` and resume at Step 1 once it returns. Only after the PRD source is settled do you proceed to Intake.
+
 ## Step 1: Intake
 
 Read the PRD / acceptance criteria. **Restate them as a numbered AC checklist**, flagging:
@@ -135,6 +144,14 @@ Before showing the plan to the user, walk the rest of the workflow in your head 
 
 Present the plan + the consolidated question list together. The user answers once. From this point on, execution should run end-to-end without further interruption, **except the final commit gate at Step 8**.
 
+### Scope changes from the user — restate the cost before accepting
+
+If the user pivots mid-plan (a new entity, a separate table, an extra endpoint, a different actor, a swap from "extend X" to "create Y"), do **not** silently absorb the change. Restate the new scope with its concrete cost in one block before regenerating the plan:
+
+> *"That changes scope — adds approximately X new PHP classes, Y new schema XML(s), Z new tables, a new BO form, new permission(s). Net diff from the current plan: +N files, ~M lines. Confirm before I update the plan."*
+
+Wait for the user to confirm before regenerating. The point isn't to discourage pivots — it's to make sure the user sees the cost they just signed for, rather than discovering it during edit.
+
 ### Show the plan + questions to the user. Wait for one consolidated round of answers before editing.
 
 ## Step 4: Edit
@@ -152,7 +169,9 @@ Apply changes per the chosen quality bar.
 - **If you get stuck on *"why is this code doing X at runtime"* during the build** — and the answer isn't in the logs or DB state already — invoke the `ai-runtime-debugging` skill (via the `Skill` tool). It teaches the `[AI-DEBUG]` tagged-log pattern (and optional XDebug step-debug if a debugger MCP is installed) for inspecting runtime state. Use sparingly; remove all instrumentation before Step 7b.
 - **Do NOT invoke the `static-validation` skill at this step.** Its own description fires aggressively on any PHP edit, but static-validation must run only at Step 7b — running it now fights the self-correct loop and lets `phpcbf` reformat code before verification ever sees it. Wait.
 - **Visual fit is mandatory for any new UI element.** When adding a badge, label, button, form field, banner, widget, table column, or any other visible UI piece — to Yves, Zed, Merchant Portal — **invoke the `yves-atomic-frontend` skill** (via the `Skill` tool) for guidance on extending the project's atomic design system properly. Reuse existing atoms/molecules/organisms from `Theme/default/components/` rather than writing standalone HTML. The output must look like part of the shop, not like raw text pasted onto a polished page. This rule applies equally to PoC and MVP — *"PoC"* is about code minimum, not visual minimum.
+- **Hard pre-edit gate for any `.scss` / `.ts` / atomic-component file.** The `yves-atomic-frontend` skill MUST be invoked **before** the first `Write` or `Edit` on any file under `Theme/default/components/`, or any new `.scss` / `.ts` file in that tree — not after. Common failure mode: codegen writes a new SCSS file that references an undefined mixin (e.g. `@include pyz-foo-tag`) or doesn't follow the project's atom convention (style.scss split, index.ts export, etc.), and `frontend:yves:build` fails in Step 5. Self-correction signal: if you're about to create a new `Theme/default/components/atoms/<name>/<name>.scss` file and you haven't loaded `yves-atomic-frontend` in this run, **stop** — load it first, then write the file using the skill's templates.
 - **No defensive comments.** Don't add inline comments or PHPDoc to justify what the code does, why a review flag was addressed, or what an identifier means — well-named identifiers and the PR description carry that information. Specifically forbidden: class-level docblocks (already covered above), multi-line inline comments, references to recent reviews / fixes / iterations (*"addressed CR feedback"*, *"fixes #123"*, *"after refactor"*, *"per static-validation"*), explanations of *"why this approach over the obvious one"*, and `// TODO` markers that exist only because the model wasn't sure what to do. If the *why* is non-obvious enough to need text, that's a signal the code needs restructuring, not commenting. Self-correction signal: if you're about to type the words *"because"*, *"to handle"*, *"workaround for"*, *"to satisfy"*, *"per review"*, or *"fixes"* inside a comment — **stop**, the comment shouldn't be there.
+- **Workaround = re-plan signal, not a comment.** If you catch yourself about to write code you'd describe as a *"workaround"*, *"non-obvious framework trick"*, *"we have to do this because Spryker..."*, or any wording that admits the chosen extension point doesn't fit — **stop**. The right answer is almost never *"write the workaround and explain it in a comment"*. Re-invoke `spryker-feature-expert` with a specific follow-up about the seam you're fighting (e.g. *"the post-execute hook doesn't see the form submission yet — what's the canonical pre-render extension point for this step?"*). 9/10 the canonical seam exists and you missed it on the first research pass. Only after the expert confirms there is no clean seam do you proceed with the workaround; even then, the justification belongs in the PR description, never in an inline comment.
 
 **PoC quality bar:** minimum files, hardcoded values OK, skip plugin/expander indirection when a direct edit works, no tests, no locale completeness beyond default, no ACL ceremony beyond what an AC demands.
 
@@ -263,6 +282,16 @@ Wait for the user's answer before doing anything else. Do not mark the AC `faile
 - The user **only sees a prompt when there's actually nothing more to try**, not at an arbitrary retry boundary.
 - The **attempt log carries across iterations**, so the diagnoser has memory of prior failures within the same workflow run.
 
+### Visual outcomes require explicit user sign-off — never self-assess
+
+The model cannot reliably judge whether a UI element looks good. Visual quality is subjective and depends on the project's design system, the user's taste, and the surrounding context. The verifier's role on visual ACs is limited to **objective** checks (element renders, uses an atom class from `Theme/default/components/`, no layout breakage); subjective design judgment is the user's call, not the model's.
+
+So: after **any** UI-touching AC reaches verified-green on its objective checks, present the screenshot and ask the user explicitly before treating that AC as done:
+
+> *"The [element] renders with the [atom] styling. Screenshot at [path]. Does the visual look right, or want changes (colour, weight, position, size)?"*
+
+Do not skip this question on the basis that the feature *"looks fine"* — that judgment is not the model's to make. Iterate only when the user explicitly redirects; never on the model's own visual assessment. Stop when the user signs off.
+
 ### Do NOT invoke `static-validation` inside this loop
 
 The static-validation skill's trigger ("after any PHP code changes") will tempt the orchestrator to fire it on each retry iteration's edit. **Don't.** Static-validation runs only at Step 7b, against the final stable diff. Running it inside the self-correct loop:
@@ -353,7 +382,8 @@ Branch `ai-customize/<slug>`. <X of N> ACs green. Commit?
 
 1. **`git add` only the files you edited** (you've been tracking them throughout the workflow). Do **not** use `git add .` / `git add -A` — they sweep unrelated changes the user may have on the branch.
 2. **Verify staging:** `git status` to confirm only the intended files are staged; `git diff --cached` to confirm the staged diff matches what you edited.
-3. Show the commit gate (the report block + the *"Commit?"* question).
+3. **Final code review against the staged diff** (mandatory whenever the code-review phase is on — and the user should not have to ask for this). Invoke `spryker-code-reviewer` with the output of `git diff --cached`, not the in-memory file list. The earlier review at Step 7b ran before the last round of self-correct fixes; this final pass is what the user judges the commit on. If the reviewer surfaces new findings, apply the "fix root cause, never work around" rules from Step 7b, re-stage, and re-review. Loop until the reviewer is clean OR the user explicitly accepts remaining findings. Surface the final reviewer report in the commit gate so the user sees it before deciding.
+4. Show the commit gate (the report block + the *"Commit?"* question).
 
 **If the user says yes:**
 - `git commit` with a structured message that lists the ACs in the body.
@@ -384,6 +414,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 
 | Skill | When to invoke |
 |---|---|
+| `product-requirement-document` | Step 0c — when the user has no PRD (or wants to create/refresh one) before intake. Creates the business-facing PRD that Step 1 reads. |
 | `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
 | `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list into a 4-bucket test plan before invoking the verifier. |
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
@@ -402,7 +433,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 - When you *do* need to read project files directly (e.g. project namespaces from `composer.json`, install recipes from `config/install/*.yml`), use **native tools, never `Bash`**: `Read` for files (relative paths from the project root, never absolute `/Users/...`), `Glob` for filename discovery, `Grep` for content search. `Bash cat`, `Bash grep`, `Bash sed`, `Bash awk`, `Bash find`, and the `cd` + `&&` pattern with absolute paths all prompt for approval, are slower, and are never necessary for in-project file work.
 - Do not manipulate CSV files. Delegate to `spryker-data-seeder`.
 - Do not touch the database directly via any shell route. Reads go through `executeDatabaseQuery` (delegated to expert / verifier / debugger); writes go through the data-import path (delegated to data-seeder) or schema XML + propel migrations.
-- Do not drive the browser yourself. Verification UI work belongs to `spryker-verifier`; demo capture belongs to `spryker-screenshot-collector`.
+- **Do not drive the browser from the main loop. Ever.** Verification UI work belongs to `spryker-verifier`; demo capture belongs to `spryker-screenshot-collector`. When a screenshot or verification result looks wrong, the answer is to **re-invoke the agent with sharper instructions** — never to load `mcp__claude-in-chrome__*` tools into the main session and *"just check it yourself"*. Self-correction signal: if you're about to call `ToolSearch(query="...claude-in-chrome...")` from the main loop, **stop** — that's main-loop bleed. The agents own the browser; the orchestrator delegates. This rule applies equally to *"just one quick screenshot to verify the agent's output"* — that quick check is still the agent's job.
 - Do not run `docker/sdk reset` or any environment-destructive command.
 - Do not produce MVP-grade ceremony when the chosen bar is PoC. If you have more than ~5 PHP classes in a PoC, you're building MVP — re-cut.
 - Do not produce PoC-grade shortcuts when the chosen bar is MVP. Canonical patterns are non-negotiable for MVP.

@@ -61,6 +61,14 @@ No filesystem writes from this agent. The browser writes the GIF files itself wh
    - Log in if needed (admin / agent / customer per the caller's instruction).
    - Navigate to the URL.
    - If the capture needs a specific UI state (form filled, item selected, tooltip showing), perform the minimal interactions to reach that state.
+   - **Stale-CSS cache-bust (mandatory when SCSS was just rebuilt).** Spryker writes Yves CSS to `yves_default.app.css` with no content hash — the browser caches the OLD CSS even after `frontend:yves:build`. Before any capture that depends on freshly-built styling, force-refresh the stylesheet via `javascript_tool`:
+     ```js
+     document.querySelectorAll('link[rel="stylesheet"]').forEach(l => {
+       l.href = l.href.split('?')[0] + '?cb=' + Date.now();
+     });
+     ```
+     Wait ~500ms for re-fetch, then proceed. Skipping this and capturing the stale-CSS frame produces a misleading file that the caller can't tell from a real "the styling didn't land" bug.
+   - **Pre-capture DOM check (mandatory when the intent names a specific element).** If the caller's capture intent says *"with the badge"*, *"showing the warning banner"*, *"with the merchant label"*, etc., use `javascript_tool` to assert that element is actually rendered on the page **before** starting the recording — e.g. `document.querySelector('.company-default-tag')` returns non-null, or `document.body.innerText.includes('Company default')`. If the element isn't there, do **NOT** capture — return `precondition_failed: element-missing` with the URL, the selector / text you looked for, and a short note on what you saw instead. A capture that doesn't show what the caller asked for is a false-success; better to fail loud than ship a misleading file the caller might commit or present.
    - Capture: still image via `gif_creator` with a short capture window, or a multi-step GIF for flows.
    - **Persist the capture via `gif_creator`'s export-download flow.** The browser writes the file to its configured download folder (typically `~/Downloads/`). Just trust that and report the path; don't try to relocate it.
 
@@ -101,4 +109,6 @@ Move them into the project / your demo deck wherever you want from there.
 - Do not edit files.
 - Do not run console / DB / API commands. Browser + file save only.
 - Do not claim a capture was "saved" without verifying the file exists on disk first (`Read` or `ls`). MCP-internal references inside the tool-call context are not deliverables. If the file isn't on disk, the capture didn't succeed — report it that way.
+- Do not capture or save a file when the target element named in the caller's intent isn't present on the page. False-success captures are worse than failures — the caller may commit or present them thinking the feature works. Return `precondition_failed: element-missing` with what you looked for and what you saw instead, and stop.
+- Do not write captions that describe what the capture was *supposed* to show — only describe what is actually visible. If the caller asked for "badge visible" and the badge isn't in frame, the caption must not say "with badge" — say what you actually see, or fail the capture per the rule above.
 - **Do not prepend `cd /absolute/path/to/this-project && ...` to any `Bash` command.** The harness already runs every `Bash` invocation in the project root, so cd-ing back is redundant AND it shifts the command to a different allowlist pattern, causing permission prompts on commands that would otherwise auto-approve. Use relative paths for in-project work. For files outside the project (e.g. `~/Downloads/`), pass the absolute path as a tool argument to native `Read` / `Glob`, don't `cd` there.

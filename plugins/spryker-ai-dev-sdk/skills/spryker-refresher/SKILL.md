@@ -59,7 +59,8 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
 | `RouteProvider` plugin or route configuration file added / changed / deleted (NOT controller body edits) | `router:cache:warm-up` (Zed) and/or the per-application variant — `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` — for the applications the route belongs to |
 | OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
-| Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` |
+| Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` (Yves storefront translations only — does NOT cover Zed BO labels) |
+| Zed translator CSV changed (`src/<Namespace>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` (Zed BO labels — separate pipeline from glossary; verify the command via `docker/sdk console list`) |
 | Search schema / index-map file changed (project-layer JSON under `src/<Namespace>/Shared/Search/Schema/*.json`) | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` |
 | Data import CSV changed (entity-specific) | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`) |
 | Publisher plugin / queue config changed | Queue workers need a manual restart — project-specific. Document in the report; don't auto-run. |

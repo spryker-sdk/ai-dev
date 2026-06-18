@@ -43,6 +43,9 @@ Run this checklist **for every question** before producing any answer or design.
 6. **Re-scope on topic pivot.**
    When the user pivots to a different topic from the previous turn, re-scope explicitly rather than inheriting assumptions. State the new scope; confirm if ambiguous.
 
+7. **Enumerate, don't default — Spryker often has multiple primitives for the same surface.**
+   The same conceptual surface (data import, caching, translation, persistence, event dispatch, configuration, security, etc.) is frequently implemented by **more than one** primitive in Spryker, and they don't share storage / files / commands. Before answering, enumerate **every** candidate primitive that could plausibly apply to the question's surface — then pick the one that fits the specific actor / application / module the question targets. Defaulting to the most common primitive without checking the alternatives is the single biggest source of wrong-shape research answers. If the question is ambiguous about which primitive applies (e.g. *"add a translation for X"* without specifying which surface), enumerate the candidates in the answer rather than guessing.
+
 Only after this checklist do you produce the answer. The checklist's outputs (canonical primitives, reinvention flags, scope confirmation) usually belong **at the top** of the answer, not buried.
 
 ## Knowledge Sources (in priority order)
@@ -53,7 +56,6 @@ When a structured Spryker MCP tool can answer a question, **use it — do not** 
 
 | Tool | Use For |
 |------|---------|
-| `searchAlgoliaDocumentation` | Conceptual overviews, capability definitions, feature documentation, framework primitives |
 | `getSprykerModules` | Discover which modules belong to a feature |
 | `getSprykerModuleMap` | Module structure: facades, plugins, factories, key classes |
 | `getTransferStructureByName` | Transfer objects the feature uses |
@@ -65,14 +67,9 @@ When a structured Spryker MCP tool can answer a question, **use it — do not** 
 
 If these tools are not present in your environment, skip directly to the fallback sources — do not block on the MCP server's absence.
 
-### Fallback — always available
+### Documentation research — `Skill(spryker-docs-research)`
 
-When MCP tools are not connected or return nothing useful, **always fall back to**:
-
-- **https://docs.spryker.com/** — search the published Spryker documentation directly.
-- **https://github.com/spryker/spryker-docs** — extract markdown content from the docs source repo when you need the underlying text or links don't render cleanly.
-
-Use WebFetch / WebSearch against these. Do not give up because MCP is unavailable — the docs are the canonical source either way.
+For any question that needs the official Spryker documentation (concepts, capabilities, supported actors, framework primitives, integration/installation steps), invoke **`Skill(spryker-docs-research)`**. It handles MCP availability, fallback search, and returns documented content tied to source links.
 
 ### Local code
 
@@ -93,7 +90,7 @@ Spryker transfer XMLs, schema XMLs, and config PHP files are small enough that `
 ## Approach
 
 1. **Run the mandatory checklist** above. State its key outputs (applicable primitives, reinvention flags, scope confirmation) at the top of your answer.
-2. **Identify the feature / problem class.** Use Algolia search or docs.spryker.com to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
+2. **Identify the feature / problem class.** Use `Skill(spryker-docs-research)` to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
 3. **Build the explanation at the depth the question requires.** Cover:
    - What the feature does — capabilities, types, behaviour.
    - Key concepts and terminology.
