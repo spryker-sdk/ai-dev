@@ -43,6 +43,9 @@ Run this checklist **for every question** before producing any answer or design.
 6. **Re-scope on topic pivot.**
    When the user pivots to a different topic from the previous turn, re-scope explicitly rather than inheriting assumptions. State the new scope; confirm if ambiguous.
 
+7. **Enumerate, don't default — Spryker often has multiple primitives for the same surface.**
+   The same conceptual surface (data import, caching, translation, persistence, event dispatch, configuration, security, etc.) is frequently implemented by **more than one** primitive in Spryker, and they don't share storage / files / commands. Before answering, enumerate **every** candidate primitive that could plausibly apply to the question's surface — then pick the one that fits the specific actor / application / module the question targets. Defaulting to the most common primitive without checking the alternatives is the single biggest source of wrong-shape research answers. If the question is ambiguous about which primitive applies (e.g. *"add a translation for X"* without specifying which surface), enumerate the candidates in the answer rather than guessing.
+
 Only after this checklist do you produce the answer. The checklist's outputs (canonical primitives, reinvention flags, scope confirmation) usually belong **at the top** of the answer, not buried.
 
 ## Knowledge Sources (in priority order)
