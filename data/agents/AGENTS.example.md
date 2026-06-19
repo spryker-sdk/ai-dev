@@ -8,6 +8,7 @@ You are part of the **Project team**. Strictly follow Spryker architectural guid
 # Docker CLI
 docker/sdk cli console [<command>]                    # List/run commands
 docker/sdk cli console cache:clear                    # Clear application cache
+docker/sdk cli console cache:class-resolver:build     # Builds a class map for the class resolver, needed when Spryker classes are overridden
 docker/sdk cli console navigation:cache:remove        # Remove navigation cache
 docker/sdk cli console twig:cache:warmer              # Warm Twig template cache
 docker/sdk cli console transfer:generate              # Generate transfers

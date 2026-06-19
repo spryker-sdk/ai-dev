@@ -61,6 +61,23 @@ interface AiToolArtifactGeneratorInterface
     public function generateSkills(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array;
 
     /**
+     * @param string $tool
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @return array<string>
+     */
+    public function listAgentsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array;
+
+    /**
+     * @param string $tool
+     * @param array<string> $skipPaths
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @return array<string>
+     */
+    public function generateAgents(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array;
+
+    /**
      * @param string $absolutePath
      *
      * @return string

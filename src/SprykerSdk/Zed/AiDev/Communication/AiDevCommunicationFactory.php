@@ -17,6 +17,7 @@ use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolDetectorInterface;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformer;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformerInterface;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsFileGenerationStep;
+use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsGenerationStep;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\RulesGenerationStep;
 use SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\SkillsGenerationStep;
 
@@ -83,6 +84,7 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
             $this->createRulesGenerationStep(),
             $this->createAgentsFileGenerationStep(),
             $this->createSkillsGenerationStep(),
+            $this->createAgentsGenerationStep(),
         ];
     }
 
@@ -108,5 +110,13 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
     protected function createSkillsGenerationStep(): SkillsGenerationStep
     {
         return new SkillsGenerationStep($this->createAiToolArtifactGenerator());
+    }
+
+    /**
+     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsGenerationStep
+     */
+    protected function createAgentsGenerationStep(): AgentsGenerationStep
+    {
+        return new AgentsGenerationStep($this->createAiToolArtifactGenerator(), $this->getConfig());
     }
 }

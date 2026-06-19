@@ -1,0 +1,202 @@
+---
+name: product-requirement-document
+description: Use when creating PRDs for Spryker features, before implementation planning, or when a user requests a spec/requirements document that another AI agent will turn into tasks. Drives an interactive, research-grounded PRD — first investigates official Spryker docs and the real codebase, strictly assigns a real Spryker actor to every story, names the affected endpoint + path, and keeps the document business-focused (no implementation, no quality gates, no task breakdown).
+---
+
+# Product Requirement Document (PRD) Creation
+
+## Overview
+
+A PRD defines WHAT to build and WHY — never HOW, HOW LONG, or which commands to run. It is business-facing and AI-parseable so another agent can later extract tasks and a plan from it.
+
+**Core principle:** Clear, reality-grounded requirements enable autonomous task generation. Anchor every requirement in real Spryker behavior, then structure it for machines first, humans second.
+
+**This is an INTERACTIVE, ITERATIVE process. Do NOT write a complete PRD in one pass.** Gather requirements through questions, present sections at checkpoints, create user stories ONE AT A TIME, present acceptance criteria ONE BY ONE, and get approval before each next phase.
+
+## When to Use
+
+- User requests a PRD, spec, or requirements document for a Spryker feature
+- Planning a new feature before implementation
+- Aligning on scope and goals
+
+Do NOT use for: implementation plans, technical design docs, API reference, project timelines, or quick informal requirement gathering.
+
+## What this PRD deliberately EXCLUDES
+
+This skill produces a **business requirements** document. Keep technical/implementation material OUT:
+
+- ❌ **No "Quality Gates"** — no `phpstan` / `phpcs` / `codecept` commands. Testing strategy belongs to planning, not the PRD.
+- ❌ **No "Tasks" / implementation breakdown** — that is the planner's job.
+- ❌ **No architecture/code design** in user stories.
+- ❌ **No code references anywhere in the PRD body** — no fully-qualified class names, no `Class::method()`, no controller/action/plugin/facade/transfer/repository class names, no file paths. Refer to capabilities by **feature/module name** (e.g. "AiCommerce module", "Content module") and to settings by **configuration name** (e.g. "the `ai_commerce:smart_cms:general:is_enabled` configuration", "the Smart CMS feature flag") — names, not code symbols. The endpoint line carries only the **URL path** (see Phase 5).
+
+If you catch yourself adding any of the above, stop and remove it.
+
+**Where the code references go instead — the `.refs.md` attachment.** The FQCNs, transfer field names, controller/action/plugin names, config keys, and file paths you discover during Phase 0 are valuable for the planner — do **not** discard them. Capture them in a **sibling attachment file** `<feature-name>.refs.md` saved next to the `.prd.md` (see [refs-attachment.md](refs-attachment.md)), and link it from the PRD's research header. The PRD body stays business-readable and code-free; the attachment is the implementation crosswalk. Tell the user, when saving, that you saved the discovered code references as this attachment.
+
+## Core Workflow
+
+### Phase 0: Research FIRST — ground the PRD in real Spryker 🔬 REQUIRED
+
+**Before any requirement, story, or design, investigate.** Requirements written from memory drift from how Spryker actually works. Do this in three layers — docs, then code, then (for existing flows) the running app. **Two of the three layers are opt-in — ASK the user before running them** (steps 1 and 3 below). Step 2 (codebase facts) is always done.
+
+1. **Public documentation — ASK FIRST, then run `spryker-docs-research` as a subagent.** Before researching docs, ask the user whether documentation research is needed for this feature (use `AskUserQuestion`: "Should I research the official Spryker docs for this feature first?"). Some features are project-specific or already well-understood from the codebase and need no doc research. **Only if the user says yes**, dispatch the research to **one or more subagents via the Agent tool** (do NOT run it inline in the main loop) — each subagent's prompt instructs it to invoke the `spryker-docs-research` skill. Keeping docs research in a subagent isolates its large doc-fetch output from the PRD-drafting context and returns only the distilled brief. **Fan out when the feature spans multiple concepts/PBCs** — launch parallel subagents (one per concept, e.g. one for "CMS content widgets/placeholders", one for "Content Items", one for an actor/API area) in a single message so they run concurrently; use a single subagent for a narrow, single-concept feature. Each subagent returns the **relevant documentation content + source links** plus a short brief: official feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Collect and merge the briefs. If a subagent reports a missing MCP tool, relay that to the user and suggest enabling it. (It is **docs-only** — it does not read the codebase.)
+
+2. **Codebase facts — inline, using the Spryker tooling MCP server.** Confirm against the real install what the docs claim, and pin down exact names. Match tools by **tool name** (server names vary by install; some clients namespace as `mcp__<server>__<tool>`):
+   - `getSprykerModules` — confirm the module exists and get its exact name.
+   - `getSprykerModuleMap` — the module's API surface: find the **controller + action** behind the feature, the **plugins / extension points** it hooks into, and whether the capability already ships. (For Yves, routes come from `RouteProviderPlugin`s; for Glue, the resource name from a `ResourceRoutePlugin`.)
+   - `getTransferStructureByName` — real field names/types for any transfer a story touches. Never invent transfer fields.
+   **If the Spryker tooling MCP server is not connected / not running** (e.g. `getSprykerModules` is unavailable or a `/mcp` reconnect failed): try to **start the underlying server first** — it backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up — then **tell the user to reload the MCP connection** (e.g. run `/mcp` to reconnect) and wait for them to confirm it is back before proceeding. Do **not** guess the names the tools would have returned; fall back to reading the codebase directly (grep/Read) and say so explicitly. Only after the reconnect fails twice should you continue from codebase facts alone.
+
+3. **Validate existing flows when relevant — ASK FIRST, then invoke the `spryker-runtime` skill.** If the feature modifies or extends behavior that already exists, **ask the user whether you should validate the existing endpoint(s)/flow against the running app** (use `AskUserQuestion`: "This extends an existing flow (<name> → <endpoint>). Should I run the app and validate how it behaves today?"). Running the app is slow and not always wanted. **Only if the user says yes**, invoke the `spryker-runtime` skill to confirm how it behaves today (run a console command, call the endpoint, or log in and drive the UI) — and if the app is not running, start it with `script -q /dev/null docker/sdk run`. Do this only for flows that already exist; skip it (and skip the question) for purely greenfield behavior that can't be run yet. Use what you observe to write accurate Given/When/Then and the correct endpoint path.
+
+Keep all gathered findings at hand — documented behavior (if researched), real module/transfer names, and observed behavior (if validated) feed directly into the stories and endpoints below.
+
+### Phase 1: Initial Requirements Gathering 🔄 INTERACTIVE
+Use `AskUserQuestion` to gather: the problem/opportunity, relevant context/constraints, and preliminary measurable goals.
+
+### Phase 2: Draft Background & Goals 🔄 INTERACTIVE
+Write Background (WHY) and 3–5 measurable Goals. **CHECKPOINT:** present, get approval.
+
+### Phase 3: Create User Stories 🔄 INTERACTIVE — one at a time
+- **Assign the actor strictly** from the canonical Spryker actor set — see [actors.md](actors.md). Never write "As a user". Pick Back Office user, Customer, Agent, Merchant user, or Merchant Agent. For Back Office, you MAY name a narrower ACL role keeping the canonical actor mapped — e.g. `As a Back Office content manager (Back Office user)`. When unsure which roles exist on this install, confirm at `http://<backoffice-host>/user` (users) and `/acl` (roles) via `spryker-runtime` (resolve `<backoffice-host>` from the `backoffice` application in deploy.dev.yml).
+- Format: `As a [canonical actor], I want [action], so that [benefit]`.
+- **Resolve the affected endpoint now** (Phase 5 rules) so it can be confirmed together with the story — do not defer it to after approval.
+- **CHECKPOINT — the story-approval question MUST present, and ask the user to confirm, all three together:**
+  1. the **story text**,
+  2. the **actor** (the exact canonical actor / role chosen, so the user can correct a wrong actor), and
+  3. the **affected endpoint** — the **URL path** + module/feature name + existing/greenfield (or "No endpoint affected"). Show the path, not the controller/action class. (You still resolve the controller+action during research and record it in the `.refs.md` attachment — it just doesn't appear in the PRD body.)
+
+  Example to show before the AskUserQuestion:
+  ```markdown
+  **Story:** As a Back Office content manager (Back Office user), I want to edit CMS block content, so that …
+  **Actor:** Back Office content manager (Back Office user)
+  **Affected endpoint:** `/cms-gui/glossary/edit` (existing; CmsGui module)
+  ```
+  Approve EACH story (with its actor and endpoint) before moving to its criteria. If the user corrects the actor or endpoint, revise and re-present before proceeding.
+
+### Phase 4: Add Acceptance Criteria 🔄 INTERACTIVE — one at a time
+- 2–4 Gherkin scenarios per story — see [gherkin-guide.md](gherkin-guide.md).
+- **CHECKPOINT:** approve EACH criterion.
+
+### Phase 5: Record the Affected Endpoint(s) 🎯 REQUIRED per story
+These are the rules for resolving the endpoint — apply them in Phase 3 so the endpoint is **confirmed at the story checkpoint** (alongside the actor), then written into the PRD here. Every story that touches a request/response surface MUST name the **endpoint affected**, derived from the Phase 0 codebase facts — not guessed. **What goes in the PRD body is the URL path only** (a routing identifier the reader can hit), never the controller/action class — the FQCN belongs in the `.refs.md` attachment.
+- **Resolve the controller + action** from `getSprykerModuleMap` (e.g. the User module's index action) so you know the real route — but **write the FQCN into `<feature-name>.refs.md`, not the PRD**.
+- **Path (this is what the PRD shows):** combine the route with the **host resolved from `deploy.dev.yml`** (`groups.<region>.applications.<app>.endpoints`) — hosts are configurable and may differ from the defaults. **If the user specified an endpoint to use** (e.g. a real cloud URL like `https://<env>.cloud.spryker.com`), use that host instead. Route conventions: **Zed/Back Office** → `/<module-name-dashed>/<controller>/<action>` (e.g. `/user`); **Yves** → `/<locale>/<route>` (route from a Yves route provider); **Glue** → `<glue-host>/<resource-name>` (Glue resource name).
+- **Status:** `existing` or `greenfield` (and for greenfield, the closest existing neighbor endpoint — never fabricate a path).
+
+Add it under each story (path + status + module name, no class):
+```markdown
+**Affected endpoint:** `/user` (existing; User module)
+```
+If a story has no endpoint (pure config/data), state "No endpoint affected" explicitly. Record the matching controller+action FQCN for each story in the `.refs.md` attachment.
+
+### Phase 6: Non-functional Requirements 🔄 INTERACTIVE
+Business-level quality attributes only: performance targets, reliability/availability, security/compliance, scalability. Quantify everything. Do NOT list tooling commands or test suites here. **CHECKPOINT.**
+
+### Phase 7: Success Metrics & Scope
+- Success Metrics: measurable KPIs with baseline → target and the measurement tool.
+- Out of Scope: what is explicitly NOT built.
+- Dependencies: internal/external prerequisites (if any).
+Quick confirmation.
+
+### Phase 8: Final Review & Save 🔄 INTERACTIVE
+Run the Red-Flag check (below), present the complete PRD, get final approval, then save.
+
+**For the detailed phase-by-phase script, see [workflow.md](workflow.md).**
+
+## Critical Requirements
+
+### 1. Research before requirements
+Codebase facts (step 2) are not optional — module names, transfer fields, controller/actions, and endpoint paths trace to the inline codebase tools (`getSprykerModules`/`getSprykerModuleMap`/`getTransferStructureByName` + `deploy.dev.yml`), never guessed. Docs research (step 1) and running-app validation (step 3) are **opt-in — ask the user first**. Docs research, when run, is dispatched to **`spryker-docs-research` subagent(s) via the Agent tool** (parallel subagents when the feature spans multiple concepts) — never inline — so documented behavior/actors trace to the merged subagent briefs; existing-flow behavior traces to what `spryker-runtime` observed. If the tooling MCP server is down, start it and ask the user to reload the MCP connection before falling back to grep/Read.
+
+### 2. Strict actor assignment
+Every story names one canonical actor from [actors.md](actors.md). One actor per story — if two actors are involved, split the story.
+
+### 3. Endpoint path per story
+See Phase 5. Real, resolved URL **paths** only in the body — no controller/action class names (those go in the `.refs.md` attachment).
+
+### 3a. No code references in the PRD body
+The PRD body MUST be code-free: no FQCNs, no `Class::method()`, no controller/action/plugin/facade/transfer/repository class names, no file paths. Use **feature/module names** and **configuration names** instead. All discovered code references are captured in the sibling `<feature-name>.refs.md` attachment (see [refs-attachment.md](refs-attachment.md)) and linked from the PRD's research header. This applies to **every** section, **including Dependencies** — list dependencies as module/feature names and configuration names, never as class/method references.
+
+### 4. Gherkin acceptance criteria
+ALL criteria use Gherkin. See [gherkin-guide.md](gherkin-guide.md). Max 4 steps, one behavior per scenario, every outcome quantified, two trailing spaces per line for Markdown line breaks.
+
+### 5. Quantified outcomes — no vague language
+- ❌ "Fast" → ✅ "within 500 ms"  ❌ "Good experience" → ✅ "≥90% satisfaction"  ❌ "Works well" → ✅ "handles 1000 req/sec"
+
+### 6. Interactive checkpoints
+Approval required after Background & Goals, after EACH story, after EACH criterion, after NFRs, and before saving. Never batch. **The per-story checkpoint MUST surface the chosen actor and the affected endpoint (name + path, or "No endpoint affected") so the user explicitly confirms — or corrects — both, not just the story sentence.**
+
+## Using AskUserQuestion
+
+Use it at each checkpoint. Keep labels short (2–4 words); description explains the consequence; wait for the response before proceeding.
+
+For the per-story checkpoint, present the story + actor + affected endpoint (as shown in Phase 3) before asking, and make the options let the user correct the actor or endpoint specifically:
+
+```json
+{
+  "questions": [{
+    "question": "Approve this story with its actor and affected endpoint?",
+    "header": "Story Review",
+    "options": [
+      {"label": "Approve", "description": "Story, actor, and endpoint are correct — proceed to acceptance criteria"},
+      {"label": "Fix actor", "description": "Wrong actor/role — change it (e.g. Back Office content manager, not admin)"},
+      {"label": "Fix endpoint", "description": "Endpoint name/path is wrong, or it should be 'no endpoint affected'"},
+      {"label": "Modify story", "description": "Adjust the action or benefit"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+## PRD Template
+
+Use [template.md](template.md). It contains exactly the allowed sections — no Quality Gates, no Tasks, no priority tiers.
+
+## Storage Location
+
+Ask the user at Phase 8 which location:
+- **Global feature:** `resources/plan/PRD/Features/{FeatureName}/{feature-name}.prd.md`
+- **Module-specific:** `src/{Org}/{Module}/resources/plan/PRD/{feature-name}.prd.md`
+
+**Always save the code-reference attachment alongside the PRD** as `<feature-name>.refs.md` in the **same directory** as the `.prd.md`. The PRD's research header links to it. When you confirm the save to the user, mention both files (the code-free PRD and the `.refs.md` containing the discovered code references). See [refs-attachment.md](refs-attachment.md) for its structure.
+
+## Red Flags — STOP and Revise
+
+- "I'll write the whole PRD at once" → NO. Interactive checkpoints.
+- "I'll skip the research" → NO. Always gather codebase facts first (no invented module/transfer/endpoint names); and ASK the user before docs research and before running-app validation — never silently skip the question.
+- "I'll run docs research inline in the main loop" → NO. Dispatch `spryker-docs-research` as subagent(s) via the Agent tool (parallel for multi-concept features); only merge their briefs back.
+- "As a user…" → NO. Use a canonical actor from [actors.md](actors.md).
+- "I'll guess the endpoint path" → NO. Take it from the research brief.
+- "Add the phpstan/codecept commands / Quality Gates" → NO. Excluded by design.
+- "Let me add implementation details" → NO. WHAT and WHY only.
+- "This criterion is obvious" → NO. Gherkin + quantified.
+- "I'll put the controller/facade/transfer class name in the body" → NO. Code-free body. Path-only endpoint; FQCNs and config keys go in `<feature-name>.refs.md`.
+- "Dependencies can list the facade method I'll call" → NO. Module/feature names + configuration names only; the methods/classes go in the `.refs.md` attachment.
+- "I'll discard the FQCNs I found" → NO. Save them to `<feature-name>.refs.md` so the planner has the crosswalk.
+
+## Interactive Workflow Checklist
+
+- [ ] Phase 0: Asked the user whether docs research is needed (and, only if yes, dispatched `spryker-docs-research` as **subagent(s) via the Agent tool** — parallel subagents for multi-concept features — never inline; merged their briefs); gathered codebase facts inline (`getSprykerModules`/`getSprykerModuleMap`/`getTransferStructureByName`) — started the server + asked the user to reload MCP if the tooling server was down; asked the user whether to validate existing endpoints/flows against the running app (and ran `spryker-runtime` only if yes); flagged any missing tools
+- [ ] Phase 2: Background & Goals approved
+- [ ] Phase 3: Each story approved individually — the approval checkpoint presented and the user confirmed the **actor** and the **affected endpoint (URL path, or "no endpoint")** alongside the story
+- [ ] Phase 4: Each acceptance criterion approved individually, all Gherkin + quantified
+- [ ] Phase 5: Each story records affected endpoint as a **URL path** (+ existing/greenfield + module name), or "no endpoint" — as confirmed at the Phase 3 checkpoint; the controller+action FQCN is recorded in `<feature-name>.refs.md`, not the body
+- [ ] Phase 6: Business NFRs approved (no tooling/test commands)
+- [ ] Phase 7: Success metrics, out-of-scope, dependencies confirmed (dependencies as module/feature + configuration names, no code references)
+- [ ] Phase 8: PRD body is code-free (no FQCNs/`::method`/file paths anywhere, including Dependencies); discovered code references captured in `<feature-name>.refs.md`; research header links the attachment
+- [ ] Final PRD approved before saving; saved the `.prd.md` and its sibling `.refs.md`, and told the user about both
+
+## Supporting Files
+
+- **[workflow.md](workflow.md)** — detailed phase-by-phase interactive script
+- **[actors.md](actors.md)** — canonical Spryker actor reference (strict actor assignment)
+- **[gherkin-guide.md](gherkin-guide.md)** — Gherkin format rules and examples
+- **[examples.md](examples.md)** — full PRD example and anti-patterns
+- **[template.md](template.md)** — allowed PRD section structure
+- **[refs-attachment.md](refs-attachment.md)** — structure of the `<feature-name>.refs.md` code-reference attachment (keeps the PRD body code-free)
+
+## Summary
+
+PRD creation is INTERACTIVE and RESEARCH-GROUNDED. Investigate real Spryker (docs + code, and run the app for existing flows) → ask → draft incrementally → assign a real actor and real endpoint to every story → approve at each checkpoint → keep it business-only. Alignment over speed.

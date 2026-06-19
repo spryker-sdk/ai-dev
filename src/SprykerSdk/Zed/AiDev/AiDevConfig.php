@@ -115,6 +115,7 @@ class AiDevConfig extends AbstractBundleConfig
      * rules_file_suffix: suffix applied to the source filename (source .md extension is stripped first).
      * agents_file: path relative to project root.
      * skills_dir: path relative to project root.
+     * agents_dir: path relative to project root. null means agents generation is skipped for that tool.
      *
      * @var array<string, array<string, string|null>>
      */
@@ -124,36 +125,42 @@ class AiDevConfig extends AbstractBundleConfig
             'rules_file_suffix' => '.md',
             'agents_file' => 'CLAUDE.md',
             'skills_dir' => '.claude/skills',
+            'agents_dir' => '.claude/agents',
         ],
         self::TOOL_WINDSURF => [
             'rules_dir' => '.windsurf/rules',
             'rules_file_suffix' => '.md',
             'agents_file' => '.windsurfrules',
             'skills_dir' => '.windsurf/skills',
+            'agents_dir' => '.windsurf/agents',
         ],
         self::TOOL_COPILOT => [
             'rules_dir' => '.github/instructions',
             'rules_file_suffix' => '.instructions.md',
             'agents_file' => '.github/copilot-instructions.md',
             'skills_dir' => '.github/skills',
+            'agents_dir' => '.github/agents',
         ],
         self::TOOL_CURSOR => [
             'rules_dir' => '.cursor/rules',
             'rules_file_suffix' => '.mdc',
             'agents_file' => 'AGENTS.md',
             'skills_dir' => '.cursor/skills',
+            'agents_dir' => '.cursor/agents',
         ],
         self::TOOL_OPENCODE => [
             'rules_dir' => '.opencode/rules',
             'rules_file_suffix' => '.md',
             'agents_file' => 'AGENTS.md',
             'skills_dir' => '.agents/skills',
+            'agents_dir' => '.opencode/agents',
         ],
         self::TOOL_CODEX => [
             'rules_dir' => null,
             'rules_file_suffix' => null,
             'agents_file' => 'AGENTS.md',
             'skills_dir' => '.agents/skills',
+            'agents_dir' => null,
         ],
     ];
 
@@ -224,6 +231,19 @@ class AiDevConfig extends AbstractBundleConfig
     public function getSkillsExamplesDirectory(): string
     {
         return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/skills';
+    }
+
+    /**
+     * Specification:
+     * - Returns absolute path to the bundled agent examples directory.
+     *
+     * @api
+     *
+     * @return string
+     */
+    public function getAgentsExamplesDirectory(): string
+    {
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/agents';
     }
 
     /**
@@ -306,6 +326,19 @@ class AiDevConfig extends AbstractBundleConfig
         return array_values(array_keys(array_filter(
             static::TOOL_ARTIFACT_MAP,
             static fn (array $config): bool => $config['rules_dir'] !== null,
+        )));
+    }
+
+    /**
+     * @api
+     *
+     * @return array<string>
+     */
+    public function getAgentsCompatibleTools(): array
+    {
+        return array_values(array_keys(array_filter(
+            static::TOOL_ARTIFACT_MAP,
+            static fn (array $config): bool => ($config['agents_dir'] ?? null) !== null,
         )));
     }
 }

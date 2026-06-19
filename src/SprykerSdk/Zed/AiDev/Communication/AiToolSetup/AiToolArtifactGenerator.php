@@ -209,6 +209,60 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
+     * @param string $tool
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @return array<string>
+     */
+    public function listAgentsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
+    {
+        $artifactConfig = $this->config->getToolArtifacts($tool);
+        $targetDir = $this->projectRoot . DIRECTORY_SEPARATOR . (string)$artifactConfig['agents_dir'];
+
+        return $this->resolveAgentTargetPaths($targetDir, $mode);
+    }
+
+    /**
+     * @param string $tool
+     * @param array<string> $skipPaths
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @throws \RuntimeException
+     *
+     * @return array<string>
+     */
+    public function generateAgents(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): array
+    {
+        $artifactConfig = $this->config->getToolArtifacts($tool);
+        $targetDir = $this->projectRoot . DIRECTORY_SEPARATOR . (string)$artifactConfig['agents_dir'];
+        $generated = [];
+
+        $this->ensureDirectory($targetDir);
+
+        foreach (new DirectoryIterator($this->config->getAgentsExamplesDirectory()) as $item) {
+            if (!$item->isFile()) {
+                continue;
+            }
+
+            $targetPath = sprintf('%s%s%s', $targetDir, DIRECTORY_SEPARATOR, $this->resolveAgentFileName($item->getFilename(), $mode));
+
+            $this->assertPathIsWithinProjectRoot($targetPath);
+
+            if (in_array($targetPath, $skipPaths, true)) {
+                continue;
+            }
+
+            if (!copy($item->getPathname(), $targetPath)) {
+                throw new RuntimeException(sprintf('Failed to copy "%s" to "%s".', $item->getPathname(), $targetPath));
+            }
+
+            $generated[] = $targetPath;
+        }
+
+        return $generated;
+    }
+
+    /**
      * @param string $absolutePath
      *
      * @return string
@@ -330,6 +384,45 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         }
 
         return $paths;
+    }
+
+    /**
+     * @param string $targetDir
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @return array<string>
+     */
+    protected function resolveAgentTargetPaths(string $targetDir, ArtifactMode $mode): array
+    {
+        $paths = [];
+
+        foreach (new DirectoryIterator($this->config->getAgentsExamplesDirectory()) as $item) {
+            if (!$item->isFile()) {
+                continue;
+            }
+
+            $paths[] = sprintf('%s%s%s', $targetDir, DIRECTORY_SEPARATOR, $this->resolveAgentFileName($item->getFilename(), $mode));
+        }
+
+        return $paths;
+    }
+
+    /**
+     * @param string $fileName
+     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
+     *
+     * @return string
+     */
+    protected function resolveAgentFileName(string $fileName, ArtifactMode $mode): string
+    {
+        if ($mode !== ArtifactMode::Example) {
+            return $fileName;
+        }
+
+        $baseName = pathinfo($fileName, PATHINFO_FILENAME);
+        $extension = pathinfo($fileName, PATHINFO_EXTENSION);
+
+        return $extension === '' ? $baseName . '-example' : sprintf('%s-example.%s', $baseName, $extension);
     }
 
     /**
