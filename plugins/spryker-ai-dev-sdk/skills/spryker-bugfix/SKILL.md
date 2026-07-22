@@ -24,6 +24,14 @@ between them, enforce the verification loop, and respect the operating mode the 
 > MCP/CLI is available, the skill pulls it for extra context; otherwise it works entirely from the
 > description. Everything downstream (branch name, PR title, commit message) has a `no-ticket` fallback.
 
+> **Note — the PR channel is capability-gated.** The push/PR/CI-watch stage (Step 11) needs a way to
+> talk to the remote. Step 0 **probes** for one and records a `PR_CHANNEL`: `gh` (full — push + Draft PR
+> + CI watch), `git-only` (can push a branch but has no PR API — commit + push, then hand the PR to the
+> user), or `none` (no reachable remote / not a GitHub remote — **local-only**: commit and stop). Every
+> GitHub-dependent action checks `PR_CHANNEL` first; if the needed capability is absent, that action is
+> **skipped with a clear note in the report**, never attempted-and-failed. A missing or unauthenticated
+> `gh` never aborts the run — it just downgrades how far Step 11 can go.
+
 > **Note — Claude-only orchestration.** This skill is built to run on **Claude and the skills/agents
 > already installed in the project** — nothing else. Every stage delegates to a bundled/installed
 > `Skill(...)` or Claude subagent; no third-party MCP server is required for the core flow. The only
@@ -138,14 +146,17 @@ the user-visible symptom is gone with fresh evidence. Returns a PASS/FAIL verdic
 is treated as a Step 8 failure (loop to Step 4 within the budget).
 Read [stages.md](stages.md) § Step 10 before executing this stage.
 
-**Step 11 — Commit, push, Draft PR, watch loop. ← MODE GATE.** Collaborative (or pre-push review
-requested): commit, then **STOP and present** for user confirmation — never push without it.
-Autonomous: commit, push, open a **Draft PR** (title `<JIRA-KEY>: <summary>`, labels `bug` +
-`generate-changelog`), write `$BUGFIX_DIR/watch-state.md`, and arm a ~15-min watch loop that
-re-hydrates from that file and polls `gh pr checks`. Red check → subagent pulls the failed logs,
-`attempt`+1, return to Step 4 through the **full** gate chain before re-pushing; `attempt > 3` →
-STOP, cancel the loop, leave the PR in Draft, comment and report.
-Read [stages.md](stages.md) § Step 11 before executing this stage.
+**Step 11 — Commit, push, Draft PR, watch loop. ← MODE GATE + PR-CHANNEL GATE.** Always commit on the
+branch first. Then act by mode **and** by the `PR_CHANNEL` probed at Step 0. Collaborative (or pre-push
+review requested): commit, then **STOP and present** for user confirmation — never push without it.
+Autonomous: push and open a **Draft PR** *only if `PR_CHANNEL=gh`* (title `<TICKET-KEY>: <summary>`,
+**no labels**), write `$BUGFIX_DIR/watch-state.md`, and arm a ~15-min watch loop
+that re-hydrates from that file and polls `gh pr checks` — red check → subagent pulls the failed logs,
+`attempt`+1, return to Step 4 through the **full** gate chain before re-pushing; `attempt > 3` → STOP,
+cancel the loop, leave the PR in Draft, comment and report. If `PR_CHANNEL=git-only`, push the branch
+and **skip** the PR + watch loop, handing the user a ready-to-run `gh pr create` line and the branch
+name. If `PR_CHANNEL=none`, **skip push, PR, and watch entirely** — leave the committed branch local and
+tell the user how to push it themselves. Read [stages.md](stages.md) § Step 11 before executing this stage.
 
 **Step 12 — Final report (ALWAYS LAST, every terminal state).** Outcome, bug + root cause,
 CRITICAL DECISIONS (headline section), OPEN QUESTIONS/RISKS, per-gate status (honest), extra

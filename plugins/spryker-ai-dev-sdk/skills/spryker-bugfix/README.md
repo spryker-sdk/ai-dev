@@ -41,6 +41,11 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
   re-orients from it. It complements the `run.log` timeline and the `decisions.md` rationale.
 - **The bug is the contract.** A fix is "done" only when the user-visible symptom no longer reproduces
   with evidence **and** every gate is green.
+- **PR channel is capability-gated.** Step 0 probes how the run can reach a remote and records
+  `PR_CHANNEL` — `gh` (push + Draft PR + CI watch), `git-only` (push a branch, no PR API), or `none`
+  (local-only). `gh` is **never assumed**: if it's missing or unauthenticated, Step 11 degrades to a
+  clean local terminal (commit, and — where possible — push + a handoff `gh pr create` line) instead of
+  failing. Every GitHub step checks the channel first and is skipped-with-a-note when unavailable.
 
 ## Modes
 
@@ -55,7 +60,7 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
 flowchart TD
     Start([Trigger: 'fix this bug' / ticket / description]) --> S0
 
-    S0["Step 0 — Mode + context<br/>(ticket OPTIONAL, or description)<br/>run dir + logger, env-reset"]
+    S0["Step 0 — Mode + context<br/>(ticket OPTIONAL, or description)<br/>run dir + logger, env-reset<br/>probe PR_CHANNEL: gh / git-only / none"]
     S0 --> S1["Step 1 — Intake &amp; framing"]
     S1 --> S2{"Step 2 — Branch<br/>SAFETY GATE<br/>clean tree &amp; fresh base?"}
 
@@ -79,15 +84,19 @@ flowchart TD
     S9 -- "accepted" --> S10{"Step 10 — Final verification<br/>tests + spryker-verifier / spryker-runtime<br/>symptom gone in running app?"}
 
     S10 -- "FAIL" --> Budget
-    S10 -- "PASS" --> S11{"Step 11 — MODE GATE"}
+    S10 -- "PASS" --> S11{"Step 11 — commit always<br/>MODE + PR_CHANNEL gate"}
 
     Budget{"attempt &gt; 3?"}
     Budget -- "no → attempt++" --> S4
     Budget -- "yes" --> Report
 
     S11 -- "Collaborative / pre-push review" --> Confirm["Commit → STOP<br/>present for user confirmation"]
-    S11 -- "Autonomous" --> Ship["Commit → push →<br/>Draft PR (labels: bug, generate-changelog)"]
+    S11 -- "Autonomous · PR_CHANNEL=none" --> Local["Commit LOCALLY<br/>skip push/PR/watch<br/>report publish commands"]
+    S11 -- "Autonomous · PR_CHANNEL=git-only" --> PushOnly["Commit → push branch<br/>skip PR + watch<br/>hand over gh pr create line"]
+    S11 -- "Autonomous · PR_CHANNEL=gh/mcp" --> Ship["Commit → push →<br/>Draft PR (no labels)"]
     Confirm --> Report
+    Local --> Report
+    PushOnly --> Report
     Ship --> Watch{"Watch loop<br/>gh pr checks ~15m"}
 
     Watch -- "all green" --> Report

@@ -27,7 +27,21 @@ Begin with **one `AskUserQuestion` call carrying multiple questions** (multi-tab
    `Not reset — I'll keep the current env` (drives Step 2's safety check + the reset decision below).
 5. **Personal review before push** — does the user want to personally review and accept the fix
    before it is pushed, in addition to the automated gates? (yes / no.)
-6. **Extra expectations beyond the standard workflow** — is there anything you want from this run
+6. **PR delivery — create a PR, and via what?** How should the run end at Step 11? Offer:
+   - **Create a PR — auto (recommended)** — open a Draft PR using the **best channel the Step 0 probe
+     finds** (native `gh` for GitHub, else a connected forge MCP for GitHub/GitLab/Bitbucket/…, else
+     push-only handoff). This is the default.
+   - **Create a PR — specific channel** — force it: `gh` CLI, or a **named forge MCP server** (e.g.
+     GitHub/GitLab/Bitbucket MCP), or `git push only` (push the branch, hand over a create-PR command).
+     If the forced channel turns out unavailable at Step 11, the run reports the mismatch rather than
+     silently switching (Autonomous: downgrades with a logged CRITICAL DECISION).
+   - **No PR — commit only** — commit on the branch and stop (push only if a remote exists and the user
+     allows it); never open a PR or arm the watch loop.
+
+   Record the answer as the **PR preference**; it combines with the probed `PR_CHANNEL` (below) at
+   Step 11. Because Autonomous mode won't ask again, this is the moment to capture "don't open a PR" or
+   "use the GitLab MCP, not gh".
+7. **Extra expectations beyond the standard workflow** — is there anything you want from this run
    *on top of* the default scope and steps below? This is **open-ended and optional** — the default
    answer is "no, just the standard workflow". Surface it because Autonomous mode won't ask again, so
    anything non-standard must be captured now. Examples the user might raise: also update the JIRA
@@ -68,6 +82,69 @@ printf '[%s] STEP 0 — mode=%s base=%s env=%s | START\n' "$(date '+%Y-%m-%d %H:
   and any gate verdict (review/QA/verification pass-fail).
 - Keep the human-readable decision log (`decisions.md`) separate from this terse step log; the step log
   is the timeline, the decision log is the rationale.
+
+### Probe the PR channel (do this in Step 0, before you rely on it)
+
+Step 11 (and the optional ticket pull) needs a way to talk to the remote forge. **Never assume `gh`
+exists or is authenticated** — and `gh` is not the only way. A connected **forge MCP server** (GitHub,
+GitLab, Bitbucket, Gitea, …) can create and watch a PR/MR just as well; the `git` CLI alone can still
+push a branch. Probe once at Step 0 and record the result as `PR_CHANNEL`. This is a capability check,
+not an action — it makes no network changes.
+
+Resolve the channel in this order (first match wins), deciding from the **remote** first (a run's
+channel is a property of its repo, not of a globally-authenticated tool):
+
+1. **`none`** — no `origin` remote at all → local-only.
+2. **`gh`** — the origin is a GitHub remote **and** `gh` is installed + `gh auth status` succeeds. Native
+   CLI: push + Draft PR + `gh pr checks` watch loop.
+3. **`mcp`** — a **forge MCP server matching the remote host is connected** (e.g. a GitHub MCP for a
+   `github.com` remote, a GitLab MCP for a `gitlab.*` remote, a Bitbucket MCP for `bitbucket.org`). Use
+   the MCP's create-PR / list-checks tools for the same push + PR + watch flow. Discover these via
+   `ToolSearch` (e.g. query the forge name + "pull request"/"merge request"); if a create-PR tool
+   resolves for the remote's host, the channel is `mcp`. **Prefer `gh` over `mcp` only for GitHub when
+   both exist** (native `gh pr checks` is the cheapest poll); for non-GitHub remotes `mcp` is the *only*
+   PR-capable channel.
+4. **`git-only`** — a remote exists but neither `gh` nor a matching forge MCP is usable. Push a branch,
+   but no PR API.
+
+```bash
+# CLI/remote part of the probe (the MCP check is a ToolSearch, done in-agent — see below).
+REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
+if [ -z "$REMOTE_URL" ]; then
+  PR_CHANNEL="none"                      # no origin remote → local-only
+else
+  PR_CHANNEL="git-only"                  # a remote exists → at least push a branch
+  case "$REMOTE_URL" in
+    *github.com*)                        # GitHub remote → native gh is possible…
+      if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+        PR_CHANNEL="gh"                   # …and gh is installed + authenticated → full native
+      fi
+      ;;
+  esac
+fi
+# Then, if PR_CHANNEL is still "git-only", check for a forge MCP matching the remote host
+# (ToolSearch for the host's create-PR/MR tool). If one resolves, set PR_CHANNEL="mcp"
+# and remember the tool names. This step is done by the agent, not in bash.
+printf '[%s] STEP 0 — PR_CHANNEL=%s remote=%s | probe\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$PR_CHANNEL" "${REMOTE_URL:-none}" >> "$BUGFIX_LOG"
+```
+
+- **`gh`** — GitHub remote + usable `gh`. Step 11 pushes, opens a Draft PR, and runs the `gh pr checks`
+  watch loop. GitHub-issue ticket pull available via `gh`.
+- **`mcp`** — a forge MCP server for the remote host is connected. Step 11 pushes (git), then creates
+  the Draft PR/MR and polls checks **through the MCP tools** instead of `gh`. Works for GitHub, GitLab,
+  Bitbucket, etc. Ticket pull can use the same MCP if it exposes an issue-fetch tool.
+- **`git-only`** — remote exists, but no PR-capable tool. Step 11 commits and pushes the branch, then
+  **skips** the PR + watch loop and hands the user a ready-to-run `gh pr create` (or MR) line. Ticket
+  pull falls back to "paste the ticket text".
+- **`none`** — no `origin` remote (or nothing usable). Step 11 commits **locally only** and **skips
+  push, PR, and watch**; the report tells the user how to add a remote and push. The rest of the
+  workflow (reproduce → … → final verification) is unaffected — it never needed the remote.
+
+Record `PR_CHANNEL` (and, for `mcp`, the resolved create-PR / list-checks tool names) in the **State
+Object**. If it is `git-only` or `none`, note it as an OPEN RISK in `decisions.md` ("no PR channel —
+Step 11 will stop at a local commit / branch push") so the downgrade is visible up front rather than a
+surprise at Step 11. In **Autonomous** mode this is a logged fact, not a question — do **not** stop to
+ask the user to install `gh` or connect an MCP.
 
 ### Arrange the plan as a task list (do this right after the logger)
 
@@ -127,7 +204,8 @@ the pasted description:
 
 - **JIRA key** (e.g. `XY-1122`) with the Atlassian MCP available → `jira_get_issue`; if its text comes
   back thin, fall back to `jira_get_issue_images` to read the bug visually.
-- **GitHub issue** (URL or `#number`) with `gh` available → `gh issue view <ref>`.
+- **GitHub issue** (URL or `#number`) with `PR_CHANNEL=gh` → `gh issue view <ref>`. If `gh` isn't
+  usable (`PR_CHANNEL` is `git-only`/`none`), fall back to paste — do not try to call `gh`.
 - **Any other tracker / no integration available** → do **not** block. Ask the user to paste the
   relevant ticket text, or proceed from the free-text description alone.
 
@@ -151,19 +229,28 @@ Keep this short. It exists so the later stages — and any subagents — share t
 
 ```bash
 git status --porcelain          # working tree must be clean
-git fetch origin <base>         # default: master
-git rev-list --left-right --count origin/<base>...HEAD   # how far behind/ahead
+# Fetch only when a remote exists (PR_CHANNEL != none); otherwise compare against the local base.
+if [ "$PR_CHANNEL" != "none" ]; then
+  git fetch origin <base>       # default: master
+  git rev-list --left-right --count origin/<base>...HEAD   # how far behind/ahead vs remote
+else
+  git rev-list --left-right --count <base>...HEAD          # local base only — no remote to compare
+fi
 ```
 
-- If the working tree is **dirty** or HEAD is **behind** `origin/<base>`: surface exactly what you
-  found and **ask before proceeding** (Collaborative) or **abort with a clear report** (Autonomous —
-  do not silently branch off a polluted/stale base). Branching off the wrong base produces a fix that
-  can't be reviewed cleanly.
+- If the working tree is **dirty** or HEAD is **behind** the base: surface exactly what you found and
+  **ask before proceeding** (Collaborative) or **abort with a clear report** (Autonomous — do not
+  silently branch off a polluted/stale base). Branching off the wrong base produces a fix that can't be
+  reviewed cleanly.
+- When `PR_CHANNEL=none` there is no remote to compare against — verify the working tree is clean and
+  branch off the **local** base, and note in the report that base-freshness could not be checked against
+  a remote. Do not treat "no remote" as a stale-base abort.
 - When clean and current, create the branch:
 
 ```bash
-git checkout <base> && git pull origin <base>
-git checkout -b bugfix/<JIRA-KEY>/<brief-kebab-name>
+git checkout <base>
+[ "$PR_CHANNEL" != "none" ] && git pull origin <base>   # pull only when a remote exists
+git checkout -b bugfix/<TICKET-KEY-or-no-ticket>/<brief-kebab-name>
 ```
 
 Branch name pattern: `bugfix/{ticket-key}/brief-name` (e.g. `bugfix/ab-1234/short-symptom-name`), always lowercase.
@@ -333,35 +420,78 @@ evidence, not just green tests.
 
 ## Step 11 — Commit, push, Draft PR, watch loop
 
-**Mode-gated:**
+**Gated by mode, the Step 0 PR preference, _and_ `PR_CHANNEL`.** Always **commit on the branch first** —
+the commit happens in every mode and every channel. What happens *after* the commit depends on (a)
+whether the user asked for a PR at all (Step 0 answer 7) and (b) which channel is available.
+
+**First honor the Step 0 PR preference:**
+- **"No PR — commit only"** → commit on the branch and stop (optionally push if a remote exists and the
+  user allowed pushing). Skip PR creation and the watch loop regardless of channel. Report the branch.
+- **"Create a PR"** with a **forced channel** (the user named `gh` / a specific forge MCP / `git push
+  only`) → use that channel if the probe confirms it's usable; if the forced channel isn't available,
+  do **not** silently fall back — report the mismatch (Autonomous: log it and downgrade to the best
+  available channel with a CRITICAL DECISION).
+- **"Create a PR — auto"** (default) → use the best channel the probe found, per the table below.
+
+| `PR_CHANNEL` | Collaborative | Autonomous |
+|---|---|---|
+| `gh` / `mcp` | commit → STOP for review; push/PR after user OK | commit → push → Draft PR → checks-watch loop |
+| `git-only` | commit → STOP for review; on OK, push branch + hand over a `gh pr create`/MR line | commit → push branch → **skip PR + watch**; hand over the create-PR line |
+| `none` | commit → STOP; report the local branch + how to push | commit **locally** → **skip push, PR, watch**; report the local branch + how to add a remote and push |
+
+The commit message references the ticket if there is one (e.g. `fix(<module>): <summary> (<TICKET-KEY>)`);
+with no ticket, omit the trailing key.
 
 - **Collaborative mode (or if the user asked for personal review before push):** commit on the branch,
-  then **STOP and present** the result — summary, root cause, diff, test/QA/verification status — and
-  ask the user to review and confirm before any push/PR. Do not push without that confirmation. (This
-  honors the project rule that committing/pushing is a human-confirmed step.)
+  then **STOP and present** the result — summary, root cause, diff, test/QA/verification status, and the
+  `PR_CHANNEL` — and ask the user to review and confirm before any push/PR. Do not push without that
+  confirmation. After the user confirms, do the push/PR that the preference + channel allow (Draft PR on
+  `gh`/`mcp`, branch push + handover on `git-only`, nothing to push on `none`).
 
-- **Autonomous mode (and user did not request pre-push review):** go all the way:
+- **`PR_CHANNEL=none` (any mode) — local-only terminal.** Commit on the branch and **stop there**: do
+  **not** attempt `git push`, PR creation, or the watch loop (there is no reachable remote). Report the
+  committed branch name, the diff summary, and a copy-paste snippet for the user to publish it themselves
+  (`git remote add origin <url>` if needed, then `git push -u origin <branch>` and `gh pr create
+  --draft …` / the forge's MR command). This is a **successful** terminal state, not a failure — mark
+  Step 11's task completed and go to Step 12.
+
+- **`PR_CHANNEL=git-only` (Autonomous) — push, then hand off the PR.** Commit and `git push -u origin
+  <branch>`, then **skip** PR creation and the checks-watch loop (no PR API available). Report the
+  pushed branch and a ready-to-run create-PR line (`gh pr create --draft --title
+  "<TICKET-KEY-or-NO-TICKET>: <summary>" --body "…"`, no labels — or the equivalent MR command for the
+  forge) so the user (or a machine with the tool) can open the PR in one step. Mark Step 11 completed and
+  go to Step 12.
+
+- **`PR_CHANNEL=mcp` (Autonomous) — same flow as `gh`, through the MCP.** `git push -u origin <branch>`,
+  then create the Draft PR/MR via the forge MCP's create-PR tool (title `<TICKET-KEY-or-NO-TICKET>:
+  <summary>`, **no labels**, body as below), and run the watch loop polling checks via the MCP's
+  list-checks/status tool instead of `gh pr checks`. Everything else (red-check loopback, budget,
+  handoff file) is identical to the `gh` path.
+
+- **Autonomous mode with `PR_CHANNEL=gh` (and user did not request pre-push review):** go all the way
+  (`mcp` follows the identical shape, swapping `gh` calls for the forge MCP's create-PR / list-checks tools):
   1. Commit with a message referencing the ticket if there is one (e.g.
      `fix(<module>): <summary> (<TICKET-KEY>)`); with no ticket, omit the trailing key.
   2. `git push -u origin <branch>`.
-  3. Open a **Draft PR** via `gh pr create --draft`. Requirements:
+  3. Open a **Draft PR** via `gh pr create --draft` (or the MCP create-PR tool for `mcp`). Requirements:
      - **`--draft`** (always a draft).
      - **Title starts with the ticket number in UPPER CASE**, e.g. `AB-1234: <short summary>`. If
        there is no ticket, prefix with `NO-TICKET:`.
-     - **Labels `bug` and `generate-changelog`** (`--label bug --label generate-changelog`). If a
-       label doesn't exist on the repo, create it with `gh label create` or note it in the report —
-       do not let a missing label block the PR.
+     - **Do not set any labels.** Labeling is left to the repo's own automation / reviewers; the skill
+       never passes `--label` (and never creates labels). *(Exception: only if the user explicitly asked
+       for specific labels as a Step 0 extra expectation — then add exactly those, nothing more.)*
      - **Body** summarizing: bug, root cause (file:line), fix, tests added, QA verdict, and the ticket
        link if there is one.
      - Record the PR URL.
 
      ```bash
      gh pr create --draft \
-       --title "<JIRA-KEY>: <short summary>" \
-       --label bug --label generate-changelog \
+       --title "<TICKET-KEY-or-NO-TICKET>: <short summary>" \
        --body "<summary body>"
      ```
-  4. **Arm a watch loop** that polls the PR's **remote GitHub checks** roughly every 15 minutes.
+  4. **Arm a watch loop** that polls the PR's **remote checks** roughly every 15 minutes.
+     *(Steps 3–4 run only when `PR_CHANNEL` is `gh` or `mcp`; for `git-only` you already handed the
+     create-PR line to the user and there is no PR to watch.)*
 
      **Write a one-page handoff file first** — `$BUGFIX_DIR/watch-state.md` containing the PR
      URL, branch, current `attempt`, the State Object, and the paths to the decision/step logs. The
@@ -377,8 +507,9 @@ evidence, not just green tests.
          it at the same handoff file.
        - **Fallback if no scheduler is available:** do NOT claim a loop is running. Report the PR URL
          and explicitly hand monitoring back to the user.
-     On each wake, **poll with the cheapest call** — `gh pr checks <pr>` (a compact status table),
-     **not** `gh run view`. The poll itself must add almost nothing to context.
+     On each wake, **poll with the cheapest call** — `gh pr checks <pr>` (a compact status table), or for
+     `mcp` the forge's list-checks/status tool — **not** `gh run view`. The poll itself must add almost
+     nothing to context.
      - **All green** → report success and **remove the loop** (cancel the Cron / stop rescheduling).
      - **Any red** in the changed code → **do not pull the raw CI logs into the orchestrator.** Spawn a
        subagent that runs `gh run view --log-failed`, writes it to `$BUGFIX_DIR/ci-remote-attempt<N>.log`,
@@ -401,8 +532,11 @@ This step runs at the very end **no matter how the run terminated** — full suc
 stop-before-push, or a hard stop (`attempt > 3`). Append a `STEP 12 | END` line to the step log, then
 present a concise report to the user containing, in this order:
 
-1. **Outcome** — one line: shipped (PR URL) / awaiting your review (committed, not pushed) / stopped
-   after N attempts (why).
+1. **Outcome** — one line, reflecting the `PR_CHANNEL` that was available: shipped (PR URL) / pushed —
+   PR handoff line provided (`git-only`) / committed locally — not pushed, no remote (`none`) / awaiting
+   your review (committed, not pushed) / stopped after N attempts (why). When the channel downgraded the
+   ending (`git-only` or `none`), say so explicitly and include the exact command(s) the user needs to
+   finish publishing.
 2. **The bug & root cause** — symptom + root-cause `file:line` (clickable absolute-path format).
 3. **CRITICAL DECISIONS** — bullet list pulled from the decision log: each fork you resolved on your
    own, the choice, and the one-line reason. This is the headline section — surface it prominently so
@@ -423,7 +557,7 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 
 | Step | Skill / tool |
 |------|--------------|
-| 0 Mode, context, logger, env-reset decision | `AskUserQuestion`, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `docker/sdk reset` (if chosen) |
+| 0 Mode, context, logger, PR-channel probe, env-reset decision | `AskUserQuestion`, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `PR_CHANNEL` probe (`command -v gh` + `gh auth status` + remote check), `docker/sdk reset` (if chosen) |
 | 3 Reproduce | `Skill(spryker-runtime)` + `Skill(spryker-docs-research)` — **subagents**, return summaries to `repro-notes.md` |
 | 4 Root cause | `Skill(ai-runtime-debugging)` + `Skill(spryker-runtime)` — **subagent**, returns path+values |
 | 5 Fix | edits (+ parallel subagents), regen/cache commands |
@@ -432,5 +566,5 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 | 8 Review (gate) | `Skill(code-review)` — returns ≤5 blocker/major; loop to 4 (max 3) |
 | 9 QA | `Skill(spryker-qa-coverage)` (isolated subagent) |
 | 10 Final verification (gate) | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` — **subagent**, returns PASS/FAIL + evidence |
-| 11 Ship + remote CI watch | git / `gh pr create --draft` (title `CC-XXXX: …`, labels `bug` + `generate-changelog`) / `ScheduleWakeup` or `CronCreate` watch loop |
+| 11 Ship + remote CI watch (PR-channel gated) | always `git commit`; then by `PR_CHANNEL`: `gh` → `git push` + `gh pr create --draft` (no labels) + `ScheduleWakeup`/`CronCreate` watch loop · `git-only` → `git push` + handover `gh pr create` line · `none` → local commit only, report publish commands |
 | 12 Final report | decision log + step log → user-facing report ending with the log file path |

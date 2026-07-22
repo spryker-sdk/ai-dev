@@ -44,6 +44,10 @@ survives across loopbacks and wake-ups, which is exactly why the watch loop can 
 Keep this small block current in your head and mirror it into the step log. Everything else is on disk.
 
 - `mode`, `base`, `branch`, `attempt` (current value), env-freshness choice.
+- **`PR_CHANNEL`** — how the run can interact with a PR, probed once at Step 0: `gh` (push + Draft PR +
+  CI watch), `git-only` (push a branch, no PR API), or `none` (local-only). Step 11 and the optional
+  GitHub-issue ticket pull check this before any `gh`/push action; anything the channel can't do is
+  skipped, not attempted.
 - **Extra expectations** — any Step 0 delta from the standard scope (e.g. "also update JIRA", "fix
   related bugs too", "single module only"), so every later step honors it without re-asking.
 - **Repro:** 1–3 line scenario summary + path to the full repro notes file.
@@ -150,3 +154,8 @@ value) and whenever you make a non-obvious choice — do not wait until the end.
 - "The watch loop can just re-run the whole skill from the top each wake" → No. It re-hydrates from
   `$BUGFIX_DIR/watch-state.md`, polls with `gh pr checks`, and only fans out to a subagent if a
   check is red.
+- "Just run `gh pr create` / `git push` — it'll work" → No. **Never assume `gh` or a remote exists.**
+  Use the `PR_CHANNEL` probed at Step 0: `gh` → full push + PR + watch; `git-only` → push + hand over a
+  `gh pr create` line; `none` → commit locally and stop. A missing/unauthenticated `gh` **downgrades**
+  Step 11 to a clean local terminal state — it never aborts the run, and a skipped GitHub step is
+  reported plainly, never attempted-and-failed.
