@@ -44,9 +44,13 @@ survives across loopbacks and wake-ups, which is exactly why the watch loop can 
 Keep this small block current in your head and mirror it into the step log. Everything else is on disk.
 
 - `mode`, `base`, `branch`, `attempt` (current value), env-freshness choice.
-- **`PR_CHANNEL`** — how the run can interact with a PR, probed once at Step 0: `gh` (push + Draft PR +
-  CI watch), `git-only` (push a branch, no PR API), or `none` (local-only). Step 11 and the optional
-  GitHub-issue ticket pull check this before any `gh`/push action; anything the channel can't do is
+- **PR preference** — the Step 0 answer for how the run should end: create a PR (auto / a forced channel)
+  or commit-only. Combines with `PR_CHANNEL` at Step 11.
+- **`PR_CHANNEL`** — how the run *can* interact with a PR, probed once at Step 0: `gh` (native GitHub CLI
+  → push + Draft PR + `gh pr checks` watch), `mcp` (a connected forge MCP for the remote host — GitHub /
+  GitLab / Bitbucket / … → push + PR/MR + checks via MCP tools), `git-only` (push a branch, no PR API),
+  or `none` (local-only). For `mcp`, also retain the resolved create-PR / list-checks tool names. Step 11
+  and the optional ticket pull check this before any push/PR action; anything the channel can't do is
   skipped, not attempted.
 - **Extra expectations** — any Step 0 delta from the standard scope (e.g. "also update JIRA", "fix
   related bugs too", "single module only"), so every later step honors it without re-asking.

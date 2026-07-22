@@ -44,10 +44,11 @@ Begin with **one `AskUserQuestion` call carrying multiple questions** (multi-tab
 7. **Extra expectations beyond the standard workflow** — is there anything you want from this run
    *on top of* the default scope and steps below? This is **open-ended and optional** — the default
    answer is "no, just the standard workflow". Surface it because Autonomous mode won't ask again, so
-   anything non-standard must be captured now. Examples the user might raise: also update the JIRA
+   anything non-standard must be captured now. Examples the user might raise: also update the tracker
    ticket / post a status comment, fix related bugs you find along the way (vs. only-the-reported one),
-   add a changelog entry, target a specific reviewer or extra PR labels, skip the E2E/QA stage,
-   produce a written RCA doc, keep the fix to a single module, or a hard time/scope cap.
+   add a changelog entry, target a specific reviewer, apply specific PR labels (the skill sets none by
+   default), skip the E2E/QA stage, produce a written RCA doc, keep the fix to a single module, or a
+   hard time/scope cap.
 
    > **The default scope** (so the user knows what's already covered and need not restate it): reproduce
    > → root-cause → minimal fix → functional test → static validation → code review → independent QA →

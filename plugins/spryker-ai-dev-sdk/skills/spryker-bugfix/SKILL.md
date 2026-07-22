@@ -24,13 +24,15 @@ between them, enforce the verification loop, and respect the operating mode the 
 > MCP/CLI is available, the skill pulls it for extra context; otherwise it works entirely from the
 > description. Everything downstream (branch name, PR title, commit message) has a `no-ticket` fallback.
 
-> **Note — the PR channel is capability-gated.** The push/PR/CI-watch stage (Step 11) needs a way to
-> talk to the remote. Step 0 **probes** for one and records a `PR_CHANNEL`: `gh` (full — push + Draft PR
-> + CI watch), `git-only` (can push a branch but has no PR API — commit + push, then hand the PR to the
-> user), or `none` (no reachable remote / not a GitHub remote — **local-only**: commit and stop). Every
-> GitHub-dependent action checks `PR_CHANNEL` first; if the needed capability is absent, that action is
-> **skipped with a clear note in the report**, never attempted-and-failed. A missing or unauthenticated
-> `gh` never aborts the run — it just downgrades how far Step 11 can go.
+> **Note — PR delivery is chosen and capability-gated.** Step 0 asks **whether to open a PR at all and
+> via which channel**, then **probes** what's actually available and records `PR_CHANNEL`: `gh` (native
+> GitHub CLI — push + Draft PR + CI watch), `mcp` (a connected **forge MCP server** for the remote host
+> — GitHub, GitLab, Bitbucket, … — same flow via MCP tools), `git-only` (push a branch but no PR API —
+> commit + push, then hand the create-PR command to the user), or `none` (no reachable remote —
+> **local-only**: commit and stop). `gh` is **never assumed** — a missing/unauthenticated `gh` is fine
+> when an MCP or plain `git` is available. Every push/PR action checks the preference + `PR_CHANNEL`
+> first; anything unavailable (or a "no PR" choice) is **skipped with a clear note in the report**, never
+> attempted-and-failed. This never aborts the run — it only changes how far Step 11 goes.
 
 > **Note — Claude-only orchestration.** This skill is built to run on **Claude and the skills/agents
 > already installed in the project** — nothing else. Every stage delegates to a bundled/installed
@@ -87,10 +89,11 @@ principles and § The decision & question log.
 
 **Step 0 — Choose mode and gather context (ALWAYS FIRST).** One multi-tab `AskUserQuestion`: mode
 (Autonomous vs Collaborative), the bug context (an **optional** ticket from any tracker **and/or** a
-free-text description), base branch, env freshness, pre-push personal review, extra expectations beyond
-the default scope. Then create `$BUGFIX_DIR` + `run.log` step logger, handle the env-reset decision,
-and — only if a ticket was given and its tracker is reachable — pull the ticket for extra context.
-Read [stages.md](stages.md) § Step 0 before executing this stage.
+free-text description), base branch, env freshness, pre-push personal review, **PR delivery** (create a
+PR or not, and via which channel — auto / `gh` / a named forge MCP / push-only), and extra expectations
+beyond the default scope. Then create `$BUGFIX_DIR` + `run.log` step logger, **probe `PR_CHANNEL`**,
+handle the env-reset decision, and — only if a ticket was given and its tracker is reachable — pull the
+ticket for extra context. Read [stages.md](stages.md) § Step 0 before executing this stage.
 
 **Step 1 — Intake & framing.** Turn the context into a crisp problem statement: verbatim symptom,
 affected actor/surface, environment, provisional module/layer scope. Keep it short — it aligns
