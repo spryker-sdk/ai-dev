@@ -41,11 +41,14 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
   re-orients from it. It complements the `run.log` timeline and the `decisions.md` rationale.
 - **The bug is the contract.** A fix is "done" only when the user-visible symptom no longer reproduces
   with evidence **and** every gate is green.
-- **PR channel is capability-gated.** Step 0 probes how the run can reach a remote and records
-  `PR_CHANNEL` — `gh` (push + Draft PR + CI watch), `git-only` (push a branch, no PR API), or `none`
-  (local-only). `gh` is **never assumed**: if it's missing or unauthenticated, Step 11 degrades to a
-  clean local terminal (commit, and — where possible — push + a handoff `gh pr create` line) instead of
-  failing. Every GitHub step checks the channel first and is skipped-with-a-note when unavailable.
+- **PR delivery is chosen + capability-gated.** Step 0 asks **whether to open a PR and via which
+  channel**, then probes what's available and records `PR_CHANNEL` — `gh` (native GitHub CLI), `mcp` (a
+  connected **forge MCP** for the remote host: GitHub / GitLab / Bitbucket / …), `git-only` (push a
+  branch, no PR API), or `none` (local-only). `gh` is **never assumed** — an MCP server or plain `git`
+  is enough. If the chosen/available channel can't open a PR, Step 11 degrades to a clean terminal
+  (commit, and where possible push + a handoff create-PR line) instead of failing, and the skill **sets
+  no labels** on any PR it opens. Every push/PR step checks the preference + channel first and is
+  skipped-with-a-note when unavailable.
 
 ## Modes
 
@@ -60,7 +63,7 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
 flowchart TD
     Start([Trigger: 'fix this bug' / ticket / description]) --> S0
 
-    S0["Step 0 — Mode + context<br/>(ticket OPTIONAL, or description)<br/>run dir + logger, env-reset<br/>probe PR_CHANNEL: gh / git-only / none"]
+    S0["Step 0 — Mode + context<br/>(ticket OPTIONAL, or description)<br/>PR delivery? (create/no · which channel)<br/>run dir + logger, env-reset<br/>probe PR_CHANNEL: gh / mcp / git-only / none"]
     S0 --> S1["Step 1 — Intake &amp; framing"]
     S1 --> S2{"Step 2 — Branch<br/>SAFETY GATE<br/>clean tree &amp; fresh base?"}
 
@@ -91,13 +94,13 @@ flowchart TD
     Budget -- "yes" --> Report
 
     S11 -- "Collaborative / pre-push review" --> Confirm["Commit → STOP<br/>present for user confirmation"]
-    S11 -- "Autonomous · PR_CHANNEL=none" --> Local["Commit LOCALLY<br/>skip push/PR/watch<br/>report publish commands"]
-    S11 -- "Autonomous · PR_CHANNEL=git-only" --> PushOnly["Commit → push branch<br/>skip PR + watch<br/>hand over gh pr create line"]
+    S11 -- "pref: No PR / PR_CHANNEL=none" --> Local["Commit (push if allowed)<br/>skip PR + watch<br/>report publish commands"]
+    S11 -- "Autonomous · PR_CHANNEL=git-only" --> PushOnly["Commit → push branch<br/>skip PR + watch<br/>hand over create-PR line"]
     S11 -- "Autonomous · PR_CHANNEL=gh/mcp" --> Ship["Commit → push →<br/>Draft PR (no labels)"]
     Confirm --> Report
     Local --> Report
     PushOnly --> Report
-    Ship --> Watch{"Watch loop<br/>gh pr checks ~15m"}
+    Ship --> Watch{"Watch loop<br/>checks poll ~15m<br/>gh pr checks / MCP status"}
 
     Watch -- "all green" --> Report
     Watch -- "red (your code)" --> Budget
