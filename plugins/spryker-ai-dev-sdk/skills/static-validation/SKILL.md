@@ -9,7 +9,7 @@ description: >
   "validate my changes", "run static analysis on what I changed", "lint the changed modules",
   "check js/css/scss I changed", "check code vs master/main", "static-check the branch". Works
   from any git worktree, auto-detects or takes an explicit base branch (master, main,
-  master-demo, or any ref), validates only added/changed files (not the all-files globs in
+  or any ref), validates only added/changed files (not the all-files globs in
   package.json), and can group PHP either by individually changed files (files scope) or by every
   full Spryker MODULE that has a changed file (module scope — detects changed modules, not just
   files, and validates the whole module).
@@ -22,10 +22,9 @@ project's Spryker QA / `package.json` use — **PHP**: `phpcbf`, `phpcs`, `phpmd
 (architecture-sniffer), `phpstan`; **frontend**: `eslint`, `stylelint`, `prettier` — all
 executed inside the container via `docker/sdk cli`.
 
-It replaces the fixed `.claude/bash-local/validation.sh` / `validation-master.sh` scripts with a
-single flexible engine:
+It replaces fixed, single-base validation scripts with a single flexible engine:
 
-- **Any base branch** — `--base <ref>`, or auto-detected (`master-demo` → `master` → `main` →
+- **Any base branch** — `--base <ref>`, or auto-detected (`master` → `main` →
   remote default). Handles the diff via merge-base (`base...HEAD`) plus uncommitted working-tree
   edits and brand-new untracked files, so in-progress work is fully covered.
 - **Worktree-aware** — resolves the current worktree's root with `git rev-parse --show-toplevel`
@@ -46,12 +45,12 @@ single flexible engine:
 
 ## The command
 
-The engine is `scripts/static-check-diff.sh` inside this skill directory. `${CLAUDE_PLUGIN_ROOT}`
-resolves to this plugin's install location regardless of which Spryker project loaded it.
+The engine is `scripts/static-check-diff.sh` inside this skill directory. Run it from the skill
+directory, or reference it by its full path from the skill's install location.
 
 ```bash
-# From anywhere inside the repo / worktree:
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh [options]
+# From the skill directory:
+bash scripts/static-check-diff.sh [options]
 ```
 
 | Option | Meaning |
@@ -80,14 +79,14 @@ Tool config and the base branch can be overridden via env vars (project defaults
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
 
 ```bash
-STATIC_CHECK_PHPSTAN_LEVEL=6 bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --tools phpstan
+STATIC_CHECK_PHPSTAN_LEVEL=6 bash scripts/static-check-diff.sh --tools phpstan
 ```
 
 ## How to use it (agent workflow)
 
 1. **Preview first** with `--dry-run` to confirm the base branch and the exact targets:
    ```bash
-   bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --scope module --dry-run
+   bash scripts/static-check-diff.sh --scope module --dry-run
    ```
    Report the detected base branch and the module/file list back to the user.
 
@@ -100,10 +99,10 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation
      (note phpcbf mutates, so drop it: `--tools phpcs,phpmd,phpstan,eslint,stylelint,prettier`).
    ```bash
    # Validate every changed PHP module + all changed FE files:
-   bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --scope module
+   bash scripts/static-check-diff.sh --scope module
 
    # Autofix the diff (PHP + FE):
-   bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --fix
+   bash scripts/static-check-diff.sh --fix
    ```
 
 3. **Interpret results.** Report `phpcs`/`phpstan`/`phpmd`/`eslint`/`stylelint`/`prettier` findings

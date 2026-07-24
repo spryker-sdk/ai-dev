@@ -10,8 +10,7 @@ Runs the project's standard tools inside the container via `docker/sdk cli`, sco
   json/html) — the same linters as `package.json`, but on **changed files only** instead of the
   all-files globs (`eslint … './src/Pyz/Yves/**/*.{js,ts}'`, `prettier --check '**/*.…'`).
 
-It is the flexible successor to the fixed `.claude/bash-local/validation.sh` (`master-demo`) and
-`validation-master.sh` (`master`) scripts.
+It is the flexible successor to fixed, single-base validation scripts.
 
 ## Why
 
@@ -21,9 +20,9 @@ whole Spryker module you touched — against whatever base branch your work fork
 
 ## Features
 
-- **Flexible base branch.** `--base <ref>` for any branch (`master`, `main`, `master-demo`,
-  `develop`, a release branch, …). Auto-detects when omitted (`master-demo` → `master` → `main` →
-  the remote's default branch). Also honours the `STATIC_CHECK_BASE` env var.
+- **Flexible base branch.** `--base <ref>` for any branch (`master`, `main`, `develop`,
+  a release branch, …). Auto-detects when omitted (`master` → `main` → the remote's default
+  branch). Also honours the `STATIC_CHECK_BASE` env var.
 - **Worktree-aware.** Resolves the current worktree root with `git rev-parse --show-toplevel` for
   file/diff detection, and finds `docker/sdk` in the **main** working tree via
   `git rev-parse --git-common-dir` — a linked worktree doesn't contain the untracked,
@@ -51,19 +50,19 @@ whole Spryker module you touched — against whatever base branch your work fork
 
 ```bash
 # Preview what would be checked (no tools run):
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --dry-run
+bash scripts/static-check-diff.sh --dry-run
 
 # Validate changed files (PHP + FE) against auto-detected base:
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh
+bash scripts/static-check-diff.sh
 
 # Validate every changed PHP MODULE (+ all changed FE files) against master:
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --base master --scope module
+bash scripts/static-check-diff.sh --base master --scope module
 
 # Only the frontend linters, autofix:
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --tools eslint,stylelint,prettier --fix
+bash scripts/static-check-diff.sh --tools eslint,stylelint,prettier --fix
 
 # Fully read-only check (no fixers), against main:
-bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
+bash scripts/static-check-diff.sh --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
 ```
 
 ### Options
@@ -94,7 +93,7 @@ Defaults live in the script; each is overridable via an env var:
 ```bash
 # Run phpstan at level 8 against a custom config:
 STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
-  bash ${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh --tools phpstan
+  bash scripts/static-check-diff.sh --tools phpstan
 ```
 
 ### Exit codes

@@ -7,7 +7,7 @@
 # between the current branch/worktree and a base branch — added or changed only.
 #
 # Highlights:
-#   * Flexible base branch  — master, main, master-demo, or any ref (auto-detected).
+#   * Flexible base branch  — master, main, or any ref (auto-detected).
 #   * Worktree aware        — resolves the real repo root, works from any worktree.
 #   * Module-level scope     — with --scope=module it detects changed Spryker MODULES
 #                              (src/{Org}/{Layer}/{Module}) and validates each whole module,
@@ -158,7 +158,7 @@ info "Repo root (worktree): $REPO_ROOT"
 # ----------------------------------------------------------------------------
 # Determine the base ref.
 # Priority: --base flag > env STATIC_CHECK_BASE > auto-detect.
-# Auto-detect order: master-demo, master, main, origin/HEAD default branch.
+# Auto-detect order: master, main, origin/HEAD default branch.
 # We only pick a candidate that actually resolves in this repo.
 # ----------------------------------------------------------------------------
 ref_exists() { git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1; }
@@ -168,7 +168,7 @@ if [ -z "$BASE_REF" ] && [ -n "${STATIC_CHECK_BASE:-}" ]; then
 fi
 
 if [ -z "$BASE_REF" ]; then
-    for candidate in master-demo master main; do
+    for candidate in master main; do
         if ref_exists "$candidate"; then BASE_REF="$candidate"; break; fi
     done
 fi
