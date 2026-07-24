@@ -1,0 +1,19 @@
+{
+    "name": "spryker-architecture",
+    "version": "0.1.0",
+    "description": "Architecture documentation tooling for Spryker projects — arc42/C4 records, ADRs, and Solution Designs.",
+    "author": {
+        "name": "Spryker Systems GmbH",
+        "email": "support@spryker.com"
+    },
+    "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev",
+    "repository": "https://github.com/spryker-sdk/ai-dev",
+    "license": "proprietary",
+    "keywords": [
+        "spryker",
+        "architecture",
+        "arc42",
+        "c4",
+        "documentation"
+    ]
+}
