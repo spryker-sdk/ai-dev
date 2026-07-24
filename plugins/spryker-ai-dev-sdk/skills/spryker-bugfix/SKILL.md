@@ -152,13 +152,14 @@ Read [stages.md](stages.md) § Step 10 before executing this stage.
 **Step 11 — Commit, push, Draft PR, watch loop. ← MODE GATE + PR-CHANNEL GATE.** Always commit on the
 branch first. Then act by mode **and** by the `PR_CHANNEL` probed at Step 0. Collaborative (or pre-push
 review requested): commit, then **STOP and present** for user confirmation — never push without it.
-Autonomous: push and open a **Draft PR** *only if `PR_CHANNEL=gh`* (title `<TICKET-KEY>: <summary>`,
-**no labels**), write `$BUGFIX_DIR/watch-state.md`, and arm a ~15-min watch loop
-that re-hydrates from that file and polls `gh pr checks` — red check → subagent pulls the failed logs,
+Autonomous (and the Step 0 PR preference asked for a PR): push and open a **Draft PR** when
+`PR_CHANNEL` is `gh` **or** `mcp` (title `<TICKET-KEY>: <summary>`, **no labels**), write
+`$BUGFIX_DIR/watch-state.md`, and arm a ~15-min watch loop that re-hydrates from that file and polls the
+checks (`gh pr checks`, or the forge MCP's status tool) — red check → subagent pulls the failed logs,
 `attempt`+1, return to Step 4 through the **full** gate chain before re-pushing; `attempt > 3` → STOP,
 cancel the loop, leave the PR in Draft, comment and report. If `PR_CHANNEL=git-only`, push the branch
-and **skip** the PR + watch loop, handing the user a ready-to-run `gh pr create` line and the branch
-name. If `PR_CHANNEL=none`, **skip push, PR, and watch entirely** — leave the committed branch local and
+and **skip** the PR + watch loop, handing the user a ready-to-run create-PR line and the branch name.
+If `PR_CHANNEL=none` (or the user chose "no PR"), **skip PR and watch** — leave the committed branch and
 tell the user how to push it themselves. Read [stages.md](stages.md) § Step 11 before executing this stage.
 
 **Step 12 — Final report (ALWAYS LAST, every terminal state).** Outcome, bug + root cause,

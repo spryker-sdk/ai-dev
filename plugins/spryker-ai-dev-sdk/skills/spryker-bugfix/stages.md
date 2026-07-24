@@ -567,5 +567,5 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 | 8 Review (gate) | `Skill(code-review)` — returns ≤5 blocker/major; loop to 4 (max 3) |
 | 9 QA | `Skill(spryker-qa-coverage)` (isolated subagent) |
 | 10 Final verification (gate) | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` — **subagent**, returns PASS/FAIL + evidence |
-| 11 Ship + remote CI watch (PR-channel gated) | always `git commit`; then by `PR_CHANNEL`: `gh` → `git push` + `gh pr create --draft` (no labels) + `ScheduleWakeup`/`CronCreate` watch loop · `git-only` → `git push` + handover `gh pr create` line · `none` → local commit only, report publish commands |
+| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + `ScheduleWakeup`/`CronCreate` watch loop (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
 | 12 Final report | decision log + step log → user-facing report ending with the log file path |
