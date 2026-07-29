@@ -73,7 +73,8 @@ Tool config and the base branch can be overridden via env vars (project defaults
 |---|---|---|
 | `STATIC_CHECK_BASE` | auto-detect | Base branch/ref (same as `--base`). |
 | `STATIC_CHECK_PHPCS_STANDARD` | `phpcs.xml` | phpcs/phpcbf ruleset. |
-| `STATIC_CHECK_PHPMD_RULESET` | `vendor/spryker/architecture-sniffer/src/ruleset.xml` | phpmd ruleset. |
+| `STATIC_CHECK_PHPMD_RULESET` | `phpmd.xml` | phpmd ruleset (project-level; falls back to `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` when absent). |
+| `STATIC_CHECK_PHPMD_PRIORITY` | `4` | phpmd `--minimumpriority` (project-level baseline). |
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
@@ -119,9 +120,14 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash scripts/static-check-diff.sh --tools phpstan
   (host node may be too old / lack `node_modules`).
 - Autofixers **modify files**: `phpcbf` always (whenever included); `eslint`/`stylelint`/`prettier`
   only with `--fix`. For a non-mutating check, drop `phpcbf` from `--tools` and omit `--fix`.
-- Uses the project configs verbatim — `phpcs.xml`, architecture-sniffer ruleset, `phpstan.neon`
-  (level 6), plus `eslint.config.mjs`, `.stylelintrc.js`, `.prettierrc.json`/`.prettierignore` —
-  so results match what CI enforces.
+- Uses the project configs verbatim — `phpcs.xml`, the project architecture ruleset `phpmd.xml`
+  (priority 4), `phpstan.neon` (level 6), plus `eslint.config.mjs`, `.stylelintrc.js`,
+  `.prettierrc.json`/`.prettierignore` — so results match what CI enforces.
+- **phpmd runs the project ruleset, not the core one.** Spryker ships two: `phpmd.xml` (project
+  development, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml`
+  (core/framework development, priority 2). Since this skill validates project code, it defaults to
+  the project ruleset. To check against the core framework rules instead, override both:
+  `STATIC_CHECK_PHPMD_RULESET=vendor/spryker/architecture-sniffer/src/ruleset.xml STATIC_CHECK_PHPMD_PRIORITY=2`.
 - Frontend changed-file detection covers committed, uncommitted, and brand-new untracked files.
   `--scope module` groups **PHP only**; FE files are always validated individually.
 - The script is `bash 3.2` compatible (macOS default) — no `mapfile`/associative arrays.

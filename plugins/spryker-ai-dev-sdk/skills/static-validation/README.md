@@ -5,7 +5,8 @@ frontend.
 
 Runs the project's standard tools inside the container via `docker/sdk cli`, scoped to your diff:
 
-- **PHP** — `phpcbf`, `phpcs`, `phpmd` (architecture-sniffer), `phpstan` (level 6).
+- **PHP** — `phpcbf`, `phpcs`, `phpmd` (project architecture ruleset `phpmd.xml`, priority 4),
+  `phpstan` (level 6).
 - **Frontend** — `eslint` (js/ts), `stylelint` (scss/css/less), `prettier` (all of the above +
   json/html) — the same linters as `package.json`, but on **changed files only** instead of the
   all-files globs (`eslint … './src/Pyz/Yves/**/*.{js,ts}'`, `prettier --check '**/*.…'`).
@@ -85,7 +86,8 @@ Defaults live in the script; each is overridable via an env var:
 |---|---|---|
 | `STATIC_CHECK_BASE` | auto-detect | Base branch/ref (same as `--base`). |
 | `STATIC_CHECK_PHPCS_STANDARD` | `phpcs.xml` | phpcs/phpcbf ruleset. |
-| `STATIC_CHECK_PHPMD_RULESET` | `vendor/spryker/architecture-sniffer/src/ruleset.xml` | phpmd ruleset. |
+| `STATIC_CHECK_PHPMD_RULESET` | `phpmd.xml` | phpmd ruleset (project-level; falls back to `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` when absent). |
+| `STATIC_CHECK_PHPMD_PRIORITY` | `4` | phpmd `--minimumpriority` (project-level baseline). |
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
@@ -108,8 +110,9 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
 
 - A **running** Spryker environment (`docker/sdk cli` must work). Start it with the
   `spryker-docker-sdk` skill if the containers are down. Frontend tools run via `npx` in-container.
-- Project configs present at repo root: PHP — `phpcs.xml`, `phpstan.neon`, architecture-sniffer
-  ruleset under `vendor/spryker/architecture-sniffer/`. Frontend — `eslint.config.mjs`,
+- Project configs present at repo root: PHP — `phpcs.xml`, `phpstan.neon`, and the project
+  architecture ruleset `phpmd.xml` (if absent, the vendored
+  `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` is used). Frontend — `eslint.config.mjs`,
   `.stylelintrc.js`, `.prettierrc.json`, and installed `node_modules` (via `docker/sdk cli npm install`).
 
 ## Caveats
@@ -119,6 +122,11 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
 - On Docker-for-Mac the file sync back to the host is slightly async — after an autofix run, the
   host copy updates a moment later. Re-run in check mode to confirm.
 - Levels and rulesets mirror the project QA / package.json baseline, so results align with CI.
+- **phpmd uses the project ruleset, not the core framework one.** Spryker ships two: `phpmd.xml`
+  (project development, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml`
+  (core/framework development, priority 2). To check core rules instead, set
+  `STATIC_CHECK_PHPMD_RULESET=vendor/spryker/architecture-sniffer/src/ruleset.xml` and
+  `STATIC_CHECK_PHPMD_PRIORITY=2`.
 
 ## Layout
 

@@ -49,13 +49,20 @@ TOOLS="phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier"
 
 # Tool config — overridable via environment, with project defaults below.
 #   STATIC_CHECK_PHPCS_STANDARD   phpcs/phpcbf ruleset       (default: phpcs.xml)
-#   STATIC_CHECK_PHPMD_RULESET    phpmd ruleset               (default: architecture-sniffer)
+#   STATIC_CHECK_PHPMD_RULESET    phpmd ruleset               (default: phpmd.xml, project-level)
+#   STATIC_CHECK_PHPMD_PRIORITY   phpmd minimum priority      (default: 4, project-level)
 #   STATIC_CHECK_PHPSTAN_CONFIG   phpstan config file         (default: phpstan.neon)
 #   STATIC_CHECK_PHPSTAN_LEVEL    phpstan level               (default: 6, matches phpstan.neon)
 #   STATIC_CHECK_FIX              1 = autofix (phpcbf always fixes; eslint/stylelint/prettier
 #                                 switch to --fix/--write)   (default: 0 = check only for FE)
 PHPCS_STANDARD="${STATIC_CHECK_PHPCS_STANDARD:-phpcs.xml}"
-PHPMD_RULESET="${STATIC_CHECK_PHPMD_RULESET:-vendor/spryker/architecture-sniffer/src/ruleset.xml}"
+# Project-level architecture ruleset. Spryker documents two distinct rulesets:
+#   - project development: phpmd.xml (or the Project/ruleset.xml it imports), priority 4
+#   - core/framework dev:  vendor/spryker/architecture-sniffer/src/ruleset.xml, priority 2
+# This skill validates project code (src/Pyz, src/Demo, …), so it uses the project ruleset.
+# See https://docs.spryker.com/docs/dg/dev/sdks/sdk/development-tools/architecture-sniffer
+PHPMD_RULESET="${STATIC_CHECK_PHPMD_RULESET:-phpmd.xml}"
+PHPMD_PRIORITY="${STATIC_CHECK_PHPMD_PRIORITY:-4}"
 PHPSTAN_CONFIG="${STATIC_CHECK_PHPSTAN_CONFIG:-phpstan.neon}"
 PHPSTAN_LEVEL="${STATIC_CHECK_PHPSTAN_LEVEL:-6}"
 
@@ -377,9 +384,16 @@ fi
 
 if has_tool phpmd; then
     if [ "${#strict_paths[@]}" -gt 0 ]; then
+        # Fall back to the vendored project ruleset when the repo has no root phpmd.xml
+        # (only when the default is in play — an explicit override is always respected).
+        phpmd_ruleset="$PHPMD_RULESET"
+        if [ -z "${STATIC_CHECK_PHPMD_RULESET:-}" ] && [ ! -f "$REPO_ROOT/$phpmd_ruleset" ]; then
+            phpmd_ruleset="vendor/spryker/architecture-sniffer/src/Project/ruleset.xml"
+            warn "phpmd: no phpmd.xml at repo root — falling back to $phpmd_ruleset"
+        fi
         # phpmd takes a comma-separated list as a single arg.
         strict_csv="$(IFS=,; printf '%s' "${strict_paths[*]}")"
-        run vendor/bin/phpmd "$strict_csv" text "$PHPMD_RULESET" --minimumpriority 2
+        run vendor/bin/phpmd "$strict_csv" text "$phpmd_ruleset" --minimumpriority "$PHPMD_PRIORITY"
         [ $? -ne 0 ] && overall_rc=1
     elif [ "${#changed_php[@]}" -gt 0 ]; then
         warn "phpmd: no non-test/non-config paths to analyse — skipped."
