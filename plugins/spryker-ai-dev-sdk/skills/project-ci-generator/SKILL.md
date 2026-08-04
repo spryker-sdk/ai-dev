@@ -1,14 +1,11 @@
 ---
 name: project-ci-generator
 description: >-
-  Transform a product/vendor-style CI setup into a single, lean project CI pipeline.
-  Use this whenever the user wants to "clean up CI for the project", "make a project CI",
-  "recreate one CI file", "remove product-only CI jobs", "clear the CI folder and rebuild",
-  or port CI to another host (GitLab, Bitbucket). It first reads and investigates whatever CI
-  actually exists in the repo, runs a short questionnaire to learn what the project needs
-  (which test suites, PHP version, notifications, target platform), then proposes a keep/drop
-  plan to the user before wiping the old CI and emitting one project-tuned pipeline plus only
-  the support files the surviving jobs reference.
+  Use when turning a repo's inherited product/vendor CI into a single, lean project CI
+  pipeline — "clean up CI for the project", "make a project CI", "recreate one CI file",
+  "remove product-only CI jobs", "clear the CI folder and rebuild", or porting CI to
+  another host (GitLab, Bitbucket). A pre-boot wizard step of project start, and standalone
+  on any repo carrying product-style CI.
 ---
 
 # Project CI Generator
@@ -49,9 +46,18 @@ they encode the maintainers' own guidance on what a project keeps vs drops, so u
 starting classification. Still confirm each one against the questionnaire answers rather than
 applying it blindly — a marker is a strong hint, not a final decision.
 
+On an un-annotated CI (no markers), classify by these marker-free heuristics instead of vibes:
+- **drop-shaped:** matrix `strategy` over PHP/database versions; release-branch or tag triggers;
+  upmerge/sync automation; API/doc publishing for the product; full product QA / E2E suites that
+  need the product's own infrastructure; anything gated on upstream-repo secrets.
+- **keep-shaped:** fast static gates (lint, CS, PHPStan), unit/functional suites that run on a
+  plain checkout, security/credential scans.
+- **genuinely ambiguous** (an acceptance suite the project might adopt): put it in the plan as a
+  question, not a silent verdict.
+
 ### 2. Ask
 
-Run one short questionnaire. The answers, combined with the discovery, determine the output:
+**Under the project-starter wizard, skip this step:** all five answers were collected in the interview's CI section and live in the state file's `ci:` block (platform, keep_suites, matrix, notifications, wipe_unreferenced) — read them and go straight to Propose. Standalone, run one short questionnaire. The answers, combined with the discovery, determine the output:
 
 - **Target platform** — keep the current host or port to another (decides file path/syntax).
 - **Which suites to keep** — offer only the suites you actually found; recommend keeping
@@ -93,8 +99,11 @@ pipeline.
 Do not consider the work done until every item below holds. Walk the list explicitly and
 report it — this is what proves the CI folder was actually cleaned, not just added to.
 
-- [ ] **Single pipeline.** Exactly one project CI file exists; no leftover secondary
-      workflows from the old setup remain.
+- [ ] **Single GATING pipeline.** Exactly one project CI file gates commits/PRs; no leftover
+      secondary workflows from the old setup remain. Additional non-gating workflows are
+      legitimate ONLY when user-approved and listed in the report (a scheduled credential
+      scan, a separate deploy workflow) — they don't belong squeezed into the PR gate, and
+      they don't survive by default either.
 - [ ] **All unneeded files removed.** Every CI file the approved plan marked as dropped is
       gone from the CI folder — product-only pipelines, unreferenced support/deploy files, and
       composite actions or scripts no surviving job uses. Re-list the CI folder and confirm
