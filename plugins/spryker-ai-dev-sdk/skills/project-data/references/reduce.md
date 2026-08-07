@@ -4,7 +4,7 @@
 
 The developer keeps only part of the demo catalog (e.g. "drop the office-supplies and transport categories — we sell heat-recovery systems"). Removal is **not** just deleting product rows: a Spryker catalog is a web of files that reference a product by SKU (prices, stock, images, options, relations, labels, offers, category assignments, approval status, measurement/packaging units, shipment types, …). **Every referencing row left pointing at a removed product aborts the import** — and a fresh-clone import runs 30–60 min, so a missed file is expensive. This skill makes removal a disciplined cascade, verified by a tool before boot.
 
-**Do it pre-boot when you can.** In the wizard, this runs after the **adapt** strategy and **before** `boot-and-verify`, in files-mode: you edit the import CSVs, and the first boot imports the already-reduced catalog — **no reset, no teardown**. Only a change on an already-booted stack needs the reset ladder (see below). The costly first run did removal *after* boot and paid for it in repeated resets.
+**Do it pre-boot when you can.** In the wizard, this runs after the **adapt** strategy and **before** `boot-and-verify`, in files-mode: you edit the import CSVs, and the first boot imports the already-reduced catalog — **no reset, no teardown**. Only a change on an already-booted stack needs the reset ladder (see below). Removal *after* boot costs repeated resets — do it pre-boot.
 
 You supply the judgment (which categories/products, which columns are real product refs).
 
@@ -16,7 +16,7 @@ Decide keep-vs-remove at the level the developer stated (usually **category**), 
 - After this, **the two product files ARE the kept-set**: the distinct `abstract_sku` in `product_abstract.csv` ∪ the distinct `concrete_sku` in `product_concrete.csv` = every valid product token. The scanner reads them directly — you don't maintain a separate list.
 
 ### 2. Broad orphan scan — discover EVERY referencing file (don't curate a list)
-The first run used a hand-picked file list and missed six sku-bearing importers (`product_shipment_type`, `product_stock`, `product_measurement_base_unit`, `product_packaging_unit`, `product_abstract_approval_status`, and more) → a fresh boot-abort for each miss. **Use the scanner instead of guessing:**
+A hand-picked file list misses sku-bearing importers (`product_shipment_type`, `product_stock`, `product_measurement_base_unit`, `product_packaging_unit`, `product_abstract_approval_status`, and more) → a fresh boot-abort for each miss. **Use the scanner instead of guessing:**
 
 ```
 php "$VALIDATE" product-refs data/import/common \
@@ -31,7 +31,7 @@ It walks the whole tree, auto-discovers every product-ref column (the exact name
 ### 3. Prune each real referencing file — two rules that bite
 For every column the scan confirms IS a product reference:
 - **Row keyed DIRECTLY by a removed product → delete the row.** `php "$CSV" delete <files…> --in <col>=<removed…>` or, cleaner, keep-set style: `filter --in <col>=<kept…>` / `--in-file`. This covers prices, stock, images, category assignments, approval status, measurement/packaging units, shipment types, offers, etc.
-- **List-valued assignment column (`abstract_product_skus`, `concrete_skus`, …) → prune the list, KEEP the row.** An assignment list going empty means "assigned to nothing", which is harmless — it must **NOT** drop the entity DEFINITION. The real regression: office removal emptied `product_option.csv` (its `abstract_product_skus` lost every kept product), but `product_option_price.csv` still referenced those options → `Product option SKU not found` → Aborted. The options (generic warranties/insurance, and some that belonged to a KEPT category) were never office-specific. **Keep every definition row; only prune its assignment list.**
+- **List-valued assignment column (`abstract_product_skus`, `concrete_skus`, …) → prune the list, KEEP the row.** An assignment list going empty means "assigned to nothing", which is harmless — it must **NOT** drop the entity DEFINITION. The trap: emptying `product_option.csv` (its `abstract_product_skus` losing every kept product) while `product_option_price.csv` still references those options → `Product option SKU not found` → Aborted. The options (generic warranties/insurance, some belonging to a KEPT category) are rarely category-specific. **Keep every definition row; only prune its assignment list.**
 
 ### 4. Reconcile dependents (child cannot outlive parent)
 For **every entity you reduce or empty**, find the files that reference *its* key — especially per-store children (`*_price`, `*_store`) — and reconcile them, so no child points at a removed parent:
@@ -46,7 +46,7 @@ Re-run the scanner after pruning; extend the `product-refs` check to any other k
 ## Applying to a RUNNING project (standalone, not the wizard's pre-boot path)
 See `boot-and-verify` for the full **data-iteration ladder**. In short, never full-teardown to test a removal:
 1. Edit the CSVs, run the `product-refs` scan to zero orphans (above).
-2. **Validate the manifest cheaply first:** `docker/sdk console data:import -c <config>` — it collects *all* importer failures and runs to the end, so one pass surfaces every remaining orphan (`Product with SKU … not found`, `Overall Import status: Failed`) **without** a reset. Fix, repeat. (This is the developer's own instruction: *"run `data:import -c <config>` to check if you removed correct files."*)
+2. **Validate the manifest cheaply first:** `docker/sdk console data:import -c <config>` — it collects *all* importer failures and runs to the end, so one pass surfaces every remaining orphan (`Product with SKU … not found`, `Overall Import status: Failed`) **without** a reset. Fix, repeat — iterate to a clean import before spending a reset.
 3. Once the import is clean, **reflect the deletions with `docker/sdk reset`** — it drops the DB and re-imports on the running stack (a plain `data:import` only upserts, so it will **not** delete already-imported removed products). Then **drain the queues** (see boot-and-verify's queue gate) and re-verify search per store — the reset re-emits events on import, so no manual `publish:trigger-events` unless the read model comes out of sync.
 4. **Never `clean-data` + full `up`** for a data-only change — that tears down containers/volumes and rebuilds images/composer/frontend (~30–60 min). Reserve it for code/deploy/service changes.
 

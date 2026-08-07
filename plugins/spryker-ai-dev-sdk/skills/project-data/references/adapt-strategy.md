@@ -1,4 +1,4 @@
-# Adapt-mode strategy map (source: 666-CSV scan + spikes V1/V2)
+# Adapt-mode strategy map
 
 How to re-shape each kind of column/row when adapting the demo catalog to new stores/locales/currencies. The scripts do the mechanics; this table is the judgment.
 
@@ -9,11 +9,11 @@ How to re-shape each kind of column/row when adapting the demo catalog to new st
 | Family | Strategy |
 |---|---|
 | `name` / `description` / `meta_*` / `placeholder` / `title` / `content` / `alt_text` `.<locale>` | **copy** en_US → each project locale (English content; translation debt, flagged) |
-| **`is_searchable.<locale>`** | **copy the value, never blank** — blank imports as silently unsearchable (spike V2a). The worst silent failure. |
-| **`url.<locale>`** | **transform, never copy** — duplicate then `replace` the language prefix per the 2-char scheme, then `validate unique`. **Apply to EVERY file with a `url.<locale>` column, found by scan — never a fixed list.** `spy_url.url` is globally unique, so any un-rewritten verbatim copy aborts the import. Files include `product_abstract`, `category`, `cms_page`, `navigation_node`, `product_set`, **`merchant.csv`** (a real boot-blocker when missed — 3 identical `/en/merchant/…` collided), and possibly more — discover with `columns --plain` across `data/import/**`. |
+| **`is_searchable.<locale>`** | **copy the value, never blank** — blank imports as silently unsearchable. The worst silent failure. |
+| **`url.<locale>`** | **transform, never copy** — duplicate then `replace` the language prefix per the 2-char scheme, then `validate unique`. **Apply to EVERY file with a `url.<locale>` column, found by scan — never a fixed list.** `spy_url.url` is globally unique, so any un-rewritten verbatim copy aborts the import. Files include `product_abstract`, `category`, `cms_page`, `navigation_node`, `product_set`, **`merchant.csv`** (a real boot-blocker when missed — duplicate `/en/merchant/…` URLs collide), and possibly more — discover with `columns --plain` across `data/import/**`. |
 | attribute pairs (`attribute_key_N` / `value_N` + locale variants) | copy; structural edits need the pairing + `product_attribute_key.csv` siblings |
 | keys / SKUs / FKs (`abstract_sku`, `category_key`, `tax_set_name`, block/page keys) | **never touch** in locale/store/currency ops |
-| `locale` / `locale_name` row values | per file: `product_image` → real project-locale rows (NOT `locale=default`, spike V2b); `customer` / `product_review` → `locale_name` must ∈ project locales (both are carried as-is, just relocalized) |
+| `locale` / `locale_name` row values | per file: `product_image` → real project-locale rows (NOT `locale=default`); `customer` / `product_review` → `locale_name` must ∈ project locales (both are carried as-is, just relocalized) |
 | store columns (`store`, `store_name`, `included_store_names`) | generate per declared store (`csv set`); validate refs ⊆ declared stores |
 | currency columns + `price_data` volume JSON | generate for **assigned pairs only**; convert via rate_table incl. the JSON tiers; **convert (never blind-drop) an off-currency row** — see Prices |
 
@@ -33,8 +33,8 @@ How to re-shape each kind of column/row when adapting the demo catalog to new st
 
 ## Constraints the interview must enforce
 
-- **One locale per language per store** (spike V1): the storefront URL segment is the 2-char language code, so two same-language locales (fr_CA + fr_FR) both map to `/store/fr` and the second is silently unreachable. Reject/warn unless the URL scheme is changed (out of scope).
-- **Image locale rows** use real locale names, never `default` (spike V2b).
+- **One locale per language per store:** the storefront URL segment is the 2-char language code, so two same-language locales (fr_CA + fr_FR) both map to `/store/fr` and the second is silently unreachable. Reject/warn unless the URL scheme is changed (out of scope).
+- **Image locale rows** use real locale names, never `default`.
 
 ## Strip demo leftovers
 

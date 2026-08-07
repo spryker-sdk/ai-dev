@@ -1,0 +1,658 @@
+# Machine-readable entity classification — the single list the keep-lists derive from.
+#
+# Derived from data/import/local/full_EU.yml @ 528e7c7e85, 2026-08-07.
+# No row count is recorded here — the file IS the list (regenerate to re-measure).
+# Regenerate the skeleton:  php "$VALIDATE" known-set --emit-map --base .
+# Check it stays honest:     php "$VALIDATE" known-set --base .
+#
+# One row per data_entity in the shipped EU manifest. `source` is the CSV
+# basename the manifest points at (it often differs from the entity name — that
+# difference is the whole reason this file exists; see stock/warehouse.csv).
+#
+# class:
+#   structural   — theme-INDEPENDENT plumbing: registries, type tables, store
+#                  definitions, code-registration, and the marketplace /
+#                  measurement / discount wiring a project keeps regardless of its
+#                  catalog. `clean` keeps these populated (or reshaped). `why` is
+#                  MANDATORY — the reason is the transferable knowledge.
+#   content      — theme-DEPENDENT demo data: the specific products, prices,
+#                  images, category tree, CMS copy, nav nodes, merchants, offers,
+#                  customers, companies, orders, carts, lists — regenerated or
+#                  dropped per project.
+#   unclassified — undecided. The DEFAULT for anything new, and it BLOCKS the boot
+#                  (known-set exits non-zero). A new upstream entity arrives loud
+#                  instead of being silently dropped. No shipped entity is
+#                  unclassified today.
+#
+# Three rules that keep this surviving drift:
+#   1. unclassified is the default for anything new, and it blocks the boot.
+#   2. why is mandatory for structural — the list alone is just data.
+#   3. the header carries the commit + date it was measured against, so staleness
+#      is a diff, not a re-audit.
+#
+# NOTE on the two entities the pure structural/content line doesn't settle:
+#   - product-search-attribute / -map are classed structural per the review's M3
+#     (search-facet plumbing) though their VALUES are theme-dependent — regenerate.
+#   - the SSP / service-point family is classed content (feature demo data,
+#     droppable); reclassify to structural if your project uses that feature.
+
+- entity: category
+  source: category.csv
+  class: structural
+  why: "Keep the is_root row; the demo tree below it is content — regenerate for your catalog."
+- entity: category-store
+  source: category_store.csv
+  class: structural
+  why: "Assigns categories to stores (root only; children inherit) — a tree with no category-store shows in no store."
+- entity: category-template
+  source: category_template.csv
+  class: structural
+  why: "Registers category Twig templates — code binding."
+- entity: cms-block
+  source: cms_block.csv
+  class: structural
+  why: "The cms-block-email--* rows are transactional email bodies (Mail renderCmsBlockAsTwig) and also carry content-block template defs — dropping them throws on every mail."
+- entity: cms-block-store
+  source: cms_block_store.csv
+  class: structural
+  why: "Assigns the kept email blocks to each store."
+- entity: cms-page
+  source: cms_page.csv
+  class: content
+  why: "Demo CMS pages (header-only in clean)."
+- entity: cms-page-store
+  source: cms_page_store.csv
+  class: structural
+  why: "Assigns CMS pages to stores (header-only when pages are dropped)."
+- entity: cms-slot
+  source: cms_slot.csv
+  class: structural
+  why: "Registers CMS slots — code binding."
+- entity: cms-slot-block
+  source: cms_slot_block.csv
+  class: content
+  why: "Demo slot-block wiring (header-only in clean)."
+- entity: cms-slot-template
+  source: cms_slot_template.csv
+  class: structural
+  why: "Registers CMS slot templates — code binding."
+- entity: cms-template
+  source: cms_template.csv
+  class: structural
+  why: "Registers CMS PAGE Twig templates (@Cms/*) — code binding, not content."
+- entity: comment
+  source: comment.csv
+  class: content
+  why: "Demo comments."
+- entity: company
+  source: company.csv
+  class: content
+  why: "Demo B2B companies."
+- entity: company-business-unit
+  source: company_business_unit.csv
+  class: content
+  why: "Demo business units."
+- entity: company-business-unit-address
+  source: company_business_unit_address.csv
+  class: content
+  why: "Demo business-unit addresses."
+- entity: company-business-unit-user
+  source: company_business_unit_user.csv
+  class: content
+  why: "Demo business-unit users."
+- entity: company-role
+  source: company_role.csv
+  class: content
+  why: "Demo company roles (authored with your companies)."
+- entity: company-role-permission
+  source: company_role_permission.csv
+  class: content
+  why: "Demo company role permissions."
+- entity: company-unit-address
+  source: company_unit_address.csv
+  class: content
+  why: "Demo company unit addresses."
+- entity: company-unit-address-label
+  source: company_unit_address_label.csv
+  class: content
+  why: "Demo company unit address labels."
+- entity: company-unit-address-label-relation
+  source: company_unit_address_label_relation.csv
+  class: content
+  why: "Demo company unit address-label relations."
+- entity: company-user
+  source: company_user.csv
+  class: content
+  why: "Demo company users."
+- entity: company-user-on-behalf
+  source: company_user_on_behalf.csv
+  class: content
+  why: "Demo on-behalf-of relations."
+- entity: company-user-role
+  source: company_user_role.csv
+  class: content
+  why: "Demo company user→role links."
+- entity: configurable-bundle-template
+  source: configurable_bundle_template.csv
+  class: content
+  why: "Demo configurable-bundle templates."
+- entity: configurable-bundle-template-image
+  source: configurable_bundle_template_image.csv
+  class: content
+  why: "Demo configurable-bundle images."
+- entity: configurable-bundle-template-slot
+  source: configurable_bundle_template_slot.csv
+  class: content
+  why: "Demo configurable-bundle slots."
+- entity: configuration-value
+  source: configuration_value.csv
+  class: structural
+  why: "Store configuration rows read at boot — theme-independent."
+- entity: content-banner
+  source: content_banner.csv
+  class: content
+  why: "Demo content banners."
+- entity: content-navigation
+  source: content_navigation.csv
+  class: content
+  why: "Demo content→navigation maps."
+- entity: content-product-abstract-list
+  source: content_product_abstract_list.csv
+  class: content
+  why: "Demo content abstract lists."
+- entity: content-product-set
+  source: content_product_set.csv
+  class: content
+  why: "Demo content product sets."
+- entity: context-store
+  source: store_context.csv
+  class: structural
+  why: "Store context (store_context.csv) — DMS store context rows."
+- entity: country-store
+  source: country_store.csv
+  class: structural
+  why: "Binds countries to each store."
+- entity: currency
+  source: currency.csv
+  class: structural
+  why: "All ISO currencies ship; currency-store selects per store — no per-currency authoring."
+- entity: currency-store
+  source: currency_store.csv
+  class: structural
+  why: "Binds currencies to each store; absent = store has no currency."
+- entity: customer
+  source: customer.csv
+  class: content
+  why: "Demo customers."
+- entity: customer-group
+  source: customer_group.csv
+  class: content
+  why: "Demo customer groups."
+- entity: customer-group-to-customer
+  source: customer_group_to_customer.csv
+  class: content
+  why: "Demo customer→group links."
+- entity: default-locale-store
+  source: default_locale_store.csv
+  class: structural
+  why: "Sets each store's default locale."
+- entity: discount
+  source: discount.csv
+  class: structural
+  why: "Cart-rule/discount definitions — keep the wiring even if the demo values reset."
+- entity: discount-amount
+  source: discount_amount.csv
+  class: structural
+  why: "Discount amounts — keep the wiring."
+- entity: discount-store
+  source: discount_store.csv
+  class: structural
+  why: "Assigns discounts to stores."
+- entity: discount-voucher
+  source: discount_voucher.csv
+  class: structural
+  why: "Voucher codes — keep the wiring."
+- entity: glossary
+  source: glossary.csv
+  class: structural
+  why: "Translation keys; one file per project locale."
+- entity: locale-store
+  source: locale_store.csv
+  class: structural
+  why: "Binds locales to each store; drives storefront languages."
+- entity: merchant
+  source: merchant.csv
+  class: content
+  why: "Demo marketplace merchants."
+- entity: merchant-category
+  source: merchant_category.csv
+  class: content
+  why: "Demo merchant categories."
+- entity: merchant-commission
+  source: merchant_commission.csv
+  class: structural
+  why: "Marketplace commission plumbing."
+- entity: merchant-commission-amount
+  source: merchant_commission_amount.csv
+  class: structural
+  why: "Marketplace commission plumbing."
+- entity: merchant-commission-group
+  source: merchant_commission_group.csv
+  class: structural
+  why: "Marketplace commission plumbing."
+- entity: merchant-commission-merchant
+  source: merchant_commission_merchant.csv
+  class: structural
+  why: "Marketplace commission plumbing."
+- entity: merchant-commission-store
+  source: merchant_commission_store.csv
+  class: structural
+  why: "Marketplace commission plumbing."
+- entity: merchant-oms-process
+  source: merchant_oms_process.csv
+  class: structural
+  why: "Marketplace OMS process registration — theme-independent, no self-installer."
+- entity: merchant-opening-hours-date-schedule
+  source: merchant_open_hours_date_schedule.csv
+  class: content
+  why: "Demo merchant opening-hours (date)."
+- entity: merchant-opening-hours-weekday-schedule
+  source: merchant_open_hours_week_day_schedule.csv
+  class: content
+  why: "Demo merchant opening-hours (weekday)."
+- entity: merchant-product
+  source: merchant_product.csv
+  class: content
+  why: "Demo merchant products."
+- entity: merchant-product-approval-status-default
+  source: merchant_product_approval_status_default.csv
+  class: structural
+  why: "Default approval status for merchant products — plumbing."
+- entity: merchant-product-offer
+  source: merchant_product_offer.csv
+  class: content
+  why: "Demo merchant offers."
+- entity: merchant-product-offer-store
+  source: merchant_product_offer_store.csv
+  class: content
+  why: "Demo offer→store assignment."
+- entity: merchant-product-option-group
+  source: merchant_product_option_group.csv
+  class: content
+  why: "Demo merchant product-option groups."
+- entity: merchant-profile
+  source: merchant_profile.csv
+  class: content
+  why: "Demo merchant profiles."
+- entity: merchant-profile-address
+  source: merchant_profile_address.csv
+  class: content
+  why: "Demo merchant profile addresses."
+- entity: merchant-relationship
+  source: merchant_relationship.csv
+  class: structural
+  why: "Merchant-relationship plumbing (drives relationship pricing/thresholds)."
+- entity: merchant-relationship-product-list
+  source: merchant_relation_to_product_list.csv
+  class: structural
+  why: "Merchant-relationship product-list plumbing."
+- entity: merchant-relationship-sales-order-threshold
+  source: sales_order_threshold_per_merchant_relationship.csv
+  class: structural
+  why: "Merchant-relationship thresholds (sales_order_threshold_per_merchant_relationship.csv)."
+- entity: merchant-stock
+  source: merchant_stock.csv
+  class: content
+  why: "Demo merchant stock."
+- entity: merchant-store
+  source: merchant_store.csv
+  class: content
+  why: "Demo merchant→store assignment."
+- entity: merchant-user
+  source: merchant_user.csv
+  class: content
+  why: "Demo merchant users."
+- entity: mime-type
+  source: mime_type.csv
+  class: structural
+  why: "Registered MIME types — code-level registry."
+- entity: multi-cart
+  source: multi_cart.csv
+  class: content
+  why: "Demo multi-carts."
+- entity: navigation
+  source: navigation.csv
+  class: structural
+  why: "Menu container keys (MAIN_NAVIGATION, FOOTER_*, PARTNERS…) — empty containers still needed or menus vanish; the nodes (content) live in navigation-node."
+- entity: navigation-node
+  source: navigation_node.csv
+  class: content
+  why: "Demo menu items (header-only in clean; url is a link target, not a resource)."
+- entity: payment-method
+  source: payment_method.csv
+  class: structural
+  why: "Payment method registry; project must reassign stores via payment-method-store (stripe hardcodes DE/AT)."
+- entity: payment-method-store
+  source: payment_method_store.csv
+  class: structural
+  why: "Assigns payment methods to stores; stripe must be reassigned to project stores."
+- entity: price-product-offer
+  source: price_product_offer.csv
+  class: content
+  why: "Demo offer prices."
+- entity: product-abstract
+  source: product_abstract.csv
+  class: content
+  why: "Demo abstract products — regenerate per project."
+- entity: product-abstract-store
+  source: product_abstract_store.csv
+  class: content
+  why: "Demo abstract→store assignment (header-only in clean; author per catalog)."
+- entity: product-alternative
+  source: product_alternative.csv
+  class: content
+  why: "Demo product alternatives."
+- entity: product-approval-status
+  source: product_abstract_approval_status.csv
+  class: content
+  why: "Demo abstract approval status (product_abstract_approval_status.csv)."
+- entity: product-attachment
+  source: product_attachment.csv
+  class: content
+  why: "Demo product attachments."
+- entity: product-attribute-key
+  source: product_attribute_key.csv
+  class: content
+  why: "Demo attribute keys (regenerate with your attributes)."
+- entity: product-class
+  source: product_class.csv
+  class: content
+  why: "Demo product classes."
+- entity: product-concrete
+  source: product_concrete.csv
+  class: content
+  why: "Demo concrete products/variants."
+- entity: product-configuration
+  source: product_configuration.csv
+  class: content
+  why: "Demo configurable-product data."
+- entity: product-discontinued
+  source: product_discontinued.csv
+  class: content
+  why: "Demo discontinued flags."
+- entity: product-group
+  source: product_group.csv
+  class: content
+  why: "Demo product groups."
+- entity: product-image
+  source: product_image.csv
+  class: content
+  why: "Demo product images."
+- entity: product-label
+  source: product_label.csv
+  class: structural
+  why: "NEW+SALE have no self-installer (missing row aborts install); other shipped labels self-install or are unwired."
+- entity: product-label-store
+  source: product_label_store.csv
+  class: structural
+  why: "Assigns labels to stores (header-only until products exist)."
+- entity: product-list
+  source: product_list.csv
+  class: content
+  why: "Demo product lists."
+- entity: product-list-category
+  source: product_list_to_category.csv
+  class: content
+  why: "Demo product-list→category (product_list_to_category.csv)."
+- entity: product-list-product-concrete
+  source: product_list_to_concrete_product.csv
+  class: content
+  why: "Demo product-list→concrete (product_list_to_concrete_product.csv)."
+- entity: product-management-attribute
+  source: product_management_attribute.csv
+  class: content
+  why: "Demo attribute schema (regenerate with your attributes)."
+- entity: product-measurement-base-unit
+  source: product_measurement_base_unit.csv
+  class: structural
+  why: "Measurement base-unit plumbing — theme-independent."
+- entity: product-measurement-sales-unit
+  source: product_measurement_sales_unit.csv
+  class: structural
+  why: "Measurement sales-unit plumbing — theme-independent."
+- entity: product-measurement-sales-unit-store
+  source: product_measurement_sales_unit_store.csv
+  class: structural
+  why: "Sales-unit per-store plumbing — theme-independent."
+- entity: product-measurement-unit
+  source: product_measurement_unit.csv
+  class: structural
+  why: "Measurement-unit plumbing — theme-independent; keep in the manifest even when the demo catalog is dropped."
+- entity: product-offer-service
+  source: product_offer_service.csv
+  class: content
+  why: "Demo offer→service data."
+- entity: product-offer-shipment-type
+  source: product_offer_shipment_type.csv
+  class: structural
+  why: "Offer↔shipment-type — marketplace plumbing."
+- entity: product-offer-shopping-list-item
+  source: product_offer_shopping_list_item.csv
+  class: content
+  why: "Demo offer shopping-list items."
+- entity: product-offer-stock
+  source: product_offer_stock.csv
+  class: content
+  why: "Demo offer stock."
+- entity: product-offer-validity
+  source: product_offer_validity.csv
+  class: structural
+  why: "Offer validity windows — theme-independent plumbing."
+- entity: product-option
+  source: product_option.csv
+  class: content
+  why: "Demo product options."
+- entity: product-option-price
+  source: product_option_price.csv
+  class: content
+  why: "Demo product-option prices (header-only in clean)."
+- entity: product-packaging-unit
+  source: product_packaging_unit.csv
+  class: structural
+  why: "Packaging-unit plumbing — theme-independent."
+- entity: product-packaging-unit-type
+  source: product_packaging_unit_type.csv
+  class: structural
+  why: "Packaging-unit-type plumbing — theme-independent."
+- entity: product-price
+  source: product_price.csv
+  class: content
+  why: "Demo prices (header-only in clean; author per catalog)."
+- entity: product-price-merchant-relationship
+  source: price_product_merchant_relationship.csv
+  class: structural
+  why: "Merchant-relationship pricing (price_product_merchant_relationship.csv)."
+- entity: product-price-schedule
+  source: product_price_schedule.csv
+  class: content
+  why: "Demo scheduled prices (header-only in clean)."
+- entity: product-quantity
+  source: product_quantity.csv
+  class: structural
+  why: "Min/max/interval quantity rules — theme-independent."
+- entity: product-relation
+  source: product_relation.csv
+  class: content
+  why: "Demo product relations (up/cross-sell)."
+- entity: product-relation-store
+  source: product_relation_store.csv
+  class: content
+  why: "Demo product-relation store assignment (header-only in clean)."
+- entity: product-review
+  source: product_review.csv
+  class: content
+  why: "Demo product reviews."
+- entity: product-search-attribute
+  source: product_search_attribute.csv
+  class: structural
+  why: "Search facet config; regenerate for your attribute schema — omitting yields no search facets (M3). Theme-dependent VALUES, structural ROLE."
+- entity: product-search-attribute-map
+  source: product_search_attribute_map.csv
+  class: structural
+  why: "Search attribute-map config; regenerate for your attribute schema (M3)."
+- entity: product-set
+  source: product_set.csv
+  class: content
+  why: "Demo product sets."
+- entity: product-shipment-type
+  source: product_shipment_type.csv
+  class: structural
+  why: "~1 row per concrete = required; the near-miss that breaks silently if omitted (M7/generate.md:73)."
+- entity: product-stock
+  source: product_stock.csv
+  class: content
+  why: "Demo per-product stock."
+- entity: product-to-product-class
+  source: product_to_product_class.csv
+  class: content
+  why: "Demo product↔class links."
+- entity: purchasing-control-budget
+  source: budget.csv
+  class: content
+  why: "Demo B2B budgets (budget.csv)."
+- entity: purchasing-control-cost-center
+  source: cost_center.csv
+  class: content
+  why: "Demo cost centers (cost_center.csv)."
+- entity: purchasing-control-cost-center-to-company-business-unit
+  source: cost_center_company_business_unit.csv
+  class: content
+  why: "Demo cost-center→business-unit (cost_center_company_business_unit.csv)."
+- entity: quote-request
+  source: quote_request.csv
+  class: content
+  why: "Demo quote requests."
+- entity: quote-request-version
+  source: quote_request_version.csv
+  class: content
+  why: "Demo quote-request versions."
+- entity: return-reason
+  source: ~
+  class: structural
+  why: "RMA return-reason codes — theme-independent config. NOTE: bare data_entity in full_EU.yml with no source; needs authoring or an explicit source (M3)."
+- entity: sales-order
+  source: sales_order.csv
+  class: content
+  why: "Demo sales orders."
+- entity: sales-order-threshold
+  source: sales_order_threshold.csv
+  class: structural
+  why: "MOV/MOQ thresholds; keep the wiring (header-only until configured)."
+- entity: service
+  source: service.csv
+  class: content
+  why: "Demo service data (SSP feature — droppable; reclassify if your project uses it)."
+- entity: service-point
+  source: service_point.csv
+  class: content
+  why: "Demo service points (SSP feature — droppable; reclassify if used)."
+- entity: service-point-address
+  source: service_point_address.csv
+  class: content
+  why: "Demo service-point addresses (SSP feature)."
+- entity: service-point-store
+  source: service_point_store.csv
+  class: content
+  why: "Demo service-point→store (SSP feature)."
+- entity: service-type
+  source: service_type.csv
+  class: structural
+  why: "Service-type registry — referenced by shipment-type-service-type; theme-independent."
+- entity: shared-cart
+  source: shared_cart.csv
+  class: content
+  why: "Demo shared carts."
+- entity: shipment
+  source: shipment.csv
+  class: structural
+  why: "Shipment/carrier method config — theme-independent."
+- entity: shipment-method-shipment-type
+  source: shipment_method_shipment_type.csv
+  class: structural
+  why: "Links shipment methods to types — plumbing."
+- entity: shipment-method-store
+  source: shipment_method_store.csv
+  class: structural
+  why: "Assigns shipment methods to stores."
+- entity: shipment-price
+  source: shipment_price.csv
+  class: content
+  why: "Demo shipment prices (header-only in clean)."
+- entity: shipment-type
+  source: shipment_type.csv
+  class: structural
+  why: "Shipment type registry (delivery/pickup) — referenced by shipment-type-store and product-shipment-type."
+- entity: shipment-type-service-type
+  source: shipment_type_service_type.csv
+  class: structural
+  why: "Relation linking kept shipment-type to service-type — theme-independent (M3)."
+- entity: shipment-type-store
+  source: shipment_type_store.csv
+  class: structural
+  why: "Assigns shipment types to stores."
+- entity: shopping-list
+  source: shopping_list.csv
+  class: content
+  why: "Demo shopping lists."
+- entity: shopping-list-company-business-unit
+  source: shopping_list_company_business_unit.csv
+  class: content
+  why: "Demo shopping-list→business-unit."
+- entity: shopping-list-company-user
+  source: shopping_list_company_user.csv
+  class: content
+  why: "Demo shopping-list→user."
+- entity: shopping-list-item
+  source: shopping_list_item.csv
+  class: content
+  why: "Demo shopping-list items."
+- entity: ssp-asset
+  source: ssp_asset.csv
+  class: content
+  why: "Demo SSP assets (feature — droppable; reclassify if used)."
+- entity: ssp-inquiry
+  source: ssp_inquiry.csv
+  class: content
+  why: "Demo SSP inquiries (feature)."
+- entity: ssp-model
+  source: ssp_model.csv
+  class: content
+  why: "Demo SSP models (feature)."
+- entity: ssp-model-asset
+  source: ssp_model_asset.csv
+  class: content
+  why: "Demo SSP model→asset (feature)."
+- entity: ssp-model-product-list
+  source: ssp_model_product_list.csv
+  class: content
+  why: "Demo SSP model→product-list (feature)."
+- entity: stock
+  source: warehouse.csv
+  class: structural
+  why: "Warehouse/stock definitions (warehouse.csv) — gate every product's availability."
+- entity: stock-address
+  source: warehouse_address.csv
+  class: structural
+  why: "Warehouse addresses (warehouse_address.csv) — plumbing for stock."
+- entity: stock-store
+  source: warehouse_store.csv
+  class: structural
+  why: "Assigns warehouses to stores (warehouse_store.csv)."
+- entity: store
+  source: store.csv
+  class: structural
+  why: "Store definitions — the stores every *-store relation and P&S key is scoped to."
+- entity: tax
+  source: tax.csv
+  class: structural
+  why: "Tax sets; regenerate for the project's countries (shipped covers DE/AT only) or checkout tax breaks."

@@ -13,7 +13,7 @@ declare(strict_types=1);
  * (e.g. cms_page.csv), so shell tools (cut/awk/sed) MUST NOT touch them.
  * PHP's fgetcsv with escape disabled ('') is RFC-4180 compliant and handles
  * multi-line quoted fields correctly. All access is by HEADER NAME, never by
- * column index (the index approach caused a real mis-read in the playbook run).
+ * column index (the index approach caused a real mis-read).
  */
 
 /**
@@ -49,6 +49,10 @@ function csv_read(string $path): array
             continue;
         }
 
+        // NOTE: rows are keyed by header NAME, so two columns with the same header
+        // name collapse to last-wins on a read→write round trip. Spryker import files
+        // don't ship duplicate headers, so this is acceptable — but don't rely on this
+        // tool to preserve a file that has them.
         $row = [];
         foreach ($header as $i => $name) {
             $row[$name] = array_key_exists($i, $record) ? (string) $record[$i] : '';
@@ -297,6 +301,12 @@ function csv_replace(array $data, string $column, string $search, string $replac
 {
     if (!in_array($column, $data['header'], true)) {
         throw new RuntimeException("csv_replace: no '{$column}' column");
+    }
+    // A bad PCRE pattern makes preg_replace() return null → cast to '' → every cell
+    // silently blanked while the report says "changed". Validate once, up front, and
+    // fail loudly instead of writing the null result.
+    if ($regex && @preg_match($search, '') === false) {
+        throw new RuntimeException("csv_replace: invalid regex '{$search}' (a PCRE pattern needs delimiters, e.g. '#^/en/#')");
     }
     $changed = 0;
     foreach ($data['rows'] as &$row) {
@@ -624,7 +634,9 @@ function csv_translate(array $data, string $sourceCol, string $targetCol, array 
     $changed = 0;
     foreach ($data['rows'] as &$row) {
         $src = $row[$sourceCol] ?? '';
-        if ($src === '' || !array_key_exists($src, $map)) {
+        // Skip an empty source, a source not in the map, AND an empty TARGET — a blank
+        // translation must be a no-op, never a silent cell-wipe.
+        if ($src === '' || !array_key_exists($src, $map) || $map[$src] === '') {
             continue;
         }
         if (($row[$targetCol] ?? '') !== $map[$src]) {
@@ -909,8 +921,8 @@ function csv_usage(): int
 function csv_cli_distinct(array $files, array $opts): int
 {
     $col = $opts['column'] ?? '';
-    if ($col === '') {
-        return csv_report(2, [], ['distinct: --column is required']);
+    if ($col === '' || is_array($col)) {
+        return csv_report(2, [], ['distinct: exactly one --column is required']);
     }
     $plain = isset($opts['plain']);
     $multi = count($files) > 1;
@@ -995,6 +1007,16 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
             if ($where === [] && $inSets === []) {
                 return ['exit' => 2, 'summary' => ['error' => "{$command}: at least one --where col=val or --in col=v1,v2 (or --in-file col=path) is required"]];
             }
+            // Error when a referenced COLUMN is absent from the header — a wrong/typo'd
+            // column otherwise "matches nothing", which for `filter` means "keep nothing"
+            // = a header-only file reported as success (data loss). This guards the
+            // column name only; a never-matching VALUE on a real column is still the
+            // legitimate header-only-truncation move.
+            foreach (array_merge(array_keys($where), array_keys($inSets)) as $col) {
+                if (!in_array($col, $data['header'], true)) {
+                    return ['exit' => 2, 'summary' => ['error' => "{$command}: no '{$col}' column in this file (columns: " . implode(', ', $data['header']) . ')']];
+                }
+            }
             $mode = $opts['match'] ?? 'exact';
             // A row "matches" when it satisfies BOTH the --where conditions and the
             // set-membership (--in) conditions (AND). Set-membership expresses
@@ -1032,14 +1054,14 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
             if ($from === '' || $to === '' || $target === null) {
                 return ['exit' => 2, 'summary' => ['error' => 'duplicate-columns: --from, --to and (--out|--in-place) are required']];
             }
-            $skip = isset($opts['skip-base']) ? explode(',', $opts['skip-base']) : [];
+            $skip = isset($opts['skip-base']) ? csv_split_list($opts['skip-base']) : []; // trim, so `--skip-base "url, name"` skips `name` too
             $added = [];
             $skipped = [];
             foreach (csv_split_list($to) as $t) { // list-valued --to fans out over locales/stores
                 $r = csv_duplicate_columns($data, $from, $t, $skip);
                 $data = ['header' => $r['header'], 'rows' => $r['rows']];
                 $added = array_merge($added, $r['added']);
-                $skipped = $r['skipped'];
+                $skipped = array_values(array_unique(array_merge($skipped, $r['skipped']))); // accumulate across locales, not last-wins
             }
             csv_write($target, $data['header'], $data['rows']);
             $warnings = $skipped === [] ? [] : ['skipped bases (not copied): ' . implode(', ', $skipped)];
@@ -1065,8 +1087,8 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
 
         case 'set':
             $col = $opts['column'] ?? '';
-            if ($col === '' || !isset($opts['value']) || $target === null) {
-                return ['exit' => 2, 'summary' => ['error' => 'set: --column, --value and (--out|--in-place) are required']];
+            if ($col === '' || is_array($col) || !isset($opts['value']) || $target === null) {
+                return ['exit' => 2, 'summary' => ['error' => 'set: a single --column, --value and (--out|--in-place) are required (--column is not repeatable here)']];
             }
             $r = csv_set($data, $col, (string) $opts['value'], $where);
             csv_write($target, $r['header'], $r['rows']);
@@ -1077,7 +1099,7 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
             if (!isset($opts['columns']) || $target === null) {
                 return ['exit' => 2, 'summary' => ['error' => 'select: --columns and --out are required']];
             }
-            $r = csv_select($data, explode(',', $opts['columns']));
+            $r = csv_select($data, csv_split_list($opts['columns']));
             csv_write($target, $r['header'], $r['rows']);
 
             return ['exit' => 0, 'summary' => ['written' => [$target], 'columns' => $r['header']]];
@@ -1115,8 +1137,8 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
 
         case 'replace':
             $col = $opts['column'] ?? '';
-            if ($col === '' || !isset($opts['search']) || !isset($opts['with']) || $target === null) {
-                return ['exit' => 2, 'summary' => ['error' => 'replace: --column, --search, --with and (--out|--in-place) are required ([--regex] [--where col=val --match mode])']];
+            if ($col === '' || is_array($col) || !isset($opts['search']) || !isset($opts['with']) || $target === null) {
+                return ['exit' => 2, 'summary' => ['error' => 'replace: a single --column, --search, --with and (--out|--in-place) are required ([--regex] [--where col=val --match mode]; --column is not repeatable here)']];
             }
             $r = csv_replace($data, $col, (string) $opts['search'], (string) $opts['with'], isset($opts['regex']), $where, $opts['match'] ?? 'exact');
             csv_write($target, $r['header'], $r['rows']);
@@ -1147,6 +1169,11 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
                 }
             } elseif (!is_numeric($opts['by']) || (float) $opts['by'] <= 0) { // non-numeric → (float) 0.0 → every value silently zeroed
                 return ['exit' => 2, 'summary' => ['error' => "scale: --by must be a positive number, got '{$opts['by']}'"]];
+            }
+            if ($rates !== [] && !in_array($curCol, $data['header'], true)) {
+                // Wrong --currency-column → every per-currency --where fails to match →
+                // 0 rows converted, reported as success (the silent wrong-price class).
+                return ['exit' => 2, 'summary' => ['error' => "scale: no '{$curCol}' currency column in this file (set --currency-column; columns: " . implode(', ', $data['header']) . ')']];
             }
             foreach ($columns as $col) {
                 if ($rates !== []) {
@@ -1214,6 +1241,10 @@ function csv_parse_opts(array $args): array
     for ($i = 0; $i < count($args); $i++) {
         $arg = $args[$i];
         if (!str_starts_with($arg, '--')) {
+            // A bare token here is a positional that landed AFTER the first flag — almost
+            // always a file listed after the flags (`set a.csv --column x b.csv`). Silently
+            // skipping it made a batch cover fewer files than it looked. Fail loudly.
+            $opts['_errors'][] = "unexpected argument '{$arg}' — list all input files BEFORE the first --flag";
             continue;
         }
         $key = substr($arg, 2);

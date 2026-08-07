@@ -18,6 +18,8 @@ description: >
 
 # Cypress Migration: Demo-Shop Suites → Project-Owned Baseline
 
+Failure-signature triage for the E2E steps lives in the Known-traps catalog: `../project-starter-wizard/references/pitfalls.md`.
+
 Every step below discovers facts about the **target project** before acting. Do not assume
 file names, job names, hostnames, or conventions from any other project — grep and verify in
 the repo you're actually working in. Several steps below exist specifically because assuming
@@ -31,16 +33,18 @@ very different track records in the reference repo (`spryker-shop/b2b-demo-marke
 
 - **Proven (Steps 6–11):** the vendored `tests/cypress-boilerplate/` suite, its CI jobs, and the
   companion skill were built and debugged against a live Spryker B2B Marketplace instance.
-- **NOT yet executed anywhere (Steps 2–5, the removal half):** the reference repo is Spryker's
-  own *product* repo — it still needs its demo-shop suites, so it never deleted them. Its
-  cypress-boilerplate work was purely **additive**: `spryker/cypress-tests` and
-  `spryker/robotframework-suite-tests` are still in its `composer.json`/`composer.lock`, and the
-  old Robot/Cypress CI jobs are still live there. So the removal instructions below have never
-  actually been run end-to-end. Treat them as a careful plan, not a proven script: verify each
-  deletion with the greps given rather than trusting the step.
+- **NOT yet executed anywhere (the removal half — Step 2 here, plus the CI/config removal now owned
+  by `project-ci-generator`):** the reference repo is Spryker's own *product* repo — it still needs
+  its demo-shop suites, so it never deleted them. Its cypress-boilerplate work was purely
+  **additive**: `spryker/cypress-tests` and `spryker/robotframework-suite-tests` are still in its
+  `composer.json`/`composer.lock`, and the old Robot/Cypress CI jobs are still live there. So the
+  removal instructions have never been run end-to-end — treat them as a careful plan, not a proven
+  script; verify each deletion with the greps given rather than trusting the step.
 
 Instead of deleting its own suites, the reference repo **labels everything an adopting project
-should delete** — that inventory is the authoritative removal list. See Step 3.
+should delete** — that inventory is the authoritative removal list. Under the wizard,
+`project-ci-generator` consumes it (it owns the CI + deploy/install-pipeline/fixture removal, per
+its `keep_suites` decision); this skill's own removal is limited to the Composer packages (Step 2).
 
 ## Step 1 — Confirm scope
 
@@ -48,7 +52,7 @@ should delete** — that inventory is the authoritative removal list. See Step 3
 grep -n "spryker/cypress-tests\|spryker/robotframework-suite-tests" composer.json
 ```
 
-If neither package is present, this project doesn't need the removal steps (Steps 2–5) — skip
+If neither package is present, this project doesn't need the Composer removal (Step 2) — skip
 ahead to Step 6 (detect the locator convention) and Step 7 (vendoring) if the goal is just
 adding a Cypress baseline to a project that never had these suites.
 
@@ -57,6 +61,8 @@ similar internal test packages), adapt the steps below accordingly rather than a
 are always present together.
 
 ## Step 2 — Remove Composer entries
+
+> **Under the project-starter wizard this is pre-boot, where there is no `vendor/` yet.** So Step 2 there **edits `composer.json` only** (remove the `require-dev`/repository/installer entries); the lock-file + `vendor/` sync happens at the first boot's in-container `composer install`. The `composer update --lock` / `composer install` / `composer remove` commands below are for a **standalone, already-installed** project — don't run them pre-boot when `composer`/`vendor/` isn't there.
 
 In `composer.json`, remove:
 - The `require-dev` entries for the packages found in Step 1.
@@ -94,122 +100,30 @@ git status --porcelain <path-from-installer-paths>
 If it shows `??` (untracked), it's a stale local build artifact — safe to delete. If it's
 tracked, investigate before touching it; it may be legitimate project content.
 
-## Step 3 — Remove CI workflow jobs referencing the old suites
+## Step 3 — CI + deploy/install-pipeline removal is owned by `project-ci-generator`
 
-**Start with the removal markers, not with grep.** If the target project descends from
-b2b-demo-marketplace (or you copied its `ci.yml`), the workflow already tells you exactly what
-to delete:
+The old suites' CI jobs and the deploy/install-pipeline/fixture configs those jobs referenced are
+removed by **`project-ci-generator`**, not here. It is the CI skill, it decides the
+robot/acceptance-fixture lane from the interview `keep_suites`, and it already rebuilds the
+pipeline — so keeping this removal here too would re-edit the same files (`.github/workflows`,
+`config/install/*.yml`, `.github/deploy/*.yml`) at a second point in the run.
 
-```bash
-grep -rn "remove for project\|REMOVE FOR PROJECT" .github/workflows/*.yml
-```
+- **Under the wizard:** ci-generator (step 1) has already done it. Verify rather than redo —
+  `grep -rln "cypress\|robot" .github/workflows/ config/install/ .github/deploy/ 2>/dev/null`
+  should surface only the KEPT new stack (`…cypress-boilerplate.yml`); an old-suite job or config
+  that survives is a ci-generator gap to report, not something to fix here.
+- **Standalone (no ci-generator run):** do the removal per ci-generator's "a dropped suite's job
+  pulls support files out with it" guidance — remove the old suites' CI jobs and the
+  `.github/deploy/*.yml` / `config/install/*.yml` configs (and fixture dirs) they alone reference,
+  honouring its two traps: near-identical kept-vs-dropped filenames (`…cypress-boilerplate.yml` kept
+  vs `…cypress.yml` dropped — delete by which surviving job references it), and a `*_ROBOT.yml`
+  fixture config that may be shared with the regular demodata import (grep the literal filename
+  repo-wide and read the actual `source:`/`command:` lines before deleting).
 
-Two kinds of hit, and they are **not** interchangeable:
+## Step 4 — (folded into Step 3)
 
-1. A `# ===== REMOVE FOR PROJECT =====` banner. Everything from the banner to the end of the
-   `jobs:` mapping is product-delivery/upstream suites (Codeception acceptance, Robot, the old
-   demo-shop Cypress). In the reference repo that banner sits at ~line 316 and the marked
-   region runs to EOF (~820) covering six jobs:
-   `php-84-mariadb-acceptance-alpine`, `docker-alpine-php-84-mariadb-robot-api`,
-   `docker-alpine-php-84-mariadb-robot-api-b2b`, `docker-alpine-php-84-mariadb-cypress`,
-   `docker-alpine-php-84-mariadb-cypress-b2b`, `docker-alpine-php-84-mariadb-robot-ui`.
-2. Individual `# [remove for project]` comments **above the banner**, which mark things that
-   are product-only but have nothing to do with test suites (e.g. the multi-PHP `strategy`
-   matrix, a `release-*`-branch-only Evaluator step). These are legitimate project cleanups but
-   are **out of scope for this migration** — don't sweep them up silently. Leave them, or raise
-   them with the user as a separate change.
-
-Line numbers drift; re-derive them, never hardcode. **Keep** `cypress-quality-gate` and
-`cypress-e2e` (the new project-owned jobs) — they live *above* the banner precisely so this
-step doesn't eat them.
-
-Then confirm nothing was missed by grep, since a project may have suites the markers don't
-cover — and note there is usually **more than one workflow file** (the reference repo also has
-`.github/workflows/compatibility-ci.yml` with its own `*-robot-api`, `*-cypress`, `*-robot-ui`
-jobs):
-
-```bash
-grep -rn "robot\|cypress" .github/workflows/*.yml
-```
-
-For every remaining job block that references the removed packages (by name, by docker-compose
-file, by deploy-yml file), identify its exact line range: the job starts at its `<job-key>:`
-line (same indentation as other job keys under `jobs:`) and ends at the line before the next
-sibling job key (or end of file). Delete each full block, then:
-
-```bash
-grep -n "robot\|cypress" .github/workflows/*.yml   # no *active* job references may remain
-python3 -c "import yaml; yaml.safe_load(open('<file>')); print('OK')"   # each edited file
-```
-
-Judge that grep by whether any **live** job still references the removed suites — not by
-whether it prints zero lines. Commented-out blocks kept deliberately for reference, and the
-project-owned Cypress jobs you add in Step 9, both legitimately match this pattern. (The
-`python3 -c "import yaml"` check needs PyYAML installed; if it's missing, use any other YAML
-parser available rather than skipping validation.)
-
-Also check no remaining job has a `needs:` list referencing a job name you just deleted.
-
-## Step 4 — Remove deploy configs and install-pipeline configs — verify before deleting
-
-Find candidate files:
-```bash
-grep -rl "robot\|cypress" .github/deploy/ config/install/ 2>/dev/null
-ls .github/deploy/ config/install/ | grep -i "robot\|cypress"
-```
-
-For reference, this is the full inventory in b2b-demo-marketplace, as a sanity-check on what
-you find in the target project (re-verify — do not delete from this list blindly):
-
-| Path | Action |
-|---|---|
-| `.github/deploy/deploy.ci.acceptance.mariadb.cypress-boilerplate.yml` | **KEEP** — this is the new project-owned stack |
-| `.github/deploy/deploy.ci.acceptance.mariadb.cypress.yml` | delete (old demo-shop Cypress) |
-| `.github/deploy/deploy.ci.acceptance.postgress.cypress.yml` | delete |
-| `.github/deploy/deploy.ci.acceptance.mariadb.robot.yml` | delete |
-| `.github/deploy/deploy.ci.acceptance.postgres.robot.yml` | delete |
-| `.github/deploy/deploy.ci.api.mariadb.robot.yml` | delete |
-| `.github/deploy/deploy.ci.api.postgres.robot.yml` | delete |
-| `config/install/docker.robot.ci.acceptance.yml` | delete |
-| `config/install/docker.robot.ci.api.full.yml` | delete |
-
-Note the near-identical `cypress.yml` vs `cypress-boilerplate.yml` names — deleting the wrong
-one breaks the job you just built. Cross-check against `grep -n "docker/sdk boot"
-.github/workflows/*.yml` and only delete deploy files whose sole referencing jobs you removed
-in Step 3.
-
-**Before deleting any file, grep the whole repo for its literal filename** to confirm nothing
-else references it — don't trust that a "robot"/"cypress" name means it's exclusively used by
-the suites you're removing:
-```bash
-grep -rln "<exact-filename>" --include="*.yml" --include="*.php" . | grep -v vendor
-```
-
-This check matters most for **data-import fixture configs**. A file named something like
-`*_ROBOT.yml` might either (a) be used only by the Robot-Framework-specific install pipeline
-you're deleting — in which case it (and its underlying CSV fixture directories) is now
-orphaned and should also be deleted — or (b) also be referenced generically by the project's
-regular (non-Robot) install pipelines under a step like `import-eu-region-demodata` — in
-which case it must be **kept**, since deleting it would break unrelated demodata imports.
-**Check the actual `command:`/`source:` lines in each install pipeline yml directly** —
-don't infer from a research summary or from what a similar project did; re-verify with a live
-grep every time, since naming conventions vary and can be misleading.
-
-Worked example (verified in b2b-demo-marketplace — re-run it, don't trust it):
-```bash
-grep -rn "full_ROBOT\|b2b_full_ROBOT" --include="*.yml" --include="*.php" . | grep -v vendor
-```
-There, `data/import/local/full_ROBOT.yml` and `b2b_full_ROBOT.yml` are referenced **only** by
-`config/install/docker.robot.ci.acceptance.yml` and `config/install/docker.robot.ci.api.full.yml`
-— both of which Step 4 deletes. So they fall into case (a): once those pipelines are gone, these
-configs *and* the CSV fixture trees they point at (`data/import/robot/`,
-`data/import/b2b_robot/`) are orphaned and should be deleted too. A different project may wire
-the same-looking file into its general demodata import instead, which is case (b) — hence the
-grep.
-
-Also check for any environment-specific PHP config solely tied to a deleted deploy
-environment (e.g. a config file only loaded when `environment: docker.ci.cypress` is
-referenced) and remove it once nothing references that environment name anymore.
+Deploy and install-pipeline config removal is part of Step 3's `project-ci-generator` ownership
+above — nothing separate here. (Step number kept so later step references don't shift.)
 
 ## Step 5 — Clean up `.gitignore`
 
@@ -274,29 +188,51 @@ git check-ignore -v <project>/tests/cypress-boilerplate   # must produce no outp
 
 Then adapt, discovering each value rather than assuming a default is correct:
 - `package.json`: set `name`/`description` to the project's own.
-- `.envs/.env.local` / `.envs/.env.ci` / etc.: set `BACK_OFFICE_URL`/`STOREFRONT_URL`/
-  `GLUE_URL`/`MP_URL` to the project's actual local/CI hostnames — grep existing CI workflows
-  or install configs for `*.spryker.local` (or whatever domain convention the project uses)
-  rather than trusting the reference project's own hostnames are right for this one.
-- `PROJECT_LOCATION` (used by any CLI-exec-based commands, e.g. OMS transitions): set to the
-  relative path from the vendored Cypress directory back to the repo root (e.g. `../..` if
-  Cypress runs with `tests/cypress-boilerplate` — two directories deep — as its working
-  directory). Set this in **every** `.envs/.env.<environment>` file that needs it, including
-  the local one — a value only set for CI and missing locally silently no-ops any CLI-exec
-  step when run locally instead of failing loudly.
+- **Store facts are resolved from the running shop, not configured — this is what makes the suite
+  portable with no per-helper edits.** `cypress.config.ts`'s `resolveStoreContext()` POSTs
+  `getAllowedStore` to glue-backend `/dynamic-fixtures` once per run and writes
+  `STORE_NAME`/`LOCALE_NAME`/`LOCALE_PREFIX`/`CURRENCY_CODE`/`COUNTRY_ISO2` into `config.env`; specs
+  read them via `Cypress.env()`, fixtures via `{{PLACEHOLDER}}`. So do **not** put
+  store/locale/currency/country in `.envs` — a hand-set value reintroduces a second source of truth.
+- `.envs/.env.local` / `.envs/.env.ci` / etc.: set the endpoint URLs — `BACK_OFFICE_URL`/
+  `STOREFRONT_URL`/`GLUE_URL`/`MP_URL` and **`GLUE_BACKEND_URL`** (mandatory — the store-context
+  resolution above dies without it) — to the project's actual local/CI hostnames; grep existing CI
+  workflows or install configs for `*.spryker.local` (or the project's domain convention) rather
+  than trusting the reference project's hostnames. Plus the values that are genuinely not store
+  properties, each with a one-line reason it can't be resolved:
+  - `PROJECT_LOCATION` — relative path from the vendored Cypress dir back to the repo root (e.g.
+    `../..` when Cypress runs with `tests/cypress-boilerplate` as its cwd, two dirs deep). Set it in
+    **every** `.envs/.env.<environment>`, including local — a value only set for CI silently no-ops
+    any CLI-exec step (OMS transitions, etc.) when run locally instead of failing loudly.
+  - `DEFAULT_PASSWORD` — the password every fixture-created customer/admin/merchant user is given.
+  - `PRODUCT_PRICE_ABOVE_THRESHOLD` — a fixture price above the store's hard-minimum and below its
+    soft-minimum `spy_sales_order_threshold`; no API exposes those thresholds, so it lives here.
+- **One fact the shop can't expose — ship a helper in the project test namespace.** Fixtures need the
+  currency's DB id (`fkCurrency`), which no API returns. Add a ~10-line `CurrencyDataHelper` extending
+  `SprykerTest\Shared\Currency\Helper\CurrencyDataHelper` that overrides `getCurrencyByIsoCode()` →
+  `$this->getCurrencyFacade()->fromIsoCode($isoCode)`, in the **project** test namespace
+  (`tests/<Ns>Test/Shared/Currency/_support/Helper/`, or `tests/PyzTest/Shared/Currency/_support/Helper/`
+  for keep-Pyz), and enable it in `tests/PyzTest/Zed/TestifyBackendApi/codeception.dynamic.fixtures.yml`.
+  The helper file and that enable line are a pair — one without the other is a dangling reference. (No
+  `codecept build` needed — the fixtures endpoint runs helpers directly, not via the generated actor.)
+- **BO/MP specs depend on the `getBackofficeUILocales()` override** on any project whose store locales
+  exclude `en_US`/`de_DE` — without it a BO admin on the project locale sees empty product lists. It's a
+  general Back Office requirement owned by `define-stores` (see its Back Office interface-language rule),
+  not a cypress one; if BO/MP specs are kept it's a prerequisite for them to pass.
 - If Step 6 determined the project's convention differs from `data-qa` (what this reference
   copy already uses throughout), update the vendored page-object selectors accordingly.
-- **Verify the vendored fixture data is real for this project**, don't just trust it:
+- **Fixture data:** the converted specs provision their own data per run via `POST /dynamic-fixtures`
+  (merchant/warehouse/product/price/customer created with the resolved store facts), so they do **not**
+  assert on the project's demodata — nothing to match against `data/import`. The demodata check below
+  applies **only** to any spec still on the legacy static path (reading `cypress/fixtures/*-data.json`):
   ```bash
   grep -rl "<fixture-customer-email>" data/import/common/ 2>/dev/null
   grep -rl "<fixture-product-sku>" data/import/common/ 2>/dev/null
   ```
-  If the values aren't found in the project's own demodata, replace them with values that
-  are — a smoke test asserting on data that doesn't exist in this project's environment will
-  fail for reasons unrelated to the code under test. Prefer merchants/products/customers with
-  no unusual restrictions (e.g. B2B Purchasing Control has no Glue REST API support at all —
-  a customer whose business unit requires cost-center/budget selection will make any
-  Glue-API-based test-setup scaffolding fail with a 422 regardless of the code under test).
+  If a static spec's values aren't in the project's demodata, replace them with values that are — or
+  convert the spec to a dynamic fixture. (B2B Purchasing Control has no Glue REST support — a customer
+  whose business unit requires cost-center/budget selection makes Glue-API setup 422 regardless of the
+  code under test; avoid such customers in fixtures.)
 
 ## Step 8 — Add representative smoke tests
 
@@ -309,6 +245,13 @@ ships (it already includes working examples for common Spryker flows — check
 `cypress/support/page-objects/` and `cypress/e2e/` before writing new ones). Every test must
 reset any state it mutates in a `before`/`beforeEach` hook (deterministic setup/cleanup) and
 assert on specific, meaningful content rather than mere presence/visibility.
+
+**When authoring or porting a dynamic fixture, three non-obvious constraints of the `/dynamic-fixtures` DSL** (`testify-backend-api`) — invisible until a `#key` reference explodes at runtime:
+- **A `#key` reference can only point at a helper that returns an `AbstractTransfer`/`ArrayObject`.** A scalar-returning helper is silently discarded and a later `#key` dies with `Undefined array key`. This rules out chaining on `haveCurrency`/`haveLocaleStore`/… (they return `int`) — resolve the store via `getAllowedStore` (returns a `StoreTransfer`) instead.
+- **References are one level deep and can't index arrays** — `#store.countries.0` yields the whole array, not element 0.
+- **Resolve shop facts through glue-backend `/dynamic-fixtures`, never storefront Glue `/stores`** — `glue` is an optional app (`configure-services` can disable it), so a suite that reads storefront Glue becomes unrunnable on a headless project; glue-backend is the one backend the suite can't run without. (Required header `Content-Type: application/vnd.api+json`; `application/json` returns a bare 404 that looks like a missing route.)
+
+**Storefront checkout specs must use a NON-marketplace payment method** (e.g. `dummyPaymentInvoice`) as long as their fixtures put a plain product in the cart — marketplace payment (`dummyMarketplacePaymentInvoice`) is filtered out of the form until a merchant **offer** is in the cart, so a spec selecting it hangs waiting for a radio that never renders. State this next to the `paymentMethodKey` fixture, or the next person "corrects" it back to the marketplace method. A spec that wants to exercise marketplace payment must add an offer to the cart first.
 
 Run locally before moving on:
 ```bash
@@ -342,16 +285,23 @@ Add two jobs:
    installs the Cypress project's dependencies, and runs `npx cypress run --env
    environment=ci ...`, uploading screenshots/reports as artifacts on failure.
 
-The reference repo's two jobs (`cypress-quality-gate` and `cypress-e2e` in its `ci.yml`) are
-the model to copy — they are placed **above** the `REMOVE FOR PROJECT` banner deliberately, so
-Step 3's deletion doesn't take them with it. Its `cypress-e2e` step order is worth reproducing,
+Those two jobs are **not on the default branch** — they ship in the boilerplate's own workflow
+(`…cypress-boilerplate.yml`) on the `add-cypress-boilerplate` branch, the same branch Step 7 names
+as the boilerplate's source (`git ls-remote` to confirm it still exists). If you can reach that
+branch, copy the two jobs from there; if not, the inline shape above is authoritative — author the
+two jobs to it. Place them **above** the `REMOVE FOR PROJECT` banner deliberately, so the old-suite
+CI removal (owned by `project-ci-generator`) doesn't take them with it. The `cypress-e2e`
+step order is worth reproducing,
 because two of the steps exist to fix real flakiness rather than as boilerplate:
 
 1. `actions/checkout` → `ramsey/composer-install` → `actions/setup-node` (Node 24, npm cache
    keyed on `tests/cypress-boilerplate/package-lock.json`) → `npm ci`
 2. `docker/sdk boot <deploy>.yml`, add the stack's hostnames to `/etc/hosts`, `docker/sdk up -t`
 3. **`docker/sdk console queue:worker:start --stop-when-empty`** — drain the queue, otherwise
-   asynchronously-published data isn't visible to the UI yet
+   asynchronously-published data isn't visible to the UI yet. This drains what was published
+   **before** the run; fixtures the specs create mid-run publish *during* it, and `synchronize: true`
+   does not make search indexing synchronous — if a spec searches for its just-created SKU and gets 0
+   results, run a **continuous** `queue:worker:start` (no `--stop-when-empty`) alongside the Cypress run.
 4. **`docker/sdk console sync:data merchant` + drain the queue again** — warm the search index,
    otherwise merchant/product listings are empty on the first assertions
 5. `npx cypress run --env environment=ci --headless --browser chrome` (`--browser chrome` relies
@@ -404,8 +354,9 @@ describe the new project-owned setup, its location, and a pointer to the new
       deleted file names (deploy configs, docker-compose files, install pipelines) returns
       nothing outside historical git log; no remaining CI job's `needs:` references a job you
       deleted; data-import fixture configs still used by *other* pipelines were verified as
-      still referenced (Step 4), not deleted by mistake. Every test-suite block the reference
-      workflow marked for removal is gone, and the installer path is gone:
+      still referenced (by `project-ci-generator`'s removal, which owns deploy/install-config
+      pruning), not deleted by mistake. Every test-suite block the reference workflow marked for
+      removal is gone, and the installer path is gone:
       ```bash
       grep -rn "REMOVE FOR PROJECT" .github/workflows/*.yml   # banner + its jobs should be gone
       ls -d tests/cypress-tests 2>/dev/null                   # must not exist

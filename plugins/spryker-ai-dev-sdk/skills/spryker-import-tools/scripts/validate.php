@@ -13,7 +13,7 @@ declare(strict_types=1);
  *             (an explicit list, or the distinct values of another file's column).
  *             → store refs, currency refs, country refs, locale refs, label refs, …
  *   required  cells in given column(s) must be non-empty
- *             → is_searchable.<locale> (blank = silently unsearchable, spike V2a), …
+ *             → is_searchable.<locale> (blank = silently unsearchable), …
  *   absent    given strings must NOT appear in given text files
  *             → stale DE/AT/de_DE literal sweep across config/src files
  *   paths     every `source:` in an import-config YAML resolves to an existing file
@@ -578,22 +578,36 @@ function validate_manifest_entries(string $ymlPath, string $baseDir): array
     if ($content === false) {
         throw new RuntimeException(sprintf('validate preflight: cannot read manifest %s', $ymlPath));
     }
+    // Buffer per list item and pair data_entity/source WITHIN the item, so a
+    // manifest that writes `source:` before `data_entity:` (YAML does not fix key
+    // order) is read correctly — the old last-seen-data_entity approach mis-attributed
+    // the source to the previous item and produced a silent false green.
     $entries = [];
-    $currentEntity = '';
-    foreach (explode("\n", $content) as $line) {
-        if (preg_match('/^\s*-?\s*data_entity:\s*(.+?)\s*$/', $line, $m) === 1) {
-            $currentEntity = trim($m[1], "'\" \t");
-            continue;
+    $curEntity = '';
+    $curSource = '';
+    $flush = static function () use (&$entries, &$curEntity, &$curSource, $baseDir): void {
+        if ($curSource === '') {
+            $curEntity = '';
+
+            return;
         }
-        if (preg_match('/^\s*-?\s*source:\s*(.+?)\s*$/', $line, $m) === 1) {
-            $source = trim($m[1], "'\" \t");
-            if ($source === '') {
-                continue;
-            }
-            $full = $source[0] === '/' ? $source : rtrim($baseDir, '/') . '/' . $source;
-            $entries[] = ['data_entity' => $currentEntity, 'source' => $source, 'file' => $full, 'exists' => is_file($full)];
+        $full = $curSource[0] === '/' ? $curSource : rtrim($baseDir, '/') . '/' . $curSource;
+        $entries[] = ['data_entity' => $curEntity, 'source' => $curSource, 'file' => $full, 'exists' => is_file($full)];
+        $curEntity = '';
+        $curSource = '';
+    };
+    foreach (explode("\n", $content) as $line) {
+        if (preg_match('/^\s*-\s/', $line) === 1) {
+            $flush(); // new list item — close the previous one
+        }
+        if (preg_match('/^\s*-?\s*data_entity\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $curEntity = trim($m[1], "'\" \t");
+        }
+        if (preg_match('/^\s*-?\s*source\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $curSource = trim($m[1], "'\" \t");
         }
     }
+    $flush();
 
     return $entries;
 }
@@ -1031,6 +1045,249 @@ function validate_manifest_diff(string $oldYml, string $newYml, string $baseDir)
     return ['missing' => $missing, 'added' => $added];
 }
 
+/**
+ * Parse entity-map.yml into rows. Line-based (no YAML lib): a row opens on
+ * `- entity:` and collects source/class/why until the next `- entity:`.
+ *
+ * @return list<array{entity:string, source:string, class:string, why:string, line:int}>
+ */
+function validate_parse_entity_map(string $path): array
+{
+    $content = @file_get_contents($path);
+    if ($content === false) {
+        throw new RuntimeException(sprintf('known-set: cannot read entity map %s', $path));
+    }
+    $rows = [];
+    $cur = null;
+    $lineNo = 0;
+    foreach (explode("\n", $content) as $line) {
+        $lineNo++;
+        if (preg_match('/^\s*-\s*entity\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            if ($cur !== null) {
+                $rows[] = $cur;
+            }
+            $cur = ['entity' => trim($m[1], "'\" \t"), 'source' => '', 'class' => '', 'why' => '', 'line' => $lineNo];
+
+            continue;
+        }
+        if ($cur === null) {
+            continue;
+        }
+        if (preg_match('/^\s*source\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $cur['source'] = trim($m[1], "'\" \t");
+        } elseif (preg_match('/^\s*class\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $cur['class'] = trim($m[1], "'\" \t");
+        } elseif (preg_match('/^\s*why\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $cur['why'] = trim($m[1], "'\" \t");
+        }
+    }
+    if ($cur !== null) {
+        $rows[] = $cur;
+    }
+
+    return $rows;
+}
+
+/**
+ * known-set: keep entity-map.yml honest against the shipped manifest, and keep
+ * record counts out of the skills. Grounds every check in the manifest or the
+ * map — it does NOT scan prose for identifiers/paths (a `<placeholder>`-templated
+ * doc false-positives; `paths` and `product-refs` own that against real files).
+ *
+ * @return array{
+ *   missingFromMap: list<string>,
+ *   staleMapRows: list<string>,
+ *   badSource: list<array{entity:string, source:string, reason:string}>,
+ *   unclassified: list<string>,
+ *   structuralNoWhy: list<string>,
+ *   counts: list<array{file:string, line:int, match:string}>
+ * }
+ */
+function validate_known_set(string $manifestPath, string $mapPath, string $skillsDir, string $baseDir): array
+{
+    // Coverage is measured against EVERY data_entity declaration, including the
+    // source-less ones (e.g. return-reason) that validate_manifest_entries drops
+    // because it can only pair entities that have a source.
+    $manifestEntities = [];
+    $manifestContent = @file_get_contents($manifestPath);
+    if ($manifestContent === false) {
+        throw new RuntimeException(sprintf('known-set: cannot read manifest %s', $manifestPath));
+    }
+    foreach (explode("\n", $manifestContent) as $line) {
+        if (preg_match('/^\s*-?\s*data_entity\s*:\s*(.+?)\s*$/', $line, $m) === 1) {
+            $manifestEntities[trim($m[1], "'\" \t")] = true;
+        }
+    }
+
+    $entries = validate_manifest_entries($manifestPath, $baseDir);
+    $manBasenames = [];
+    $manAnyExists = [];
+    foreach ($entries as $e) {
+        $ent = $e['data_entity'];
+        if ($ent === '') {
+            continue;
+        }
+        $manBasenames[$ent][basename($e['source'])] = true;
+        $manAnyExists[$ent] = ($manAnyExists[$ent] ?? false) || $e['exists'];
+    }
+
+    $map = validate_parse_entity_map($mapPath);
+    $mapEntities = [];
+    $unclassified = [];
+    $structuralNoWhy = [];
+    $badSource = [];
+    foreach ($map as $row) {
+        $mapEntities[$row['entity']] = true;
+        if ($row['class'] === '' || $row['class'] === 'unclassified') {
+            $unclassified[] = $row['entity'];
+        }
+        if ($row['class'] === 'structural' && $row['why'] === '') {
+            $structuralNoWhy[] = $row['entity'];
+        }
+        // A source of `~` means the entity legitimately has no file in this
+        // manifest (e.g. return-reason) — nothing to verify.
+        if ($row['source'] === '' || $row['source'] === '~' || !isset($manBasenames[$row['entity']])) {
+            continue;
+        }
+        if (!isset($manBasenames[$row['entity']][$row['source']])) {
+            $badSource[] = ['entity' => $row['entity'], 'source' => $row['source'], 'reason' => 'not the source the manifest imports for this entity'];
+        } elseif (($manAnyExists[$row['entity']] ?? false) === false) {
+            $badSource[] = ['entity' => $row['entity'], 'source' => $row['source'], 'reason' => 'source file does not exist on disk'];
+        }
+    }
+
+    $missingFromMap = array_values(array_diff(array_keys($manifestEntities), array_keys($mapEntities)));
+    $staleMapRows = array_values(array_diff(array_keys($mapEntities), array_keys($manifestEntities)));
+
+    return [
+        'missingFromMap' => $missingFromMap,
+        'staleMapRows' => $staleMapRows,
+        'badSource' => $badSource,
+        'unclassified' => $unclassified,
+        'structuralNoWhy' => $structuralNoWhy,
+        'counts' => validate_scan_counts($skillsDir),
+    ];
+}
+
+/**
+ * The record-count gate: scan every `.md` under the skills dir for a bare
+ * `N rows|files|entities|...` literal. A zero count (`0 products`) is an
+ * emptiness assertion, not a record count — exempt. A line carrying a
+ * `count-ok` marker is a deliberate, reviewed exception — exempt.
+ *
+ * @return list<array{file:string, line:int, match:string}>
+ */
+function validate_scan_counts(string $skillsDir): array
+{
+    if (!is_dir($skillsDir)) {
+        return [];
+    }
+    $hits = [];
+    // The number allows a comma only BETWEEN digits (thousands separator like
+    // 1,178) — never a trailing one, so a JSON list comma (`20, categories`)
+    // isn't swallowed into a false hit.
+    $re = '/~?\d+(?:,\d{3})* (?:rows|files|entities|products|blocks|labels|SKUs|docs|CSVs|nodes|keys|columns|attributes|categories)\b/';
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($skillsDir, FilesystemIterator::SKIP_DOTS));
+    foreach ($it as $file) {
+        if (strtolower($file->getExtension()) !== 'md') {
+            continue;
+        }
+        $lineNo = 0;
+        foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $line) {
+            $lineNo++;
+            if (str_contains($line, 'count-ok')) {
+                continue;
+            }
+            if (preg_match_all($re, $line, $mm) === 0) {
+                continue;
+            }
+            foreach ($mm[0] as $match) {
+                if ((int) ltrim($match, '~') === 0) {
+                    continue; // 0 / ~0 is an emptiness assertion, not a record count
+                }
+                $hits[] = ['file' => $file->getPathname(), 'line' => $lineNo, 'match' => trim($match)];
+            }
+        }
+    }
+
+    return $hits;
+}
+
+/**
+ * --emit-map: regenerate the map SKELETON from the manifest, preserving the
+ * class/why of entities that already exist in the current map and marking new
+ * ones `unclassified`. A demo-data bump becomes a diff review, not a retype.
+ */
+function validate_emit_map(string $manifestPath, string $mapPath, string $baseDir): string
+{
+    $existing = [];
+    if (is_file($mapPath)) {
+        foreach (validate_parse_entity_map($mapPath) as $row) {
+            $existing[$row['entity']] = $row;
+        }
+    }
+    // entity -> source basename, from the source-paired entries (first occurrence).
+    $basename = [];
+    foreach (validate_manifest_entries($manifestPath, $baseDir) as $e) {
+        if ($e['data_entity'] !== '' && !isset($basename[$e['data_entity']])) {
+            $basename[$e['data_entity']] = basename($e['source']);
+        }
+    }
+    // Iterate EVERY data_entity declaration in manifest order — including the
+    // source-less ones entries drops — so the skeleton is complete.
+    $content = (string) @file_get_contents($manifestPath);
+    $seen = [];
+    $out = '';
+    foreach (explode("\n", $content) as $line) {
+        if (preg_match('/^\s*-?\s*data_entity\s*:\s*(.+?)\s*$/', $line, $m) !== 1) {
+            continue;
+        }
+        $ent = trim($m[1], "'\" \t");
+        if ($ent === '' || isset($seen[$ent])) {
+            continue;
+        }
+        $seen[$ent] = true;
+        $prev = $existing[$ent] ?? null;
+        $out .= sprintf("- entity: %s\n", $ent);
+        $out .= sprintf("  source: %s\n", ($basename[$ent] ?? '') === '' ? '~' : $basename[$ent]);
+        $out .= sprintf("  class: %s\n", $prev['class'] ?? 'unclassified');
+        $out .= '  why: ' . json_encode($prev['why'] ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+    }
+
+    return $out;
+}
+
+/**
+ * @param array{missingFromMap:list<string>, staleMapRows:list<string>, badSource:list<array<string,string>>, unclassified:list<string>, structuralNoWhy:list<string>, counts:list<array<string,mixed>>} $result
+ */
+function validate_report_known_set(array $result): int
+{
+    $problems = count($result['missingFromMap'])
+        + count($result['staleMapRows'])
+        + count($result['badSource'])
+        + count($result['unclassified'])
+        + count($result['structuralNoWhy'])
+        + count($result['counts']);
+    $exit = $problems === 0 ? 0 : 2;
+    if (validate_quiet()) {
+        return $exit;
+    }
+    echo json_encode([
+        'status' => $exit === 0 ? 'ok' : 'error',
+        'check' => 'known-set',
+        'problemCount' => $problems,
+        'missingFromMap' => $result['missingFromMap'],
+        'staleMapRows' => $result['staleMapRows'],
+        'badSource' => $result['badSource'],
+        'unclassified' => $result['unclassified'],
+        'structuralNoWhy' => $result['structuralNoWhy'],
+        'counts' => $result['counts'],
+        'errors' => [],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+
+    return $exit;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -1054,7 +1311,14 @@ function validate_manifest_ref_registry(): array
         'merchant_reference' => [['merchant', 'merchant_reference']],
         'product_offer_reference' => [['product-offer', 'product_offer_reference'], ['merchant-product-offer', 'product_offer_reference']],
         'category_key' => [['category', 'category_key']],
+        'sales_unit_key' => [['product-measurement-sales-unit', 'sales_unit_key']],
     ];
+    // NOTE: only families with a DISTINCTIVE column name belong here — a column
+    // used by only its producer + consumers. Generic columns (e.g. product-label's
+    // `name`, shared by many entities) CANNOT be expressed by this column-name
+    // convention without cross-entity false positives; check those with a targeted
+    // `refs --ref-file` instead. This registry is a convenience net, not the whole
+    // FK graph — see the `spryker-import-tools` doc.
 }
 
 /**
@@ -1209,6 +1473,127 @@ function validate_report_orphan_files(array $result): int
         'findings' => $result['findings'],
         'onDisk' => $result['onDisk'],
         'referenced' => $result['referenced'],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+
+    return $exit;
+}
+
+/**
+ * threshold-glossary — Sales-Order-Threshold builds its message glossary key at
+ * runtime from type+store+currency (`sales-order-threshold.<type>.<store_lc>.<cur_lc>.message`)
+ * and looks it up unconditionally; the empty `message_glossary_key` column is NOT
+ * an exemption. For every threshold row in the manifest, assert the key resolves in
+ * every project locale's glossary. A miss boots green and throws
+ * MissingTranslationException only at add-to-cart in the offending store/locale.
+ *
+ * Files are identified among the manifest's CSV sources by `data_entity` — threshold:
+ * `sales-order-threshold`; glossary: `glossary` — so the sweep is scoped to what the
+ * active boot imports and does NOT touch `merchant-relationship-sales-order-threshold`
+ * (its message keys are auto-generated by its own importer — never glossary-seeded).
+ * If a row carries an explicit non-empty `message_glossary_key`, that literal key is
+ * checked instead of the derived one (an author override); the empty default derives.
+ *
+ * @param list<string> $locales project locale iso codes (e.g. nb_NO, pl_PL)
+ * @return array{findings: list<array{file:string,row:int,store:string,currency:string,type:string,key:string,locale:string}>, thresholdRows:int, thresholdFiles:int, glossaryFiles:int, locales:list<string>}
+ */
+function validate_threshold_glossary(string $ymlPath, string $baseDir, array $locales): array
+{
+    $thresholdFiles = [];
+    $glossaryFiles = [];
+    foreach (validate_manifest_entries($ymlPath, $baseDir) as $entry) {
+        if (!$entry['exists'] || strtolower(pathinfo($entry['file'], PATHINFO_EXTENSION)) !== 'csv') {
+            continue;
+        }
+        if ($entry['data_entity'] === 'sales-order-threshold') {
+            $thresholdFiles[$entry['file']] = true;
+        } elseif ($entry['data_entity'] === 'glossary') {
+            $glossaryFiles[$entry['file']] = true;
+        }
+    }
+
+    $glossary = [];
+    foreach (array_keys($glossaryFiles) as $file) {
+        foreach (validate_read_csv($file)['rows'] as $row) {
+            $key = $row['key'] ?? '';
+            $locale = $row['locale'] ?? '';
+            if ($key !== '' && $locale !== '') {
+                $glossary[$key][$locale] = true;
+            }
+        }
+    }
+
+    $findings = [];
+    $thresholdRows = 0;
+    $skippedRows = 0;
+    foreach (array_keys($thresholdFiles) as $file) {
+        foreach (validate_read_csv($file)['rows'] as $i => $row) {
+            $type = $row['threshold_type_key'] ?? '';
+            $store = $row['store'] ?? '';
+            $currency = $row['currency'] ?? '';
+            // Skip rows the importer itself skips: a blank threshold value writes no
+            // record (SalesOrderThresholdWriterStep), and a row missing store/currency/type
+            // has no derivable key — counting either would be a false "missing key".
+            // Spryker's importer guards on `if ($typeKey && $threshold)`, and '0' is
+            // falsy in PHP — so a threshold of 0 (or blank) writes no record and needs
+            // no glossary key. Skip both, or the tool demands a key for a row Spryker ignores.
+            $thresholdVal = trim($row['threshold'] ?? '');
+            if ($type === '' || $store === '' || $currency === '' || $thresholdVal === '' || (float) $thresholdVal === 0.0) {
+                $skippedRows++;
+                continue;
+            }
+            $thresholdRows++;
+            $explicit = $row['message_glossary_key'] ?? '';
+            // The core generator lowercases the WHOLE derived key; a mixed-case authored
+            // type would otherwise produce a key that never matches. An explicit
+            // message_glossary_key is used verbatim (the author's literal key).
+            $key = $explicit !== ''
+                ? $explicit
+                : strtolower(sprintf('sales-order-threshold.%s.%s.%s.message', $type, $store, $currency));
+            foreach ($locales as $locale) {
+                if (!isset($glossary[$key][$locale])) {
+                    $findings[] = ['file' => $file, 'row' => $i + 2, 'store' => $store, 'currency' => $currency, 'type' => $type, 'key' => $key, 'locale' => $locale];
+                }
+            }
+        }
+    }
+
+    $warnings = [];
+    if ($thresholdFiles !== [] && $thresholdRows === 0) {
+        $warnings[] = 'threshold file(s) found but 0 checkable rows — verify the manifest/CSV parsed as expected before trusting a 0-finding result';
+    }
+
+    return [
+        'findings' => $findings,
+        'thresholdRows' => $thresholdRows,
+        'skippedRows' => $skippedRows,
+        'thresholdFiles' => count($thresholdFiles),
+        'glossaryFiles' => count($glossaryFiles),
+        'locales' => array_values($locales),
+        'warnings' => $warnings,
+    ];
+}
+
+/**
+ * @param array{findings: list<array{file:string,row:int,store:string,currency:string,type:string,key:string,locale:string}>, thresholdRows:int, skippedRows:int, thresholdFiles:int, glossaryFiles:int, locales:list<string>, warnings:list<string>} $result
+ */
+function validate_report_threshold_glossary(array $result, int $cap = 200): int
+{
+    $total = count($result['findings']);
+    $exit = $total === 0 ? 0 : 2;
+    if (validate_quiet()) {
+        return $exit;
+    }
+    echo json_encode([
+        'status' => $exit === 0 ? 'ok' : 'error',
+        'check' => 'threshold-glossary',
+        'findingCount' => $total,
+        'findings' => array_slice($result['findings'], 0, $cap),
+        'thresholdRows' => $result['thresholdRows'],
+        'skippedRows' => $result['skippedRows'],
+        'thresholdFiles' => $result['thresholdFiles'],
+        'glossaryFiles' => $result['glossaryFiles'],
+        'locales' => $result['locales'],
+        'warnings' => $result['warnings'],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
     return $exit;
@@ -1372,8 +1757,37 @@ function validate_cli(array $argv): int
 
                 return validate_report_orphan_files(validate_orphan_files($pos[0], array_slice($pos, 1), $base));
 
+            case 'threshold-glossary':
+                $file = $opts['_pos'][0] ?? '';
+                $base = $opts['base'] ?? '.';
+                $locales = validate_locale_opt($opts);
+                if ($file === '' || $locales === []) {
+                    return validate_report(2, 'threshold-glossary', [], ['usage: validate.php threshold-glossary <import-config.yml> --locales a,b [--base dir]  (asserts each Sales-Order-Threshold row\'s derived message key resolves in every project locale\'s glossary)']);
+                }
+
+                return validate_report_threshold_glossary(validate_threshold_glossary($file, $base, $locales));
+
+            case 'known-set':
+                $base = $opts['base'] ?? '.';
+                $manifest = $opts['manifest'] ?? ($opts['_pos'][0] ?? 'data/import/local/full_EU.yml');
+                // The manifest path is relative to cwd; fall back to base/manifest so
+                // `--base <repo-root>` also finds it when cwd is elsewhere.
+                if (!is_file($manifest) && $manifest[0] !== '/') {
+                    $manifest = rtrim($base, '/') . '/' . $manifest;
+                }
+                // Defaults resolve relative to THIS script, so known-set works from any cwd.
+                $map = $opts['map'] ?? (dirname(__DIR__) . '/data/entity-map.yml');
+                $skills = $opts['skills'] ?? dirname(__DIR__, 2);
+                if (isset($opts['emit-map'])) {
+                    echo validate_emit_map($manifest, $map, $base);
+
+                    return 0;
+                }
+
+                return validate_report_known_set(validate_known_set($manifest, $map, $skills, $base));
+
             default:
-                return validate_report(2, $check, [], ['usage: validate.php <refs|required|unique|absent|paths|product-refs|manifest-refs|orphan-files|preflight|manifest-diff> ...']);
+                return validate_report(2, $check, [], ['usage: validate.php <refs|required|unique|absent|paths|product-refs|manifest-refs|orphan-files|threshold-glossary|preflight|manifest-diff|known-set> ...']);
         }
     } catch (Throwable $e) {
         return validate_report(2, $check, [], [$e->getMessage()]);
@@ -1412,7 +1826,7 @@ function validate_ref_from_file(array $opts): ?array
 function validate_parse_opts(array $args): array
 {
     $repeatable = ['column' => true, 'string' => true, 'ref-column' => true, 'keep-from' => true, 'exclude' => true, 'exclude-column' => true];
-    $flags = ['quiet' => true, 'composite' => true]; // valueless boolean flags
+    $flags = ['quiet' => true, 'composite' => true, 'emit-map' => true]; // valueless boolean flags
     $opts = ['_pos' => []];
     for ($i = 0; $i < count($args); $i++) {
         $arg = $args[$i];

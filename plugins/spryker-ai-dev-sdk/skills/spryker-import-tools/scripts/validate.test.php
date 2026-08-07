@@ -41,7 +41,7 @@ $multi = ['header' => ['cat', 'included'], 'rows' => [['cat' => 'root', 'include
 $fm = validate_refs($multi, ['included'], ['US', 'CA'], ',');
 check('refs split: MX flagged, US/CA ok', count($fm) === 1 && $fm[0]['value'] === 'MX');
 
-// --- required: no blank cells (is_searchable, spike V2a) ---
+// --- required: no blank cells (is_searchable) ---
 $data = ['header' => ['sku', 'is_searchable.en_US'], 'rows' => [
     ['sku' => 'A', 'is_searchable.en_US' => 'yes'],
     ['sku' => 'B', 'is_searchable.en_US' => ''],   // blank → silent-unsearchable
@@ -430,6 +430,22 @@ $mrCode2 = 0;
 exec("{$php} {$lib} manifest-refs " . escapeshellarg($mrManifest) . ' --base ' . escapeshellarg($mr) . ' --quiet', $mrOut2, $mrCode2);
 check('manifest-refs CLI: exit 0 when clean', $mrCode2 === 0);
 
+// sales_unit_key family: sales-unit-store references a sales unit that must exist
+$su = $tmp . '/su';
+@mkdir($su, 0777, true);
+file_put_contents($su . '/sales_unit.csv', "sales_unit_key,concrete_sku\nos-su-1,C1\nos-su-2,C2\n");
+file_put_contents($su . '/sales_unit_store.csv', "sales_unit_key,store_name\nos-su-1,NO\nsales_unit_9,NO\n"); // sales_unit_9 orphan
+$suManifest = $su . '/full.yml';
+file_put_contents(
+    $suManifest,
+    "actions:\n"
+    . "    - data_entity: product-measurement-sales-unit\n      source: sales_unit.csv\n"
+    . "    - data_entity: product-measurement-sales-unit-store\n      source: sales_unit_store.csv\n"
+);
+$suRes = validate_manifest_refs($suManifest, $su);
+check('manifest-refs: sales_unit_key orphan caught', count(array_filter($suRes['findings'], fn ($f) => $f['value'] === 'sales_unit_9' && $f['column'] === 'sales_unit_key')) === 1);
+check('manifest-refs: valid sales_unit_key not flagged', count(array_filter($suRes['findings'], fn ($f) => $f['value'] === 'os-su-1')) === 0);
+
 // --- orphan-files: CSVs on disk under the roots that no manifest source references ---
 file_put_contents($mr . '/stray_demo.csv', "sku\nX1\n");
 $ofRes = validate_orphan_files($mrManifest, [$mr], $mr);
@@ -444,6 +460,215 @@ $ofOut2 = [];
 $ofCode2 = 0;
 exec("{$php} {$lib} orphan-files " . escapeshellarg($mrManifest) . ' ' . escapeshellarg($mr) . ' --base ' . escapeshellarg($mr) . ' --quiet', $ofOut2, $ofCode2);
 check('orphan-files CLI: exit 0 when tree == manifest', $ofCode2 === 0);
+
+// --- threshold-glossary: derived message key must resolve in every project locale ---
+$tg = $tmp . '/tg';
+@mkdir($tg . '/NO', 0777, true);
+@mkdir($tg . '/common', 0777, true);
+file_put_contents($tg . '/NO/sales_order_threshold.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,hard-minimum-threshold,4000,,\nNO,NOK,soft-minimum-threshold,100000,,\n");
+// glossary carries nb_NO for hard-minimum only; soft-minimum + pl_PL are missing
+file_put_contents(
+    $tg . '/common/glossary.csv',
+    "key,translation,locale\n"
+    . "sales-order-threshold.hard-minimum-threshold.no.nok.message,Legg til varer,nb_NO\n"
+    . "sales-order-threshold.hard-minimum-threshold.no.nok.message,Add items,pl_PL\n"
+    . "sales-order-threshold.soft-minimum-threshold.no.nok.message,Legg til varer,nb_NO\n"
+);
+$tgManifest = $tg . '/full.yml';
+file_put_contents(
+    $tgManifest,
+    "actions:\n"
+    . "    - data_entity: sales-order-threshold\n      source: NO/sales_order_threshold.csv\n"
+    . "    - data_entity: glossary\n      source: common/glossary.csv\n"
+);
+$tgRes = validate_threshold_glossary($tgManifest, $tg, ['nb_NO', 'pl_PL']);
+// misses: hard-minimum×pl_PL is present (ok); soft-minimum×nb_NO present (ok); soft-minimum×pl_PL missing → 1
+check('threshold-glossary: 1 missing (soft-minimum × pl_PL)', count($tgRes['findings']) === 1);
+check('threshold-glossary: names the missing locale + derived key', $tgRes['findings'][0]['locale'] === 'pl_PL' && $tgRes['findings'][0]['key'] === 'sales-order-threshold.soft-minimum-threshold.no.nok.message');
+check('threshold-glossary: counted both rows and found both files', $tgRes['thresholdRows'] === 2 && $tgRes['thresholdFiles'] === 1 && $tgRes['glossaryFiles'] === 1);
+check('threshold-glossary: present key×locale not flagged', count(array_filter($tgRes['findings'], fn ($f) => $f['type'] === 'hard-minimum-threshold')) === 0);
+
+// all locales present → clean
+file_put_contents(
+    $tg . '/common/glossary.csv',
+    "key,translation,locale\n"
+    . "sales-order-threshold.hard-minimum-threshold.no.nok.message,x,nb_NO\n"
+    . "sales-order-threshold.hard-minimum-threshold.no.nok.message,x,pl_PL\n"
+    . "sales-order-threshold.soft-minimum-threshold.no.nok.message,x,nb_NO\n"
+    . "sales-order-threshold.soft-minimum-threshold.no.nok.message,x,pl_PL\n"
+);
+check('threshold-glossary: clean when every key×locale present', validate_threshold_glossary($tgManifest, $tg, ['nb_NO', 'pl_PL'])['findings'] === []);
+
+// no glossary rows at all → every derived key×locale missing (4)
+file_put_contents($tg . '/common/glossary.csv', "key,translation,locale\n");
+check('threshold-glossary: no glossary → all 4 key×locale missing', count(validate_threshold_glossary($tgManifest, $tg, ['nb_NO', 'pl_PL'])['findings']) === 4);
+
+// explicit message_glossary_key overrides the derived key
+file_put_contents($tg . '/NO/sales_order_threshold.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,hard-minimum-threshold,4000,,custom.threshold.msg\n");
+file_put_contents($tg . '/common/glossary.csv', "key,translation,locale\ncustom.threshold.msg,x,nb_NO\n");
+check('threshold-glossary: explicit message_glossary_key checked instead of derived', validate_threshold_glossary($tgManifest, $tg, ['nb_NO'])['findings'] === []);
+
+// merchant-relationship threshold entity is auto-generated → must NOT be checked (real false-positive)
+@mkdir($tg . '/NO', 0777, true);
+file_put_contents($tg . '/NO/sales_order_threshold_per_merchant_relationship.csv', "merchant_relation_key,store,currency,threshold_type_key,threshold,fee,message_glossary_key\nMR1,NO,NOK,soft-minimum-threshold-fixed-fee,4000,,\n");
+file_put_contents($tg . '/NO/sales_order_threshold.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,hard-minimum-threshold,4000,,\n");
+file_put_contents($tg . '/common/glossary.csv', "key,translation,locale\nsales-order-threshold.hard-minimum-threshold.no.nok.message,x,nb_NO\n");
+$tgMrManifest = $tg . '/full_mr.yml';
+file_put_contents(
+    $tgMrManifest,
+    "actions:\n"
+    . "    - data_entity: sales-order-threshold\n      source: NO/sales_order_threshold.csv\n"
+    . "    - data_entity: merchant-relationship-sales-order-threshold\n      source: NO/sales_order_threshold_per_merchant_relationship.csv\n"
+    . "    - data_entity: glossary\n      source: common/glossary.csv\n"
+);
+$tgMrRes = validate_threshold_glossary($tgMrManifest, $tg, ['nb_NO']);
+check('threshold-glossary: merchant-relationship entity excluded (only regular row counted)', $tgMrRes['thresholdRows'] === 1 && $tgMrRes['findings'] === []);
+
+$tgOut = [];
+$tgCode = 0;
+exec("{$php} {$lib} threshold-glossary " . escapeshellarg($tgManifest) . ' --locales nb_NO,pl_PL --base ' . escapeshellarg($tg) . ' --quiet', $tgOut, $tgCode);
+check('threshold-glossary CLI: exit 2 when a key×locale is missing (pl_PL)', $tgCode === 2);
+$tgUsage = [];
+$tgUsageCode = 0;
+exec("{$php} {$lib} threshold-glossary " . escapeshellarg($tgManifest) . ' --base ' . escapeshellarg($tg) . ' --quiet', $tgUsage, $tgUsageCode);
+check('threshold-glossary CLI: usage error (exit 2) when --locales omitted', $tgUsageCode === 2);
+
+// A2: manifest parser must pair data_entity/source WITHIN a list item regardless of key order
+$po = $tmp . '/po';
+@mkdir($po, 0777, true);
+file_put_contents($po . '/a.csv', "x\n1\n");
+file_put_contents($po . '/b.csv', "y\n2\n");
+$poManifest = $po . '/full.yml';
+file_put_contents(
+    $poManifest,
+    "actions:\n"
+    . "    - source: a.csv\n      data_entity: entity-a\n"   // source BEFORE data_entity
+    . "    - data_entity: entity-b\n      source: b.csv\n"
+);
+$poEntries = validate_manifest_entries($poManifest, $po);
+check('manifest parser: source-before-data_entity paired correctly (A2)', count($poEntries) === 2
+    && $poEntries[0]['data_entity'] === 'entity-a' && $poEntries[0]['source'] === 'a.csv'
+    && $poEntries[1]['data_entity'] === 'entity-b' && $poEntries[1]['source'] === 'b.csv');
+
+// B9: derived key is FULLY lowercased — a mixed-case threshold type must still resolve
+$b9 = $tmp . '/b9';
+@mkdir($b9 . '/NO', 0777, true);
+@mkdir($b9 . '/common', 0777, true);
+file_put_contents($b9 . '/NO/sot.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,Hard-Minimum-Threshold,4000,,\n");
+file_put_contents($b9 . '/common/g.csv', "key,translation,locale\nsales-order-threshold.hard-minimum-threshold.no.nok.message,x,nb_NO\n");
+file_put_contents($b9 . '/full.yml', "actions:\n    - data_entity: sales-order-threshold\n      source: NO/sot.csv\n    - data_entity: glossary\n      source: common/g.csv\n");
+$b9res = validate_threshold_glossary($b9 . '/full.yml', $b9, ['nb_NO']);
+check('threshold-glossary: mixed-case type key fully lowercased (B9)', $b9res['findings'] === [] && $b9res['thresholdRows'] === 1);
+
+// D1/D2/D3: empty-threshold row is skipped (importer skips it), counted, and the 0-rows warning fires
+$d1 = $tmp . '/d1';
+@mkdir($d1 . '/NO', 0777, true);
+@mkdir($d1 . '/common', 0777, true);
+file_put_contents($d1 . '/NO/sot.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,hard-minimum-threshold,,,\n");
+file_put_contents($d1 . '/common/g.csv', "key,translation,locale\n");
+file_put_contents($d1 . '/full.yml', "actions:\n    - data_entity: sales-order-threshold\n      source: NO/sot.csv\n    - data_entity: glossary\n      source: common/g.csv\n");
+$d1res = validate_threshold_glossary($d1 . '/full.yml', $d1, ['nb_NO']);
+check('threshold-glossary: empty-threshold row skipped, no false missing key (D1/D2)', $d1res['findings'] === [] && $d1res['thresholdRows'] === 0 && $d1res['skippedRows'] === 1);
+check('threshold-glossary: warns when files present but 0 checkable rows (D3)', count($d1res['warnings']) === 1);
+
+// B13: a threshold of 0 is skipped by Spryker's importer ('0' is falsy) → must not demand a glossary key
+$b13 = $tmp . '/b13';
+@mkdir($b13 . '/NO', 0777, true);
+@mkdir($b13 . '/common', 0777, true);
+file_put_contents($b13 . '/NO/sot.csv', "store,currency,threshold_type_key,threshold,fee,message_glossary_key\nNO,NOK,hard-minimum-threshold,0,,\n");
+file_put_contents($b13 . '/common/g.csv', "key,translation,locale\n");
+file_put_contents($b13 . '/full.yml', "actions:\n    - data_entity: sales-order-threshold\n      source: NO/sot.csv\n    - data_entity: glossary\n      source: common/g.csv\n");
+$b13res = validate_threshold_glossary($b13 . '/full.yml', $b13, ['nb_NO']);
+check('threshold-glossary: threshold=0 row skipped, no false missing key (B13)', $b13res['findings'] === [] && $b13res['thresholdRows'] === 0 && $b13res['skippedRows'] === 1);
+
+// --- known-set (R3): keep entity-map.yml honest against the manifest + count gate ---
+$ks = $tmp . '/ks';
+@mkdir($ks . '/skills', 0777, true);
+@mkdir($ks . '/data', 0777, true);
+// A manifest with a source-less declaration (return-reason) — the case that made
+// validate_manifest_entries drop it and known-set falsely call it stale.
+file_put_contents($ks . '/full.yml', "actions:\n"
+    . "  - data_entity: store\n    source: data/store.csv\n"
+    . "  - data_entity: stock\n    source: data/warehouse.csv\n"
+    . "  - data_entity: product-abstract\n    source: data/product_abstract.csv\n"
+    . "  - data_entity: return-reason\n");
+@mkdir($ks . '/data', 0777, true);
+file_put_contents($ks . '/data/store.csv', "name\nDE\n");
+file_put_contents($ks . '/data/warehouse.csv', "warehouse_name\nW1\n");
+file_put_contents($ks . '/data/product_abstract.csv', "abstract_sku\nC1\n");
+
+// parse_entity_map basics
+file_put_contents($ks . '/map-good.yml', "# header\n"
+    . "- entity: store\n  source: store.csv\n  class: structural\n  why: \"stores\"\n"
+    . "- entity: stock\n  source: warehouse.csv\n  class: structural\n  why: \"stock defs\"\n"
+    . "- entity: product-abstract\n  source: product_abstract.csv\n  class: content\n  why: \"demo\"\n"
+    . "- entity: return-reason\n  source: ~\n  class: structural\n  why: \"rma\"\n");
+$parsed = validate_parse_entity_map($ks . '/map-good.yml');
+check('known-set: parse_entity_map reads 4 rows', count($parsed) === 4);
+check('known-set: parse reads class + why', $parsed[0]['class'] === 'structural' && $parsed[1]['why'] === 'stock defs');
+
+// clean case: map matches manifest, source-less entity present → NO problems
+$ksClean = validate_known_set($ks . '/full.yml', $ks . '/map-good.yml', $ks . '/skills', $ks);
+check('known-set: clean map → no missing', $ksClean['missingFromMap'] === []);
+check('known-set: source-less return-reason NOT stale', $ksClean['staleMapRows'] === []);
+check('known-set: clean map → no badSource', $ksClean['badSource'] === []);
+check('known-set: clean map → no unclassified/noWhy', $ksClean['unclassified'] === [] && $ksClean['structuralNoWhy'] === []);
+
+// missing-from-map: drop product-abstract from the map
+file_put_contents($ks . '/map-missing.yml', "- entity: store\n  source: store.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: stock\n  source: warehouse.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: return-reason\n  source: ~\n  class: structural\n  why: \"r\"\n");
+$ksMiss = validate_known_set($ks . '/full.yml', $ks . '/map-missing.yml', $ks . '/skills', $ks);
+check('known-set: manifest entity absent from map flagged', $ksMiss['missingFromMap'] === ['product-abstract']);
+
+// stale map row: map names an entity the manifest no longer imports
+file_put_contents($ks . '/map-stale.yml', "- entity: store\n  source: store.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: stock\n  source: warehouse.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: product-abstract\n  source: product_abstract.csv\n  class: content\n  why: \"d\"\n"
+    . "- entity: return-reason\n  source: ~\n  class: structural\n  why: \"r\"\n"
+    . "- entity: gone-entity\n  source: gone.csv\n  class: content\n  why: \"x\"\n");
+$ksStale = validate_known_set($ks . '/full.yml', $ks . '/map-stale.yml', $ks . '/skills', $ks);
+check('known-set: stale map row flagged', $ksStale['staleMapRows'] === ['gone-entity']);
+
+// unclassified + structural-without-why both gate
+file_put_contents($ks . '/map-bad.yml', "- entity: store\n  source: store.csv\n  class: unclassified\n  why: \"\"\n"
+    . "- entity: stock\n  source: warehouse.csv\n  class: structural\n  why: \"\"\n"
+    . "- entity: product-abstract\n  source: product_abstract.csv\n  class: content\n  why: \"d\"\n"
+    . "- entity: return-reason\n  source: ~\n  class: structural\n  why: \"r\"\n");
+$ksBad = validate_known_set($ks . '/full.yml', $ks . '/map-bad.yml', $ks . '/skills', $ks);
+check('known-set: unclassified row flagged', $ksBad['unclassified'] === ['store']);
+check('known-set: structural without why flagged', $ksBad['structuralNoWhy'] === ['stock']);
+
+// badSource: map names a file the manifest does not import for that entity
+file_put_contents($ks . '/map-src.yml', "- entity: store\n  source: store.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: stock\n  source: warehouse_WRONG.csv\n  class: structural\n  why: \"s\"\n"
+    . "- entity: product-abstract\n  source: product_abstract.csv\n  class: content\n  why: \"d\"\n"
+    . "- entity: return-reason\n  source: ~\n  class: structural\n  why: \"r\"\n");
+$ksSrc = validate_known_set($ks . '/full.yml', $ks . '/map-src.yml', $ks . '/skills', $ks);
+check('known-set: wrong source basename flagged', count($ksSrc['badSource']) === 1 && $ksSrc['badSource'][0]['entity'] === 'stock');
+
+// count gate: flag real counts (incl. widened nouns + thousands separator),
+// exempt zero + count-ok, and do NOT swallow a JSON list comma into a hit.
+file_put_contents($ks . '/skills/a.md', "shipped 457 products across stores\n"      // caught
+    . "the demo has ~44 nodes pointing at the old tree\n"                            // caught (widened noun)
+    . "a stale state file says 1,178 docs long after cleanup\n"                      // caught (thousands sep)
+    . "header-only files have 0 products\n"                                          // exempt (zero)
+    . "product_count: 20, categories: [a, b]\n"                                      // NOT caught (JSON comma, not '20 categories')
+    . "the target is ~20 products <!-- count-ok: operator target -->\n");            // exempt (count-ok)
+$ksCount = validate_scan_counts($ks . '/skills');
+$matches = array_map(static fn ($c) => $c['match'], $ksCount);
+check('known-set: count gate flags products + widened noun + thousands',
+    count($matches) === 3
+    && in_array('457 products', $matches, true)
+    && in_array('~44 nodes', $matches, true)
+    && in_array('1,178 docs', $matches, true));
+check('known-set: count gate does not swallow a JSON list comma', !in_array('20, categories', $matches, true));
+
+// emit-map: one row per data_entity INCLUDING source-less, preserving existing class/why
+$emit = validate_emit_map($ks . '/full.yml', $ks . '/map-good.yml', $ks);
+check('known-set: emit-map emits all 4 entities (incl source-less)', substr_count($emit, "- entity:") === 4);
+check('known-set: emit-map preserves existing class', str_contains($emit, "class: content"));
+check('known-set: emit-map marks source-less as ~', str_contains($emit, "source: ~"));
 
 // recursive: $tmp now contains a subdir (sub/) from the absent directory-recursion tests
 $tmpIt = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);

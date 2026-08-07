@@ -148,8 +148,8 @@ $dc = csv_duplicate_columns($wide, 'en_US', 'fr_CA', ['url']);
 check('dup-cols: name.fr_CA added', in_array('name.fr_CA', $dc['header'], true));
 check('dup-cols: grouped after last name.* (name.en_US)', $dc['header'][array_search('name.en_US', $dc['header'], true) + 1] === 'name.fr_CA');
 check('dup-cols: value copied', $dc['rows'][0]['name.fr_CA'] === 'Widget');
-check('dup-cols: is_searchable copied verbatim (blank stays blank — spike V2a)', $dc['rows'][1]['is_searchable.fr_CA'] === '');
-check('dup-cols: url base skipped (spike V1 — needs transform)', !in_array('url.fr_CA', $dc['header'], true) && in_array('url', $dc['skipped'], true));
+check('dup-cols: is_searchable copied verbatim (blank stays blank)', $dc['rows'][1]['is_searchable.fr_CA'] === '');
+check('dup-cols: url base skipped (base needs transform, not copy)', !in_array('url.fr_CA', $dc['header'], true) && in_array('url', $dc['skipped'], true));
 check('dup-cols: idempotent', csv_duplicate_columns($dc, 'en_US', 'fr_CA', ['url'])['added'] === []);
 
 // duplicate-rows: the glossary use case, concept-free.
@@ -494,6 +494,42 @@ $dvBad = json_decode((string) shell_exec("{$php} {$lib} derive " . escapeshellar
 check('derive: non-numeric --factor → error (nothing zeroed)', ($dvBad['status'] ?? '') === 'error');
 $dvNoArg = json_decode((string) shell_exec("{$php} {$lib} derive " . escapeshellarg($dvFile) . ' --source value_net --factor 2 --in-place 2>&1'), true);
 check('derive: missing --target → error', ($dvNoArg['status'] ?? '') === 'error');
+
+// B4 regression — a file arg placed AFTER the first flag is a stray positional → error, not silently ignored.
+$b4a = $tmp . '/b4a.csv';
+$b4b = $tmp . '/b4b.csv';
+file_put_contents($b4a, "sku,store\nA,X\n");
+file_put_contents($b4b, "sku,store\nB,X\n");
+$b4 = json_decode((string) shell_exec("{$php} {$lib} set " . escapeshellarg($b4a) . ' --column store --value Y ' . escapeshellarg($b4b) . ' --in-place 2>&1'), true);
+check('CLI: file arg after first flag → error, not silent skip (B4)', ($b4['status'] ?? '') === 'error');
+check('CLI: the stray-arg error left the second file untouched (B4)', csv_read($b4b)['rows'][0]['store'] === 'X');
+
+// A1/A2 regression — filter/delete must ERROR on an ABSENT column, not silently keep-nothing.
+// (Following clean.md's cms_block step with the wrong `name` column wiped every email body and reported "ok".)
+$cmsFile = $tmp . '/cms_block.csv';
+file_put_contents($cmsFile, "block_key,block_name\ncms-block-email--registration,Reg\nhome-hero,Hero\n");
+$fMiss = json_decode((string) shell_exec("{$php} {$lib} filter " . escapeshellarg($cmsFile) . ' --where name=cms-block-email-- --match prefix --out ' . escapeshellarg($tmp . '/o.csv') . ' 2>&1'), true);
+check('filter: absent column → error, not header-only wipe (A2)', ($fMiss['status'] ?? '') === 'error');
+$dMiss = json_decode((string) shell_exec("{$php} {$lib} delete " . escapeshellarg($cmsFile) . ' --where name=x --out ' . escapeshellarg($tmp . '/o.csv') . ' 2>&1'), true);
+check('delete: absent column → error (A2)', ($dMiss['status'] ?? '') === 'error');
+$fOk = json_decode((string) shell_exec("{$php} {$lib} filter " . escapeshellarg($cmsFile) . ' --where block_key=cms-block-email-- --match prefix --out ' . escapeshellarg($tmp . '/ok.csv') . ' 2>&1'), true);
+check('filter: correct column keeps the match (A1)', ($fOk['status'] ?? '') === 'ok' && count(csv_read($tmp . '/ok.csv')['rows']) === 1);
+$fTrunc = json_decode((string) shell_exec("{$php} {$lib} filter " . escapeshellarg($cmsFile) . ' --where block_key=__none__ --out ' . escapeshellarg($tmp . '/trunc.csv') . ' 2>&1'), true);
+check('filter: never-matching VALUE on a real column → ok, header-only (clean truncation preserved)', ($fTrunc['status'] ?? '') === 'ok' && count(csv_read($tmp . '/trunc.csv')['rows']) === 0);
+
+// A3 regression — replace --regex with an invalid pattern must ERROR, not blank the column.
+$reFile = $tmp . '/re.csv';
+file_put_contents($reFile, "url\n/en/x\n");
+$reBad = json_decode((string) shell_exec("{$php} {$lib} replace " . escapeshellarg($reFile) . " --column url --search '^/en/' --with /pl/ --regex --in-place 2>&1"), true);
+check('replace --regex: invalid pattern → error (A3)', ($reBad['status'] ?? '') === 'error');
+check('replace --regex: invalid pattern left the cell unchanged (A3)', csv_read($reFile)['rows'][0]['url'] === '/en/x');
+
+// B5 regression — scale --rates with a wrong --currency-column must ERROR, not silently convert nothing.
+$b5File = $tmp . '/b5.csv';
+file_put_contents($b5File, "currency,value_gross\nPLN,100\n");
+$b5 = json_decode((string) shell_exec("{$php} {$lib} scale " . escapeshellarg($b5File) . ' --column value_gross --rates PLN=4.3 --currency-column currency_code --in-place 2>&1'), true);
+check('scale --rates: absent currency-column → error, not silent 0 (B5)', ($b5['status'] ?? '') === 'error');
+check('scale --rates: value unchanged after the error (B5)', csv_read($b5File)['rows'][0]['value_gross'] === '100');
 
 // cleanup
 array_map('unlink', glob($tmp . '/*') ?: []);
