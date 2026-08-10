@@ -43,8 +43,8 @@ cross-linked.
 
 **The architecture folder is the deliverable, edited in place.** By default this skill writes into
 the git-tracked `architecture/` folder, replacing template/example content with project content.
-Run scratch (logs, research findings, the decision log) lives separately under a cache folder — it
-never pollutes the deliverable. Confirm the target at Step 0.
+Run scratch (logs, research findings, the decision log) lives separately under
+`.ai-dev/architecture-prep/<run-id>/` — it never pollutes the deliverable. Confirm the target at Step 0.
 
 ## This is an orchestrator — delegate, don't do it all inline
 

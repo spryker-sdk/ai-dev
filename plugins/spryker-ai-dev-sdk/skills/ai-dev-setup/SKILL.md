@@ -19,6 +19,63 @@ You do **not** generate prompts. The `ai-dev:generate-prompts` command exists in
 
 ---
 
+## Run logging — what, when, how, where
+
+Every run keeps a plain-text trail so a completed onboarding can be audited afterwards: what the mode
+decision was, which steps ran, what each one changed, and what was skipped because it was already in
+place. This does **not** change any step's behavior — it records what the steps already do.
+
+**Where.** One per-run folder, anchored to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`,
+with a `$(pwd)` fallback) so it is stable regardless of the current working directory:
+
+```
+${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/ai-dev-setup/<run-id>/
+```
+
+`<run-id>` is the UTC start timestamp (`YYYYMMDD-HHMMSS`). Keep **all** run files inside `$SETUP_DIR` —
+never scatter them elsewhere.
+
+**When.** Create the folder and the log as the **first action after the mode decision is made** (that
+decision is the first thing worth recording), before Requirements / Preflight in onboarding flow or
+before Step 5 in update flow.
+
+```bash
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+SETUP_DIR="$PROJECT_DIR/.ai-dev/ai-dev-setup/$(date -u '+%Y%m%d-%H%M%S')"
+mkdir -p "$SETUP_DIR"
+SETUP_LOG="$SETUP_DIR/run.log"
+printf '[%s] MODE — flow=%s (signalA=%s signalB=%s) | START\n' \
+  "$(date '+%Y-%m-%d %H:%M:%S')" "$FLOW" "$SIGNAL_A" "$SIGNAL_B" >> "$SETUP_LOG"
+```
+
+**What.** Append one line per step boundary, plus a line for every outcome that a later reader would
+need. Use `| START` and `| END <one-line outcome>`, and log skips as explicitly as actions — an
+idempotent skip is a result, not an absence:
+
+```bash
+printf '[%s] STEP 1 — install package | START\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$SETUP_LOG"
+printf '[%s] STEP 1 — install package | END already installed: spryker-sdk/ai-dev 0.5.0 (skipped)\n' \
+  "$(date '+%Y-%m-%d %H:%M:%S')" >> "$SETUP_LOG"
+```
+
+Log, at minimum: the mode decision and the two signals behind it; each Requirements / Preflight check
+and its result; each step's START/END with what changed or why it was skipped; the actual
+`ConsoleDependencyProvider` path edited; the MCP server name registered; each Step 5 artifact decision
+(`added` / `overwritten` / `merged` / `skipped` / `failed`) with the user's answer; and every hard stop
+(missing Composer, `docker/sdk` down, a failed copy) with the verbatim error.
+
+**How.** Two rules carry over from the rest of this skill:
+
+- **Bulk output goes to a file, not the log line.** When a command produces more than a couple of lines
+  (`composer require` output, `claude mcp list`, a failed copy's stderr), redirect it to
+  `$SETUP_DIR/<step>.log` and keep the `run.log` line to the one-line outcome plus that file's name.
+- **Never log a step green that wasn't.** A skipped, blocked, or partially-completed step is recorded
+  as exactly that. The log is evidence; an optimistic log is worse than no log.
+
+The Final report's last line is the absolute path to `$SETUP_DIR`.
+
+---
+
 ## Mode selection — infer onboarding vs. update before running anything
 
 This skill operates in one of two flows. **Decide which one is appropriate before doing any work.** The decision uses two signals: (a) what the user said when invoking the skill, and (b) the current state of the project. Do not ask the user "which mode?" as a first question — pick the mode yourself and only confirm if genuinely ambiguous.
@@ -61,6 +118,8 @@ Combine Signals A and B:
 
 ### Update flow
 
+Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the mode decision before jumping to Step 5.
+
 When in update flow, **skip Requirements / Preflight / Step 1 / Step 2 / Step 3 / Step 4 entirely**. Jump straight to Step 5, but apply these overrides:
 
 - The user is **refreshing**, not installing for the first time. Frame the prompts that way. Suggested phrasing for `CLAUDE.md`: *"Refresh `CLAUDE.md` from the bundled content in `vendor/spryker-sdk/ai-dev/data/`? Choose overwrite (replace), merge (append missing sections), or skip."* For rules: *"Refresh `.claude/rules/` from `vendor/spryker-sdk/ai-dev/data/rules/`? Choose overwrite (replace same-named files), merge (only add missing files), or skip."*
@@ -73,6 +132,8 @@ When in update flow, **skip Requirements / Preflight / Step 1 / Step 2 / Step 3 
 After Step 5 completes in update flow, **stop**. Do not run anything else in this file.
 
 ### Onboarding flow
+
+Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the mode decision before running Requirements.
 
 Run all the sections below in order: Requirements → Preflight → Step 1 → Step 2 → Step 3 → Step 4 → Step 5. The per-step idempotency pre-checks (defined in the Preflight "Idempotency principle" paragraph) automatically skip work that is already in place, so this is also safe to re-run on a partially-onboarded project — the user does not need to manually pick "onboarding" vs. "update" to handle the partial case.
 
@@ -421,6 +482,8 @@ In **3–5 lines**, tell the user:
 - Suggest setup improvents:
   - Setup plugin with Language Server php-lsp@claude-plugins-official https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md
   - Setup MCP server for Context7 to work with Spryker documentation https://docs.spryker.com/docs/dg/dev/ai/ai-assistants/context7-mcp-server
+- As the **last line**, the absolute path to the run log (`$SETUP_DIR/run.log`), so the user can audit
+  what ran, what was skipped, and why.
 
 Do **not** print a long summary or restate the steps. The user can read the diff.
 

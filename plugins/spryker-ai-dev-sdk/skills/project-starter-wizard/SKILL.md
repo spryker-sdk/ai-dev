@@ -63,6 +63,8 @@ Conduct the interview per **`references/interview.md`** — read it BEFORE askin
 
 Summarise every answer. Get explicit confirmation. Then write `.ai-dev/project-setup.md` **exactly per the template at the end of `references/interview.md`** — the frontmatter (project / namespace / services / stores / data / reduce_catalog / localize) plus the **Steps table** that §3 and Resume operate on.
 
+In the same pass, create `.ai-dev/run.log` with the interview summary as its first line (see §3 → Run logging). Every step from here on appends to it.
+
 ## 3. Run the steps in order
 
 **Run mode — chosen in the interview (`run_mode: autonomous | supervised` in the state file).** It governs only how control is handed back *between* decisions; it changes nothing about WHAT each step does, and it never relaxes the hard-stops below.
@@ -76,6 +78,73 @@ Summarise every answer. Get explicit confirmation. Then write `.ai-dev/project-s
 - **(c) a step failure** — stop with guidance, per the failure rule below.
 
 **Decision log (`.ai-dev/decision-log.md`) — the autonomous run's audit trail (and supervised's answer record).** Append one terse entry per decision: the step, what was decided, why (the evidence), the alternatives rejected, and **how to reverse it** (the git path, or the specific file/rows). Like the improvement log it is dev scaffolding, not developer-facing status — its purpose is that a reversible-but-wrong autonomous call costs a review-and-revert, not a silent broken shop. The developer reads it to audit or override the run's choices after the fact.
+
+### Run logging — what, when, how, where
+
+A run spans nine steps, several sub-skills, a boot, and can be interrupted and resumed hours later. The
+three `.ai-dev/` files already cover *configuration* (the state file), *rationale* (the decision log),
+and *maintainer feedback* (the improvement log) — what is missing is the **timeline**: what actually
+ran, in what order, and how each step ended. `.ai-dev/run.log` is that file. It **records** the steps
+below; it changes nothing about what any step does, which gate fires, or when control returns.
+
+**Where.** Alongside the other run artifacts, in the clone's own tree — `.ai-dev/run.log`, a
+project-relative path like every other `.ai-dev/` file. The run is self-contained: never write run
+files outside this clone. It is created by the run and removed by the "Return to fresh" recipe, which
+already deletes `.ai-dev/project-setup.md` **(+ run logs)**.
+
+The run's four files sit flat at `.ai-dev/` because the state file's path is load-bearing: pre-flight
+detects a prior run by it, Resume reads it, and "Return to fresh" deletes it.
+
+**When.** Create it in **§2 (Confirm & write state)**, in the same pass that writes
+`.ai-dev/project-setup.md` — the interview answers are the first thing worth recording, and every step
+from §3 onward appends to it. On **Resume**, do not start a new file: append a `RESUME` line and keep
+going, so one run reads as one continuous timeline across interruptions.
+
+**How.** Write it with the built-in **Write / Edit / Read** tools, not the shell. This is a direct
+application of the Tooling discipline below: `printf … >> file` is a redirect, and redirects (like
+pipes, `&&`, and subshells) prompt regardless of the allowlist. Appending a line with `Edit` costs no
+prompt and keeps the run hands-off. Keep entries terse — one line per event:
+
+```
+[2026-08-10 14:02:11] INTERVIEW — 9 sections answered · run_mode=autonomous · data.mode=adapt
+[2026-08-10 14:02:40] STEP 1 project-ci-generator | START
+[2026-08-10 14:11:05] STEP 1 project-ci-generator | END done — 1 workflow kept, 14 files wiped (approved)
+[2026-08-10 14:11:20] STEP 5 define-stores | SKIPPED (data.mode=leave)
+[2026-08-10 14:48:02] STEP 8 boot-and-verify | ⚠ ACTION NEEDED /etc/hosts — waiting
+[2026-08-10 15:03:55] RESUME — continuing from step 8 (in-progress: browser ACs pending)
+[2026-08-10 15:12:31] STEP 8 boot-and-verify | END done (browser ACs BLOCKED — /etc/hosts declined)
+```
+
+**What.** One line per step boundary (`| START`, `| END <one-line outcome>`), plus every event a later
+reader would need to explain the run:
+
+- The interview summary: `run_mode`, and the answers that decide whether steps run (`data.mode`,
+  `reduce_catalog`, `localize`, the `ci:` plan).
+- Each step's START/END with its terminal status, and each **conditional skip with its reason**
+  (`SKIPPED (data.mode=leave)`) — a skip is a result, and it explains a "missing" step later.
+- Every **hard-stop** as it happens: a `⚠ ACTION NEEDED` prerequisite and how it resolved, each
+  **destructive-op gate** with the blast radius presented and the developer's answer, and any step
+  failure with the signature you matched in `references/pitfalls.md`.
+- Each sub-skill handoff (which skill, for what) and the post-boot passes in step 8 — brand theming,
+  the codeception seed, the `cy:run` smoke — with their individual outcomes.
+- The `spryker-verifier` verdict at the step-8 gate, per store.
+- Every `RESUME`, so an interrupted run's real elapsed shape stays visible.
+
+Three rules:
+
+- **Mirror the one-liner, keep the detail in its own file.** The decision log holds the *why*, the run
+  log holds the *when* — when you record a CRITICAL DECISION, add a one-line pointer here rather than
+  duplicating the rationale. Bulk output (boot logs, verifier transcripts) stays where it already lives;
+  reference it, don't paste it.
+- **Never log a step green that wasn't.** `done (browser ACs BLOCKED — /etc/hosts declined)` is the
+  honest terminal state and is exactly what belongs in the log — not `done`. A skipped, blocked, or
+  partially-completed step is recorded as precisely that. This is the same honesty rule the state
+  file's status column already carries.
+- **Write it as you go, never reconstruct it at the end.** The log's whole value is surviving an
+  interruption; a timeline assembled from memory after the fact is the one thing it cannot be.
+
+The closing summary points at `.ai-dev/run.log` so the developer can audit what ran without re-reading
+the conversation.
 
 Re-check the execution pre-flight (still fresh/un-booted) before writing anything. Then run, updating each step's status in the state file as you go. **Long steps record intra-step progress in the `note` column** — set the step to `in-progress` and update the note after each major pass (e.g. `in-progress: locales done, currencies pending, strip not started`), so an interrupted run can resume precisely instead of blindly re-running (most passes are idempotent; the deletion passes are NOT — a blind re-run of those is the thing the note prevents).
 
@@ -107,7 +176,7 @@ Re-check the execution pre-flight (still fresh/un-booted) before writing anythin
 8. **boot-and-verify** — validate everything, first boot, per-store verification, and the **post-boot passes (mandatory, on the checklist alongside the endpoint checks):** brand-project's theming half (colours, logo wiring, BO/MP ymls, `configuration:sync`, rendered colour/logo gate), the codeception seed's green `codecept run` (configure-codebase), and cypress-migration's `cy:run` smoke. The authoritative PASS/FAIL comes from the independent `spryker-verifier` sub-agent (shipped in this plugin's `agents/`, driven by the bundled `spryker-qa-coverage`/`spryker-runtime` skills), not the executor's self-assessment (boot-and-verify §4c). Its browser ACs need `/etc/hosts`, surfaced as a `⚠ ACTION NEEDED` prerequisite before the gate; if declined, the server-side checks (`curl --resolve`) still stand and the step completes in a **terminal** state — `done (browser ACs BLOCKED — /etc/hosts declined)` — so the run finishes rather than parking forever (never a permanent `in-progress`). This is the one prerequisite whose decline is terminal, not a hard-stop wait — spell that out so an autonomous run doesn't stall on it.
 9. **translate-content** (optional — only if `localize.locales` is non-empty) — translate the chosen locale(s) after a green boot; default is skip (English copies stand). Never blocks setup.
 
-On any step failure: **stop with guidance**, leave the state file recording where it stopped. Do not proceed past a failed step.
+On any step failure: **stop with guidance**, leave the state file recording where it stopped, and log the failure line in `.ai-dev/run.log` (the step, the signature, the matched `pitfalls.md` entry if there is one) before you hand back — a run that stops is exactly the run whose timeline gets read. Do not proceed past a failed step.
 
 **Triage reference — the Known-traps catalog (`references/pitfalls.md`).** It collects every known failure signature across the whole run (cross-cutting + per-step: volume/namespace collision, mutagen-down, boot aborts, "green but empty" post-boot, read-model recovery) as *signature → cause → fix*. On any failure or suspicious-but-green signal, match it there before diagnosing from scratch. Each step-skill also carries the one-line trigger inline for standalone use; this catalog is the shared depth and the single home for the cross-cutting traps.
 
@@ -115,7 +184,7 @@ When blocked on a human action, apply the **Communication** rules at the top: le
 
 ## Resume
 
-If invoked with an existing `.ai-dev/project-setup.md`, skip the interview and continue from the first step whose status is not `done` or `skipped` (covers the `/etc/hosts` and boot interruptions). **Re-read `run_mode` from the state file first** — a resumed run honours the mode chosen at interview time (autonomous vs supervised), and any `## Required follow-ups` recorded there. **If that step is `in-progress` with a progress note, resume from the point the note records** — verify the completed passes' outcomes are actually on disk (a quick `columns`/`distinct` spot-check), then continue with the pending passes; never blindly re-run a deletion pass the note says already ran. (Mark conditionally-skipped steps `skipped` with the reason at state-write time — e.g. `define-stores: skipped (data.mode=leave)` — so Resume never lands on a step that must not run.)
+If invoked with an existing `.ai-dev/project-setup.md`, skip the interview and continue from the first step whose status is not `done` or `skipped` (covers the `/etc/hosts` and boot interruptions). **Append a `RESUME` line to `.ai-dev/run.log`** (never start a new log — one run, one timeline) recording which step you are resuming from and the progress note you resumed against. **Re-read `run_mode` from the state file first** — a resumed run honours the mode chosen at interview time (autonomous vs supervised), and any `## Required follow-ups` recorded there. **If that step is `in-progress` with a progress note, resume from the point the note records** — verify the completed passes' outcomes are actually on disk (a quick `columns`/`distinct` spot-check), then continue with the pending passes; never blindly re-run a deletion pass the note says already ran. (Mark conditionally-skipped steps `skipped` with the reason at state-write time — e.g. `define-stores: skipped (data.mode=leave)` — so Resume never lands on a step that must not run.)
 
 ## Abort, change an answer, return to fresh
 

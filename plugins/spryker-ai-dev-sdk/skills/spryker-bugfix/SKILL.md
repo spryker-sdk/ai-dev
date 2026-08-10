@@ -59,7 +59,7 @@ companion files in this directory:
 
 Heavy work (Chrome, XDebug, codecept, phpcs/phpstan, review, final verification, CI logs) runs in
 **subagents** that write raw output to files under `$BUGFIX_DIR`
-(`$CLAUDE_PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
+(`$CLAUDE_PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
 The orchestrator retains only the **State Object**: mode/base/branch/attempt, extra expectations, repro
 summary, root-cause `file:line`, diff stat, per-gate verdicts (≤5 actionable items each), and log-file
 pointers. Details: [reference.md](reference.md) § Run lean / § The run directory / § The State Object.

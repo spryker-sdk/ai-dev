@@ -34,7 +34,7 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
   Step 0 ticket pull. Every spawned subagent runs on a Claude model.
 - **Run lean.** Bulk output (Chrome, XDebug, codecept, phpcs/phpstan, review, verification, CI logs)
   runs inside subagents that write raw logs to `$BUGFIX_DIR`
-  (`$CLAUDE_PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
+  (`$CLAUDE_PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
 - **Plan is a task list.** Step 0 arranges the 12 stages as a `TaskCreate` task list and drives it with
   `TaskUpdate` (one task `in_progress` at a time; a fresh attempt task per loopback). `TaskList` is the
   live position — it survives compaction and scheduled wake-ups, so a resumed run or the watch loop
@@ -129,6 +129,25 @@ nothing is pushed and no PR is marked ready with a known-broken state.
 | 9 | `Skill(spryker-qa-coverage)` |
 | 10 | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` |
 | 11 | `git` / `gh pr create --draft` / `ScheduleWakeup` or `CronCreate` watch loop |
+
+## Run artifacts
+
+Every file the run produces lives in one per-bugfix folder (`$BUGFIX_DIR`), created at Step 0 and
+surviving loopbacks and scheduled wake-ups — which is what lets the watch loop re-hydrate from it:
+
+```
+.ai-dev/spryker-bugfix/<bugfix-id>/     # <bugfix-id> = ticket key, else no-ticket-<brief-name>
+```
+
+| File | Role |
+|------|------|
+| `run.log` | The append-only **timeline** — one line per step boundary, every loopback (`attempt=<n>`), every gate verdict. |
+| `decisions.md` | The **rationale** — CRITICAL DECISIONS plus OPEN QUESTIONS / RISKS; the source for the Step 12 report. |
+| `repro-notes.md` | The reproduction scenario in full; the State Object keeps only a 1–3 line summary + this path. |
+| `<stage>-attempt<N>.log` | **Bulk output** per gate — tests, static analysis, review, verification, CI logs. |
+| `watch-state.md` | The Step 11 handoff the remote-CI watch loop re-reads on each wake-up. |
+
+The Step 12 report's last line is the path to the step log and decision log.
 
 ## Packaging note
 

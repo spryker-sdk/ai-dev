@@ -69,7 +69,7 @@ the current working directory; fall back to `$(pwd)` if the variable is unset.
 ```bash
 # <bugfix-id>: JIRA key if known, else "no-ticket-<brief-name>". Finalize after Step 2 if unknown now.
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-BUGFIX_DIR="$PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>"
+BUGFIX_DIR="$PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>"
 mkdir -p "$BUGFIX_DIR"
 BUGFIX_LOG="$BUGFIX_DIR/run.log"
 printf '[%s] STEP 0 — mode=%s base=%s env=%s | START\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$MODE" "$BASE" "$ENV_FRESHNESS" >> "$BUGFIX_LOG"
@@ -259,7 +259,7 @@ The ticket key is whatever tracker key exists (JIRA key, GitHub issue number, et
 ticket, use `bugfix/no-ticket/brief-name`** and note it — the ticket is optional.
 
 **Finalize the run directory** now that the branch exists: if `<bugfix-id>` wasn't known at Step 0
-(no JIRA key), rename `$BUGFIX_DIR` to `$PROJECT_DIR/.claude/.cache/spryker-bugfix/no-ticket-<brief-name>/`,
+(no JIRA key), rename `$BUGFIX_DIR` to `$PROJECT_DIR/.ai-dev/spryker-bugfix/no-ticket-<brief-name>/`,
 update `BUGFIX_DIR`/`BUGFIX_LOG`, and append the Step 2 boundary line. From here on, every run file stays
 under this stable folder.
 

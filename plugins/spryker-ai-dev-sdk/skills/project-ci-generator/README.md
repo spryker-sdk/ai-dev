@@ -59,3 +59,9 @@ flowchart TD
   CI, reusing their real commands so the result is environment-correct.
 - **Support files are load-bearing.** Support files referenced by kept jobs are preserved;
   everything unreferenced is pruned.
+
+## Packaging note
+
+This skill ships in the `spryker-ai-dev-sdk` plugin under `vendor/spryker-sdk/ai-dev/…`, which is
+Composer-managed — `composer update spryker-sdk/ai-dev` may overwrite it. The durable home for edits
+is the plugin's own repository (`github.com/spryker-sdk/ai-dev`).

@@ -1,4 +1,4 @@
-# static-check-diff
+# static-validation
 
 Spryker static analysis over **only the code that changed** versus a base branch — PHP **and**
 frontend.
@@ -18,6 +18,56 @@ It is the flexible successor to fixed, single-base validation scripts.
 Validating the whole codebase on every change is slow and noisy, and the `package.json` FE scripts
 lint **everything**. This skill validates just what you touched — and, for PHP, optionally the
 whole Spryker module you touched — against whatever base branch your work forked from.
+
+## Flow schema
+
+```mermaid
+flowchart TD
+    A([bash scripts/static-check-diff.sh options]) --> B["Resolve roots<br/>REPO_ROOT = git rev-parse --show-toplevel<br/>MAIN_ROOT = parent of --git-common-dir"]
+    B --> SDK{"docker/sdk<br/>executable found?"}
+    SDK -- "no" --> ERR2([exit 2 — environment error])
+    SDK -- "yes" --> WT{"linked worktree?<br/>MAIN_ROOT != REPO_ROOT"}
+    WT -- "yes" --> WARN["warn: container mounts the MAIN checkout<br/>commit/sync worktree-only files"]
+    WT -- "no" --> BASE
+    WARN --> BASE["Resolve base ref<br/>--base &gt; STATIC_CHECK_BASE &gt; auto-detect<br/>master &rarr; main &rarr; origin/HEAD"]
+    BASE --> BOK{"base resolves?"}
+    BOK -- "no" --> ERR2
+    BOK -- "yes" --> COLLECT["Collect changed files<br/>git diff base...HEAD (merge-base)<br/>+ git diff HEAD (working tree)<br/>+ git ls-files --others (untracked)<br/>dedupe, skip deleted"]
+
+    COLLECT --> ANY{"anything changed?"}
+    ANY -- "no" --> OK0([exit 0 — nothing to validate])
+    ANY -- "yes" --> PART["Partition by extension<br/>.php &rarr; PHP<br/>.js/.ts &rarr; eslint + prettier<br/>.scss/.css/.less &rarr; stylelint + prettier<br/>.json/.html &rarr; prettier"]
+
+    PART --> SKIP["PHP: skip generated code<br/>src/Generated, src/Orm"]
+    SKIP --> SCOPE{"--scope"}
+    SCOPE -- "files (default)" --> SF["one target per changed .php file"]
+    SCOPE -- "module" --> SM["module root of<br/>src/Org/Layer/Module<br/>&rarr; validate whole dir<br/>non-module paths stay individual"]
+    SF --> SETS
+    SM --> SETS["Build path sets<br/>cs_paths: phpcs/phpcbf (tests only with --include-tests)<br/>strict_paths: phpmd/phpstan (never tests or config/)"]
+
+    SETS --> DRY{"--dry-run?"}
+    DRY -- "yes" --> PLAN([Print base, scope<br/>and per-tool paths<br/>exit 0 — run nothing])
+    DRY -- "no" --> RUN["Run each selected tool via<br/>docker/sdk cli, from MAIN_ROOT<br/>--tools filters the set"]
+
+    RUN --> PHP["PHP<br/>phpcbf (always fixes)<br/>phpcs<br/>phpmd ruleset+priority<br/>phpstan -l level -c config"]
+    RUN --> FE{"--fix / STATIC_CHECK_FIX=1?"}
+    FE -- "no" --> FEC["eslint · stylelint --allow-empty-input<br/>prettier --check"]
+    FE -- "yes" --> FEF["eslint --fix · stylelint --fix<br/>prettier --write"]
+
+    PHP --> AGG["Aggregate exit codes<br/>any tool non-zero &rarr; overall_rc = 1"]
+    FEC --> AGG
+    FEF --> AGG
+    AGG --> VERDICT{"overall_rc"}
+    VERDICT -- "0" --> OK([exit 0 — static analysis passed])
+    VERDICT -- "1" --> BAD([exit 1 — violations reported<br/>report findings, list autofixed files])
+
+    classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
+    classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
+    class B,WARN,COLLECT,PART,SKIP,SF,SM,SETS,RUN,PHP,FEC,FEF,AGG step;
+    class SDK,WT,BOK,ANY,SCOPE,DRY,FE,VERDICT decision;
+    class A,OK,OK0,BAD,ERR2,PLAN terminal;
+```
 
 ## Features
 
@@ -137,3 +187,9 @@ static-validation/
 └── scripts/
     └── static-check-diff.sh        # the engine (bash 3.2 compatible)
 ```
+
+## Packaging note
+
+This skill ships in the `spryker-ai-dev-sdk` plugin under `vendor/spryker-sdk/ai-dev/…`, which is
+Composer-managed — `composer update spryker-sdk/ai-dev` may overwrite it. The durable home for edits
+is the plugin's own repository (`github.com/spryker-sdk/ai-dev`).

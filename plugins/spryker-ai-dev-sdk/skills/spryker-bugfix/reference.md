@@ -31,7 +31,7 @@ Anchor it to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`, with a 
 it is stable regardless of the current working directory:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/spryker-bugfix/<bugfix-id>/
+${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-bugfix/<bugfix-id>/
 ```
 
 `<bugfix-id>` is the ticket key (e.g. a JIRA key `CC-39232` or a GitHub issue number) when there is
