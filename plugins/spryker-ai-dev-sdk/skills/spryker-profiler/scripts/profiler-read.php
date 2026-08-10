@@ -614,7 +614,7 @@ function describeProfiles(string $directory, array $rows, array $options): array
     if ($rows === []) {
         fail(sprintf(
             'No profile matched in %s. Each application writes to its own directory '
-            . '(Yves: data/cache/codeBucket/profiler; Zed/Back Office/Merchant Portal/Glue: data/tmp/profiler) '
+            . '(Yves/Glue: data/cache/codeBucket/profiler; Zed/Back Office/Merchant Portal: data/tmp/profiler) '
             . 'and the auto-picked one may be wrong — pass --dir explicitly, or use --list to see what is here.',
             $directory,
         ));
