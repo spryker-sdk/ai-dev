@@ -22,7 +22,7 @@ and write every snapshot and report into `<project>/.spryker-upgrade/state/`, wh
 self-gitignoring so no baseline or merge artifact can ever be committed.
 
 Orchestrated upgrade of a Spryker project to a newer release. Deterministic detection is done by
-the twelve scripts in `$UP/` (see `README.md` next to this skill); your job is to run
+the thirteen scripts in `$UP/` (see `README.md` next to this skill); your job is to run
 the phases in order, do the semantic resolution work, and stop at the decision gates that belong to
 the developer.
 
@@ -111,6 +111,7 @@ actually hit rather than what the docs predicted.
 | 52 | Test suite is **already red** before the upgrade, so "tests pass/fail" proves nothing afterwards | Phase 0 baseline suite run, results recorded | compare post-upgrade run against the recorded baseline, never against "green" |
 | 53 | A module's test directory holds only `_support/` helpers — looks like coverage, asserts nothing | `check-test-coverage.php` (`supportOnlyTestDirs`) | treat as uncovered |
 | 54 | The upgrade breaks the **tests** rather than the app: vendor `SprykerTest` helpers/Testers/fixtures moved or changed signature | `codecept build` + suite run in Phase 5 | fix the test-side usage; this is damage in the harness, report it separately from app damage |
+| 55 | A CSS framework major (Bootstrap 3→5) removes classes the project still uses — but most are **vendor conventions core still emits**, and some are selected by **vendor's own JS**, so blind migration causes the outage it was meant to prevent | grep the class in vendor's `*/src/**/<Layer>/**/*.twig` **and** `assets/<Layer>/js` **at the target release** — never reason from the framework's changelog | keep any class vendor still emits or selects; migrate only classes absent from vendor. Where vendor pairs old+new (`pull-left float-start`), mirror the pair |
 | 55 | The project declares a class **in a vendor's own namespace** and force-loads it via `autoload.files`, so the vendor implementation never loads at all | `check-vendor-class-replacement.php` (VENDOR_CLASS_REPLACED) | **decide before upgrading** — the copy is frozen at an older version, so upstream changes are already being discarded; re-copy from the target release and re-apply the delta |
 | 56 | A copied vendor class **lost its namespace** and sits in the global namespace, so it overrides nothing while still being parsed on every request | `check-vendor-class-replacement.php` (GLOBAL_NAMESPACE_COPY) | verify nothing references the global name, then delete — the vendor class was in use all along |
 | 57 | A file under `src/Pyz/` declares a **non-Pyz namespace**, so PSR-4 cannot load it — it resolves only under an optimized/classmap dump, making behaviour differ between dev and prod | `check-vendor-class-replacement.php` (VENDOR_NAMESPACE_ADDITION) + `check-dead-overrides.php` (unloadable) | move it to the namespace's real path or delete it if unreferenced |

@@ -54,6 +54,7 @@ findings:
 # BEFORE composer: can this upgrade be verified at all?
 php $UP/check-test-coverage.php               # override surface vs. tests
 php $UP/check-vendor-class-replacement.php     # classes declared in vendor namespaces
+php $UP/check-legacy-css-classes.php           # legacy CSS classes vs what vendor still emits
 
 # BEFORE composer: baselines + constraint preflight
 php $UP/check-constraint-style.php            # patch-locked / merged constraints
@@ -350,3 +351,40 @@ before anyone can merge.
 - **No detector covers** Propel schema merges, glossary keys, ACL/navigation for new Backoffice
   routes, or pure behavioural change. Those are Phase 5 process gates and tests, and the skill's
   matrix marks them as such.
+
+## bin/check-legacy-css-classes.php — legacy CSS classes vs what vendor actually emits
+
+For releases that cross a CSS framework major (Bootstrap 3 → 5). The instinct is to take the
+framework's changelog, grep the project for removed classes and rewrite them. On a real upgrade that
+instinct was wrong about **six of seven** classes, and two of the "fixes" would have caused an
+outage.
+
+```bash
+php $UP/check-legacy-css-classes.php                  # Bootstrap 3->5 default list, Zed
+php $UP/check-legacy-css-classes.php --layer=Yves     # storefront instead
+php $UP/check-legacy-css-classes.php --classes=a,b    # your own list
+php $UP/check-legacy-css-classes.php --verbose        # show the vendor evidence lines
+```
+
+The question it asks is never "did the framework remove this class" but **"does vendor, at the
+installed release, still emit or select it itself"** — answerable from source, with no browser, no
+compiled CSS and no built assets. Verdicts:
+
+- `MIGRATE` — absent from vendor templates *and* vendor JS. A genuine leftover; safe to convert.
+- `KEEP` — vendor still emits it in its own templates, so core styles it deliberately.
+- `KEEP (JS)` — **vendor JavaScript selects or toggles it.** Rewriting detaches project markup from
+  vendor behaviour, causing the breakage the migration was meant to prevent. On the validation run
+  this covered `has-error` (`gui` `tabs.js` marks invalid tabs), `hidden` (`init.js`/`tabs.js`
+  toggle it), `form-group` (`sales-order-threshold-gui` does
+  `.parents('.form-group').addClass('hidden')`), `btn-default` (`init.js` swaps it on hover) and
+  `control-label` (`discount`'s query builder generates the markup).
+- `PAIR` — vendor emits the legacy class *and* its modern equivalent on the same element
+  (`nav-item pull-left float-start`). Mirror the pair; do not replace.
+
+It scans **every** Spryker vendor package's `assets/<Layer>/js`, not just the module you assume owns
+the behaviour — that breadth is the whole point. A hand pass over `gui` alone found 2 of the 5 JS
+dependencies.
+
+Exit 1 only when something is genuinely `MIGRATE`. It never rewrites anything: `KEEP (JS)` rows in
+particular need a human to leave them alone. If vendor templates cannot be found at all it exits 2
+rather than reporting everything as `MIGRATE`, since that is the dangerous direction to be wrong in.
