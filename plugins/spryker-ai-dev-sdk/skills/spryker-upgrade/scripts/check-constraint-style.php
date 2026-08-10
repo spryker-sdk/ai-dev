@@ -98,6 +98,7 @@ $patchLocked = [];
 $caret = 0;
 $floating = [];
 $thirdPartyPinned = [];
+$featurePins = [];
 foreach (array_merge($json['require'] ?? [], $json['require-dev'] ?? []) as $name => $constraint) {
     if (isFloatingConstraint($constraint)) {
         if (isSprykerModule($name)) {
@@ -106,6 +107,13 @@ foreach (array_merge($json['require'] ?? [], $json['require-dev'] ?? []) as $nam
         continue;
     }
     $first = $constraint[0] ?? '';
+
+    // Feature meta-packages are exact-pinned to a release group BY DESIGN — that is the Spryker
+    // layout, and moving those pins is what the upgrade does. Never report them as pinned deps.
+    if (str_starts_with($name, 'spryker-feature/')) {
+        $featurePins[$name] = $constraint;
+        continue;
+    }
 
     if (!isSprykerModule($name)) {
         // A third-party package pinned exactly (e.g. "twig/twig": "3.20") blocks Spryker
@@ -136,6 +144,7 @@ file_put_contents($reportFile, json_encode([
     'patchLocked' => $patchLocked,
     'floating' => $floating,
     'thirdPartyPinned' => $thirdPartyPinned,
+    'featurePins' => $featurePins,
     'mergedConstraints' => $merged,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 

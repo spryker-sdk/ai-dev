@@ -2,7 +2,7 @@
 
 Deterministic detectors for the *silent* failure modes of a Spryker module upgrade on a project
 with heavy `src/Pyz` customization. Orchestrated by the `/spryker-upgrade` Claude Code skill, which
-also holds the full **54-use-case coverage matrix** — including the process-level modes these
+also holds the full **58-use-case coverage matrix** — including the process-level modes these
 scripts cannot cover (Propel schema merges, infra requirements, glossary keys, behavioural changes):
 `.claude/skills/spryker-upgrade/SKILL.md`. Every script is a standalone CLI, usable in CI.
 
@@ -53,6 +53,7 @@ findings:
 ```bash
 # BEFORE composer: can this upgrade be verified at all?
 php $UP/check-test-coverage.php               # override surface vs. tests
+php $UP/check-vendor-class-replacement.php     # classes declared in vendor namespaces
 
 # BEFORE composer: baselines + constraint preflight
 php $UP/check-constraint-style.php            # patch-locked / merged constraints
@@ -102,11 +103,45 @@ provider registering 190 plugins is one file to assert, not 190 units of risk. E
 test type that would actually catch it (characterization test on the model output, assertion on the
 plugin stack contents, acceptance path for a template). Report: `.spryker-upgrade/state/test-coverage-report.json`.
 
-In this repo it reports 63 business-logic overrides, **none** in a module with a test, and 13 module
-test directories that contain only helpers — the PyzTest suites cover API endpoints, not the override
-surface. That is the normal starting point, and it is why the skill's Phase 0.5 offers to write
-characterization tests *before* the upgrade: written afterwards they pin the upgraded behaviour and
-can no longer detect that it changed.
+Two real projects for calibration: a demo shop reported 63 business-logic overrides with **none** in
+a tested module, and a large customer project reported 1 056 with **483** untested plus 32 module
+test directories holding only helpers. Both suites covered API endpoints rather than the override
+surface — that is the normal starting point, and it is why Phase 0.5 offers to write characterization
+tests *before* the upgrade: written afterwards they pin the upgraded behaviour and can no longer
+detect that it changed.
+
+Split the resulting worklist by what a host can prove: `Business/`, `Service/` and `Client/`
+overrides are usually pure logic and provable green with mocked constructor dependencies, while
+`Communication/` (forms, tables, controllers) and `Persistence/` need a container and a database.
+
+## bin/check-vendor-class-replacement.php — classes declared in vendor namespaces
+
+The one override style no other detector can see, and the most dangerous. A file that simply *is*
+`Spryker\Zed\Gui\Communication\Table\AbstractTable` has no parent to compare against — it replaces
+the class outright, and when it is listed in composer's `autoload.files` it is included eagerly, so
+the vendor implementation never loads at all.
+
+```bash
+php $UP/check-vendor-class-replacement.php            # exit 1 if a vendor class is replaced
+php $UP/check-vendor-class-replacement.php src lib    # extra roots
+```
+
+It reads the project's own `autoload`/`autoload-dev` maps to learn which namespace roots the project
+legitimately owns, then flags every class declared under `src/` outside them:
+
+- `VENDOR_CLASS_REPLACED` — vendor ships the same FQCN. Reports the vendor path, both line counts and
+  a ready `diff -u`, and whether the file is force-loaded (project always wins) or merely competing
+  in the classmap (whichever the autoloader dumped first wins — behaviour depends on dump order).
+- `VENDOR_NAMESPACE_ADDITION` — a namespace the project does not own, with no vendor file behind it.
+  Works today; collides the day upstream adds that class. This also catches a file under `src/Pyz/`
+  declaring a non-Pyz namespace, which PSR-4 cannot load at all.
+- `GLOBAL_NAMESPACE_COPY` — a copy that lost its `namespace` line, so it overrides nothing while
+  still being parsed on every request.
+
+Run it in Phase 0. The diff is the whole point: in the reference run a 1848-line copy of core's
+`AbstractTable` differed by **26 lines**, and several of those were vendor features the copy was
+simply missing — so upstream improvements were already being discarded before any upgrade started.
+Report: `.spryker-upgrade/state/vendor-class-replacement-report.json`.
 
 ## bin/check-constraint-style.php — patch-locked constraints (upgrade blocker)
 

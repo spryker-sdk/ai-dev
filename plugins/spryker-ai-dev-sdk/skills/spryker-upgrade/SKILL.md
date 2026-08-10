@@ -22,7 +22,7 @@ and write every snapshot and report into `<project>/.spryker-upgrade/state/`, wh
 self-gitignoring so no baseline or merge artifact can ever be committed.
 
 Orchestrated upgrade of a Spryker project to a newer release. Deterministic detection is done by
-the eleven scripts in `$UP/` (see `README.md` next to this skill); your job is to run
+the twelve scripts in `$UP/` (see `README.md` next to this skill); your job is to run
 the phases in order, do the semantic resolution work, and stop at the decision gates that belong to
 the developer.
 
@@ -111,6 +111,10 @@ actually hit rather than what the docs predicted.
 | 52 | Test suite is **already red** before the upgrade, so "tests pass/fail" proves nothing afterwards | Phase 0 baseline suite run, results recorded | compare post-upgrade run against the recorded baseline, never against "green" |
 | 53 | A module's test directory holds only `_support/` helpers — looks like coverage, asserts nothing | `check-test-coverage.php` (`supportOnlyTestDirs`) | treat as uncovered |
 | 54 | The upgrade breaks the **tests** rather than the app: vendor `SprykerTest` helpers/Testers/fixtures moved or changed signature | `codecept build` + suite run in Phase 5 | fix the test-side usage; this is damage in the harness, report it separately from app damage |
+| 55 | The project declares a class **in a vendor's own namespace** and force-loads it via `autoload.files`, so the vendor implementation never loads at all | `check-vendor-class-replacement.php` (VENDOR_CLASS_REPLACED) | **decide before upgrading** — the copy is frozen at an older version, so upstream changes are already being discarded; re-copy from the target release and re-apply the delta |
+| 56 | A copied vendor class **lost its namespace** and sits in the global namespace, so it overrides nothing while still being parsed on every request | `check-vendor-class-replacement.php` (GLOBAL_NAMESPACE_COPY) | verify nothing references the global name, then delete — the vendor class was in use all along |
+| 57 | A file under `src/Pyz/` declares a **non-Pyz namespace**, so PSR-4 cannot load it — it resolves only under an optimized/classmap dump, making behaviour differ between dev and prod | `check-vendor-class-replacement.php` (VENDOR_NAMESPACE_ADDITION) + `check-dead-overrides.php` (unloadable) | move it to the namespace's real path or delete it if unreferenced |
+| 58 | Characterization tests fail with `Class Generated\Shared\Transfer\* not found` on a fresh checkout | `src/Generated` is gitignored and absent | run `transfer:generate` BEFORE writing any test — not a code problem |
 
 If during the run you meet a failure mode not in this table, add it to the table and to the
 detectors (or Phase 5 checks) before finishing the run — the matrix must stay exhaustive.
@@ -127,6 +131,7 @@ detectors (or Phase 5 checks) before finishing the run — the matrix must stay 
    php $UP/check-typed-members.php || true     # baseline: should be clean before upgrading
    php $UP/check-constraint-style.php || true  # baseline: patch-locked + merged constraints
    php $UP/check-test-coverage.php || true     # baseline: is the override surface verifiable at all?
+   php $UP/check-vendor-class-replacement.php || true  # baseline: classes declared in vendor namespaces
    mkdir -p .spryker-upgrade/state && cp composer.lock .spryker-upgrade/state/composer.lock.before
    ```
    The snapshots must be taken against a COMPLETE vendor tree — run `composer install` first and
@@ -191,7 +196,25 @@ upgrade branch diverges** — they must be provably green against the current ve
    own additions are on the page rather than re-testing core markup.
 
 Keep them characterization tests: assert what the code does today, including quirks. The goal is a
-tripwire for the upgrade, not a specification.
+tripwire for the upgrade, not a specification. When a test fails on first run, assume the assumption
+was wrong before assuming the code is — an absent array-typed transfer field yields `[]`, not `null`,
+and that IS the behaviour to pin.
+
+**Split the worklist by what you can actually prove.** Overrides in `Business/`, `Service/`,
+`Client/` are usually pure logic, provable green on plain host PHP with mocked constructor
+dependencies. Overrides in `Communication/` (forms, tables, controllers) and `Persistence/` need a
+container and a database. Draft the second group, but never report it green from a host that cannot
+run it — separate the two counts in the report. Practical notes for a host run:
+
+```bash
+vendor/bin/console transfer:generate     # FIRST — src/Generated is gitignored, so a fresh checkout
+                                         # fails every test with "Class Generated\...\* not found"
+php -d register_argc_argv=On vendor/bin/codecept build -c tests/PyzTest/<Layer>/<Module>
+php -d register_argc_argv=On vendor/bin/codecept run   -c tests/PyzTest/<Layer>/<Module>
+```
+Codeception refuses to start without `register_argc_argv`, and a new module suite needs its own
+`codeception.yml`; keep its `modules.enabled` minimal (`Asserts` + the project's Environment helper)
+so a unit suite does not drag in Propel or locator helpers it does not need.
 
 ## Phase 1 — Target selection (developer gate #2)
 
