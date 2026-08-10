@@ -41,6 +41,11 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
   re-orients from it. It complements the `run.log` timeline and the `decisions.md` rationale.
 - **The bug is the contract.** A fix is "done" only when the user-visible symptom no longer reproduces
   with evidence **and** every gate is green.
+- **Cypress E2E coverage is a first-class, conditional stage.** Step 0 asks how to handle it (auto /
+  always / skip); Step 9b — after QA has accepted the fix — delegates to `Skill(cypress-tests)` to
+  **fix** a spec the bug broke, **improve** assertions that would have missed it, or **add** a new
+  spec — only when the bug is user-visible on an E2E surface and the project's suite exists. A skip
+  is always a logged decision.
 - **PR delivery is chosen + capability-gated.** Step 0 asks **whether to open a PR and via which
   channel**, then probes what's available and records `PR_CHANNEL` — `gh` (native GitHub CLI), `mcp` (a
   connected **forge MCP** for the remote host: GitHub / GitLab / Bitbucket / …), `git-only` (push a
@@ -84,7 +89,10 @@ flowchart TD
     S8 -- "clean" --> S9{"Step 9 — QA GATE<br/>spryker-qa-coverage (E2E)"}
 
     S9 -- "rejected" --> Budget
-    S9 -- "accepted" --> S10{"Step 10 — Final verification<br/>tests + spryker-verifier / spryker-runtime<br/>symptom gone in running app?"}
+    S9 -- "accepted" --> S9b{"Step 9b — Cypress E2E<br/>conditional · cypress-tests<br/>fix / improve / add spec"}
+
+    S9b -- "fail (fix wrong)" --> Budget
+    S9b -- "pass / reasoned skip" --> S10{"Step 10 — Final verification<br/>tests + spryker-verifier / spryker-runtime<br/>symptom gone in running app?"}
 
     S10 -- "FAIL" --> Budget
     S10 -- "PASS" --> S11{"Step 11 — commit always<br/>MODE + PR_CHANNEL gate"}
@@ -111,7 +119,8 @@ flowchart TD
 
 ### The verification loop
 
-Steps 8 (review), 9 (QA), 10 (final verification), and 11 (remote CI) are gates. A failure in any of
+Steps 8 (review), 9 (QA), 10 (final verification), and 11 (remote CI) are gates — and a Step 9b
+Cypress failure that indicts the fix (not the test) joins the same loop. A failure in any of
 them draws from **one shared `attempt` counter** and loops back to **Step 4** to re-investigate, then
 forward through the full chain again. The hard stop is `attempt > 3`: the run STOPs and reports —
 nothing is pushed and no PR is marked ready with a known-broken state.
@@ -127,6 +136,7 @@ nothing is pushed and no PR is marked ready with a known-broken state.
 | 7 | `Skill(static-validation)` |
 | 8 | `Skill(code-review)` |
 | 9 | `Skill(spryker-qa-coverage)` |
+| 9b | `Skill(cypress-tests)` — conditional: fix / improve / add a Cypress E2E spec for the bug |
 | 10 | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` |
 | 11 | `git` / `gh pr create --draft` / `ScheduleWakeup` or `CronCreate` watch loop |
 

@@ -1,7 +1,8 @@
 # spryker-customization
 
 Take a **PRD or acceptance criteria and walk it to a committed branch** — intake, plan, edit,
-refresh, per-AC verification, self-correction, static validation, review, commit gate.
+refresh, per-AC verification, self-correction, Cypress E2E coverage (when warranted), static
+validation, review, commit gate.
 
 This skill is an **orchestrator**. It writes no research and drives no browser itself; it delegates
 focused work to the `spryker-*` subagents and skills at the points the workflow calls out. Two things
@@ -67,7 +68,11 @@ flowchart TD
     LIT --> FAN
 
     FAN --> RED{"Any red AC or red test?"}
-    RED -- "no" --> S7B
+    RED -- "no" --> S7A{"Step 7a — Cypress phase on?<br/>user-visible E2E surface?<br/>suite exists?"}
+    S7A -- "off / no surface / no suite<br/>(logged skip)" --> S7B
+    S7A -- "yes" --> CY["Skill cypress-tests<br/>fix / improve / add spec<br/>targeted run + code:check"]
+    CY -- "green / none needed" --> S7B
+    CY -- "red — feature bug missed by Step 6" --> S7
     RED -- "yes" --> S7["Step 7 — self-correct loop<br/>spryker-issue-diagnoser + the ATTEMPT LOG"]
     S7 --> SIG{"Diagnoser: insufficient signal?"}
     SIG -- "yes" --> DBG2["Skill ai-runtime-debugging<br/>instrument, re-trigger, read back"] --> S7
@@ -80,7 +85,7 @@ flowchart TD
 
     RED -- "UI AC green on objective checks" --> VIS{"Show the screenshot, ASK the user.<br/>Visual quality is never self-assessed"}
     VIS -- "changes wanted" --> S4
-    VIS -- "signed off" --> S7B
+    VIS -- "signed off" --> S7A
 
     S7B["Step 7b — final pre-commit pass<br/>1. strip ALL [AI-DEBUG] instrumentation<br/>2. Skill static-validation (ONLY here)<br/>3. spryker-code-reviewer"]
     S7B -- "blocking issues, retries &lt; 2" --> S7B
@@ -97,8 +102,8 @@ flowchart TD
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
     classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
-    class S0B,PRD,S3,S3P,COLLAPSE,CANON,REFINE,CONSOL,COST,S4,FE,DBG,S5,DIAG5,WARM,QA,ORDER,LIT,FAN,S7,DBG2,FIX,S7B,CAP,S8 step;
-    class S0A,S0C,S0C1,S0C2,S1,S2,ASKB,BAR,GATE1,S6A,SMOKE,S6B,RED,SIG,REV,STUCK,VIS,S7C,GATE2 decision;
+    class S0B,PRD,S3,S3P,COLLAPSE,CANON,REFINE,CONSOL,COST,S4,FE,DBG,S5,DIAG5,WARM,QA,ORDER,LIT,FAN,S7,DBG2,FIX,CY,S7B,CAP,S8 step;
+    class S0A,S0C,S0C1,S0C2,S1,S2,ASKB,BAR,GATE1,S6A,SMOKE,S6B,RED,SIG,REV,STUCK,VIS,S7A,S7C,GATE2 decision;
     class A,ESC,ESC2,C,L terminal;
 ```
 
@@ -129,6 +134,7 @@ off, the workflow **skips its subagents entirely**.
 | Verification (`spryker-verifier` per AC) | on |
 | QA-thorough 4-bucket coverage (`spryker-qa-coverage`) | on for MVP, off for PoC |
 | Self-correction on red ACs | on if verification is on |
+| Cypress E2E coverage (`cypress-tests` skill, once all ACs are green) | on for MVP, off for PoC |
 | Static validation | on |
 | Code review (`spryker-code-reviewer`) | off — opt-in |
 | Demo artifact capture (`spryker-screenshot-collector`) | off — opt-in |
@@ -150,6 +156,7 @@ are never swapped.
 | 6 | `spryker-qa-coverage` — expand ACs into the 4-bucket plan | Skill |
 | 6a / 6b | `spryker-verifier` — smoke check, then per case, parallel within a bucket | Agent |
 | 7 | `spryker-issue-diagnoser` — on every red AC and every refresher failure | Agent |
+| 7a | `cypress-tests` — once all ACs are green: fix / improve / add an E2E spec, run targeted + quality gate | Skill |
 | 7b | `static-validation` — the only step that runs it | Skill |
 | 7b / 8 | `spryker-code-reviewer` — after static validation, so it sees a clean diff; re-run at 8 against the staged diff | Agent |
 | 7c | `spryker-screenshot-collector` — before the commit gate | Agent |
@@ -185,6 +192,12 @@ are never swapped.
 - **The model never judges visual quality.** The verifier's role on visual ACs is limited to objective
   checks — element renders, uses an atom class, no layout breakage. Subjective design judgment goes to
   the user with the screenshot, every time; iteration happens only on an explicit redirect.
+- **Cypress E2E coverage is a conditional phase that runs only on a stable feature.** Step 7a fires
+  after the self-correct loop has converged (all ACs green, visual sign-offs done), so no spec is
+  authored against an implementation still in flux. The `cypress-tests` skill decides fix vs improve
+  vs add against the existing suite; a spec that goes red because the feature is wrong is a red AC
+  Step 6 missed and feeds back into the Step 7 loop, and a skip (PoC, no E2E surface, no suite) is
+  always logged, never silent.
 - **Frontend smoke check before any fan-out.** Facade-level tests can pass on a broken UI, so a 500,
   a JS console error, or a missing bundle sentinel stops Step 6 immediately and hands straight to the
   diagnoser — rather than burning minutes on results that don't reflect a working feature.

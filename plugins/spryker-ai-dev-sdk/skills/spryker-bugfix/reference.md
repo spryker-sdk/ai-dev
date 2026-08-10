@@ -57,7 +57,7 @@ Keep this small block current in your head and mirror it into the step log. Ever
 - **Repro:** 1–3 line scenario summary + path to the full repro notes file.
 - **Root cause:** the `file:line` references + one-sentence defect explanation.
 - **Diff:** `git diff --stat` summary (files + ±lines), not the diff body.
-- **Per-gate verdict:** for tests / static / review / QA / final-verification / remote-CI — `pass|fail`,
+- **Per-gate verdict:** for tests / static / review / QA / Cypress E2E (when run) / final-verification / remote-CI — `pass|fail`,
   a one-line reason, and the path to that gate's output file. For a failing gate, keep **only the ≤5
   actionable items** you must act on (e.g. blocker/major review findings, the failing test name), not
   the surrounding report.
