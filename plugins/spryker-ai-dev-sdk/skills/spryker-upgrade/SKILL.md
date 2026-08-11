@@ -132,6 +132,10 @@ actually hit rather than what the docs predicted.
 | 57 | The host is not a valid resolution environment at all — it is missing **extensions** the project requires (`ext-redis`, `ext-pgsql`), so composer cannot resolve those packages even with the platform pinned | `composer update` on the host reports *"ext-redis is missing from your system"* | run composer **in the container** (`docker/sdk cli composer …`). Never paper over it with `--ignore-platform-req`: that reintroduces #56 by pretending a requirement is met |
 | 58 | Tests pass on host PHP but the project runs a **different PHP minor** — the suite never exercised the deployed runtime | compare `php -v` against `image.tag`; any gap invalidates "tests pass" as an upgrade claim | re-run the suite in the container (Phase 5.5) before reporting any test result |
 | 59 | The verification plan assumes a storefront the project does not have (headless / API-only projects ship `zed` + `glue` and no `yves`) | `grep -oE "application: [a-z_]+" deploy.*.yml \| sort -u` | build the browser checklist from the applications that exist; for a headless project the Back Office is the only UI |
+| 60 | A **manifest** is bumped but its **lock** is not, so the thing that consumes the lock keeps installing the old version — silently. `package.json` vs `package-lock.json` is the common case: `npm ci` reads only the lock, so a Bootstrap-5 asset toolchain bump never reaches CI | `git diff --stat` shows the manifest changed and the lock did not; or run the asset build and see the lock move | update the lock **by running the installer** (`npm install`, `composer update <pkg>`), never by hand-editing. Any manifest edit verified only by reading is unverified |
+| 61 | `propel:install` **deletes tracked files** — it runs migration cleanup, removing `src/Orm/Propel/*/Migration_*` files. Gitignore does not protect them if they were committed before the ignore rule existed | `git status` immediately after Phase 5 | restore with `git checkout --`. Treat every Phase 5 command as potentially write-heavy and diff the working tree after each; never assume regeneration is read-only |
+| 62 | Generated artifacts land in a path the project does not ignore, so they show up as untracked noise in the upgrade diff (e.g. `src/Orm/Propel/*/Config/propel.json`) | untracked files appear after Phase 5 | add the path to `.gitignore` next to the sibling generated dirs; never commit generated output into the upgrade branch |
+| 63 | A live 500 looks like upgrade damage but the failing call path is **identical in the pre-upgrade versions** | fetch the pre-upgrade file at its exact tag (`raw.githubusercontent.com/<vendor>/<pkg>/<old-version>/…`) and compare the specific method | this is the cheapest way to separate upgrade damage from pre-existing breakage when no baseline exists — do it before blaming the release, and before "fixing" anything |
 | 55 | The project declares a class **in a vendor's own namespace** and force-loads it via `autoload.files`, so the vendor implementation never loads at all | `check-vendor-class-replacement.php` (VENDOR_CLASS_REPLACED) | **decide before upgrading** — the copy is frozen at an older version, so upstream changes are already being discarded; re-copy from the target release and re-apply the delta |
 | 56 | A copied vendor class **lost its namespace** and sits in the global namespace, so it overrides nothing while still being parsed on every request | `check-vendor-class-replacement.php` (GLOBAL_NAMESPACE_COPY) | verify nothing references the global name, then delete — the vendor class was in use all along |
 | 57 | A file under `src/Pyz/` declares a **non-Pyz namespace**, so PSR-4 cannot load it — it resolves only under an optimized/classmap dump, making behaviour differ between dev and prod | `check-vendor-class-replacement.php` (VENDOR_NAMESPACE_ADDITION) + `check-dead-overrides.php` (unloadable) | move it to the namespace's real path or delete it if unreferenced |
@@ -578,7 +582,22 @@ script -q /dev/null docker/sdk cli vendor/bin/codecept build
 script -q /dev/null docker/sdk cli vendor/bin/codecept run -x Acceptance
 script -q /dev/null docker/sdk cli npm run yves
 ```
+**Check `git status` after every Phase 5 command.** They are not read-only: `propel:install` runs
+migration cleanup and **deletes** tracked `src/Orm/Propel/*/Migration_*` files (gitignore does not
+protect files committed before the ignore rule), `propel:config:convert` writes generated config into
+a path the project may not ignore, and `npm`/asset builds rewrite lock files. Restore deletions with
+`git checkout --`, gitignore new generated paths, and keep genuine lock updates in their own commit.
+
+Command names differ between projects and releases — **read `console list` instead of trusting this
+list**. On the validation project the commands were `propel:diff` and `search:setup:source-map`;
+`propel:migration:diff` and `search:setup:index-map` did not exist.
+
 - Non-empty `propel:migration:diff` → show the developer BEFORE anything touches a database.
+- **A clean `propel:diff` on a freshly-created database proves almost nothing.** `up --data` builds the
+  DB from the post-upgrade schema, so an XML↔DB comparison necessarily agrees. It does not tell you
+  what migration an *existing* production database needs. To answer that, boot the **pre-upgrade**
+  lock, import, then upgrade the code and diff against that database. Report which question you
+  actually answered.
 - Compare PHPStan/evaluator results against the Phase 0 baseline — only regressions block.
 - Compare the suite result against `.spryker-upgrade/state/codecept-baseline.txt`, per suite, and split the failures
   into two kinds — they have different fixes and belong in different parts of the report:
