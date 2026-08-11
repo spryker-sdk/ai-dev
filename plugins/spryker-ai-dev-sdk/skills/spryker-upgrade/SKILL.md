@@ -57,6 +57,21 @@ had no `config/bundles.php`, so application plugins stopped booting and the Back
   a **vendor BC break** — report it as a blocker with evidence and let the developer decide, rather
   than quietly re-architecting the project to route around it.
 
+**Restoring behaviour usually means a narrowly-guarded project-side shim.** When a vendor version
+changes a lifecycle the project depended on, the in-scope fix is to re-establish the old behaviour from
+project code — override the project's own bootstrap/factory and call what the vendor stopped calling.
+Two rules make this safe:
+
+- **Guard on the exact broken condition**, not on the version. The shim must disable itself once the
+  condition disappears — because the vendor fixed it, or because the project later adopted the new
+  path. A shim that always fires becomes a double-execution bug the moment upstream is fixed.
+- **Check for idempotence before assuming a re-run is harmless.** On the validation run
+  `Application::$booted` was never set to `true`, so calling `registerPluginsAndBoot()` unguarded would
+  have re-registered a security event subscriber on every request.
+
+Mark it as upgrade debt in the docblock, with the condition for removal and a pointer to the vendor
+issue. It is a bridge until upstream is fixed, not the destination.
+
 When the only apparent fix is "integrate the new thing", stop and say so. Presenting an
 architecture migration as an upgrade step, without ever asking, is the failure mode this section
 exists to prevent. Offer the new capability as a **separate, explicitly-scoped piece of work** with
