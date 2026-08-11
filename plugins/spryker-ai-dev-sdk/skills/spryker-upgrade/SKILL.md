@@ -30,6 +30,38 @@ Start by establishing whether the upgrade can be *verified* at all (Phase 0.5). 
 project overrides fails quietly, so an upgrade with no tests over the override surface is not an
 upgrade you can report on — offer to close that gap before moving a single constraint.
 
+## Scope: an upgrade updates what the project already has. Nothing else.
+
+**The deliverable is the project doing exactly what it did before, on newer versions.** Not the
+project modernised, not the project on the vendor's latest recommended architecture.
+
+- **Moving a module to a newer version is not consent to adopt what that version enables.** A module
+  can arrive carrying a new architecture, a new DI mechanism, a new storage backend, a new extension
+  point. None of that gets integrated because the version moved.
+- **No new feature is integrated unless the developer explicitly asked for it.** This is the same rule
+  as Phase 6's new-features gate, and it applies with equal force to new capabilities that appear
+  *inside a module the project already had* — that case is easier to miss precisely because no new
+  package shows up in the lock diff.
+- **A missing feature is not damage.** Damage is the project's existing behaviour changing or
+  disappearing. A capability the project never used and still does not use is not a finding.
+
+Worked example, from the validation run. `spryker/container` 1.4.6 → 1.11.0 shipped
+`ContainerDelegator`, whose presence flips `Kernel::boot()` onto a Symfony-DI code path. The project
+had no `config/bundles.php`, so application plugins stopped booting and the Back Office login broke.
+
+- **Wrong resolution:** "adopt the Symfony container — add `config/bundles.php` and service config."
+  That integrates a new architecture the developer never asked for, in an upgrade ticket, and it is
+  what this skill first recommended. It is out of scope.
+- **Right resolution:** restore the behaviour the project had. Find the minimal way to keep
+  application plugins booting as before, and if the new version genuinely offers no such path, that is
+  a **vendor BC break** — report it as a blocker with evidence and let the developer decide, rather
+  than quietly re-architecting the project to route around it.
+
+When the only apparent fix is "integrate the new thing", stop and say so. Presenting an
+architecture migration as an upgrade step, without ever asking, is the failure mode this section
+exists to prevent. Offer the new capability as a **separate, explicitly-scoped piece of work** with
+its own decision — never as a side effect of a version bump.
+
 **Sibling skills to use rather than reinvent:**
 - `spryker-docs-research` — locating and reading migration guides / release notes for Lane 0.
 - `codecept-functional` — writing the characterization tests Phase 0.5 asks for.
@@ -136,8 +168,8 @@ actually hit rather than what the docs predicted.
 | 61 | `propel:install` **deletes tracked files** — it runs migration cleanup, removing `src/Orm/Propel/*/Migration_*` files. Gitignore does not protect them if they were committed before the ignore rule existed | `git status` immediately after Phase 5 | restore with `git checkout --`. Treat every Phase 5 command as potentially write-heavy and diff the working tree after each; never assume regeneration is read-only |
 | 62 | Generated artifacts land in a path the project does not ignore, so they show up as untracked noise in the upgrade diff (e.g. `src/Orm/Propel/*/Config/propel.json`) | untracked files appear after Phase 5 | add the path to `.gitignore` next to the sibling generated dirs; never commit generated output into the upgrade branch |
 | 63 | A live 500 whose failing call path is **identical in the pre-upgrade versions** — so the files in the stack trace look innocent | comparing the pre-upgrade file at its tag can only **exonerate those files**; it can NOT establish that the release is innocent, because the cause is often several layers above the trace. The only decisive test is a **version rollback**: check out the pre-upgrade tree, install its lock in the container, clear caches, reload the page | on the validation run this exact mis-inference produced a wrong "pre-existing, not upgrade damage" verdict on a release blocker. The rollback took ~15 min and reversed it. Roll back before you conclude; use file comparison only to *localise* a confirmed regression |
-| 64 | A vendor package adds a class whose **mere existence flips a runtime branch** (`class_exists(X)` feature detection), silently moving the project onto a code path it is not configured for | no signature changes, no removed methods, nothing any static detector sees. Found only by exercising the app | grep the new package version for `class_exists(` gates and check whether the project satisfies what the new branch requires. On the validation run `spryker/container` 1.4.6→1.11.0 added `ContainerDelegator`; `Kernel::boot()` uses `class_exists` on it to choose between booting application plugins immediately (BC path) and deferring to the Symfony container path — and the project had no `config/bundles.php`, so application plugins never booted at all |
-| 65 | Application-plugin **boot lifecycle** moves between versions, so plugins that register fine never boot — every `boot()`-time side effect silently disappears (sessions, tracing, feature toggles) | a null/uninitialised service that the wiring clearly registers. Check whether the plugin's work happens in `provide()` or `boot()`, then whether anything still calls the boot stage | `spryker/application` 3.36→3.48 removed `bootPlugins()` from `handle()` and moved it to a public `registerPluginsAndBoot()` driven by the Kernel, leaving `Application::boot()` — which project entry points call — a **no-op**. Verify by loading a page that exercises a `boot()`-time service, never by unit tests |
+| 64 | A vendor package adds a class whose **mere existence flips a runtime branch** (`class_exists(X)` feature detection), silently moving the project onto a code path it is not configured for | no signature changes, no removed methods, nothing any static detector sees. Found only by exercising the app | grep the new package version for `class_exists(` gates and check whether the project satisfies what the new branch requires. **Restore the project's previous behaviour — do NOT adopt the new path** (see Scope): that would be integrating an unrequested feature. If the version offers no way back, it is a vendor BC break — report it as a blocker. Validation run: `spryker/container` 1.4.6→1.11.0 added `ContainerDelegator`, flipping `Kernel::boot()` from booting application plugins immediately onto the Symfony-DI path, and the project had no `config/bundles.php` |
+| 65 | Application-plugin **boot lifecycle** moves between versions, so plugins that register fine never boot — every `boot()`-time side effect silently disappears (sessions, tracing, feature toggles) | a null/uninitialised service that the wiring clearly registers. Check whether the plugin's work happens in `provide()` or `boot()`, then whether anything still calls the boot stage | `spryker/application` 3.36→3.48 removed `bootPlugins()` from `handle()` and moved it to a public `registerPluginsAndBoot()` driven by the Kernel, leaving `Application::boot()` — which project entry points call — a **no-op**. Fix by restoring the boot behaviour the project had, not by migrating it to the new mechanism. Verify by loading a page that exercises a `boot()`-time service, never by unit tests |
 | 55 | The project declares a class **in a vendor's own namespace** and force-loads it via `autoload.files`, so the vendor implementation never loads at all | `check-vendor-class-replacement.php` (VENDOR_CLASS_REPLACED) | **decide before upgrading** — the copy is frozen at an older version, so upstream changes are already being discarded; re-copy from the target release and re-apply the delta |
 | 56 | A copied vendor class **lost its namespace** and sits in the global namespace, so it overrides nothing while still being parsed on every request | `check-vendor-class-replacement.php` (GLOBAL_NAMESPACE_COPY) | verify nothing references the global name, then delete — the vendor class was in use all along |
 | 57 | A file under `src/Pyz/` declares a **non-Pyz namespace**, so PSR-4 cannot load it — it resolves only under an optimized/classmap dump, making behaviour differ between dev and prod | `check-vendor-class-replacement.php` (VENDOR_NAMESPACE_ADDITION) + `check-dead-overrides.php` (unloadable) | move it to the namespace's real path or delete it if unreferenced |
@@ -383,14 +415,26 @@ For **each** package in the MAJOR list of `.spryker-upgrade/state/lock-diff-repo
    `docs.spryker.com/docs/pbc/all/<pbc>/<version>/base-shop/install-and-upgrade/upgrade-modules/upgrade-the-<module>-module.html`).
 2. WebFetch the page and extract the sections covering the crossed major boundary (a guide
    covers multiple majors; only the crossed range applies, e.g. 10.x → 11.0 section).
-3. Execute every applicable step: interface swaps, constant→config-method moves, plugin
-   rewiring, schema/transfer adjustments, console commands. Cross-check each step against the
-   detectors' findings — guide steps usually explain WHY a detector fired.
+3. **Sort the steps into two piles before executing any of them** — guides freely mix them, and the
+   distinction is the Scope rule in practice:
+   - **Required to keep working** — interface swaps, constant→config-method moves, plugin rewiring,
+     schema/transfer adjustments, console commands. Execute these; they restore existing behaviour.
+   - **New capability the guide offers** — "to use the new X, register Y", "enable the new Z by
+     adding this config". **Do not execute these.** They are Phase 6 material: list them for the
+     developer as separate opt-in work, even when the guide presents them as ordinary numbered steps
+     alongside the mandatory ones.
+
+   When a step is ambiguous, ask what breaks if it is skipped. If the answer is "nothing the project
+   currently does", it is a new capability, not a migration step. Cross-check the required pile
+   against the detectors' findings — guide steps usually explain WHY a detector fired; a step no
+   detector corroborates and no existing behaviour needs is a strong candidate for the second pile.
 4. If no guide exists (some modules have none), fall back to the module's CHANGELOG.md and the
    GitHub compare URL from the report; extract the `[BC]`/breaking notes for the crossed majors.
 5. If neither yields clarity, STOP for that module and surface it to the developer — never
    invent migration steps.
-6. Record per module: guide URL (or "none published"), steps applied, steps skipped + why.
+6. Record per module: guide URL (or "none published"), steps applied, steps **deliberately not**
+   applied because they introduce a new capability (with what they would have added), and steps
+   skipped for other reasons + why.
    This table goes into the final report verbatim.
 
 ## Lanes 1–4 — Conflict resolution
@@ -664,6 +708,14 @@ failures per class above. "All tests pass" is only true if every suite actually 
 
 ## Phase 6 — New features gate (developer gate #3)
 
+Two kinds of "new" need this gate, and only the first is visible in the lock diff:
+
+1. **New packages** arriving with the release — the list below.
+2. **New capabilities inside modules the project already had.** No new package appears, so nothing
+   flags them; they surface as a migration guide step, a `class_exists` branch (matrix #64), or a new
+   extension point. These are governed by the same rule and are the easier ones to wave through by
+   accident. Per the Scope section, a version bump is never consent to integrate them.
+
 From the NEW list in `.spryker-upgrade/state/lock-diff-report.json`: fetch each package's description
 (`composer show <pkg>` + docs.spryker.com release notes). Present with AskUserQuestion
 (multiSelect): integrate now / defer / never. NOTHING new gets wired without an explicit yes.
@@ -709,6 +761,10 @@ that did not run, name it and name the damage class it would have caught.
 
 ## Hard rules
 
+- **An upgrade changes versions, not architecture.** Never integrate a feature, DI mechanism or
+  storage backend the developer did not explicitly ask for, however strongly the new version invites
+  it. If restoring existing behaviour looks impossible without adopting the new thing, that is a
+  vendor BC break to report — not a re-architecture to perform. See Scope.
 - Lane 0 is not skippable: no major bump ships without its migration guide processed or an
   explicit "none published" record.
 - Re-run the detectors after EVERY resolution lane — fixes create new conflicts, and a fix in one

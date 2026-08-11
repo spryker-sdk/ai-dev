@@ -390,6 +390,18 @@ Exit 1 only when something is genuinely `MIGRATE`. It never rewrites anything: `
 particular need a human to leave them alone. If vendor templates cannot be found at all it exits 2
 rather than reporting everything as `MIGRATE`, since that is the dangerous direction to be wrong in.
 
+## Scope rule these detectors serve
+
+Every detector here answers one question: **did the project's existing behaviour survive the version
+bump?** None of them asks whether the project should adopt something new.
+
+That distinction is deliberate. An upgrade updates what the project already has; a version bump is not
+consent to integrate the architecture, DI mechanism or feature that the new version enables. So a
+capability the project never used and still does not use is **not** a finding, and "the new version
+wants you to do X" is never a reason to do X inside an upgrade. When restoring existing behaviour
+appears to require adopting something new, that is a vendor BC break to report — not a re-architecture
+to perform. See the Scope section of `SKILL.md`.
+
 ## bin/check-platform-alignment.php — is this host a valid place to resolve at all?
 
 Run this in **Phase 0, before the first `composer update`**. It answers one question: will a lock
