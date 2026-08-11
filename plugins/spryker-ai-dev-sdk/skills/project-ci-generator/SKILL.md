@@ -78,6 +78,41 @@ user hesitates at the wipe, offer to annotate the existing CI in place instead.
 
 ### 4. Rebuild
 
+**Before deleting anything — four preconditions, in order. Do not skip them because the user
+already approved the plan: step 3's approval covers *which* files go, not whether they can be
+recovered afterwards.**
+
+1. **Clean tree.** `git status --short -- .github/ config/install/ data/import/` must be empty.
+   If it is not, stop and show the dirty paths — uncommitted CI work is unrecoverable once the
+   wipe runs. Let the user commit or stash first, then re-check.
+2. **Right repo, recorded escape hatch.** Report `git rev-parse --show-toplevel`,
+   `git branch --show-current` and the current `HEAD` sha, so the user confirms this is the
+   intended checkout and keeps the sha to restore from.
+3. **Backup the CI state.** Take a backup before the first deletion and tell the user where it
+   is. A git tag is the cheapest durable option and needs no untracked files:
+
+   ```bash
+   # Durable, survives the wipe, restorable file-by-file or wholesale.
+   git tag ci-pre-cleanup-$(git rev-parse --short HEAD) -m "CI state before project-ci-generator"
+   ```
+
+   If the CI files are **not yet committed** (a fresh clone mid-setup, so a tag would not
+   capture them), copy them out of the tree instead and report the path:
+
+   ```bash
+   mkdir -p .ai-dev/ci-backup
+   cp -R .github .ai-dev/ci-backup/github
+   cp -R config/install .ai-dev/ci-backup/install    # if present
+   ```
+
+   State the restore command in the final report, e.g.
+   `git checkout ci-pre-cleanup-<sha> -- .github/ config/install/` (tag) or
+   `cp -R .ai-dev/ci-backup/github/. .github/` (copy).
+4. **Delete with `git rm`, not `rm`.** Every removal then lands as a reviewable staged change
+   the user can inspect with `git diff --cached --stat` and undo with `git restore --staged`.
+   Use `git rm -r --cached`-plus-`rm` only for files git does not track; note those separately
+   in the report, since they are the ones the tag does not cover.
+
 Prune the files the plan drops. Write the single project CI from the surviving jobs, reusing
 their real commands verbatim — those are already correct for this repo's tooling, which is the
 whole reason to transform rather than template. Apply the agreed trims (single version,
@@ -85,7 +120,29 @@ product-only steps removed, dependencies wired only among surviving jobs, notifi
 off). Keep exactly the support files surviving jobs reference. Never invent a job or step: if
 the questionnaire selected something the source CI doesn't contain, say so.
 
-**A dropped suite's job usually pulls support files out with it — this skill owns removing them, not a later step.** When a removed job references a `docker/sdk boot <deploy>.yml` or an install recipe, the `.github/deploy/*.yml` and `config/install/*.yml` files (and any data-import fixture dirs they alone reference) are now orphaned — remove them too. A deploy file names its recipe in its `pipeline:` key (e.g. `pipeline: docker.ci.acceptance` → `config/install/docker.ci.acceptance.yml`), so that key is how you map a dropped job to the install recipe it used. **Recipes are many-to-one:** several deploy files routinely share one `pipeline:` value, so before deleting a recipe, `grep -l "^pipeline: <name>$" .github/deploy/*.yml` and keep it if ANY surviving deploy file still names it. Three traps: (1) a KEPT job and a DROPPED job can have near-identical filenames (`…cypress-boilerplate.yml` kept vs `…cypress.yml` dropped) — delete by which surviving job references it, not by the name; (2) a fixture/import config named for a suite (`*_ROBOT.yml`) may ALSO be referenced by the regular demodata pipeline — grep its literal filename repo-wide and read the actual `source:`/`command:` lines before deleting, or an unrelated import breaks; (3) a recipe whose name merely *resembles* a dropped suite may be the one a KEPT deploy file still points at — always decide by reference, never by name. When in doubt, leave the recipe: an orphaned `config/install/` file is harmless, a deleted-but-referenced one breaks the boot. Under the project-starter wizard this makes ci-generator the **single owner** of removing an old test-suite's CI jobs + its deploy/install/fixture configs (the robot/acceptance-fixture lane decision comes from the interview `keep_suites`); the suite's Composer-package removal and the new suite's vendoring stay with `cypress-migration`.
+**A dropped suite's job usually pulls support files out with it — this skill owns removing them, not a later step.** When a removed job references a `docker/sdk boot <deploy>.yml` or an install recipe, the `.github/deploy/*.yml` and `config/install/*.yml` files (and any data-import fixture dirs they alone reference) are now orphaned — remove them too. A deploy file names its recipe in its `pipeline:` key (e.g. `pipeline: docker.ci.acceptance` → `config/install/docker.ci.acceptance.yml`), so that key is how you map a dropped job to the install recipe it used.
+
+**Support-file pruning — build the KEEP set from the FINAL CI first, then delete. Order matters:
+a support file is deleted only because nothing in the final pipeline references it, never because
+a dropped job happened to reference it.**
+
+1. **Write the final CI first** (the rest of this step), so the surviving job list is settled and
+   the references you are about to resolve are the real, final ones.
+2. **Build the KEEP set from that final CI.** For every job in it, collect every
+   `docker/sdk boot .github/deploy/<f>.yml` it names, then read each of those deploy files and
+   collect every `pipeline:` value they declare. That gives you two keep-lists: deploy files and
+   install recipes.
+3. **Only then walk the drop list.** Delete a `.github/deploy/*.yml` only if **no** job in the
+   final CI boots it. Delete a `config/install/<recipe>.yml` only if `<recipe>` is **absent from
+   the KEEP set built in (2)**. Verify each recipe with
+   `grep -l "^pipeline: <name>$" .github/deploy/*.yml` — recipes are **many-to-one**, several
+   deploy files routinely share one `pipeline:` value, so keep it if ANY surviving deploy file
+   still names it.
+4. **On any doubt, KEEP.** An orphaned `config/install/` file is harmless; a deleted-but-referenced
+   one breaks the boot — and the workflow YAML still parses, so step 5's validation will **not**
+   catch it.
+
+Three traps, all instances of the same rule (decide by reference, never by name): (1) a KEPT job and a DROPPED job can have near-identical filenames (`…cypress-boilerplate.yml` kept vs `…cypress.yml` dropped) — and a typo'd sibling (`…postgress….yml`) can sit alongside both; delete by which surviving job references it, not by the name; (2) a fixture/import config named for a suite (`*_ROBOT.yml`) may ALSO be referenced by the regular demodata pipeline — grep its literal filename repo-wide **without a file-type filter** (consumers include non-YAML config such as `*.json`) and read the actual `source:`/`command:` lines before deleting, or an unrelated import breaks; (3) a recipe whose name merely *resembles* a dropped suite may be the one a KEPT deploy file still points at. Under the project-starter wizard this makes ci-generator the **single owner** of removing an old test-suite's CI jobs + its deploy/install/fixture configs (the robot/acceptance-fixture lane decision comes from the interview `keep_suites`); the suite's Composer-package removal and the new suite's vendoring stay with `cypress-migration`.
 
 For a different host, reproduce the same jobs, commands, and ordering in that host's structure
 — only the wrapper changes.
@@ -94,6 +151,12 @@ For a different host, reproduce the same jobs, commands, and ordering in that ho
 
 Confirm every dependency points at a job that still exists, and sanity-check ordering. Report
 the final tree of what remains and the job list of the new pipeline.
+
+**Re-resolve every surviving reference against the disk.** The dependency check above only proves
+jobs point at jobs; it says nothing about the files they boot. For every job in the final CI,
+re-grep its `docker/sdk boot` target and that deploy file's `pipeline:` recipe, and confirm both
+files **still exist**. This is the check that catches a shared recipe deleted with a dropped
+suite — the workflow YAML parses fine either way, so nothing else will.
 
 **Parsing the emitted YAML — mind when you can.** Pre-boot there is often no YAML parser on the
 host (no `vendor/`; foreign interpreters like python/ruby aren't allowlisted), so pre-boot
@@ -144,6 +207,14 @@ report it — this is what proves the CI folder was actually cleaned, not just a
       support file that a surviving job references. Nothing survives "just in case."
 - [ ] **No dangling references.** No surviving job points at a file, action, or script that
       was deleted; and no deleted job is still named as a dependency.
+- [ ] **Surviving references resolve on disk.** Every `docker/sdk boot` target named by a job in
+      the final CI exists, and so does every `config/install/<recipe>.yml` those deploy files
+      declare in `pipeline:`. Re-grepped, not assumed — a deleted-but-referenced recipe still
+      parses as valid YAML.
+- [ ] **Backup taken and restore path reported.** A `ci-pre-cleanup-<sha>` tag (or the
+      `.ai-dev/ci-backup/` copy, when the CI was uncommitted) exists, and the report names the
+      exact command to restore from it. Untracked files the backup could not cover are listed
+      separately.
 - [ ] **Only approved jobs.** The pipeline contains exactly the jobs the user approved — none
       dropped, none invented.
 - [ ] **No product-only jobs survive.** Nothing that exists purely to protect the upstream

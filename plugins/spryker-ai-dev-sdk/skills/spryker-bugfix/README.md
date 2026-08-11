@@ -127,6 +127,9 @@ nothing is pushed and no PR is marked ready with a known-broken state.
 
 ## Stage → skill map
 
+Skill names below are shorthand: the real invocable name is prefixed with the plugin,
+e.g. `Skill(spryker-ai-dev-sdk:spryker-runtime)`.
+
 | Step | Delegates to |
 |------|--------------|
 | 0 | `AskUserQuestion`; **optional** ticket pull (Atlassian MCP / `gh issue view` / paste) |

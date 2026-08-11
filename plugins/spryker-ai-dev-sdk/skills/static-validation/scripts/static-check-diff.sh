@@ -52,7 +52,11 @@ DRY_RUN=0
 FIX="${STATIC_CHECK_FIX:-0}"
 REPO_OVERRIDE="${STATIC_CHECK_REPO:-}"
 # PHP: phpcbf,phpcs,phpmd,phpstan   Frontend: eslint,stylelint,prettier
-TOOLS="phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier"
+# phpcbf REWRITES source files, so it is deliberately NOT in the default set — a tool whose
+# job is "validate my changes" must not mutate the working tree on a bare invocation. It is
+# pulled in by --fix, or selected explicitly via --tools phpcbf. Still in KNOWN_TOOLS so both
+# of those keep working.
+TOOLS="phpcs,phpmd,phpstan,eslint,stylelint,prettier"
 KNOWN_TOOLS="phpcbf phpcs phpmd phpstan eslint stylelint prettier"
 
 # Tool config — overridable via environment, with project defaults below.
@@ -132,6 +136,15 @@ for _t in $TOOLS; do
     esac
 done
 IFS="$_saved_ifs"
+
+# --fix means "also fix PHP", so pull the PHP fixer in. phpcbf is not in the default
+# TOOLS set (it rewrites files), so without this --fix would silently stop fixing PHP.
+if [ "$FIX" -eq 1 ]; then
+    case ",$TOOLS," in
+        *,phpcbf,*) ;;
+        *) TOOLS="phpcbf,$TOOLS" ;;
+    esac
+fi
 
 # ----------------------------------------------------------------------------
 # Resolve repo root (worktree-aware) and cd into it.
@@ -437,6 +450,57 @@ if [ "${#scope_paths[@]}" -gt 0 ]; then
     fi
 fi
 
+# ----------------------------------------------------------------------------
+# Frontend path filtering.
+#
+# The ROOT eslint/stylelint/prettier configs describe the PROJECT's frontend only.
+# Two kinds of file must not be handed to them:
+#
+#   1. Files inside a NESTED npm project (its own package.json above them, e.g.
+#      tests/cypress-boilerplate/). That project ships its own eslint config and its
+#      own conventions; linting its CommonJS tool-config with the root's browser/ESM
+#      config yields bogus `no-undef` errors on module/require/__dirname — findings no
+#      code change can fix, in files the project's own lint script never touches.
+#   2. Test trees, unless --include-tests — matching the PHP side's behaviour, so
+#      --include-tests governs BOTH halves of the gate rather than only PHP.
+# ----------------------------------------------------------------------------
+in_nested_npm_project() {
+    _d="$(dirname "$1")"
+    while [ "$_d" != "." ] && [ "$_d" != "/" ]; do
+        if [ -f "$_d/package.json" ]; then return 0; fi
+        _d="$(dirname "$_d")"
+    done
+    return 1
+}
+
+_fe_filter() {   # $1 = name of the array to filter, echoes the kept entries
+    for _f in "$@"; do
+        [ "$INCLUDE_TESTS" -eq 0 ] && is_test_path "$_f" && continue
+        in_nested_npm_project "$_f" && continue
+        printf '%s\n' "$_f"
+    done
+}
+
+_fe_skipped=0
+for _set in changed_jsts changed_style changed_fmt; do
+    eval "_before=\${#$_set[@]}"
+    _kept=()
+    while IFS= read -r _k; do
+        [ -n "$_k" ] && _kept+=("$_k")
+    done <<EOF
+$(eval "_fe_filter \"\${$_set[@]:-}\"")
+EOF
+    eval "$_set=(\"\${_kept[@]:-}\")"
+    # A single empty element is bash 3.2's residue of an empty array — normalise it.
+    eval "[ \${#$_set[@]} -eq 1 ] && [ -z \"\${$_set[0]}\" ] && $_set=()"
+    eval "_after=\${#$_set[@]}"
+    _fe_skipped=$(( _fe_skipped + _before - _after ))
+done
+if [ "$_fe_skipped" -gt 0 ]; then
+    info "Frontend: skipped $_fe_skipped file(s) in nested npm projects or test trees"
+    info "  (they have their own linter configs; the root config does not describe them)."
+fi
+
 if [ "$DRY_RUN" -eq 1 ]; then
     info ""
     info "[dry-run] Tools: $TOOLS"
@@ -502,11 +566,23 @@ run_tool() {
 
 # --- PHP -------------------------------------------------------------------
 if has_tool phpcbf && [ "${#cs_paths[@]}" -gt 0 ]; then
+    warn "phpcbf WILL REWRITE the files/directories listed above — it is a fixer, not a checker."
     # phpcbf exits 1 when it FIXED something — that is success, not a violation.
     out="$(run vendor/bin/phpcbf --standard="$PHPCS_STANDARD" -p -s --extensions=php "${cs_paths[@]}" 2>&1)"; rc=$?
     printf '%s\n' "$out"
     ran_any=1
-    [ "$rc" -eq 3 ] && { env_failures="${env_failures}phpcbf "; env_rc=1; }
+    # 0 = nothing to fix, 1 = fixed some, 2 = fixed some + some unfixable, 3 = could not run.
+    # Anything else is a crash, and a crash mid-fix can leave files partially rewritten.
+    case "$rc" in
+        0|1|2) ;;
+        3)     env_failures="${env_failures}phpcbf "; env_rc=1 ;;
+        *)     err "phpcbf exited unexpectedly (rc=$rc) — files may be partially fixed."
+               env_failures="${env_failures}phpcbf "; env_rc=1 ;;
+    esac
+    case "$out" in
+        *"PHP Fatal error"*|*"Allowed memory size of"*)
+            env_failures="${env_failures}phpcbf "; env_rc=1 ;;
+    esac
 fi
 
 if has_tool phpcs && [ "${#cs_paths[@]}" -gt 0 ]; then
@@ -592,15 +668,25 @@ if [ "$_fe_wanted" -eq 1 ]; then
             out="$( cd "$MAIN_ROOT" && "./node_modules/.bin/$tool" "$@" 2>&1 )"; rc=$?
         fi
         printf '%s\n' "$out"
+        # An "ignored because no matching configuration" finding means eslint did NOT
+        # analyse that file — it matched no `files:` block in the config. Silent empty
+        # coverage reads as a pass, so say so loudly; it usually means the config's globs
+        # are shaped for a different repo layout (e.g. vendor/monorepo paths like
+        # src/*/*/src/*/Yves/** vs a demoshop's src/Pyz/Yves/**).
+        if [ "$tool" = "eslint" ] && \
+           printf '%s' "$out" | grep -q 'File ignored because no matching configuration'; then
+            warn "eslint: some files matched NO config block and were therefore NOT analysed."
+            warn "  Check the \`files:\` globs in the project's eslint config cover this layout."
+        fi
         classify "$tool" "$rc" "$out"
     }
 
     if [ -n "$fe_mode" ]; then
         if has_tool eslint && [ "${#changed_jsts[@]}" -gt 0 ]; then
             if [ "$FIX" -eq 1 ]; then
-                run_fe eslint --fix "${changed_jsts[@]}"
+                run_fe eslint --no-warn-ignored --fix "${changed_jsts[@]}"
             else
-                run_fe eslint "${changed_jsts[@]}"
+                run_fe eslint --no-warn-ignored "${changed_jsts[@]}"
             fi
         fi
 
@@ -628,6 +714,9 @@ if [ "$env_rc" -ne 0 ]; then
     err "  No code was analysed by those tools — these are NOT code findings."
     err "  Do not attempt code fixes for them. Fix the environment and re-run, e.g.:"
     err "    missing src/Generated  -> docker/sdk cli console transfer:generate"
+    err "    missing src/Generated/Client/Ide/AutoCompletion.php (phpstan bootstrap)"
+    err "                           -> docker/sdk cli composer phpstan-setup"
+    err "                              (= vendor/bin/console dev:ide-auto-completion:generate)"
     err "    missing node_modules   -> docker/sdk cli npm install  (or npm ci on the host)"
     [ "$overall_rc" -ne 0 ] && err "  (Other tools also reported real violations — see output above.)"
     exit 2

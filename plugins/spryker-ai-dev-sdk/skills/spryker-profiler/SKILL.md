@@ -207,7 +207,8 @@ comparable". Reach for them when the counters alone do not explain the number:
 | `session` | session payload | A large session is re-written every request — cost that no query or storage counter shows. |
 | `runtime` | PHP config | **Check before comparing any timings.** `xdebug: true` inflates wall-clock several-fold; `debug: true` disables caches. Only true flags print — no `runtime` block means both were off. |
 
-`--verbose` adds the top repeated log and audit messages, ranked by frequency.
+`--verbose` adds the top repeated SQL statements plus the top repeated log and audit messages,
+ranked by frequency. It does **not** add per-template Twig detail.
 
 Three fields protect you from the most common ways this analysis goes wrong:
 

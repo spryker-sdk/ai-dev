@@ -637,6 +637,14 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 
 ## Stage → skill quick map
 
+**Skill invocation names.** Every skill this workflow delegates to ships in the
+`spryker-ai-dev-sdk` plugin, so its invocable name carries that prefix —
+`Skill(spryker-ai-dev-sdk:spryker-runtime)`, `Skill(spryker-ai-dev-sdk:code-review)`, and so on.
+The bare names used in this document and in the table below are **shorthand for the prefixed
+form**. If a bare name fails to resolve, retry it with the `spryker-ai-dev-sdk:` prefix before
+reporting a stage blocked — a delegation that cannot resolve is a naming problem, not a blocked
+gate.
+
 | Step | Skill / tool |
 |------|--------------|
 | 0 Mode, context, logger, PR-channel probe, env-reset decision | `AskUserQuestion`, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `PR_CHANNEL` probe (`command -v gh` + `gh auth status` + remote check), `docker/sdk reset` (if chosen) |

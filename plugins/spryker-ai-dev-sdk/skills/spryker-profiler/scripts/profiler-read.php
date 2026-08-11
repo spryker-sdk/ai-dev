@@ -139,8 +139,14 @@ $result = match (true) {
     default => describeProfiles($directory, selectProfiles($index, $options), $options),
 };
 
+// array_merge, not `+`: a mode that resolved a DIFFERENT directory than the auto-picked one
+// (--trace follows an entry profile across directories) must be able to override 'source'.
+// With `+` the envelope's value always wins and would name a directory the profile is not in.
 echo json_encode(
-    ['source' => $directory, 'newest_profile' => humanAge((int)$index[0]['time'])] + $result,
+    array_merge(
+        ['source' => $directory, 'newest_profile' => humanAge((int)$index[0]['time'])],
+        $result,
+    ),
     JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
 ) . PHP_EOL;
 
@@ -187,6 +193,9 @@ function traceRequest(string $directory, array $index, array $options, array $al
         : collectSiblingRequests($index, $root, (int)($options['window'] ?? 10));
 
     return [
+        // The directory the ENTRY profile actually came from, which is not necessarily the
+        // auto-picked one the envelope starts with — locateTraceRoot() may have crossed over.
+        'source' => $directory,
         'trace' => $root['token'],
         'entry_request' => $entry,
         'zed_calls' => $children,
@@ -440,10 +449,10 @@ function printUsage(): void
                               Yves + Glue: data/cache/codeBucket/profiler
                               Zed/BO/BG/MP: data/tmp/profiler
       --limit=<n>             Rows to return (default 20).
-      --scan=<n>              Profiles to load when ranking (default 200).
-      --window=<seconds>      Sibling-grouping window for --trace (default 5).
+      --scan=<n>              Profiles to load when ranking (default 100).
+      --window=<seconds>      Sibling-grouping window for --trace (default 10).
       --no-siblings           Skip sibling grouping in --trace.
-      --verbose               Include repeated SQL statements and Twig details.
+      --verbose               Include top repeated SQL, log and audit messages.
       --project-root=<path>   Project root holding vendor/autoload.php.
       --help                  This text.
 
