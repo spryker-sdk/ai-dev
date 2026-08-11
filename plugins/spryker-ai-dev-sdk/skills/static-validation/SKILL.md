@@ -99,7 +99,6 @@ Tool config and the base branch can be overridden via env vars (project defaults
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
-
 | `STATIC_CHECK_REPO` | cwd's git repo | Project root to validate (same as `--repo`). |
 
 ```bash

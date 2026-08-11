@@ -87,9 +87,11 @@ mark a stage completed whose gate wasn't actually green (the same honesty rule a
 
 ## Operating principles
 
-- **Skill invocation names are prefixed.** Every skill this workflow delegates to ships in the
-  `spryker-ai-dev-sdk` plugin, so the invocable name is `spryker-ai-dev-sdk:<name>` — e.g.
-  `Skill(spryker-ai-dev-sdk:spryker-runtime)`. The bare names written throughout these documents
+- **Skill and agent invocation names are prefixed.** Every skill this workflow delegates to ships
+  in the `spryker-ai-dev-sdk` plugin, so the invocable name is `spryker-ai-dev-sdk:<name>` — e.g.
+  `Skill(spryker-ai-dev-sdk:spryker-runtime)`. Agent types follow the same rule on a plugin
+  install: `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare name (the `Agent`
+  tool rejects unregistered bare names). The bare names written throughout these documents
   are shorthand for that prefixed form. If a bare name fails to resolve, retry with the prefix
   before reporting a stage blocked.
 - **The bug is the contract.** Everything is judged against "does the original reported symptom no

@@ -235,7 +235,7 @@ Apply changes per the chosen quality bar.
 
 **Common rules (both bars):**
 
-- **Project layer only** — under the project's namespace directories in `src/`. Never `vendor/`. The `PreToolUse` hook will block vendor writes; don't even attempt.
+- **Project layer only** — under the project's namespace directories in `src/`. Never `vendor/`. Some installs also enforce this with a `PreToolUse` hook that blocks vendor writes, but the rule holds regardless — don't attempt a vendor edit even where no hook is configured.
 - **Never add, remove, or edit any file inside generated directories** — `src/Generated/`, `src/Orm/`, and any `*/Generated/*` path. These are produced by codegen commands (`transfer:generate`, `propel:install`, scope-collection, IDE-auto-completion, etc.) and are rewritten on every Step 5 refresh; any manual edit is lost. **To change a transfer field**, edit `*.transfer.xml` in the project layer — the corresponding `src/Generated/Shared/Transfer/*.php` regenerates automatically. **To change an entity**, edit `*.schema.xml` in the project layer — the corresponding `src/Orm/Propel/*` regenerates automatically. **Self-correction signal:** if you find yourself about to `Edit` or `Write` a path under `src/Generated/` or `src/Orm/`, **stop** — you're editing the wrong file. Find the XML source instead.
 - **Track which files you edited** during this step — you'll need the list for refresh in step 5 and for staging in step 8.
 - **Do not research Spryker yourself.** If a question came up during editing that needs Spryker domain knowledge, invoke `spryker-feature-expert` again rather than grepping `vendor/spryker/` directly.
@@ -467,7 +467,7 @@ If both phases are off (and no instrumentation was added), skip this step entire
 
 **Run this BEFORE the commit gate**, not after — the captures become part of the implementation report the user reviews when deciding to commit.
 
-If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"`) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
+If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"` — prefixed as `spryker-ai-dev-sdk:spryker-screenshot-collector` on a plugin install, see the delegation cheatsheet) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
 
 Include the returned paths in the **Evidence** column of the Step 8 final report (under the AC the screenshot illustrates), so the user can open them in `~/Downloads/` before deciding whether to commit.
 
@@ -530,6 +530,14 @@ The point: refusing the commit shouldn't lose the staging work or leave the user
 ## Subagent delegation cheatsheet
 
 All of these ship as agent definitions (`.claude/agents/` for a setup install, or the plugin's `agents/` directory). Invoke them with the harness's subagent-spawning tool (commonly `Agent`), passing `subagent_type="<name>"` — never via the `Skill` tool.
+
+**Agent type names are prefixed on a plugin install.** When these agents ship via the
+`spryker-ai-dev-sdk` plugin, the registered type carries the plugin prefix —
+`subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare `spryker-verifier` (the
+`Agent` tool rejects an unregistered bare name with an "Agent type not found" error that lists
+the valid names). The bare names in this document are shorthand: try the bare name only on a
+setup install (`.claude/agents/`); if it fails to resolve, retry with the
+`spryker-ai-dev-sdk:` prefix before reporting a step blocked.
 
 | Subagent | When to invoke |
 |---|---|

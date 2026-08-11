@@ -645,6 +645,12 @@ form**. If a bare name fails to resolve, retry it with the `spryker-ai-dev-sdk:`
 reporting a stage blocked — a delegation that cannot resolve is a naming problem, not a blocked
 gate.
 
+**The same applies to agent types.** On a plugin install the registered `subagent_type` is
+prefixed too — `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare
+`spryker-verifier` (the `Agent` tool rejects an unregistered bare name with an "Agent type not
+found" error listing the valid names). Bare agent names in these documents are the same
+shorthand: if one fails to resolve, retry with the prefix.
+
 | Step | Skill / tool |
 |------|--------------|
 | 0 Mode, context, logger, PR-channel probe, env-reset decision | `AskUserQuestion`, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `PR_CHANNEL` probe (`command -v gh` + `gh auth status` + remote check), `docker/sdk reset` (if chosen) |

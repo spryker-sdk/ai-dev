@@ -3,7 +3,9 @@
 Spryker static analysis over **only the code that changed** versus a base branch — PHP **and**
 frontend.
 
-Runs the project's standard tools inside the container via `docker/sdk cli`, scoped to your diff:
+Runs the project's standard tools scoped to your diff — PHP tools inside the container via
+`docker/sdk cli`; the frontend linters wherever `node_modules` actually is (container first,
+host fallback — many Spryker projects install it on the host only):
 
 - **PHP** — `phpcbf`, `phpcs`, `phpmd` (project architecture ruleset `phpmd.xml`, priority 4),
   `phpstan` (level 6).
@@ -131,6 +133,7 @@ bash "$SCD" --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
 
 | Option | Default | Description |
 |---|---|---|
+| `-r, --repo <path>` | cwd's git repo | Project root to validate — run from anywhere. |
 | `-b, --base <ref>` | auto-detect | Base branch/ref to diff against. |
 | `-s, --scope <mode>` | `files` | `files` or `module` — PHP grouping only (FE always individual). |
 | `--tools <list>` | all | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
@@ -152,6 +155,7 @@ Defaults live in the script; each is overridable via an env var:
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
+| `STATIC_CHECK_REPO` | cwd's git repo | Project root to validate (same as `--repo`). |
 
 ```bash
 # Run phpstan at level 8 against a custom config:
@@ -175,8 +179,11 @@ the remediation. Do not report those as findings or try to fix code for them.
 - A **running** Spryker environment (`docker/sdk cli` must work). Start it with the
   `spryker-docker-sdk` skill if the containers are down.
 - **`src/Generated`** must exist for phpstan — the project's `phpstan-bootstrap.php` hard-requires files
-  under it. Generate with `docker/sdk cli console transfer:generate`; without it phpstan fatals during
-  bootstrap and the script exits `2` naming that remedy.
+  under it. Generate with `docker/sdk cli console transfer:generate`, then
+  `docker/sdk cli composer phpstan-setup` for `src/Generated/Client/Ide/AutoCompletion.php`
+  (the bootstrap file — `transfer:generate` alone does **not** create it, and `phpstan-setup`
+  itself fails until transfers exist, so run them in that order). Without them phpstan fatals
+  during bootstrap and the script exits `2` naming that remedy.
 - **`node_modules`** must exist in the container (`/data`) **or** on the host for eslint/stylelint/prettier.
   The script probes both and uses the project's pinned `node_modules/.bin/<tool>`. Install with
   `docker/sdk cli npm install`, or `npm ci` on the host.

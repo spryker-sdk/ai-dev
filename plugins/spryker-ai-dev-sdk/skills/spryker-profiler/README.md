@@ -316,10 +316,15 @@ request-scoped. Use Xdebug profiling or explicit timing for those.
 
 ## Installed as a plugin?
 
-The skill works identically whether it lives in the repo (`.claude/skills/spryker-profiler/`)
-or in a plugin cache outside it. The only difference: the Docker container mounts only the
-project directory, so a script in the plugin cache is unreachable from inside it. Copy the
-script into the project first, then run the copy:
+The skill works identically wherever it lives. The only thing that matters is whether its
+scripts sit **inside the project directory** — the Docker container mounts only the project,
+so that is all PHP inside it can reach:
+
+- **Inside the project** — a setup install (`.claude/skills/spryker-profiler/`) *or* a
+  Composer-vendored plugin (`vendor/spryker-sdk/ai-dev/plugins/…`): run the script in place,
+  no copy needed.
+- **Outside the project** — a plugin cache under `~/.claude/plugins/…`: the script is
+  unreachable from inside the container. Copy it into the project first, then run the copy:
 
 ```bash
 mkdir -p .claude/tmp

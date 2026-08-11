@@ -141,9 +141,11 @@ off, the workflow **skips its subagents entirely**.
 
 ## Stage → skill map
 
-Subagents live under `.claude/agents/` and are invoked via the **`Agent`** tool with
-`subagent_type="<name>"`. Skills are loaded into the main session via the **`Skill`** tool. The two
-are never swapped.
+Subagents ship as agent definitions (`.claude/agents/` on a setup install, or the plugin's
+`agents/` directory) and are invoked via the **`Agent`** tool with `subagent_type="<name>"` —
+on a plugin install the registered type is prefixed (`spryker-ai-dev-sdk:spryker-verifier`),
+and the bare names below are shorthand for that form. Skills are loaded into the main session
+via the **`Skill`** tool. The two are never swapped.
 
 | Step | Delegates to | Kind |
 |---|---|---|

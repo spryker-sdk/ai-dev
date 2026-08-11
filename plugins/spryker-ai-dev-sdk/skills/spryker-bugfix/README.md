@@ -128,7 +128,8 @@ nothing is pushed and no PR is marked ready with a known-broken state.
 ## Stage → skill map
 
 Skill names below are shorthand: the real invocable name is prefixed with the plugin,
-e.g. `Skill(spryker-ai-dev-sdk:spryker-runtime)`.
+e.g. `Skill(spryker-ai-dev-sdk:spryker-runtime)`. Agent types follow the same rule on a
+plugin install — `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare name.
 
 | Step | Delegates to |
 |------|--------------|
