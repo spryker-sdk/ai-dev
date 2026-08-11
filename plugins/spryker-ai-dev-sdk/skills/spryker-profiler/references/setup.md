@@ -118,7 +118,7 @@ is the fastest check.
 |---|---|---|---|
 | Yves | yes (widget) | `data/cache/codeBucket/profiler` | Redis, Elasticsearch, ZedRequest, external HTTP — **no Propel** |
 | Zed / Back Office / Backend Gateway / Backend API | yes | `data/tmp/profiler` | Propel, events, audit log — **no Redis/ZedRequest** |
-| Glue (storefront + backend) | yes | `data/tmp/profiler` | the fullest set: Propel, Redis, Elasticsearch, ZedRequest, external HTTP |
+| Glue (storefront + backend) | yes | `data/cache/codeBucket/profiler` | the fullest set: Propel, Redis, Elasticsearch, ZedRequest, external HTTP |
 | Merchant Portal | yes — registers the plugin in its own `MerchantPortalApplicationDependencyProvider` | `data/tmp/profiler` | uses the Zed collector list |
 
 Two consequences worth internalising:

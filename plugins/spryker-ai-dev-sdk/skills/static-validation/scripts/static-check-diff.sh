@@ -18,7 +18,13 @@
 # Usage:
 #   static-check-diff.sh [options]
 #
+# Run this from your SPRYKER PROJECT ROOT (the directory containing docker/sdk),
+# or point it at the project with --repo. The project to validate is NEVER
+# inferred from where this script itself is installed.
+#
 # Options:
+#   -r, --repo <path>      Project root to validate (default: the current working
+#                            directory's git repo). Also reads $STATIC_CHECK_REPO.
 #   -b, --base <ref>       Base branch/ref to diff against (default: auto-detect).
 #   -s, --scope <mode>     files | module   (default: files) — PHP module grouping only.
 #                            files  — validate only the changed PHP files.
@@ -32,7 +38,7 @@
 # Exit codes:
 #   0  all selected tools passed (or dry-run / nothing to validate)
 #   1  at least one tool reported violations
-#   2  usage / environment error
+#   2  usage / environment error, or a tool failed to RUN (nothing was analysed)
 #
 set -uo pipefail
 
@@ -44,8 +50,10 @@ SCOPE="files"
 INCLUDE_TESTS=0
 DRY_RUN=0
 FIX="${STATIC_CHECK_FIX:-0}"
+REPO_OVERRIDE="${STATIC_CHECK_REPO:-}"
 # PHP: phpcbf,phpcs,phpmd,phpstan   Frontend: eslint,stylelint,prettier
 TOOLS="phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier"
+KNOWN_TOOLS="phpcbf phpcs phpmd phpstan eslint stylelint prettier"
 
 # Tool config — overridable via environment, with project defaults below.
 #   STATIC_CHECK_PHPCS_STANDARD   phpcs/phpcbf ruleset       (default: phpcs.xml)
@@ -75,9 +83,10 @@ warn() { printf '\033[0;33m%s\033[0m\n' "$*" >&2; }
 err()  { printf '\033[0;31m%s\033[0m\n' "$*" >&2; }
 
 usage() {
-    # Print the leading comment banner (lines starting with '#') up to the first
-    # blank/non-comment line after the options block.
-    sed -n '3,35p' "$0" | sed 's/^# \{0,1\}//'
+    # Print the leading comment banner: every '#' line from line 3 up to (but not
+    # including) the `set -uo pipefail` line. Derived, not a hardcoded range, so
+    # editing the banner cannot silently truncate --help.
+    sed -n '3,/^set -uo pipefail/p' "$0" | sed '/^set -uo pipefail/d' | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -86,6 +95,8 @@ usage() {
 # ----------------------------------------------------------------------------
 while [ $# -gt 0 ]; do
     case "$1" in
+        -r|--repo)          REPO_OVERRIDE="${2:-}"; shift 2 ;;
+        --repo=*)           REPO_OVERRIDE="${1#*=}"; shift ;;
         -b|--base)          BASE_REF="${2:-}"; shift 2 ;;
         --base=*)           BASE_REF="${1#*=}"; shift ;;
         -s|--scope)         SCOPE="${2:-}"; shift 2 ;;
@@ -105,15 +116,71 @@ case "$SCOPE" in
     *) err "Invalid --scope '$SCOPE' (expected: files | module)"; exit 2 ;;
 esac
 
+# Validate --tools. An unrecognised name would otherwise match no tool block, run
+# nothing, and still print "✓ Static analysis passed" — a silent false green.
+if [ -z "$TOOLS" ]; then
+    err "--tools was given an empty list (expected any of: $KNOWN_TOOLS)"
+    exit 2
+fi
+_saved_ifs="$IFS"; IFS=','
+for _t in $TOOLS; do
+    case " $KNOWN_TOOLS " in
+        *" $_t "*) ;;
+        *) IFS="$_saved_ifs"
+           err "Unknown tool '$_t' in --tools (expected any of: $KNOWN_TOOLS)"
+           exit 2 ;;
+    esac
+done
+IFS="$_saved_ifs"
+
 # ----------------------------------------------------------------------------
 # Resolve repo root (worktree-aware) and cd into it.
+#
+# The project to validate comes from --repo/$STATIC_CHECK_REPO, or from the
+# CALLER'S working directory — never from where this script is installed. This
+# skill ships as a Claude Code plugin, so its own location may be a plugin cache,
+# a marketplace install, a git clone, or a Composer vendor/ tree; any of those
+# would resolve to the wrong repo (or none at all).
 # `git rev-parse --show-toplevel` returns the CURRENT worktree's root — correct
 # for diffs and file paths, which are relative to where the user is working.
 # ----------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+
+if [ -n "$REPO_OVERRIDE" ]; then
+    if [ ! -d "$REPO_OVERRIDE" ]; then
+        err "--repo path does not exist or is not a directory: $REPO_OVERRIDE"
+        exit 2
+    fi
+    cd "$REPO_OVERRIDE" || { err "Cannot cd to --repo path: $REPO_OVERRIDE"; exit 2; }
+fi
+
 if ! REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    err "Not inside a git repository."
+    if [ -n "$REPO_OVERRIDE" ]; then
+        err "--repo path is not inside a git repository: $REPO_OVERRIDE"
+    else
+        err "Not inside a git repository."
+        err "cd to your Spryker project root (the directory containing docker/sdk),"
+        err "or pass --repo <project-root>."
+    fi
     exit 2
 fi
+
+# Refuse to validate the SKILL'S OWN checkout. This fires when the resolved repo is
+# the plugin/SDK repo itself — i.e. the caller ran with the skill dir as cwd and the
+# skill lives in its own git repo (a dev clone, or a Composer install that kept .git).
+#
+# Note this is deliberately NOT a path-containment test: a Composer install puts the
+# plugin under the project's own vendor/, so the script legitimately lives inside the
+# project it validates. Only a DISTINCT enclosing repo means we resolved the wrong one.
+_skill_repo="$(cd "$SCRIPT_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$_skill_repo" ] && [ "$_skill_repo" = "$REPO_ROOT" ] && [ ! -e "$REPO_ROOT/docker/sdk" ]; then
+    err "Resolved repo root ($REPO_ROOT) is this skill's own checkout, not a Spryker project."
+    err "You are running from the skill's install location."
+    err "cd to your project root (the directory containing docker/sdk),"
+    err "or pass --repo <project-root>."
+    exit 2
+fi
+
 cd "$REPO_ROOT" || { err "Cannot cd to repo root: $REPO_ROOT"; exit 2; }
 
 # ----------------------------------------------------------------------------
@@ -145,7 +212,11 @@ if [ ! -x "$DOCKER_SDK" ]; then
         err "Cannot find an executable 'docker/sdk' launcher."
         err "Looked in main working tree: $MAIN_ROOT/docker/sdk"
         [ "$MAIN_ROOT" != "$REPO_ROOT" ] && err "and current worktree: $REPO_ROOT/docker/sdk"
-        err "Start/rebuild the Spryker environment so docker/sdk is available (see spryker-docker-sdk skill)."
+        err ""
+        err "Two possible causes:"
+        err "  1. Wrong repo — the resolved root ($REPO_ROOT) is not a Spryker project."
+        err "     cd to your project root, or pass --repo <project-root>."
+        err "  2. Right repo, environment down — start/rebuild it (see spryker-docker-sdk skill)."
         exit 2
     fi
 fi
@@ -199,8 +270,16 @@ if ! ref_exists "$BASE_REF"; then
     exit 2
 fi
 
-# Guard: comparing a branch against itself yields no diff.
+# Guard: comparing a branch against itself yields no committed diff, so a run that
+# analysed nothing would be reported as "passed". Compare resolved SHAs — this also
+# catches a differently-named branch sitting on the same commit.
 current_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+if [ "$(git rev-parse "$BASE_REF" 2>/dev/null)" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
+    err "Base '$BASE_REF' resolves to the same commit as HEAD — there is nothing to diff."
+    err "Only uncommitted and untracked changes would be analysed, which would report"
+    err "a clean run as 'passed'. Pass an explicit --base <upstream-ref>."
+    exit 2
+fi
 info "Comparing: ${current_ref:-<detached>}  vs  base '$BASE_REF'"
 
 # ----------------------------------------------------------------------------
@@ -326,23 +405,36 @@ _report_fe() {
 # Path sets:
 #   phpcs/phpcbf — all scope paths (optionally excluding tests)
 #   phpmd/phpstan — exclude tests and config always
+# Test-path detection. Paths here come from `git diff --name-only`, i.e. they are
+# REPO-RELATIVE with no leading slash — so patterns must anchor on `^` as well as
+# `/`, otherwise a repo-root test tree (tests/PyzTest/...) never matches.
+is_test_path() {
+    [[ "$1" =~ (^|/)tests?/ ]] && return 0
+    [[ "$1" =~ (^|/)[A-Za-z0-9]*Tests?/ ]] && return 0
+    return 1
+}
+
 cs_paths=()
 strict_paths=()   # for phpmd + phpstan
 if [ "${#scope_paths[@]}" -gt 0 ]; then
     for p in "${scope_paths[@]}"; do
-        if [ "$INCLUDE_TESTS" -eq 0 ] && [[ "$p" =~ /tests/ || "$p" =~ /Test/ ]]; then
+        if [ "$INCLUDE_TESTS" -eq 0 ] && is_test_path "$p"; then
             :  # excluded from cs when tests excluded
         else
             cs_paths+=("$p")
         fi
         # strict: never tests, never config
-        if [[ "$p" =~ /tests/ || "$p" =~ /Test/ || "$p" =~ ^config/ ]]; then
+        if is_test_path "$p" || [[ "$p" =~ ^config/ ]]; then
             continue
         fi
         strict_paths+=("$p")
     done
-    # If tests were excluded but that emptied cs_paths, fall back to scope_paths for cs.
-    [ "${#cs_paths[@]}" -eq 0 ] && cs_paths=("${scope_paths[@]}")
+    # NOTE: deliberately no "fall back to scope_paths" here. If excluding tests
+    # empties cs_paths, the correct behaviour is to run no phpcs/phpcbf and say so —
+    # silently re-including the excluded files would let phpcbf REWRITE them.
+    if [ "${#cs_paths[@]}" -eq 0 ]; then
+        warn "phpcs/phpcbf: all changed PHP paths are test files — skipped (use --include-tests to analyse them)."
+    fi
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -370,16 +462,55 @@ run() {
     ( cd "$MAIN_ROOT" && "$DOCKER_SDK" cli "$@" )
 }
 
-overall_rc=0
+overall_rc=0   # 1 = a tool reported code violations
+env_rc=0       # 1 = a tool failed to RUN (nothing was analysed)
+ran_any=0      # 1 = at least one tool was actually invoked
+env_failures=""
+
+# Classify a tool result. Static-analysis tools distinguish "found problems" from
+# "could not run"; collapsing both into "violations" sends agents chasing phantom
+# code findings that no edit can ever clear. $1=tool $2=exit code $3=captured output
+classify() {
+    local tool="$1" rc="$2" out="$3"
+    ran_any=1
+    [ "$rc" -eq 0 ] && return 0
+
+    # Exit codes that always mean "could not run", per tool.
+    case "$tool:$rc" in
+        eslint:2|stylelint:78|prettier:2|phpcs:3|phpcbf:3)
+            env_failures="${env_failures}${tool} "; env_rc=1; return 0 ;;
+    esac
+    # Output markers that mean the tool crashed before analysing anything.
+    case "$out" in
+        *ERR_MODULE_NOT_FOUND*|*"Cannot find package"*|*ConfigurationError*|\
+        *"while loading bootstrap file"*|*"Failed opening required"*|\
+        *"could not be found"*|*"does not exist"*)
+            env_failures="${env_failures}${tool} "; env_rc=1; return 0 ;;
+    esac
+
+    overall_rc=1
+}
+
+# Run a tool, echo its output live, and classify the result.
+run_tool() {
+    local tool="$1"; shift
+    local out rc
+    out="$(run "$@" 2>&1)"; rc=$?
+    printf '%s\n' "$out"
+    classify "$tool" "$rc" "$out"
+}
 
 # --- PHP -------------------------------------------------------------------
 if has_tool phpcbf && [ "${#cs_paths[@]}" -gt 0 ]; then
-    run vendor/bin/phpcbf --standard="$PHPCS_STANDARD" -p -s --extensions=php "${cs_paths[@]}"
+    # phpcbf exits 1 when it FIXED something — that is success, not a violation.
+    out="$(run vendor/bin/phpcbf --standard="$PHPCS_STANDARD" -p -s --extensions=php "${cs_paths[@]}" 2>&1)"; rc=$?
+    printf '%s\n' "$out"
+    ran_any=1
+    [ "$rc" -eq 3 ] && { env_failures="${env_failures}phpcbf "; env_rc=1; }
 fi
 
 if has_tool phpcs && [ "${#cs_paths[@]}" -gt 0 ]; then
-    run vendor/bin/phpcs --standard="$PHPCS_STANDARD" -p -s --extensions=php "${cs_paths[@]}"
-    [ $? -ne 0 ] && overall_rc=1
+    run_tool phpcs vendor/bin/phpcs --standard="$PHPCS_STANDARD" -p -s --extensions=php "${cs_paths[@]}"
 fi
 
 if has_tool phpmd; then
@@ -393,8 +524,15 @@ if has_tool phpmd; then
         fi
         # phpmd takes a comma-separated list as a single arg.
         strict_csv="$(IFS=,; printf '%s' "${strict_paths[*]}")"
-        run vendor/bin/phpmd "$strict_csv" text "$phpmd_ruleset" --minimumpriority "$PHPMD_PRIORITY"
-        [ $? -ne 0 ] && overall_rc=1
+        run_tool phpmd vendor/bin/phpmd "$strict_csv" text "$phpmd_ruleset" --minimumpriority "$PHPMD_PRIORITY"
+
+        # CI enforces the CORE architecture ruleset in addition to the project one,
+        # and the two are disjoint (not nested) — a green project-only run can still
+        # hit a red CI "Run Architecture rules" step. Run both unless pinned.
+        core_ruleset="vendor/spryker/architecture-sniffer/src/ruleset.xml"
+        if [ -z "${STATIC_CHECK_PHPMD_RULESET:-}" ] && [ -f "$MAIN_ROOT/$core_ruleset" ]; then
+            run_tool phpmd vendor/bin/phpmd "$strict_csv" text "$core_ruleset" --minimumpriority 2
+        fi
     elif [ "${#changed_php[@]}" -gt 0 ]; then
         warn "phpmd: no non-test/non-config paths to analyse — skipped."
     fi
@@ -402,8 +540,7 @@ fi
 
 if has_tool phpstan; then
     if [ "${#strict_paths[@]}" -gt 0 ]; then
-        run vendor/bin/phpstan analyse "${strict_paths[@]}" -l "$PHPSTAN_LEVEL" -c "$PHPSTAN_CONFIG"
-        [ $? -ne 0 ] && overall_rc=1
+        run_tool phpstan vendor/bin/phpstan analyse "${strict_paths[@]}" -l "$PHPSTAN_LEVEL" -c "$PHPSTAN_CONFIG"
     elif [ "${#changed_php[@]}" -gt 0 ]; then
         warn "phpstan: no non-test/non-config paths to analyse — skipped."
     fi
@@ -415,35 +552,94 @@ fi
 # prettier auto-loads .prettierrc.json and honours .prettierignore.
 # FIX=1 (via --fix or STATIC_CHECK_FIX=1) turns on autofix (eslint --fix,
 # stylelint --fix, prettier --write); otherwise all three run in check mode.
+#
+# WHERE they run is decided at runtime, not assumed. eslint/stylelint must resolve
+# the plugins their config `extends`, so they need a real node_modules. Depending on
+# the project, that exists in the container (/data), on the host, or neither — a bare
+# `npx` in a tree without it silently downloads a DIFFERENT major from the registry
+# and crashes on plugin resolution, which then reads as "violations".
 
-if has_tool eslint && [ "${#changed_jsts[@]}" -gt 0 ]; then
-    if [ "$FIX" -eq 1 ]; then
-        run npx eslint --no-error-on-unmatched-pattern --fix "${changed_jsts[@]}"
-    else
-        run npx eslint --no-error-on-unmatched-pattern "${changed_jsts[@]}"
-    fi
-    [ $? -ne 0 ] && overall_rc=1
-fi
+_fe_wanted=0
+{ has_tool eslint    && [ "${#changed_jsts[@]}"  -gt 0 ]; } && _fe_wanted=1
+{ has_tool stylelint && [ "${#changed_style[@]}" -gt 0 ]; } && _fe_wanted=1
+{ has_tool prettier  && [ "${#changed_fmt[@]}"   -gt 0 ]; } && _fe_wanted=1
 
-if has_tool stylelint && [ "${#changed_style[@]}" -gt 0 ]; then
-    if [ "$FIX" -eq 1 ]; then
-        run npx stylelint --allow-empty-input --fix "${changed_style[@]}"
+if [ "$_fe_wanted" -eq 1 ]; then
+    fe_mode=""
+    if ( cd "$MAIN_ROOT" && "$DOCKER_SDK" cli "test -d node_modules" ) >/dev/null 2>&1; then
+        fe_mode="container"
+    elif [ -d "$MAIN_ROOT/node_modules" ]; then
+        fe_mode="host"
+        warn "node_modules found on the host but not in the container — running frontend linters on the host."
     else
-        run npx stylelint --allow-empty-input "${changed_style[@]}"
+        err "No node_modules in the container (/data) or on the host ($MAIN_ROOT)."
+        err "Install them (docker/sdk cli npm install, or npm ci on the host) before"
+        err "running eslint/stylelint/prettier. Skipping frontend linters."
+        env_failures="${env_failures}eslint/stylelint/prettier(no-node_modules) "
+        env_rc=1
     fi
-    [ $? -ne 0 ] && overall_rc=1
-fi
 
-if has_tool prettier && [ "${#changed_fmt[@]}" -gt 0 ]; then
-    if [ "$FIX" -eq 1 ]; then
-        run npx prettier --ignore-unknown --write "${changed_fmt[@]}"
-    else
-        run npx prettier --ignore-unknown --check "${changed_fmt[@]}"
+    # Invoke the project's OWN pinned binaries. Never bare `npx`, which would fetch
+    # an arbitrary latest version when the local install is missing.
+    run_fe() {
+        local tool="$1"; shift
+        local out rc
+        if [ "$fe_mode" = "container" ]; then
+            out="$(run "node_modules/.bin/$tool" "$@" 2>&1)"; rc=$?
+        else
+            info ""
+            info "\$ (host) node_modules/.bin/$tool $*"
+            out="$( cd "$MAIN_ROOT" && "./node_modules/.bin/$tool" "$@" 2>&1 )"; rc=$?
+        fi
+        printf '%s\n' "$out"
+        classify "$tool" "$rc" "$out"
+    }
+
+    if [ -n "$fe_mode" ]; then
+        if has_tool eslint && [ "${#changed_jsts[@]}" -gt 0 ]; then
+            if [ "$FIX" -eq 1 ]; then
+                run_fe eslint --fix "${changed_jsts[@]}"
+            else
+                run_fe eslint "${changed_jsts[@]}"
+            fi
+        fi
+
+        if has_tool stylelint && [ "${#changed_style[@]}" -gt 0 ]; then
+            if [ "$FIX" -eq 1 ]; then
+                run_fe stylelint --allow-empty-input --fix "${changed_style[@]}"
+            else
+                run_fe stylelint --allow-empty-input "${changed_style[@]}"
+            fi
+        fi
+
+        if has_tool prettier && [ "${#changed_fmt[@]}" -gt 0 ]; then
+            if [ "$FIX" -eq 1 ]; then
+                run_fe prettier --ignore-unknown --write "${changed_fmt[@]}"
+            else
+                run_fe prettier --ignore-unknown --check "${changed_fmt[@]}"
+            fi
+        fi
     fi
-    [ $? -ne 0 ] && overall_rc=1
 fi
 
 info ""
+if [ "$env_rc" -ne 0 ]; then
+    err "✗ Tool(s) failed to RUN (environment/config error): ${env_failures}"
+    err "  No code was analysed by those tools — these are NOT code findings."
+    err "  Do not attempt code fixes for them. Fix the environment and re-run, e.g.:"
+    err "    missing src/Generated  -> docker/sdk cli console transfer:generate"
+    err "    missing node_modules   -> docker/sdk cli npm install  (or npm ci on the host)"
+    [ "$overall_rc" -ne 0 ] && err "  (Other tools also reported real violations — see output above.)"
+    exit 2
+fi
+
+if [ "$ran_any" -eq 0 ]; then
+    err "✗ No tool was actually invoked — nothing was analysed."
+    err "  Selected tools: $TOOLS"
+    err "  This is not a pass. Check --tools and the changed-file list above."
+    exit 2
+fi
+
 if [ "$overall_rc" -eq 0 ]; then
     info "✓ Static analysis passed."
 else

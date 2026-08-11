@@ -138,7 +138,7 @@ nothing is pushed and no PR is marked ready with a known-broken state.
 | 9 | `Skill(spryker-qa-coverage)` |
 | 9b | `Skill(cypress-tests)` — conditional: fix / improve / add a Cypress E2E spec for the bug |
 | 10 | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` |
-| 11 | `git` / `gh pr create --draft` / `ScheduleWakeup` or `CronCreate` watch loop |
+| 11 | `git` / `gh pr create --draft` / a watch loop on whichever scheduler or monitor tool `ToolSearch` resolves |
 
 ## Run artifacts
 

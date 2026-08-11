@@ -85,7 +85,7 @@ product-only steps removed, dependencies wired only among surviving jobs, notifi
 off). Keep exactly the support files surviving jobs reference. Never invent a job or step: if
 the questionnaire selected something the source CI doesn't contain, say so.
 
-**A dropped suite's job usually pulls support files out with it — this skill owns removing them, not a later step.** When a removed job references a `docker/sdk boot <deploy>.yml` or an install recipe, the `.github/deploy/*.yml` and `config/install/*.yml` files (and any data-import fixture dirs they alone reference) are now orphaned — remove them too. Two traps: (1) a KEPT job and a DROPPED job can have near-identical filenames (`…cypress-boilerplate.yml` kept vs `…cypress.yml` dropped) — delete by which surviving job references it, not by the name; (2) a fixture/import config named for a suite (`*_ROBOT.yml`) may ALSO be referenced by the regular demodata pipeline — grep its literal filename repo-wide and read the actual `source:`/`command:` lines before deleting, or an unrelated import breaks. Under the project-starter wizard this makes ci-generator the **single owner** of removing an old test-suite's CI jobs + its deploy/install/fixture configs (the robot/acceptance-fixture lane decision comes from the interview `keep_suites`); the suite's Composer-package removal and the new suite's vendoring stay with `cypress-migration`.
+**A dropped suite's job usually pulls support files out with it — this skill owns removing them, not a later step.** When a removed job references a `docker/sdk boot <deploy>.yml` or an install recipe, the `.github/deploy/*.yml` and `config/install/*.yml` files (and any data-import fixture dirs they alone reference) are now orphaned — remove them too. A deploy file names its recipe in its `pipeline:` key (e.g. `pipeline: docker.ci.acceptance` → `config/install/docker.ci.acceptance.yml`), so that key is how you map a dropped job to the install recipe it used. **Recipes are many-to-one:** several deploy files routinely share one `pipeline:` value, so before deleting a recipe, `grep -l "^pipeline: <name>$" .github/deploy/*.yml` and keep it if ANY surviving deploy file still names it. Three traps: (1) a KEPT job and a DROPPED job can have near-identical filenames (`…cypress-boilerplate.yml` kept vs `…cypress.yml` dropped) — delete by which surviving job references it, not by the name; (2) a fixture/import config named for a suite (`*_ROBOT.yml`) may ALSO be referenced by the regular demodata pipeline — grep its literal filename repo-wide and read the actual `source:`/`command:` lines before deleting, or an unrelated import breaks; (3) a recipe whose name merely *resembles* a dropped suite may be the one a KEPT deploy file still points at — always decide by reference, never by name. When in doubt, leave the recipe: an orphaned `config/install/` file is harmless, a deleted-but-referenced one breaks the boot. Under the project-starter wizard this makes ci-generator the **single owner** of removing an old test-suite's CI jobs + its deploy/install/fixture configs (the robot/acceptance-fixture lane decision comes from the interview `keep_suites`); the suite's Composer-package removal and the new suite's vendoring stay with `cypress-migration`.
 
 For a different host, reproduce the same jobs, commands, and ordering in that host's structure
 — only the wrapper changes.
@@ -99,9 +99,18 @@ the final tree of what remains and the job list of the new pipeline.
 host (no `vendor/`; foreign interpreters like python/ruby aren't allowlisted), so pre-boot
 validation is **structural via grep** — job keys present, `needs:` targets resolve — and GitHub
 itself validates syntax on push. A true parse becomes available **post-boot** via the clone's own
-vendor: `php -r 'require "vendor/autoload.php"; Symfony\Component\Yaml\Yaml::parseFile($f);'`
-(`vendor/symfony/yaml` is present). Cheap — run it on every generated/edited YAML (workflow, deploy
-files, import manifests, configuration ymls) before the next boot attempt.
+vendor (`vendor/symfony/yaml` is present). Pass the filename as an argument — the snippet is meant to
+be run once per file, so it takes `$argv[1]` rather than hardcoding a name, and it prints an explicit
+success line so a silent exit is never mistaken for a pass:
+
+```bash
+php -r 'require "vendor/autoload.php"; Symfony\Component\Yaml\Yaml::parseFile($argv[1]); echo "OK ", $argv[1], PHP_EOL;' .github/workflows/ci.yml
+```
+
+Cheap — run it on every generated/edited YAML (workflow, deploy files, import manifests,
+configuration ymls) before the next boot attempt. A parse error names the file, line and column; an
+error mentioning an undefined variable or a `null` argument means the command was pasted without its
+filename argument, **not** that the YAML is invalid.
 
 **Two Spryker-project handoffs this step owns:**
 - **Store/region tokens vs. the kept deploy files.** This skill runs FIRST (before `define-stores`

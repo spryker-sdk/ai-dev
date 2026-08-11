@@ -13,7 +13,8 @@ working room the later gates need and eventually destabilizes the run.
 **The rule: heavy work happens in subagents; the orchestrator holds only compact state.** A "heavy"
 stage is anything that produces bulk output — driving Chrome (screenshots, page text), runtime/XDebug
 dumps, `codecept run` output, phpcs/phpstan reports, code-review findings, final-verification runs, and
-`gh run view --log-failed`. Run each of those **inside a subagent** (via the `Agent` tool, pointing it
+`gh run view --log-failed`. Run each of those **inside a subagent** (via whichever subagent-spawning
+tool this harness exposes — commonly `Agent`; resolve it via `ToolSearch` first — pointing it
 at the relevant `Skill(...)` or agent `subagent_type`), and require the subagent to:
 
 - **write its raw output to a file** under the run directory `$BUGFIX_DIR` (e.g.

@@ -87,6 +87,9 @@ the current working directory; fall back to `$(pwd)` if the variable is unset.
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 BUGFIX_DIR="$PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>"
 mkdir -p "$BUGFIX_DIR"
+# Make the run directory ignore itself, so this run's own scratch files cannot make
+# the working tree dirty and trip the Step 2 clean-tree gate. Touches no tracked file.
+[ -f "$PROJECT_DIR/.ai-dev/.gitignore" ] || printf '*\n' > "$PROJECT_DIR/.ai-dev/.gitignore"
 BUGFIX_LOG="$BUGFIX_DIR/run.log"
 printf '[%s] STEP 0 — mode=%s base=%s env=%s | START\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$MODE" "$BASE" "$ENV_FRESHNESS" >> "$BUGFIX_LOG"
 ```
@@ -256,6 +259,8 @@ else
 fi
 ```
 
+- An untracked `.ai-dev/` is **this run's own scratch space** (created in Step 0, self-ignoring) — it
+  does **not** count as a dirty tree. If it is the only thing `git status` reports, the tree is clean.
 - If the working tree is **dirty** or HEAD is **behind** the base: surface exactly what you found and
   **ask before proceeding** (Collaborative) or **abort with a clear report** (Autonomous — do not
   silently branch off a polluted/stale base). Branching off the wrong base produces a fix that can't be
@@ -477,7 +482,8 @@ evidence, not just green tests.
 - Re-run the affected functional tests once more for a clean final signal (subagent, as in Step 6);
   if Step 9b produced or changed a Cypress spec, re-run that spec targeted (`--spec`) as well.
 - **Perform an end-to-end final verification in the running app (subagent).** Spawn the
-  `spryker-verifier` agent (via the `Agent` tool with `subagent_type="spryker-verifier"`), or a
+  `spryker-verifier` agent (via the harness's subagent-spawning tool — commonly `Agent`; resolve it
+  via `ToolSearch` first — passing `subagent_type="spryker-verifier"`), or a
   subagent using **`Skill(spryker-runtime)`** if you prefer a raw runtime drive. Hand it the changed
   files, the repro scenarios, the acceptance expectation (the exact user-visible symptom that must be
   gone), and any env gotchas. It drives the affected surface (Yves / Back Office / Glue as relevant),
@@ -570,13 +576,17 @@ with no ticket, omit the trailing key.
      because the run may already be long: re-reading the whole conversation on every 15-min wake is
      exactly what pushes context to the danger zone. The handoff file is the loop's working memory.
 
-     Pick the mechanism by how the run is driven:
-       - Interactive session: `ScheduleWakeup` with `delaySeconds: 900`. Re-pass a **minimal** `/loop`
-         input that says "resume the bugfix watch loop from `$BUGFIX_DIR/watch-state.md`" —
-         not the original full bug context.
-       - Unattended/headless: a **Cron** (`CronCreate`) — load its schema via `ToolSearch` first; point
-         it at the same handoff file.
-       - **Fallback if no scheduler is available:** do NOT claim a loop is running. Report the PR URL
+     Pick the mechanism by what this harness actually exposes — **resolve it via `ToolSearch` first
+     and use its real schema**; the names below are the common ones, not a guarantee, and parameters
+     differ between them (a cron tool takes a cron expression, not a delay in seconds):
+       - A **polling/monitor** tool (e.g. `Monitor`) is the best fit when available: it is built for
+         "poll a command, emit each terminal state, exit when the run completes".
+       - A **self-wakeup** tool (e.g. `ScheduleWakeup`) for an interactive session. Re-pass a
+         **minimal** input that says "resume the bugfix watch loop from `$BUGFIX_DIR/watch-state.md`"
+         — not the original full bug context.
+       - A **cron** tool (e.g. `CronCreate`) for unattended/headless runs; point it at the same
+         handoff file. Note cron jobs are typically session-scoped and expire on their own.
+       - **Fallback if no scheduler resolves:** do NOT claim a loop is running. Report the PR URL
          and explicitly hand monitoring back to the user.
      On each wake, **poll with the cheapest call** — `gh pr checks <pr>` (a compact status table), or for
      `mcp` the forge's list-checks/status tool — **not** `gh run view`. The poll itself must add almost
@@ -639,5 +649,5 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 | 9 QA | `Skill(spryker-qa-coverage)` (isolated subagent) |
 | 9b Cypress E2E (conditional, Step 0 answer 7 + user-visible surface) | `Skill(cypress-tests)` — **subagent**, returns pass/fail/skipped + action (fix/improve/add/none) + spec paths |
 | 10 Final verification (gate) | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` — **subagent**, returns PASS/FAIL + evidence |
-| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + `ScheduleWakeup`/`CronCreate` watch loop (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
+| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + a watch loop on whichever scheduler/monitor tool `ToolSearch` resolves (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
 | 12 Final report | decision log + step log → user-facing report ending with the log file path |

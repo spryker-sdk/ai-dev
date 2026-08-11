@@ -257,8 +257,8 @@ several-fold and `debug: true` disables caches, so a "regression" can be nothing
 than a differently-configured container. Check `runtime` before trusting any before/after
 duration.
 
-**Each application writes to its own directory.** Yves → `data/cache/codeBucket/profiler`;
-Zed, Back Office, Merchant Portal, Glue → `data/tmp/profiler`. The script auto-picks the
+**Each application writes to its own directory.** Yves **and Glue** → `data/cache/codeBucket/profiler`;
+Zed, Back Office, Backend Gateway, Merchant Portal → `data/tmp/profiler`. The script auto-picks the
 most recently written one, which is often not the one you want, so check `source` in the
 output and pass `--dir` when you know the application.
 
@@ -323,7 +323,10 @@ script into the project first, then run the copy:
 
 ```bash
 mkdir -p .claude/tmp
-cp "<plugin-install-dir>/skills/spryker-profiler/scripts/profiler-read.php" .claude/tmp/
+# Source is whichever resolves — never a hardcoded install path:
+#   .claude/skills/spryker-profiler/scripts/profiler-read.php   (setup install)
+#   ${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler/scripts/profiler-read.php  (plugin install)
+cp "${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler/scripts/profiler-read.php" .claude/tmp/
 SCRIPT=.claude/tmp/profiler-read.php
 ```
 

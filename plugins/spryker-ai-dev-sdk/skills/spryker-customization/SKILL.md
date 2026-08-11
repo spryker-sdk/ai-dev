@@ -13,7 +13,7 @@ description: >
 
 # Spryker Customization Workflow
 
-Take a PRD or acceptance criteria and walk it to a committed branch. Invoke focused subagents via the `Agent` tool at the points called out below. User-facing interactions are limited to the consolidated planning gate and the commit gate.
+Take a PRD or acceptance criteria and walk it to a committed branch. Invoke focused subagents at the points called out below, using whichever subagent-spawning tool this harness exposes (commonly `Agent` — resolve it via `ToolSearch` first). User-facing interactions are limited to the consolidated planning gate and the commit gate.
 
 ## Run logging — what, when, how, where
 
@@ -529,7 +529,7 @@ The point: refusing the commit shouldn't lose the staging work or leave the user
 
 ## Subagent delegation cheatsheet
 
-All of these live under `.claude/agents/`. Invoke via the `Agent` tool with `subagent_type="<name>"` — never via the `Skill` tool.
+All of these ship as agent definitions (`.claude/agents/` for a setup install, or the plugin's `agents/` directory). Invoke them with the harness's subagent-spawning tool (commonly `Agent`), passing `subagent_type="<name>"` — never via the `Skill` tool.
 
 | Subagent | When to invoke |
 |---|---|

@@ -105,7 +105,26 @@ $defaultProfilerDirs = [
     $projectRoot . '/data/cache/codeBucket/profiler',
 ];
 
+/**
+ * Every recognised option. A misspelled flag would otherwise be dropped silently by
+ * parseOptions() and fall through to the default "describe the newest profile" mode,
+ * returning a well-formed answer for a request nobody asked about.
+ */
+const KNOWN_OPTIONS = [
+    'list', 'worst', 'trace', 'token', 'url', 'dir', 'limit', 'scan',
+    'verbose', 'window', 'no-siblings', 'project-root', 'help',
+];
+
 $options = parseOptions($argv);
+
+if (isset($options['help'])) {
+    printUsage();
+
+    exit(0);
+}
+
+guardUnknownOptions($options);
+
 $directory = resolveProfilerDirectory($options['dir'] ?? null, $defaultProfilerDirs);
 $index = readIndex($directory);
 
@@ -382,6 +401,56 @@ function sumTree(array $entry, array $children, array $siblings): array
         'summed_duration_ms' => round($duration, 1),
         'duration_caveat' => 'double-counts nested Zed time; compare branches, not wall-clock',
     ];
+}
+
+/**
+ * @param array<string, string> $options
+ */
+function guardUnknownOptions(array $options): void
+{
+    $unknown = array_diff(array_keys($options), KNOWN_OPTIONS);
+
+    if ($unknown === []) {
+        return;
+    }
+
+    fail(sprintf(
+        'Unknown option(s): --%s. Valid: --%s. Use --help for usage.',
+        implode(', --', $unknown),
+        implode(', --', KNOWN_OPTIONS),
+    ));
+}
+
+function printUsage(): void
+{
+    echo <<<'TXT'
+    profiler-read.php — read Spryker/Symfony WebProfiler data as JSON.
+
+    Modes (pick one; default = describe the newest profile):
+      --list                  List indexed profiles (newest first).
+      --worst[=<metric>]      Rank profiles. Metrics: queries (default), duplicate_queries,
+                              redis, elasticsearch, zed_requests, external_http, memory_mb,
+                              duration_ms.
+      --trace=<token>         Follow one request across applications (Yves -> Zed children).
+      --token=<token>         Describe one profile by token.
+      --url=<substring>       Describe the newest profile whose URL matches.
+
+    Options:
+      --dir=<path>            Profiler directory to read.
+                              Yves + Glue: data/cache/codeBucket/profiler
+                              Zed/BO/BG/MP: data/tmp/profiler
+      --limit=<n>             Rows to return (default 20).
+      --scan=<n>              Profiles to load when ranking (default 200).
+      --window=<seconds>      Sibling-grouping window for --trace (default 5).
+      --no-siblings           Skip sibling grouping in --trace.
+      --verbose               Include repeated SQL statements and Twig details.
+      --project-root=<path>   Project root holding vendor/autoload.php.
+      --help                  This text.
+
+    Output is JSON on stdout; errors are JSON with an "error" key and exit code 1.
+    TXT;
+
+    echo PHP_EOL;
 }
 
 /**

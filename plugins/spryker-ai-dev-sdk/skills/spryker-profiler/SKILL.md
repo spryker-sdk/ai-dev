@@ -19,9 +19,15 @@ the container) and always **from the Spryker project root** — the script locat
 project from the working directory, not from its own path.
 
 The container mounts only the project directory, so first set `SCRIPT` based on where
-this skill actually lives — check the "Base directory for this skill" line shown when
-the skill loaded (if no such line is visible, it is the directory containing this
-SKILL.md):
+this skill actually lives. Resolve the base directory in this order — do **not** hardcode
+an install path, since this skill ships as a plugin and its location varies:
+
+1. `.claude/skills/spryker-profiler` (setup install, relative to the project cwd)
+2. `${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler` (plugin install)
+3. the "Base directory for this skill" line shown when the skill loaded, or failing that
+   the directory containing this SKILL.md
+
+Then pick the matching case below:
 
 - **Base directory is inside the project** (e.g. `<project>/.claude/skills/spryker-profiler`):
   use the script in place.
@@ -37,6 +43,7 @@ SKILL.md):
 
   ```bash
   mkdir -p .claude/tmp
+  # <base-directory> = whichever resolved above, e.g. ${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler
   cp "<base-directory>/scripts/profiler-read.php" .claude/tmp/
   SCRIPT=.claude/tmp/profiler-read.php
   ```
@@ -69,6 +76,11 @@ an empty result after the `sed` means the command itself failed before PHP ran.
 | `--token=<token>` | Metrics for one specific profile |
 | `--worst=<metric>` | Rank recent profiles to find the outlier |
 | `--trace=<token>` | **The full picture for one page load** — entry request + its Zed calls + related AJAX |
+| `--help` | Usage: every mode, option and rankable metric |
+| `--project-root=<path>` | Project root holding `vendor/autoload.php`, when the cwd is not inside it |
+
+Unrecognised flags are rejected with the valid list — a typo can never silently fall
+through to "describe the newest profile" and hand you the wrong request's numbers.
 
 Options: `--limit` (results), `--scan` (profiles to examine in `--worst`, default 100),
 `--verbose` (adds the top repeated SQL statements), `--dir` (override the profiler
@@ -112,7 +124,7 @@ Three separate mechanisms produce these profiles, and they link differently:
 | **ESI / widget sub-requests** | Separate top-level profiles, no parent link stored | Heuristic: same time window |
 | **Browser AJAX** (`/cart/quantity`, widgets, JSON) | Issued by the browser, so PHP records no relation at all | Heuristic: same time window |
 
-**Parent and children live in different directories.** Yves writes to
+**Parent and children live in different directories.** Yves **and Glue** write to
 `data/cache/codeBucket/profiler`; Zed/Backend Gateway writes to `data/tmp/profiler`.
 `--trace` searches both automatically — this is why reading a child by hand needs the
 right `--dir` and why the linked profiles carry a `source` field.
@@ -233,18 +245,29 @@ not "everything recorded". Reproduce the requests you care about and re-run.
 
 ### Each application writes to its own directory
 
-This is the single most common way to waste time here. Yves writes to
-`data/cache/codeBucket/profiler`; Zed, Back Office and Merchant Portal write to
-`data/tmp/profiler`. The script auto-picks whichever was written most recently, which
-is often not the one you want — a Back Office investigation can silently read Yves data
-and find nothing.
+This is the single most common way to waste time here.
+
+| Application | Directory |
+|---|---|
+| Yves, **Glue (storefront + backend)** | `data/cache/codeBucket/profiler` |
+| Zed, Back Office, Backend Gateway, Merchant Portal | `data/tmp/profiler` |
+
+**Glue lives with Yves, not with Zed** — `Spryker\Glue\WebProfiler\WebProfilerConfig`
+defaults to the codeBucket path. Pointing a Glue investigation at `data/tmp/profiler` either
+errors ("no profile matched") or, worse, silently ranks Back Office requests and reports them
+as the Glue endpoint's cost.
+
+The script auto-picks whichever directory was written most recently, which is often not the
+one you want — a Back Office investigation can silently read Yves data and find nothing.
 
 Check `source` in the output, and pass `--dir` when you know which application you are
-investigating:
+investigating. Note `source` only echoes back the directory you asked for, so it confirms
+rather than catches a wrong `--dir` — verify the `url` host too:
 
 ```bash
-docker/sdk cli php $SCRIPT --dir=/data/data/tmp/profiler --worst=queries    # Zed / BO / MP
-docker/sdk cli php $SCRIPT --dir=/data/data/cache/codeBucket/profiler --url=/en  # Yves
+docker/sdk cli php $SCRIPT --dir=/data/data/tmp/profiler --worst=queries              # Zed / BO / BG / MP
+docker/sdk cli php $SCRIPT --dir=/data/data/cache/codeBucket/profiler --url=/en       # Yves
+docker/sdk cli php $SCRIPT --dir=/data/data/cache/codeBucket/profiler --url=glue      # Glue
 ```
 
 Paths are container paths (`/data/...`) because the script runs inside the container.
