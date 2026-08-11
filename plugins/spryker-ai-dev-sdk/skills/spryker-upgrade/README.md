@@ -55,6 +55,7 @@ findings:
 php $UP/check-test-coverage.php               # override surface vs. tests
 php $UP/check-vendor-class-replacement.php     # classes declared in vendor namespaces
 php $UP/check-legacy-css-classes.php           # legacy CSS classes vs what vendor still emits
+php $UP/check-platform-alignment.php           # is this host a valid place to resolve at all?
 
 # BEFORE composer: baselines + constraint preflight
 php $UP/check-constraint-style.php            # patch-locked / merged constraints
@@ -388,3 +389,46 @@ dependencies.
 Exit 1 only when something is genuinely `MIGRATE`. It never rewrites anything: `KEEP (JS)` rows in
 particular need a human to leave them alone. If vendor templates cannot be found at all it exits 2
 rather than reporting everything as `MIGRATE`, since that is the dangerous direction to be wrong in.
+
+## bin/check-platform-alignment.php — is this host a valid place to resolve at all?
+
+Run this in **Phase 0, before the first `composer update`**. It answers one question: will a lock
+resolved on this machine install on the machine the project actually runs on?
+
+```bash
+php $UP/check-platform-alignment.php                 # report
+php $UP/check-platform-alignment.php --target=8.3.2  # override the detected deployment PHP
+```
+
+The failure it prevents is quiet and expensive. A project declares `require.php: ">=8.3"` and runs
+`spryker/php:8.3`; a developer on PHP 8.5 satisfies `">=8.3"`, so composer objects to nothing and
+resolves dev tooling (`doctrine/instantiator`, `symfony/type-info`, `lcobucci/clock`, `phpunit`) to
+versions needing PHP 8.4+. The lock installs on that laptop and in no container:
+
+```
+Your lock file does not contain a compatible set of packages.
+doctrine/instantiator 2.1.0 requires php ^8.4 -> your php version (8.3.32) does not satisfy that
+```
+
+On the validation run this surfaced only when `docker/sdk up` died at `composer install`, many phases
+after the damage — and it meant the entire characterization suite had been running on the wrong PHP
+minor, so "the tests pass" had not meant what it appeared to mean.
+
+It reports:
+
+- **host PHP vs every `deploy*.yml` image tag** — and flags deploy files that *disagree* with each
+  other, since then there is no single platform to resolve for;
+- **`config.platform.php` absent** while the host and deployment minors differ — the actual hazard;
+- **`config.platform.php` pointing at the wrong minor**;
+- **locked packages that cannot install on the target PHP** — the decisive check, and what
+  `docker/sdk up` would otherwise discover the hard way;
+- **extensions the lock requires that this host lacks** (`ext-redis`, `ext-pgsql`). This is a separate
+  failure: a platform pin fixes the PHP *version*, not the *extension set*, so composer cannot resolve
+  those packages here at all. The answer is to run composer in the container — never
+  `--ignore-platform-req`, which fakes the requirement and re-creates the uninstallable lock.
+
+Target precedence is `--target` → `config.platform.php` → the image tag's `.0` floor. The declared
+platform wins because it is what composer actually resolves against; inferring `.0` from an `8.3` tag
+otherwise false-positives on any package with a patch-level constraint such as `~8.3.2`.
+
+Exit 1 on anything that can produce an uninstallable lock, 0 when aligned.

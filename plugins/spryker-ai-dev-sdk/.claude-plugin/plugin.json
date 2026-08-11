@@ -1,6 +1,6 @@
 {
   "name": "spryker-ai-dev-sdk",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Set of setup tools and skills for Spryker project development.",
   "author": {
     "name": "Spryker Systems GmbH",
