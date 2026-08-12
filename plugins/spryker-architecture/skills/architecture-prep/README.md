@@ -120,3 +120,34 @@ designs · `05` building block view (+C2/C3) · `06` runtime view (+sequences) �
 `08` crosscutting concepts · `09` architecture decisions (ADRs) · `10` quality requirements (volumes) ·
 `11` risks & technical debt · `12` glossary. Step 0 asks which to produce this run; only those are
 written.
+
+## Run artifacts
+
+The **deliverable** is the git-tracked `architecture/` folder, edited in place. Everything the run
+produces *about* itself is kept separately so it never pollutes that deliverable:
+
+```
+.ai-dev/architecture-prep/<run-id>/
+```
+
+| File | Role |
+|------|------|
+| `run.log` | The append-only **timeline** — one timestamped line per boundary (`STEP <n> … \| START` / `\| END`) and per milestone (`SECTION 03 \| written (2 todos)`). |
+| `decisions.md` | The **rationale** — every fork resolved autonomously, plus open questions and risks. |
+| `intake.md` | The single intake file every interview answer or TAD mapping is written into. |
+| `research-*.md` | Per-source findings from the Step 2 research teammates (docs / web / current-state). |
+
+Logged at minimum: the Step 0 config, interview complete, each research source done or skipped, each
+section written with its TODO count, the cross-link pass total, the review outcome, and the handoff.
+A failed or blocked step is logged `FAIL`/`SKIP` with its reason **before** the run stops, so the log
+always ends with the cause rather than trailing off. Multi-deliverable runs keep **one** run directory
+even though each deliverable gets its own worktree.
+
+Full discipline — the run directory, the State Object, log line shapes, and the decision log — is in
+[references/run-lean.md](references/run-lean.md).
+
+## Packaging note
+
+This skill ships in the `spryker-architecture` plugin under `vendor/spryker-sdk/ai-dev/…`, which is
+Composer-managed — `composer update spryker-sdk/ai-dev` may overwrite it. The durable home for edits
+is the plugin's own repository (`github.com/spryker-sdk/ai-dev`).

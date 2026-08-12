@@ -1,0 +1,35 @@
+{
+  "skill_name": "spryker-profiler",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "The Back Office sales overview at /sales feels slow. How many SQL queries does it run, and are any of them duplicated?",
+      "expected_output": "Reproduces the request (or finds a fresh profile), reads it with profiler-read.php from the Zed/Back Office profiler directory (data/tmp/profiler), and reports total/unique/duplicate query counts with the profiler_url. Does not report a metric from an absent collector as zero.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Something in the storefront got sluggish this week but I can't say which page. Find the heaviest recorded request.",
+      "expected_output": "Uses --worst on the Yves profiler directory (data/cache/codeBucket/profiler), checks actually_analysed vs expired_or_missing before trusting the ranking, and reports the outlier with its counts compared against neighbouring requests.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I enabled the web profiler but the Merchant Portal shows no profile data at all. What's missing?",
+      "expected_output": "Walks the three layers from references/setup.md (IS_WEB_PROFILER_ENABLED in config_local.php, WebProfilerApplicationPlugin registration for the specific application, collector plugins), identifies which layer is missing, and mentions cache:empty-all after wiring changes.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I just changed the cart calculator wiring — prove my change didn't add queries to the cart page.",
+      "expected_output": "Profiles the same URL before/after (or against a baseline), compares I/O counts rather than wall-clock duration, and states both numbers. Notes that Yves has no Propel collector, so query counts must come from the application that does the work (Zed/Glue).",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Did the Back Office record an audit log entry for my last admin login, and did that request log any errors or throw anything?",
+      "expected_output": "Reproduces or finds the fresh /login_check profile in data/tmp/profiler and reads its audit_log block (entries, channels, --verbose for messages). Understands the omission contract: a missing exception key means nothing was thrown and a missing logs key means nothing was logged — reports that as a finding, not as missing data. Links the profiler_url.",
+      "files": []
+    }
+  ]
+}

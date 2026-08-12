@@ -1,9 +1,11 @@
-# static-check-diff
+# static-validation
 
 Spryker static analysis over **only the code that changed** versus a base branch — PHP **and**
 frontend.
 
-Runs the project's standard tools inside the container via `docker/sdk cli`, scoped to your diff:
+Runs the project's standard tools scoped to your diff — PHP tools inside the container via
+`docker/sdk cli`; the frontend linters wherever `node_modules` actually is (container first,
+host fallback — many Spryker projects install it on the host only):
 
 - **PHP** — `phpcbf`, `phpcs`, `phpmd` (project architecture ruleset `phpmd.xml`, priority 4),
   `phpstan` (level 6).
@@ -18,6 +20,56 @@ It is the flexible successor to fixed, single-base validation scripts.
 Validating the whole codebase on every change is slow and noisy, and the `package.json` FE scripts
 lint **everything**. This skill validates just what you touched — and, for PHP, optionally the
 whole Spryker module you touched — against whatever base branch your work forked from.
+
+## Flow schema
+
+```mermaid
+flowchart TD
+    A([bash $SCD options]) --> B["Resolve roots<br/>REPO_ROOT = --repo or git rev-parse --show-toplevel<br/>refuse the skill's own repo<br/>MAIN_ROOT = parent of --git-common-dir"]
+    B --> SDK{"docker/sdk<br/>executable found?"}
+    SDK -- "no" --> ERR2([exit 2 — environment error])
+    SDK -- "yes" --> WT{"linked worktree?<br/>MAIN_ROOT != REPO_ROOT"}
+    WT -- "yes" --> WARN["warn: container mounts the MAIN checkout<br/>commit/sync worktree-only files"]
+    WT -- "no" --> BASE
+    WARN --> BASE["Resolve base ref<br/>--base &gt; STATIC_CHECK_BASE &gt; auto-detect<br/>master &rarr; main &rarr; origin/HEAD"]
+    BASE --> BOK{"base resolves?"}
+    BOK -- "no" --> ERR2
+    BOK -- "yes" --> COLLECT["Collect changed files<br/>git diff base...HEAD (merge-base)<br/>+ git diff HEAD (working tree)<br/>+ git ls-files --others (untracked)<br/>dedupe, skip deleted"]
+
+    COLLECT --> ANY{"anything changed?"}
+    ANY -- "no" --> OK0([exit 0 — nothing to validate])
+    ANY -- "yes" --> PART["Partition by extension<br/>.php &rarr; PHP<br/>.js/.ts &rarr; eslint + prettier<br/>.scss/.css/.less &rarr; stylelint + prettier<br/>.json/.html &rarr; prettier"]
+
+    PART --> SKIP["PHP: skip generated code<br/>src/Generated, src/Orm"]
+    SKIP --> SCOPE{"--scope"}
+    SCOPE -- "files (default)" --> SF["one target per changed .php file"]
+    SCOPE -- "module" --> SM["module root of<br/>src/Org/Layer/Module<br/>&rarr; validate whole dir<br/>non-module paths stay individual"]
+    SF --> SETS
+    SM --> SETS["Build path sets<br/>cs_paths: phpcs/phpcbf (tests only with --include-tests)<br/>strict_paths: phpmd/phpstan (never tests or config/)"]
+
+    SETS --> DRY{"--dry-run?"}
+    DRY -- "yes" --> PLAN([Print base, scope<br/>and per-tool paths<br/>exit 0 — run nothing])
+    DRY -- "no" --> RUN["Run each selected tool via<br/>docker/sdk cli, from MAIN_ROOT<br/>--tools filters the set"]
+
+    RUN --> PHP["PHP<br/>phpcbf (always fixes)<br/>phpcs<br/>phpmd ruleset+priority<br/>phpstan -l level -c config"]
+    RUN --> FE{"--fix / STATIC_CHECK_FIX=1?"}
+    FE -- "no" --> FEC["eslint · stylelint --allow-empty-input<br/>prettier --check"]
+    FE -- "yes" --> FEF["eslint --fix · stylelint --fix<br/>prettier --write"]
+
+    PHP --> AGG["Aggregate exit codes<br/>any tool non-zero &rarr; overall_rc = 1"]
+    FEC --> AGG
+    FEF --> AGG
+    AGG --> VERDICT{"overall_rc"}
+    VERDICT -- "0" --> OK([exit 0 — static analysis passed])
+    VERDICT -- "1" --> BAD([exit 1 — violations reported<br/>report findings, list autofixed files])
+
+    classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
+    classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
+    classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
+    class B,WARN,COLLECT,PART,SKIP,SF,SM,SETS,RUN,PHP,FEC,FEF,AGG step;
+    class SDK,WT,BOK,ANY,SCOPE,DRY,FE,VERDICT decision;
+    class A,OK,OK0,BAD,ERR2,PLAN terminal;
+```
 
 ## Features
 
@@ -49,27 +101,39 @@ whole Spryker module you touched — against whatever base branch your work fork
 
 ## Usage
 
+**Locate the engine:** `.claude/skills/static-validation/scripts/static-check-diff.sh` (setup install,
+relative to the project cwd) or `${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh`
+(plugin install). `$SCD` below is shorthand for whichever resolves — substitute it inline as a literal path.
+
+**Run from the Spryker project root** (the directory containing `docker/sdk`), or pass `--repo <path>`.
+The project to validate comes from your cwd or `--repo`, never from the skill's install location —
+running with the skill directory as cwd is refused with an actionable error.
+
 ```bash
 # Preview what would be checked (no tools run):
-bash scripts/static-check-diff.sh --dry-run
+bash "$SCD" --dry-run
+
+# Validate a project without cd-ing into it:
+bash "$SCD" --repo /path/to/project --dry-run
 
 # Validate changed files (PHP + FE) against auto-detected base:
-bash scripts/static-check-diff.sh
+bash "$SCD"
 
 # Validate every changed PHP MODULE (+ all changed FE files) against master:
-bash scripts/static-check-diff.sh --base master --scope module
+bash "$SCD" --base master --scope module
 
 # Only the frontend linters, autofix:
-bash scripts/static-check-diff.sh --tools eslint,stylelint,prettier --fix
+bash "$SCD" --tools eslint,stylelint,prettier --fix
 
 # Fully read-only check (no fixers), against main:
-bash scripts/static-check-diff.sh --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
+bash "$SCD" --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
 ```
 
 ### Options
 
 | Option | Default | Description |
 |---|---|---|
+| `-r, --repo <path>` | cwd's git repo | Project root to validate — run from anywhere. |
 | `-b, --base <ref>` | auto-detect | Base branch/ref to diff against. |
 | `-s, --scope <mode>` | `files` | `files` or `module` — PHP grouping only (FE always individual). |
 | `--tools <list>` | all | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
@@ -91,11 +155,12 @@ Defaults live in the script; each is overridable via an env var:
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
+| `STATIC_CHECK_REPO` | cwd's git repo | Project root to validate (same as `--repo`). |
 
 ```bash
 # Run phpstan at level 8 against a custom config:
 STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
-  bash scripts/static-check-diff.sh --tools phpstan
+  bash "$SCD" --tools phpstan
 ```
 
 ### Exit codes
@@ -103,17 +168,29 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
 | Code | Meaning |
 |---|---|
 | `0` | Clean, or dry-run, or nothing changed. |
-| `1` | Violations reported by at least one tool. |
-| `2` | Usage / environment error (bad option, unresolvable base, not a git repo). |
+| `1` | **Code violations** reported by at least one tool. |
+| `2` | Usage error (bad option, unknown `--tools` name, unresolvable base, base == HEAD, not a git repo, skill's own dir as cwd), **or a tool that failed to RUN** (missing `src/Generated`, missing `node_modules`, unresolvable tool config), **or no tool was invoked at all**. |
+
+Exit `2` never means "your code has problems" — nothing was analysed. The script names the tool and
+the remediation. Do not report those as findings or try to fix code for them.
 
 ## Requirements
 
 - A **running** Spryker environment (`docker/sdk cli` must work). Start it with the
-  `spryker-docker-sdk` skill if the containers are down. Frontend tools run via `npx` in-container.
+  `spryker-docker-sdk` skill if the containers are down.
+- **`src/Generated`** must exist for phpstan — the project's `phpstan-bootstrap.php` hard-requires files
+  under it. Generate with `docker/sdk cli console transfer:generate`, then
+  `docker/sdk cli composer phpstan-setup` for `src/Generated/Client/Ide/AutoCompletion.php`
+  (the bootstrap file — `transfer:generate` alone does **not** create it, and `phpstan-setup`
+  itself fails until transfers exist, so run them in that order). Without them phpstan fatals
+  during bootstrap and the script exits `2` naming that remedy.
+- **`node_modules`** must exist in the container (`/data`) **or** on the host for eslint/stylelint/prettier.
+  The script probes both and uses the project's pinned `node_modules/.bin/<tool>`. Install with
+  `docker/sdk cli npm install`, or `npm ci` on the host.
 - Project configs present at repo root: PHP — `phpcs.xml`, `phpstan.neon`, and the project
   architecture ruleset `phpmd.xml` (if absent, the vendored
   `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` is used). Frontend — `eslint.config.mjs`,
-  `.stylelintrc.js`, `.prettierrc.json`, and installed `node_modules` (via `docker/sdk cli npm install`).
+  `.stylelintrc.js`, `.prettierrc.json`.
 
 ## Caveats
 
@@ -121,12 +198,17 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
   only with `--fix`. For a non-mutating review, drop `phpcbf` from `--tools` and omit `--fix`.
 - On Docker-for-Mac the file sync back to the host is slightly async — after an autofix run, the
   host copy updates a moment later. Re-run in check mode to confirm.
-- Levels and rulesets mirror the project QA / package.json baseline, so results align with CI.
-- **phpmd uses the project ruleset, not the core framework one.** Spryker ships two: `phpmd.xml`
-  (project development, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml`
-  (core/framework development, priority 2). To check core rules instead, set
-  `STATIC_CHECK_PHPMD_RULESET=vendor/spryker/architecture-sniffer/src/ruleset.xml` and
-  `STATIC_CHECK_PHPMD_PRIORITY=2`.
+- phpstan level and phpcs standard mirror the project QA baseline.
+- **phpmd runs BOTH rulesets, because CI does.** Spryker ships two and they are **disjoint, not nested**:
+  `phpmd.xml` (project, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml` (core,
+  priority 2 — ~26 rules found nowhere else, e.g. `FacadeReturnValueRule`, `SpyEntityUsageRule`).
+  Spryker CI typically runs both unconditionally, so a project-only run can be green while CI's
+  "Run Architecture rules" step is red. Setting `STATIC_CHECK_PHPMD_RULESET` (+ `_PRIORITY`) pins a
+  single pair and disables the second run.
+- **Test files are excluded from phpmd/phpstan**, including repo-root trees like `tests/PyzTest/…`
+  (phpcs/phpcbf too, unless `--include-tests`). If excluding tests leaves no phpcs target, phpcs/phpcbf
+  are **skipped with a warning** rather than silently re-including the test files — which matters
+  because `phpcbf` rewrites what it is given.
 
 ## Layout
 
@@ -137,3 +219,9 @@ static-validation/
 └── scripts/
     └── static-check-diff.sh        # the engine (bash 3.2 compatible)
 ```
+
+## Packaging note
+
+This skill ships in the `spryker-ai-dev-sdk` plugin under `vendor/spryker-sdk/ai-dev/…`, which is
+Composer-managed — `composer update spryker-sdk/ai-dev` may overwrite it. The durable home for edits
+is the plugin's own repository (`github.com/spryker-sdk/ai-dev`).

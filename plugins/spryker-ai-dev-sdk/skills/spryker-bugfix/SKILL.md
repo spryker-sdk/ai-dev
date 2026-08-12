@@ -5,7 +5,8 @@ description: >
   service) or a plain bug description to a committed,
   validated, QA-accepted fix on a bugfix branch (autonomous mode adds a pushed Draft PR +
   CI watch). Orchestrates reproduce → root-cause → fix → functional tests → static checks →
-  review → QA → final verification via the project's stage skills. Trigger — "fix this bug",
+  review → QA → Cypress E2E coverage (when warranted) → final verification via the project's stage
+  skills. Trigger — "fix this bug",
   "fix ticket XY-1122", "broken, reproduce and fix it": any bug symptom PLUS the expectation of a
   DELIVERED fix. NOT for a single isolated step (one test, "just run CI"), new features,
   refactors without a symptom, or investigation-only requests ("just find where it goes wrong,
@@ -59,7 +60,7 @@ companion files in this directory:
 
 Heavy work (Chrome, XDebug, codecept, phpcs/phpstan, review, final verification, CI logs) runs in
 **subagents** that write raw output to files under `$BUGFIX_DIR`
-(`$CLAUDE_PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
+(`$CLAUDE_PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
 The orchestrator retains only the **State Object**: mode/base/branch/attempt, extra expectations, repro
 summary, root-cause `file:line`, diff stat, per-gate verdicts (≤5 actionable items each), and log-file
 pointers. Details: [reference.md](reference.md) § Run lean / § The run directory / § The State Object.
@@ -87,10 +88,12 @@ principles and § The decision & question log.
 
 ## Workflow spine
 
-**Step 0 — Choose mode and gather context (ALWAYS FIRST).** One multi-tab `AskUserQuestion`: mode
+**Step 0 — Choose mode and gather context (ALWAYS FIRST).** One up-front intake round (two
+back-to-back multi-tab `AskUserQuestion` calls of 4 questions each — the tool caps at 4 per call): mode
 (Autonomous vs Collaborative), the bug context (an **optional** ticket from any tracker **and/or** a
 free-text description), base branch, env freshness, pre-push personal review, **PR delivery** (create a
-PR or not, and via which channel — auto / `gh` / a named forge MCP / push-only), and extra expectations
+PR or not, and via which channel — auto / `gh` / a named forge MCP / push-only), **Cypress E2E
+coverage** (auto / always / skip — gates Step 9b), and extra expectations
 beyond the default scope. Then create `$BUGFIX_DIR` + `run.log` step logger, **probe `PR_CHANNEL`**,
 handle the env-reset decision, and — only if a ticket was given and its tracker is reachable — pull the
 ticket for extra context. Read [stages.md](stages.md) § Step 0 before executing this stage.
@@ -110,7 +113,7 @@ returns a summary) and, in parallel, `Skill(spryker-docs-research)` for expected
 couldn't reproduce is a hypothesis. Read [stages.md](stages.md) § Step 3 before executing this stage.
 
 **Step 4 — Root-cause investigation. ← LOOP RE-ENTRY POINT.** The shared `attempt` counter is
-defined here (starts at 1; +1 on every loopback from Steps 8/9/11; **hard stop when `attempt > 3`**).
+defined here (starts at 1; +1 on every loopback from Steps 8/9/9b/10/11; **hard stop when `attempt > 3`**).
 Delegate runtime tracing to a subagent (`Skill(ai-runtime-debugging)` + `Skill(spryker-runtime)`)
 that returns the confirmed executing path `file:line` + decisive values. When several candidates
 survive in Autonomous mode, pick the evidence-backed one and log a CRITICAL DECISION.
@@ -141,6 +144,17 @@ subagent, handed the full session context (changed files, repro scenarios, env g
 commands already run, ticket/description). QA must confirm the symptom is gone **E2E**. Accepted → continue;
 rejected → treat as a Step 8 failure (loop to Step 4 within the budget).
 Read [stages.md](stages.md) § Step 9 before executing this stage.
+
+**Step 9b — Cypress E2E test coverage (conditional, subagent).** After QA has accepted the fix,
+lock the user-visible behavior in as an automated E2E test. Gated by the Step 0 Cypress preference:
+when the bug is user-visible on an E2E surface (storefront / Back Office / Merchant Portal / Glue)
+and the project's Cypress suite exists, one subagent with `Skill(cypress-tests)` decides whether to
+**fix** a broken spec, **improve** assertions that would have missed the bug, or **add** a new spec
+— then runs it targeted plus the suite's quality gate, writes the log to `$BUGFIX_DIR`, and returns
+pass/fail/skipped + the action taken + spec paths. A skip is a logged decision, never a silent
+omission. A fail that indicts the fix loops to Step 4 within the budget; a test-authoring fail is
+iterated without consuming an attempt. Read [stages.md](stages.md) § Step 9b before executing this
+stage.
 
 **Step 10 — Final verification before commit.** Re-run the affected functional tests (subagent),
 then perform an **end-to-end final verification of the fix in the running app** (subagent — the

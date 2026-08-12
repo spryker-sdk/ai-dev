@@ -1,6 +1,6 @@
 {
     "name": "spryker-architecture",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Architecture documentation tooling for Spryker projects — arc42/C4 records, ADRs, and Solution Designs.",
     "author": {
         "name": "Spryker Systems GmbH",

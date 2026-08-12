@@ -7,13 +7,85 @@ description: >
   "production-quality build". Drives the full workflow from intake to commit,
   choosing a quality bar (PoC or MVP) at the start and delegating focused
   work (research, verification, debugging, test-data setup, refresh,
-  demo-artifact capture) to the spryker-* subagents. Never auto-commits;
-  the user always confirms.
+  Cypress E2E coverage, demo-artifact capture) to the spryker-* subagents
+  and skills. Never auto-commits; the user always confirms.
 ---
 
 # Spryker Customization Workflow
 
-Take a PRD or acceptance criteria and walk it to a committed branch. Invoke focused subagents via the `Agent` tool at the points called out below. User-facing interactions are limited to the consolidated planning gate and the commit gate.
+Take a PRD or acceptance criteria and walk it to a committed branch. Invoke focused subagents at the points called out below, using whichever subagent-spawning tool this harness exposes (commonly `Agent` — resolve it via `ToolSearch` first). User-facing interactions are limited to the consolidated planning gate and the commit gate.
+
+## Run logging — what, when, how, where
+
+A build spans many steps, several subagents, and a self-correct loop that can revisit the same AC more
+than once. The run keeps a written trail so the commit gate is judged on evidence rather than memory,
+and so a resumed or compacted run can re-orient. This **records** the workflow below — it does not
+change any step's behavior, gates, or ordering.
+
+**Where.** One per-run folder, anchored to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`,
+with a `$(pwd)` fallback) so it is stable regardless of the current working directory:
+
+```
+${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-customization/<feature-slug>/
+```
+
+`<feature-slug>` is the same slug used for the `ai-customize/<slug>` branch. Keep **all** run files
+inside `$BUILD_DIR` — never scatter them elsewhere. The folder survives across self-correct iterations,
+which is what lets iteration N read what iteration N−1 already tried.
+
+Three files, three distinct roles — keep them separate:
+
+| File | Role |
+|---|---|
+| `run.log` | The append-only **timeline** — what happened, when. One line per step boundary. |
+| `decisions.md` | The **rationale** — why each non-obvious fork was resolved the way it was. |
+| `<stage>-<n>.log` | **Bulk output** from a subagent or gate (verifier runs, review findings, static-validation reports). |
+
+**When.** Create the folder and the log at the **end of Step 0**, once the quality bar and phase list
+are settled (those answers are the first thing worth recording) and before Step 0c / Intake. Write to
+it continuously from that point on — never reconstruct the log at the end.
+
+Because this skill does file work with **native tools, not `Bash`** (see "What you do NOT do"), create
+and update these files with `Write` / `Edit` / `Read`, using project-relative paths. The shape of a
+`run.log` line:
+
+```
+[2026-08-10 14:02:11] STEP 4 — edit | START
+[2026-08-10 14:31:47] STEP 4 — edit | END 6 files touched (3 new, 3 modified)
+[2026-08-10 14:52:03] STEP 6 — verification | END AC 1,2,4 green · AC 3 red → see verify-1.log
+[2026-08-10 15:07:20] STEP 7 — self-correct iter=1 AC=3 | END still red → iter=2
+```
+
+**What.** Log one line per step boundary (`| START`, `| END <one-line outcome>`), plus every result a
+later reader would need:
+
+- The Step 0 answers: quality bar, and which phases are ON/OFF (an OFF phase explains a missing step later).
+- The resolved PRD source from Step 0c, and the AC checklist count from Step 1.
+- The branch cut in Step 2.
+- Each subagent invocation: which agent, for what, and its compact verdict — plus the file holding its raw output.
+- **Every self-correct iteration** in Step 7: the AC, the iteration number, what was changed, and the
+  outcome. This is the highest-value part of the log — it is what makes a stuck loop visible as a
+  pattern instead of a surprise, and it feeds the "stuck signals" judgement the step already makes.
+- Each gate verdict: refresh, verification, Cypress E2E (or its logged skip reason), static validation, code review — `pass|fail` and the output file.
+- The final AC tally and the user's commit-gate answer.
+
+Record in `decisions.md` every fork you resolved without asking: the choice, the alternatives rejected,
+and a one-line reason (e.g. *"Extended the existing price expander rather than adding a plugin — the
+canonical chain already runs it for this AC"*). Also keep an **OPEN QUESTIONS / RISKS** section for
+anything you proceeded past: PoC shortcuts, out-of-scope smells, BC risks, assumptions a human should
+confirm. This is the source for the Step 8 report's Caveats block — do not wait until the end to write it.
+
+**How.** Three rules:
+
+- **Bulk output goes to a file, not into the log or your context.** A subagent returns a compact
+  verdict; its raw output (screenshots list, page text, phpstan report, review findings) belongs in
+  `$BUILD_DIR/<stage>-<n>.log`. Keep the `run.log` line to the outcome plus that filename, and `Read`
+  the file later only if you need specific lines.
+- **Never log a step green that wasn't.** A skipped phase, a blocked verification, or an AC that is
+  still red after retries is logged as exactly that. The Step 8 report is built from this log, and
+  the honesty rule the report already carries starts here.
+- **Log the loop, not just the exit.** Step 7 can revisit an AC repeatedly; each iteration gets its own
+  line. A log that shows only the final state hides the two attempts that failed first.
 
 ## Step 0: Setup decisions (quality bar + phases)
 
@@ -48,12 +120,15 @@ The workflow has these phases. **Show the user the list, mark each ON/OFF with s
 | Verification (per-AC via `spryker-verifier`) | **on** | User will verify manually, or AC list is too ambiguous to verify automatically |
 | QA-thorough coverage (expand ACs into 4-bucket test plan via `spryker-qa-coverage` skill before verifier runs) | **on for MVP, off for PoC** | PoC verifies literal ACs only — thoroughness is overkill. MVP wants Happy + Negative + Authorization + Corner coverage. |
 | Self-correction on red ACs (`spryker-issue-diagnoser` + retry) | **on if verification is on** | User wants to see red ACs and decide manually, no automatic retries |
+| Cypress E2E coverage (fix/improve/add an E2E spec via the `cypress-tests` skill once all ACs are green) | **on for MVP, off for PoC** | PoC is throwaway; or the feature has no user-visible E2E surface (pure console/import/queue), or the user will cover E2E separately |
 | Static validation (lint / phpcs / phpstan via the `static-validation` skill) | **on** | Catches style, architecture, and type errors automatically before commit. Skip only for very small / throwaway changes. |
 | Code review (post-edit diff review via `spryker-code-reviewer`) | **off** | Opt-in. Adds a structured-review pass after edits — useful for MVP, optional for PoC. |
 | Demo artifact capture (`spryker-screenshot-collector`) | **off** | Opt-in only on explicit request |
 | Commit gate (user confirms before commit) | **always on** | (required — never auto-commits) |
 
 Present this as a checklist to the user. Confirm their choices before moving to Step 1. **Whatever phases are off, do not invoke their subagents** — skip those steps entirely in the workflow below.
+
+Once the quality bar and phase list are confirmed, **create `$BUILD_DIR` with `run.log` and `decisions.md`** (see "Run logging" above) and record the quality bar plus the ON/OFF phase list as the first entries. Everything from here on appends to them.
 
 ## Step 0c: PRD source — confirm before intake
 
@@ -160,7 +235,7 @@ Apply changes per the chosen quality bar.
 
 **Common rules (both bars):**
 
-- **Project layer only** — under the project's namespace directories in `src/`. Never `vendor/`. The `PreToolUse` hook will block vendor writes; don't even attempt.
+- **Project layer only** — under the project's namespace directories in `src/`. Never `vendor/`. Some installs also enforce this with a `PreToolUse` hook that blocks vendor writes, but the rule holds regardless — don't attempt a vendor edit even where no hook is configured.
 - **Never add, remove, or edit any file inside generated directories** — `src/Generated/`, `src/Orm/`, and any `*/Generated/*` path. These are produced by codegen commands (`transfer:generate`, `propel:install`, scope-collection, IDE-auto-completion, etc.) and are rewritten on every Step 5 refresh; any manual edit is lost. **To change a transfer field**, edit `*.transfer.xml` in the project layer — the corresponding `src/Generated/Shared/Transfer/*.php` regenerates automatically. **To change an entity**, edit `*.schema.xml` in the project layer — the corresponding `src/Orm/Propel/*` regenerates automatically. **Self-correction signal:** if you find yourself about to `Edit` or `Write` a path under `src/Generated/` or `src/Orm/`, **stop** — you're editing the wrong file. Find the XML source instead.
 - **Track which files you edited** during this step — you'll need the list for refresh in step 5 and for staging in step 8.
 - **Do not research Spryker yourself.** If a question came up during editing that needs Spryker domain knowledge, invoke `spryker-feature-expert` again rather than grepping `vendor/spryker/` directly.
@@ -299,9 +374,59 @@ The static-validation skill's trigger ("after any PHP code changes") will tempt 
 - Adds new lint findings to a loop that's already iterating
 - Burns time on a moving target
 
+## Step 7a: Cypress E2E coverage (if the phase is on — runs AFTER Step 7's loop has converged)
+
+Steps 6–7 proved every AC green in the running app; a **Cypress E2E spec** locks that user-visible
+behavior in so the feature can't silently regress. Running it only after the self-correct loop has
+converged (all ACs green, visual sign-offs done) means no spec-writing effort is wasted on an
+implementation that is still changing.
+
+**Gate it first** — run this step only when ALL of these hold; otherwise skip it and log the reason
+in `run.log` (a skip is a decision, not an omission):
+
+- The Cypress E2E phase is on (per Step 0b).
+- The feature is user-visible on an E2E surface (storefront / Back Office / Merchant Portal / Glue
+  API). A pure console/import/queue-level feature has nothing for an E2E spec to assert.
+- The project's Cypress suite exists — the `cypress-tests` skill's own Step 0 locates `<e2e-dir>`;
+  no suite found ⇒ skip.
+
+When it runs, invoke the **`cypress-tests`** skill (via the `Skill` tool — it's a skill, not a
+subagent) and work from the green AC list plus the verifier's evidence (they are the ready-made
+scenarios the spec should encode). Follow the skill's own workflow:
+
+- **Decide fix vs improve vs add** against the existing suite first (the skill's Step 1 orientation):
+  1. **Fix** — an existing spec covering the feature's flow went red because of this change → repair
+     it against the new intended behavior (only if the change is intended; a spec red for an
+     unintended reason is a red AC that belongs back in Step 7, not a spec to rewrite).
+  2. **Improve** — an existing spec exercises the flow but asserts none of the new behavior →
+     strengthen it to assert the concrete values the feature introduces.
+  3. **Add** — no spec covers the flow → author a new one per the skill's conventions (page objects,
+     dynamic/static fixture pair, typed fixtures, no selectors in the spec).
+  4. **None needed** — the flow is genuinely outside the suite's scope → record that verdict with a
+     one-line reason instead of forcing a spec.
+- Run the result **targeted** (`npx cypress run --spec "<the spec>"`) and then the suite's quality
+  gate (`npm run code:check`), per the skill's Step 3–4 checklist — including the re-run-green and
+  no-flake (passed on attempt 1, not on a retry) checks.
+- Bulk run output goes to `$BUILD_DIR/cypress-<n>.log`, and `run.log` gets the one-line verdict:
+  `pass|fail|skipped(<reason>)` + the action taken (fix/improve/add/none) + the spec paths.
+- **Track the spec/fixture/page-object files you touch** — they are part of the feature diff and go
+  through Step 8's staging like every other edited file.
+
+**Verdict handling:**
+- **Green** (or a reasoned `none needed`/skip) → proceed to Step 7b.
+- **Red because the feature is wrong** (the spec correctly asserts an AC and the running app doesn't
+  deliver it) → that's a red AC that Step 6 missed: feed it into the Step 7 self-correct loop
+  (diagnoser + attempt log), and note in `decisions.md` that the verifier's earlier green contradicts
+  the spec — one of the two observations is wrong.
+- **Red for test-authoring or environment reasons** (selector drift, fixture mistake, stack not up)
+  → iterate on the test itself per the `cypress-tests` skill. If it can't get green, report the
+  blocker honestly in the Step 8 final report rather than deleting or weakening the spec — an
+  assertion loosened until it passes locks nothing in.
+
 ## Step 7b: Cleanup + static validation + code review (final pre-commit pass)
 
-Once the self-correction loop has finished — the code is now stable — run the final pre-commit pass. Run these on the **final** set of edited files, not an interim version. **This is the ONLY step in the workflow where `static-validation` runs.** If you've been holding off on it during Steps 4/5/7 (correctly — see those steps' guards), this is the moment.
+Once the self-correction loop has finished (and Step 7a, when its phase is on) — the code is now
+stable — run the final pre-commit pass. Run these on the **final** set of edited files, not an interim version. **This is the ONLY step in the workflow where `static-validation` runs.** If you've been holding off on it during Steps 4/5/7 (correctly — see those steps' guards), this is the moment.
 
 **Instrumentation cleanup (always, if `ai-runtime-debugging` was used at any point in Step 4 or Step 7).** Strip every trace of debug instrumentation **before** static validation runs — otherwise phpstan or the reviewer will flag it:
 
@@ -342,7 +467,7 @@ If both phases are off (and no instrumentation was added), skip this step entire
 
 **Run this BEFORE the commit gate**, not after — the captures become part of the implementation report the user reviews when deciding to commit.
 
-If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"`) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
+If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"` — prefixed as `spryker-ai-dev-sdk:spryker-screenshot-collector` on a plugin install, see the delegation cheatsheet) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
 
 Include the returned paths in the **Evidence** column of the Step 8 final report (under the AC the screenshot illustrates), so the user can open them in `~/Downloads/` before deciding whether to commit.
 
@@ -374,9 +499,15 @@ Quality bar: <PoC | MVP>
 ### Caveats (PoC only — shortcuts taken, worth flagging)
 - <e.g. hardcoded values, single-locale coverage, ACL skipped, etc.>
 
+### Run log
+- `<absolute path to $BUILD_DIR/run.log>`
+
 ### Commit?
 Branch `ai-customize/<slug>`. <X of N> ACs green. Commit?
 ```
+
+Build the **Acceptance Criteria** table and the **Caveats** block from `run.log` and the OPEN QUESTIONS
+section of `decisions.md` — not from recollection. The report is the log, summarized.
 
 **Stage the files before showing the commit gate**, so the report and the user's decision are based on the actual staged diff:
 
@@ -398,7 +529,15 @@ The point: refusing the commit shouldn't lose the staging work or leave the user
 
 ## Subagent delegation cheatsheet
 
-All of these live under `.claude/agents/`. Invoke via the `Agent` tool with `subagent_type="<name>"` — never via the `Skill` tool.
+All of these ship as agent definitions (`.claude/agents/` for a setup install, or the plugin's `agents/` directory). Invoke them with the harness's subagent-spawning tool (commonly `Agent`), passing `subagent_type="<name>"` — never via the `Skill` tool.
+
+**Agent type names are prefixed on a plugin install.** When these agents ship via the
+`spryker-ai-dev-sdk` plugin, the registered type carries the plugin prefix —
+`subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare `spryker-verifier` (the
+`Agent` tool rejects an unregistered bare name with an "Agent type not found" error that lists
+the valid names). The bare names in this document are shorthand: try the bare name only on a
+setup install (`.claude/agents/`); if it fails to resolve, retry with the
+`spryker-ai-dev-sdk:` prefix before reporting a step blocked.
 
 | Subagent | When to invoke |
 |---|---|
@@ -418,6 +557,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 | `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
 | `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list into a 4-bucket test plan before invoking the verifier. |
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
+| `cypress-tests` | Step 7a (when the Cypress E2E phase is on) — once all ACs are green, fix / improve / add a Cypress E2E spec locking in the user-visible behavior, run it targeted + the suite's quality gate. |
 | `static-validation` | Step 7b — lint / phpcs / phpstan over the final diff before commit. |
 
 ## What you do NOT do
@@ -428,7 +568,10 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 - Do not work on the user's current branch directly. Always cut `ai-customize/<slug>`.
 - Do not commit without user confirmation. Even when all ACs are green.
 - Do not push to remote.
-- Do not auto-retry past N = 2 per AC. Surface failures honestly.
+- Do not keep iterating on an AC past a stuck signal (or the N = 10 runaway failsafe) — escalate to
+  the user per Step 7's rules, and surface failures honestly. (The self-correct loop's default is
+  persistence until green or genuinely stuck, not a fixed retry count; the only bounded-retry gate is
+  static validation at Step 7b with N = 2.)
 - Do not research Spryker yourself (grep, read `vendor/`, inspect transfer XMLs, fetch docs). Delegate to `spryker-feature-expert` — that's its whole job.
 - When you *do* need to read project files directly (e.g. project namespaces from `composer.json`, install recipes from `config/install/*.yml`), use **native tools, never `Bash`**: `Read` for files (relative paths from the project root, never absolute `/Users/...`), `Glob` for filename discovery, `Grep` for content search. `Bash cat`, `Bash grep`, `Bash sed`, `Bash awk`, `Bash find`, and the `cd` + `&&` pattern with absolute paths all prompt for approval, are slower, and are never necessary for in-project file work.
 - Do not manipulate CSV files. Delegate to `spryker-data-seeder`.

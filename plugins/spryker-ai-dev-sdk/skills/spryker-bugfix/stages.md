@@ -9,7 +9,10 @@ This is the **one and only** place the skill collects choices up front. In **Aut
 everything you need to run unattended must be settled here — after this step, Autonomous mode asks
 nothing more (see the Operating principle above).
 
-Begin with **one `AskUserQuestion` call carrying multiple questions** (multi-tab). Ask:
+Begin with **one up-front intake round of `AskUserQuestion` calls**. `AskUserQuestion` carries at
+most **4 questions per call**, so ask the 8 questions below in **two back-to-back multi-tab calls**
+— questions 1–4, then questions 5–8 — with nothing in between. This is still a single intake: after
+the second call's answers, nothing more is asked. Ask:
 
 1. **Mode** — `Autonomous` (agent decides everything, no human in the loop, goes all the way to
    pushed Draft PR + watch loop) vs `Collaborative` (agent asks the user at the important decision
@@ -41,7 +44,19 @@ Begin with **one `AskUserQuestion` call carrying multiple questions** (multi-tab
    Record the answer as the **PR preference**; it combines with the probed `PR_CHANNEL` (below) at
    Step 11. Because Autonomous mode won't ask again, this is the moment to capture "don't open a PR" or
    "use the GitLab MCP, not gh".
-7. **Extra expectations beyond the standard workflow** — is there anything you want from this run
+7. **Cypress E2E coverage** — should the run also fix/improve/add a **Cypress E2E test** for this
+   bug (Step 9b, via `Skill(cypress-tests)`, after QA acceptance)? Offer:
+   - **Auto (recommended)** — cover it with Cypress only when the bug is user-visible on an E2E
+     surface (storefront / Back Office / Merchant Portal / Glue API) and the project's Cypress suite
+     exists; otherwise skip with a logged reason.
+   - **Always** — require a Cypress spec change (fix a broken spec, strengthen assertions that
+     missed the bug, or add a new spec) before the run may proceed past Step 9b.
+   - **Skip** — never touch the Cypress suite in this run.
+
+   Record the answer as the **Cypress preference**; it gates Step 9b. Because Autonomous mode won't
+   ask again, in `Auto` the Step 9b cover-vs-skip call is made by the agent and logged as a CRITICAL
+   DECISION.
+8. **Extra expectations beyond the standard workflow** — is there anything you want from this run
    *on top of* the default scope and steps below? This is **open-ended and optional** — the default
    answer is "no, just the standard workflow". Surface it because Autonomous mode won't ask again, so
    anything non-standard must be captured now. Examples the user might raise: also update the tracker
@@ -52,6 +67,7 @@ Begin with **one `AskUserQuestion` call carrying multiple questions** (multi-tab
 
    > **The default scope** (so the user knows what's already covered and need not restate it): reproduce
    > → root-cause → minimal fix → functional test → static validation → code review → independent QA →
+   > Cypress E2E coverage (when warranted, per answer 7) →
    > final verification → (autonomous) commit + push + Draft PR + remote-CI watch. Capture any **delta**
    > from this, record it as a project constraint in `$BUGFIX_DIR/decisions.md`, and honor it throughout
    > the run.
@@ -69,8 +85,11 @@ the current working directory; fall back to `$(pwd)` if the variable is unset.
 ```bash
 # <bugfix-id>: JIRA key if known, else "no-ticket-<brief-name>". Finalize after Step 2 if unknown now.
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-BUGFIX_DIR="$PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>"
+BUGFIX_DIR="$PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>"
 mkdir -p "$BUGFIX_DIR"
+# Make the run directory ignore itself, so this run's own scratch files cannot make
+# the working tree dirty and trip the Step 2 clean-tree gate. Touches no tracked file.
+[ -f "$PROJECT_DIR/.ai-dev/.gitignore" ] || printf '*\n' > "$PROJECT_DIR/.ai-dev/.gitignore"
 BUGFIX_LOG="$BUGFIX_DIR/run.log"
 printf '[%s] STEP 0 — mode=%s base=%s env=%s | START\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$MODE" "$BASE" "$ENV_FRESHNESS" >> "$BUGFIX_LOG"
 ```
@@ -80,7 +99,7 @@ printf '[%s] STEP 0 — mode=%s base=%s env=%s | START\n' "$(date '+%Y-%m-%d %H:
   files anywhere else.
 - Log **one line per step boundary**: `[<timestamp>] STEP <n> — <name> | START` and `| END <one-line outcome>`.
 - Also log every loopback (`attempt=<n>`), every CRITICAL DECISION (mirror the one-liner into the log),
-  and any gate verdict (review/QA/verification pass-fail).
+  and any gate verdict (review/QA/Cypress/verification pass-fail).
 - Keep the human-readable decision log (`decisions.md`) separate from this terse step log; the step log
   is the timeline, the decision log is the rationale.
 
@@ -163,6 +182,7 @@ TaskCreate  "S6  Functional test coverage"
 TaskCreate  "S7  Static validation"
 TaskCreate  "S8  Code review (gate)"
 TaskCreate  "S9  QA acceptance (gate)"
+TaskCreate  "S9b Cypress E2E coverage (conditional)"
 TaskCreate  "S10 Final verification before commit"
 TaskCreate  "S11 Commit / push / Draft PR / watch (mode gate)"
 TaskCreate  "S12 Final report"
@@ -239,6 +259,8 @@ else
 fi
 ```
 
+- An untracked `.ai-dev/` is **this run's own scratch space** (created in Step 0, self-ignoring) — it
+  does **not** count as a dirty tree. If it is the only thing `git status` reports, the tree is clean.
 - If the working tree is **dirty** or HEAD is **behind** the base: surface exactly what you found and
   **ask before proceeding** (Collaborative) or **abort with a clear report** (Autonomous — do not
   silently branch off a polluted/stale base). Branching off the wrong base produces a fix that can't be
@@ -259,7 +281,7 @@ The ticket key is whatever tracker key exists (JIRA key, GitHub issue number, et
 ticket, use `bugfix/no-ticket/brief-name`** and note it — the ticket is optional.
 
 **Finalize the run directory** now that the branch exists: if `<bugfix-id>` wasn't known at Step 0
-(no JIRA key), rename `$BUGFIX_DIR` to `$PROJECT_DIR/.claude/.cache/spryker-bugfix/no-ticket-<brief-name>/`,
+(no JIRA key), rename `$BUGFIX_DIR` to `$PROJECT_DIR/.ai-dev/spryker-bugfix/no-ticket-<brief-name>/`,
 update `BUGFIX_DIR`/`BUGFIX_LOG`, and append the Step 2 boundary line. From here on, every run file stays
 under this stable folder.
 
@@ -293,7 +315,8 @@ references it by path and carries only the summary forward.
 
 > **The attempt counter (define once, here).** There is **one shared counter**, `attempt`, starting
 > at `1` on the first entry to this step. **Increment it by 1 every time *any* downstream gate sends
-> control back to Step 4** — that is: a Step 8 code-review failure, a Step 9 QA rejection, a Step 10
+> control back to Step 4** — that is: a Step 8 code-review failure, a Step 9 QA rejection, a Step 9b
+> Cypress failure that indicts the fix, a Step 10
 > final-verification failure, OR a Step 11 remote-CI failure all draw from the same budget. Passing a
 > gate does **not** reset the counter.
 > **Hard stop when `attempt > 3`**: do not loop again — go to the stop-and-report terminal for
@@ -371,7 +394,8 @@ interim check `sh .claude/bash-local/validation.sh` is fine; the skill is the au
 2. **Fix the findings that relate to the code** (blockers/majors first; apply nits where cheap — open
    the review file to read a nit only when you're about to fix it).
 3. After fixing, **re-run `Skill(static-validation)`** and **re-run the functional tests if the review
-   fixes touched tested behavior**.
+   fixes touched tested behavior** (on a loopback pass, that includes the Step 9b Cypress spec if one
+   exists from a previous attempt and the fixes touched its flow).
 
 **The verification loop:**
 - Only **blocker/major** findings gate the loop. **Nits never cause a return to Step 4** — apply them
@@ -400,14 +424,66 @@ return the full report.
 - **Accepted** → continue. **Rejected** (a real failure found) → treat like a Step 8 failure: return
   to Step 4 within the 3-attempt budget; if exhausted, STOP and report.
 
+## Step 9b — Cypress E2E test coverage  (conditional, run in a subagent)
+
+QA (Step 9) proved the symptom is gone manually; a **Cypress E2E spec** locks that user-visible
+behavior in so the bug can't silently return. Running it *after* QA acceptance means the spec is
+authored against a fix that already passed review and QA — no wasted spec-writing on a fix that
+still loops. This step is gated by the **Cypress preference** from Step 0 (answer 7) plus the
+nature of the bug:
+
+- **Run it** when the preference is `Always`, or it is `Auto` **and** the symptom is user-visible on
+  an E2E surface (storefront / Back Office / Merchant Portal / Glue API) **and** the project's
+  Cypress suite exists (the `cypress-tests` skill's own Step 0 locates `<e2e-dir>`; no suite found ⇒
+  skip).
+- **Skip it** when the preference is `Skip`, the bug has no user-visible E2E surface (pure
+  console/import/queue-level defect), or no suite exists. Skipping is a decision, not an omission:
+  log it (Autonomous: as a CRITICAL DECISION — "no Cypress coverage because <reason>") and mark the
+  S9b task completed with that note.
+
+When it runs, **delegate the whole stage to one subagent** that uses **`Skill(cypress-tests)`** —
+`npm ci`, cypress run output, and lint chatter are bulky and must not land in the orchestrator. Hand
+it the repro scenarios, the root-cause summary, the changed files, and the QA report's E2E steps
+(they are the ready-made scenario the spec should encode), and instruct it to:
+
+- **Decide fix vs improve vs add** against the existing suite first (the skill's Step 1 orientation):
+  1. **Fix** — an existing spec covering the broken flow is red, or was weakened/skipped because of
+     this bug → repair it against the now-correct behavior.
+  2. **Improve** — an existing spec exercises the flow but its assertions would **not** have caught
+     this bug → strengthen them to assert the concrete value the bug corrupted.
+  3. **Add** — no spec covers the flow → author a new one per the skill's conventions (page objects,
+     dynamic/static fixture pair, typed fixtures, no selectors in the spec).
+  4. **None needed** — the flow is genuinely outside the suite's scope → return that verdict with a
+     one-line reason instead of forcing a spec.
+- Run the result **targeted** (`npx cypress run --spec "<the spec>"`) and then the suite's quality
+  gate (`npm run code:check`), per the skill's Step 3–4 checklist — including the re-run-green and
+  no-flake (passed on attempt 1, not on a retry) checks.
+- **Write the full run output to `$BUGFIX_DIR/cypress-attempt<N>.log`** and return only:
+  `pass|fail|skipped(<reason>)`, the action taken (fix/improve/add/none), the spec + fixture paths
+  touched, and — if failing — the failing test names + a one-line error each.
+
+**Verdict handling:**
+- **Pass** (or a reasoned `none needed`/skip) → continue to Step 10. Spec/fixture changes made here
+  are part of the bugfix diff — they go into the same commit and through Step 10 with the rest.
+- **Fail because the fix is wrong or incomplete** (the spec correctly asserts the expected behavior
+  and the running app doesn't deliver it) → treat like a Step 8 failure: increment `attempt` and
+  return to Step 4. This contradicts the Step 9 QA acceptance — note that discrepancy in
+  `decisions.md`, since one of the two observations is wrong.
+- **Fail for test-authoring or environment reasons** (selector drift, fixture mistake, stack not up)
+  → the subagent iterates on the test itself; this does **not** consume an attempt. If it can't get
+  green, report the blocker honestly rather than deleting or weakening the spec — an assertion
+  loosened until it passes would no longer catch this bug, which defeats the point of the step.
+
 ## Step 10 — Final verification before commit
 
 The last gate before commit/push — prove the fix holds in the **running application** with fresh
 evidence, not just green tests.
 
-- Re-run the affected functional tests once more for a clean final signal (subagent, as in Step 6).
+- Re-run the affected functional tests once more for a clean final signal (subagent, as in Step 6);
+  if Step 9b produced or changed a Cypress spec, re-run that spec targeted (`--spec`) as well.
 - **Perform an end-to-end final verification in the running app (subagent).** Spawn the
-  `spryker-verifier` agent (via the `Agent` tool with `subagent_type="spryker-verifier"`), or a
+  `spryker-verifier` agent (via the harness's subagent-spawning tool — commonly `Agent`; resolve it
+  via `ToolSearch` first — passing `subagent_type="spryker-verifier"`), or a
   subagent using **`Skill(spryker-runtime)`** if you prefer a raw runtime drive. Hand it the changed
   files, the repro scenarios, the acceptance expectation (the exact user-visible symptom that must be
   gone), and any env gotchas. It drives the affected surface (Yves / Back Office / Glue as relevant),
@@ -423,7 +499,7 @@ evidence, not just green tests.
 
 **Gated by mode, the Step 0 PR preference, _and_ `PR_CHANNEL`.** Always **commit on the branch first** —
 the commit happens in every mode and every channel. What happens *after* the commit depends on (a)
-whether the user asked for a PR at all (Step 0 answer 7) and (b) which channel is available.
+whether the user asked for a PR at all (Step 0 answer 6) and (b) which channel is available.
 
 **First honor the Step 0 PR preference:**
 - **"No PR — commit only"** → commit on the branch and stop (optionally push if a remote exists and the
@@ -500,13 +576,17 @@ with no ticket, omit the trailing key.
      because the run may already be long: re-reading the whole conversation on every 15-min wake is
      exactly what pushes context to the danger zone. The handoff file is the loop's working memory.
 
-     Pick the mechanism by how the run is driven:
-       - Interactive session: `ScheduleWakeup` with `delaySeconds: 900`. Re-pass a **minimal** `/loop`
-         input that says "resume the bugfix watch loop from `$BUGFIX_DIR/watch-state.md`" —
-         not the original full bug context.
-       - Unattended/headless: a **Cron** (`CronCreate`) — load its schema via `ToolSearch` first; point
-         it at the same handoff file.
-       - **Fallback if no scheduler is available:** do NOT claim a loop is running. Report the PR URL
+     Pick the mechanism by what this harness actually exposes — **resolve it via `ToolSearch` first
+     and use its real schema**; the names below are the common ones, not a guarantee, and parameters
+     differ between them (a cron tool takes a cron expression, not a delay in seconds):
+       - A **polling/monitor** tool (e.g. `Monitor`) is the best fit when available: it is built for
+         "poll a command, emit each terminal state, exit when the run completes".
+       - A **self-wakeup** tool (e.g. `ScheduleWakeup`) for an interactive session. Re-pass a
+         **minimal** input that says "resume the bugfix watch loop from `$BUGFIX_DIR/watch-state.md`"
+         — not the original full bug context.
+       - A **cron** tool (e.g. `CronCreate`) for unattended/headless runs; point it at the same
+         handoff file. Note cron jobs are typically session-scoped and expire on their own.
+       - **Fallback if no scheduler resolves:** do NOT claim a loop is running. Report the PR URL
          and explicitly hand monitoring back to the user.
      On each wake, **poll with the cheapest call** — `gh pr checks <pr>` (a compact status table), or for
      `mcp` the forge's list-checks/status tool — **not** `gh run view`. The poll itself must add almost
@@ -516,7 +596,7 @@ with no ticket, omit the trailing key.
        subagent that runs `gh run view --log-failed`, writes it to `$BUGFIX_DIR/ci-remote-attempt<N>.log`,
        and returns only the failing job(s) + the one-line root error each. Increment `attempt`, update
        the State Object, and **return to Step 4**. The fix must traverse the **full gate chain again**
-       (4→5→6→7→8→9→10) before you re-push — do not jump 4→push and skip the gates. Then push and keep
+       (4→5→6→7→8→9→9b→10) before you re-push — do not jump 4→push and skip the gates. Then push and keep
        watching. If it's flaky/infra (not your code), note it and re-poll without consuming an attempt.
      - **Budget exhausted (`attempt > 3`) on a red check:** STOP. Cancel the scheduled wakeup/Cron,
        **leave the PR in Draft**, post a PR comment summarizing the remaining failures and the diff
@@ -545,7 +625,8 @@ present a concise report to the user containing, in this order:
 4. **OPEN QUESTIONS / RISKS / FURTHER BUGS** — scope concerns, additional suspected bugs, BC/data
    risks, stale-env caveats, anything a human should confirm. Be honest; an empty list is fine only if
    genuinely empty.
-5. **Gate status** — tests / static / review / QA / final verification / remote CI, each green/red with
+5. **Gate status** — tests / static / review / QA / Cypress E2E (run, skipped-with-reason, or off) /
+   final verification / remote CI, each green/red with
    the real result (never report green what wasn't).
 6. **Extra expectations** — if the user set any Step 0 delta from the standard scope, confirm how each
    was handled (done / partially / not done + why). Omit this line only if there were none.
@@ -555,6 +636,20 @@ present a concise report to the user containing, in this order:
 Keep it skimmable — it is the artifact the user reads instead of having been interrupted during the run.
 
 ## Stage → skill quick map
+
+**Skill invocation names.** Every skill this workflow delegates to ships in the
+`spryker-ai-dev-sdk` plugin, so its invocable name carries that prefix —
+`Skill(spryker-ai-dev-sdk:spryker-runtime)`, `Skill(spryker-ai-dev-sdk:code-review)`, and so on.
+The bare names used in this document and in the table below are **shorthand for the prefixed
+form**. If a bare name fails to resolve, retry it with the `spryker-ai-dev-sdk:` prefix before
+reporting a stage blocked — a delegation that cannot resolve is a naming problem, not a blocked
+gate.
+
+**The same applies to agent types.** On a plugin install the registered `subagent_type` is
+prefixed too — `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare
+`spryker-verifier` (the `Agent` tool rejects an unregistered bare name with an "Agent type not
+found" error listing the valid names). Bare agent names in these documents are the same
+shorthand: if one fails to resolve, retry with the prefix.
 
 | Step | Skill / tool |
 |------|--------------|
@@ -566,6 +661,7 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 | 7 Static | `Skill(static-validation)` — **subagent**, returns clean/violations |
 | 8 Review (gate) | `Skill(code-review)` — returns ≤5 blocker/major; loop to 4 (max 3) |
 | 9 QA | `Skill(spryker-qa-coverage)` (isolated subagent) |
+| 9b Cypress E2E (conditional, Step 0 answer 7 + user-visible surface) | `Skill(cypress-tests)` — **subagent**, returns pass/fail/skipped + action (fix/improve/add/none) + spec paths |
 | 10 Final verification (gate) | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` — **subagent**, returns PASS/FAIL + evidence |
-| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + `ScheduleWakeup`/`CronCreate` watch loop (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
+| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + a watch loop on whichever scheduler/monitor tool `ToolSearch` resolves (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
 | 12 Final report | decision log + step log → user-facing report ending with the log file path |

@@ -57,7 +57,7 @@ claude mcp add spryker-project  -- $(pwd)/docker/sdk console ai-dev:mcp-server -
 
 ## Claude Plugin
 
-This repository also ships a Claude Code plugin — `spryker-ai-dev-sdk` — that bundles Spryker-aware skills (e.g. `propel-schema`, `data-import`, `code-review`, `cypress-e2e-test`, `codecept-functional`, `static-validation`, `yves-atomic-frontend`, `ai-dev-setup`) and a `spryker-code-reviewer` agent. Source layout:
+This repository also ships a Claude Code plugin — `spryker-ai-dev-sdk` — that bundles Spryker-aware skills (e.g. `propel-schema`, `data-import`, `code-review`, `cypress-e2e-test`, `codecept-functional`, `static-validation`, `spryker-upgrade`, `yves-atomic-frontend`, `ai-dev-setup`) and a `spryker-code-reviewer` agent. Source layout:
 
 - `.claude-plugin/marketplace.json` — marketplace manifest (`spryker-plugins-official`).
 - `plugins/spryker-ai-dev-sdk/.claude-plugin/plugin.json` — plugin manifest.

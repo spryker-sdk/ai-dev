@@ -13,7 +13,8 @@ working room the later gates need and eventually destabilizes the run.
 **The rule: heavy work happens in subagents; the orchestrator holds only compact state.** A "heavy"
 stage is anything that produces bulk output — driving Chrome (screenshots, page text), runtime/XDebug
 dumps, `codecept run` output, phpcs/phpstan reports, code-review findings, final-verification runs, and
-`gh run view --log-failed`. Run each of those **inside a subagent** (via the `Agent` tool, pointing it
+`gh run view --log-failed`. Run each of those **inside a subagent** (via whichever subagent-spawning
+tool this harness exposes — commonly `Agent`; resolve it via `ToolSearch` first — pointing it
 at the relevant `Skill(...)` or agent `subagent_type`), and require the subagent to:
 
 - **write its raw output to a file** under the run directory `$BUGFIX_DIR` (e.g.
@@ -31,7 +32,7 @@ Anchor it to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`, with a 
 it is stable regardless of the current working directory:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/spryker-bugfix/<bugfix-id>/
+${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-bugfix/<bugfix-id>/
 ```
 
 `<bugfix-id>` is the ticket key (e.g. a JIRA key `CC-39232` or a GitHub issue number) when there is
@@ -57,7 +58,7 @@ Keep this small block current in your head and mirror it into the step log. Ever
 - **Repro:** 1–3 line scenario summary + path to the full repro notes file.
 - **Root cause:** the `file:line` references + one-sentence defect explanation.
 - **Diff:** `git diff --stat` summary (files + ±lines), not the diff body.
-- **Per-gate verdict:** for tests / static / review / QA / final-verification / remote-CI — `pass|fail`,
+- **Per-gate verdict:** for tests / static / review / QA / Cypress E2E (when run) / final-verification / remote-CI — `pass|fail`,
   a one-line reason, and the path to that gate's output file. For a failing gate, keep **only the ≤5
   actionable items** you must act on (e.g. blocker/major review findings, the failing test name), not
   the surrounding report.
@@ -86,6 +87,13 @@ mark a stage completed whose gate wasn't actually green (the same honesty rule a
 
 ## Operating principles
 
+- **Skill and agent invocation names are prefixed.** Every skill this workflow delegates to ships
+  in the `spryker-ai-dev-sdk` plugin, so the invocable name is `spryker-ai-dev-sdk:<name>` — e.g.
+  `Skill(spryker-ai-dev-sdk:spryker-runtime)`. Agent types follow the same rule on a plugin
+  install: `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare name (the `Agent`
+  tool rejects unregistered bare names). The bare names written throughout these documents
+  are shorthand for that prefixed form. If a bare name fails to resolve, retry with the prefix
+  before reporting a stage blocked.
 - **The bug is the contract.** Everything is judged against "does the original reported symptom no
   longer reproduce, with evidence". A green test suite is necessary but not sufficient — reproduce
   the *user-visible* symptom and confirm it's gone (see `spryker-qa-coverage`'s E2E-over-workaround rule).

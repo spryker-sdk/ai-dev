@@ -12,7 +12,7 @@ research findings, the decision log — lives together in one per-run folder, an
 root so it's stable regardless of the current working directory:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/architecture-prep/<run-id>/
+${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/architecture-prep/<run-id>/
 ```
 
 `<run-id>` is a short slug: a JIRA key if the work is ticketed, else a date + brief name (e.g.
@@ -21,7 +21,7 @@ ${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/architecture-prep/<run-id>/
 scatter run files into `architecture/`. Set it once at Step 0:
 
 ```bash
-ARCH_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/architecture-prep/<run-id>"
+ARCH_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/architecture-prep/<run-id>"
 mkdir -p "$ARCH_DIR"
 ARCH_LOG="$ARCH_DIR/run.log"
 ```
