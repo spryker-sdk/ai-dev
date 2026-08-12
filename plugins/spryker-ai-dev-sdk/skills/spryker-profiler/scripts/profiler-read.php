@@ -105,7 +105,26 @@ $defaultProfilerDirs = [
     $projectRoot . '/data/cache/codeBucket/profiler',
 ];
 
+/**
+ * Every recognised option. A misspelled flag would otherwise be dropped silently by
+ * parseOptions() and fall through to the default "describe the newest profile" mode,
+ * returning a well-formed answer for a request nobody asked about.
+ */
+const KNOWN_OPTIONS = [
+    'list', 'worst', 'trace', 'token', 'url', 'dir', 'limit', 'scan',
+    'verbose', 'window', 'no-siblings', 'project-root', 'help',
+];
+
 $options = parseOptions($argv);
+
+if (isset($options['help'])) {
+    printUsage();
+
+    exit(0);
+}
+
+guardUnknownOptions($options);
+
 $directory = resolveProfilerDirectory($options['dir'] ?? null, $defaultProfilerDirs);
 $index = readIndex($directory);
 
@@ -120,8 +139,14 @@ $result = match (true) {
     default => describeProfiles($directory, selectProfiles($index, $options), $options),
 };
 
+// array_merge, not `+`: a mode that resolved a DIFFERENT directory than the auto-picked one
+// (--trace follows an entry profile across directories) must be able to override 'source'.
+// With `+` the envelope's value always wins and would name a directory the profile is not in.
 echo json_encode(
-    ['source' => $directory, 'newest_profile' => humanAge((int)$index[0]['time'])] + $result,
+    array_merge(
+        ['source' => $directory, 'newest_profile' => humanAge((int)$index[0]['time'])],
+        $result,
+    ),
     JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
 ) . PHP_EOL;
 
@@ -168,6 +193,9 @@ function traceRequest(string $directory, array $index, array $options, array $al
         : collectSiblingRequests($index, $root, (int)($options['window'] ?? 10));
 
     return [
+        // The directory the ENTRY profile actually came from, which is not necessarily the
+        // auto-picked one the envelope starts with — locateTraceRoot() may have crossed over.
+        'source' => $directory,
         'trace' => $root['token'],
         'entry_request' => $entry,
         'zed_calls' => $children,
@@ -382,6 +410,56 @@ function sumTree(array $entry, array $children, array $siblings): array
         'summed_duration_ms' => round($duration, 1),
         'duration_caveat' => 'double-counts nested Zed time; compare branches, not wall-clock',
     ];
+}
+
+/**
+ * @param array<string, string> $options
+ */
+function guardUnknownOptions(array $options): void
+{
+    $unknown = array_diff(array_keys($options), KNOWN_OPTIONS);
+
+    if ($unknown === []) {
+        return;
+    }
+
+    fail(sprintf(
+        'Unknown option(s): --%s. Valid: --%s. Use --help for usage.',
+        implode(', --', $unknown),
+        implode(', --', KNOWN_OPTIONS),
+    ));
+}
+
+function printUsage(): void
+{
+    echo <<<'TXT'
+    profiler-read.php — read Spryker/Symfony WebProfiler data as JSON.
+
+    Modes (pick one; default = describe the newest profile):
+      --list                  List indexed profiles (newest first).
+      --worst[=<metric>]      Rank profiles. Metrics: queries (default), duplicate_queries,
+                              redis, elasticsearch, zed_requests, external_http, memory_mb,
+                              duration_ms.
+      --trace=<token>         Follow one request across applications (Yves -> Zed children).
+      --token=<token>         Describe one profile by token.
+      --url=<substring>       Describe the newest profile whose URL matches.
+
+    Options:
+      --dir=<path>            Profiler directory to read.
+                              Yves + Glue: data/cache/codeBucket/profiler
+                              Zed/BO/BG/MP: data/tmp/profiler
+      --limit=<n>             Rows to return (default 20).
+      --scan=<n>              Profiles to load when ranking (default 100).
+      --window=<seconds>      Sibling-grouping window for --trace (default 10).
+      --no-siblings           Skip sibling grouping in --trace.
+      --verbose               Include top repeated SQL, log and audit messages.
+      --project-root=<path>   Project root holding vendor/autoload.php.
+      --help                  This text.
+
+    Output is JSON on stdout; errors are JSON with an "error" key and exit code 1.
+    TXT;
+
+    echo PHP_EOL;
 }
 
 /**
@@ -614,7 +692,7 @@ function describeProfiles(string $directory, array $rows, array $options): array
     if ($rows === []) {
         fail(sprintf(
             'No profile matched in %s. Each application writes to its own directory '
-            . '(Yves: data/cache/codeBucket/profiler; Zed/Back Office/Merchant Portal/Glue: data/tmp/profiler) '
+            . '(Yves/Glue: data/cache/codeBucket/profiler; Zed/Back Office/Merchant Portal: data/tmp/profiler) '
             . 'and the auto-picked one may be wrong — pass --dir explicitly, or use --list to see what is here.',
             $directory,
         ));
