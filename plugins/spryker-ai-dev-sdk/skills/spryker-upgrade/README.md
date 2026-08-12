@@ -54,6 +54,8 @@ findings:
 # BEFORE composer: can this upgrade be verified at all?
 php $UP/check-test-coverage.php               # override surface vs. tests
 php $UP/check-vendor-class-replacement.php     # classes declared in vendor namespaces
+php $UP/check-legacy-css-classes.php           # legacy CSS classes vs what vendor still emits
+php $UP/check-platform-alignment.php           # is this host a valid place to resolve at all?
 
 # BEFORE composer: baselines + constraint preflight
 php $UP/check-constraint-style.php            # patch-locked / merged constraints
@@ -350,3 +352,95 @@ before anyone can merge.
 - **No detector covers** Propel schema merges, glossary keys, ACL/navigation for new Backoffice
   routes, or pure behavioural change. Those are Phase 5 process gates and tests, and the skill's
   matrix marks them as such.
+
+## bin/check-legacy-css-classes.php — legacy CSS classes vs what vendor actually emits
+
+For releases that cross a CSS framework major (Bootstrap 3 → 5). The instinct is to take the
+framework's changelog, grep the project for removed classes and rewrite them. On a real upgrade that
+instinct was wrong about **six of seven** classes, and two of the "fixes" would have caused an
+outage.
+
+```bash
+php $UP/check-legacy-css-classes.php                  # Bootstrap 3->5 default list, Zed
+php $UP/check-legacy-css-classes.php --layer=Yves     # storefront instead
+php $UP/check-legacy-css-classes.php --classes=a,b    # your own list
+php $UP/check-legacy-css-classes.php --verbose        # show the vendor evidence lines
+```
+
+The question it asks is never "did the framework remove this class" but **"does vendor, at the
+installed release, still emit or select it itself"** — answerable from source, with no browser, no
+compiled CSS and no built assets. Verdicts:
+
+- `MIGRATE` — absent from vendor templates *and* vendor JS. A genuine leftover; safe to convert.
+- `KEEP` — vendor still emits it in its own templates, so core styles it deliberately.
+- `KEEP (JS)` — **vendor JavaScript selects or toggles it.** Rewriting detaches project markup from
+  vendor behaviour, causing the breakage the migration was meant to prevent. On the validation run
+  this covered `has-error` (`gui` `tabs.js` marks invalid tabs), `hidden` (`init.js`/`tabs.js`
+  toggle it), `form-group` (`sales-order-threshold-gui` does
+  `.parents('.form-group').addClass('hidden')`), `btn-default` (`init.js` swaps it on hover) and
+  `control-label` (`discount`'s query builder generates the markup).
+- `PAIR` — vendor emits the legacy class *and* its modern equivalent on the same element
+  (`nav-item pull-left float-start`). Mirror the pair; do not replace.
+
+It scans **every** Spryker vendor package's `assets/<Layer>/js`, not just the module you assume owns
+the behaviour — that breadth is the whole point. A hand pass over `gui` alone found 2 of the 5 JS
+dependencies.
+
+Exit 1 only when something is genuinely `MIGRATE`. It never rewrites anything: `KEEP (JS)` rows in
+particular need a human to leave them alone. If vendor templates cannot be found at all it exits 2
+rather than reporting everything as `MIGRATE`, since that is the dangerous direction to be wrong in.
+
+## Scope rule these detectors serve
+
+Every detector here answers one question: **did the project's existing behaviour survive the version
+bump?** None of them asks whether the project should adopt something new.
+
+That distinction is deliberate. An upgrade updates what the project already has; a version bump is not
+consent to integrate the architecture, DI mechanism or feature that the new version enables. So a
+capability the project never used and still does not use is **not** a finding, and "the new version
+wants you to do X" is never a reason to do X inside an upgrade. When restoring existing behaviour
+appears to require adopting something new, that is a vendor BC break to report — not a re-architecture
+to perform. See the Scope section of `SKILL.md`.
+
+## bin/check-platform-alignment.php — is this host a valid place to resolve at all?
+
+Run this in **Phase 0, before the first `composer update`**. It answers one question: will a lock
+resolved on this machine install on the machine the project actually runs on?
+
+```bash
+php $UP/check-platform-alignment.php                 # report
+php $UP/check-platform-alignment.php --target=8.3.2  # override the detected deployment PHP
+```
+
+The failure it prevents is quiet and expensive. A project declares `require.php: ">=8.3"` and runs
+`spryker/php:8.3`; a developer on PHP 8.5 satisfies `">=8.3"`, so composer objects to nothing and
+resolves dev tooling (`doctrine/instantiator`, `symfony/type-info`, `lcobucci/clock`, `phpunit`) to
+versions needing PHP 8.4+. The lock installs on that laptop and in no container:
+
+```
+Your lock file does not contain a compatible set of packages.
+doctrine/instantiator 2.1.0 requires php ^8.4 -> your php version (8.3.32) does not satisfy that
+```
+
+On the validation run this surfaced only when `docker/sdk up` died at `composer install`, many phases
+after the damage — and it meant the entire characterization suite had been running on the wrong PHP
+minor, so "the tests pass" had not meant what it appeared to mean.
+
+It reports:
+
+- **host PHP vs every `deploy*.yml` image tag** — and flags deploy files that *disagree* with each
+  other, since then there is no single platform to resolve for;
+- **`config.platform.php` absent** while the host and deployment minors differ — the actual hazard;
+- **`config.platform.php` pointing at the wrong minor**;
+- **locked packages that cannot install on the target PHP** — the decisive check, and what
+  `docker/sdk up` would otherwise discover the hard way;
+- **extensions the lock requires that this host lacks** (`ext-redis`, `ext-pgsql`). This is a separate
+  failure: a platform pin fixes the PHP *version*, not the *extension set*, so composer cannot resolve
+  those packages here at all. The answer is to run composer in the container — never
+  `--ignore-platform-req`, which fakes the requirement and re-creates the uninstallable lock.
+
+Target precedence is `--target` → `config.platform.php` → the image tag's `.0` floor. The declared
+platform wins because it is what composer actually resolves against; inferring `.0` from an `8.3` tag
+otherwise false-positives on any package with a patch-level constraint such as `~8.3.2`.
+
+Exit 1 on anything that can produce an uninstallable lock, 0 when aligned.
