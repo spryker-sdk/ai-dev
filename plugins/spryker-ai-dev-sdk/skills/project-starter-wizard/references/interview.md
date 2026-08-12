@@ -1,10 +1,74 @@
 # Interview & state file (wizard §1–§2 — the decision catalog)
 
-The wizard's interview phase: how to ask (AskUserQuestion mechanics), the nine decision sections, and the state-file template the answers are written to. Read this BEFORE the first question; the flow, pre-flight, execution steps, and cross-cutting rules live in `../SKILL.md`.
+The wizard's interview phase: **how** to collect the nine decision sections (live AskUserQuestion
+interview, or a pre-filled questionnaire), and the state-file template the answers are written to.
+Read this BEFORE the first question; the flow, pre-flight, execution steps, and cross-cutting rules
+live in `../SKILL.md`.
 
 Ask section by section. Always show the demoshop default and let the developer accept it. Accepting every default is valid.
 
-## How to ask (AskUserQuestion mechanics)
+## The question bank lives in [questionnaire.md](questionnaire.md) — this file is HOW to collect it
+
+The canonical, **fillable** list of every decision is the standalone
+**[questionnaire.md](questionnaire.md)** (groups P/N/S/T/D/C/L/Q + run-config R, each question
+carrying its default inline, mapped back to the interview section it feeds). The nine sections below
+are the same decisions expressed as the live-interview script.
+
+Always drive collection from questionnaire.md so a filled file, a partial file, and a live interview
+all populate the *same* state-file fields. When you change a decision, change it in questionnaire.md
+too — a drifted pair is worse than either alone.
+
+## Rule 0 — A filled questionnaire replaces (or shortens) the interview
+
+Before asking anything, check whether the developer already supplied questionnaire answers — a filled
+copy (a path or pasted text), a `yaml` answer block, or the values inline in their request:
+
+- **Filled** (P1, R1, R2 answered — the minimum viable set): **skip the interview entirely.** Copy the
+  answers verbatim into the state file, apply the shipped default for every blank, and log
+  `INTERVIEW | SKIP (questionnaire pre-filled)` to `.ai-dev/run.log`. Confirm the resolved set once
+  (§ Confirm & write state) and start running — that single confirmation is not the interview
+  returning, it's the one gate that stops a typo becoming a 40-minute wrong boot.
+- **Partially filled** — behaviour depends on `R1`, and this is the crux of the whole design:
+  - `R1: autonomous` → **do NOT ask the blanks.** Resolve each one to its documented default, or
+    where there is a genuine fork, decide it and record it in `.ai-dev/decision-log.md`. This is what
+    the developer chose autonomous *for*; coming back with questions defeats it.
+  - `R1: collaborative` → ask **ONLY the still-blank questions**, batched per § How to ask. Never
+    re-ask something already answered.
+- **`R1` itself missing** while other answers are present: that is the one blank you must ask about
+  (a single AskUserQuestion), because it decides whether every other blank becomes a question or a
+  logged decision. Do not assume either mode.
+- **Not provided at all:** offer the choice in Rule 1 before defaulting to the full live interview.
+
+**Parsing rules.** Match answers to question IDs (`P1`, `T2`, `D1`…). A blank, omitted, or `?` line
+is **unanswered → take the default** (not "ask me"). `decide for me` is an explicit instruction to
+choose (autonomous) or to ask (collaborative). An answer of `default` / `keep` / `n/a` is
+**ANSWERED** — the developer consciously took the shipped value; don't re-ask it. A gated section
+(`only if …`) whose gate doesn't apply is not a blank at all — skip it silently.
+
+**One thing a questionnaire does NOT skip: pre-flight.** Everything in SKILL.md §0 (flavor, fresh,
+un-booted, volume collision, ports, composer auth, disk, SDK pin) still runs, and its
+developer-must-do findings are still surfaced as `⚠ ACTION NEEDED`. A filled questionnaire removes
+*questions*, never *checks* — and the namespace-collision check in particular now has a name to test
+(`P1`) before any boot.
+
+## Rule 1 — Offer "fill the list yourself" vs "interview me"
+
+When no filled questionnaire exists, don't launch straight into nine sections. First offer both paths
+in a single AskUserQuestion:
+
+> "I can either (a) hand you the setup questionnaire to fill at your own pace — then run with no
+> interview at all, or (b) interview you now in a few batched question sets. Which do you prefer?"
+
+- **Fill-it-yourself** → point them at [questionnaire.md](questionnaire.md) (or paste its content),
+  tell them the **minimum viable set is just P1, R1, R2** and that every blank line means "take the
+  default", then **wait** for their answers. Treat the result per Rule 0.
+- **Interview me** → run the batched interview below.
+- If the developer's request already said "autonomous, don't ask me" but gave no answers, don't offer
+  the choice and don't interview: take the demoshop defaults for all nine sections, treat it as
+  `run_mode: autonomous`, log `INTERVIEW | SKIP (autonomous, defaults)`, and confirm the resolved set
+  once before running.
+
+## How to ask (AskUserQuestion mechanics — the live-interview path)
 
 **Conduct the interview with the AskUserQuestion tool — this is what makes it a wizard, not a form.** Present each decision as a structured question with selectable options; do **not** dump a markdown list of defaults and wait for a freeform reply. For each question:
 - Put the **default first** as a selectable option (e.g. "Keep default: b2b-demo-marketplace", "Keep `Pyz`").
@@ -77,18 +141,26 @@ If a term isn't in this table and you can't phrase it without jargon, treat that
    - **The only extra plain choice:** notifications — "send check results to a chat channel? (default: no)". If the operator picked "let a developer tune it," THEN expose the underlying suite/version/cleanup detail for a technical user; otherwise it stays derived.
    - The kept-checks decision doubles as the **robot/acceptance-fixture lane decision** other steps read (whether the `b2b_robot` import fixtures are dead weight) — resolve it from "keep functional/acceptance gating, drop heavy product QA".
 
-9. **Run mode** — how the wizard proceeds once the interview is confirmed (ask it last; it's a deliberate choice, no silent default). Same work either way — only the check-in cadence differs (full behaviour: §3 of the wizard SKILL):
-   - **autonomous** — runs steps 1–9 in one pass with no "continue?" check-ins; at any **reversible, in-project** decision point it picks the best option and records it in `.ai-dev/decision-log.md`. Destructive/irreversible actions (CI wipe, file deletions, DB drops, `sudo`) and human-only prerequisites (start Docker, `/etc/hosts`, tokens) **still stop for explicit OK**. Best for a repeat/experienced run.
-   - **supervised** — asks **"continue?" at each step boundary** and surfaces **every decision as a question** with a recommendation; never runs straight through, never silently stops. Best for a first run or when the developer wants to steer.
+9. **Run mode** (= questionnaire `R1`) — how the wizard proceeds once the answers are confirmed (ask it last; it's a deliberate choice, no silent default). Same work either way — only the check-in cadence differs (full behaviour: §3 of the wizard SKILL):
+   - **autonomous** — runs steps 1–9 in one pass with no "continue?" check-ins; at any **reversible, in-project** decision point it picks the best option and records it in `.ai-dev/decision-log.md`. **This includes every questionnaire question left blank** — a blank is a delegated decision, not a deferred question. Destructive/irreversible actions (CI wipe, file deletions, DB drops, `sudo`) and human-only prerequisites (start Docker, `/etc/hosts`, tokens) **still stop for explicit OK**. Best for a repeat/experienced run, and the mode the questionnaire exists to serve.
+   - **collaborative** (accepted alias: `supervised` — same mode, older name; both read as `collaborative` in the state file) — asks **"continue?" at each step boundary** and surfaces **every decision as a question** with a recommendation; never runs straight through, never silently stops. It also asks the questionnaire's blanks rather than resolving them. Best for a first run or when the developer wants to steer.
+
+   Ask this section **even when a questionnaire was supplied but `R1` is missing** (Rule 0) — it is the one answer that has no safe default, because it decides whether every other blank becomes a question or a logged decision.
 
 ## Confirm & write state (the state-file template)
 
-Summarise every answer. Get explicit confirmation. Then write `.ai-dev/project-setup.md` in this format:
+Summarise every answer — **including which ones you resolved to a default or decided yourself**, marked
+as such, so the confirmation shows the developer the *whole* resolved set and not just what they typed.
+Get explicit confirmation. (This one confirmation stands even on the fully-filled questionnaire
+fast-path; it is what stops a typo becoming a 40-minute wrong boot.) Then write
+`.ai-dev/project-setup.md` in this format:
 
 ```markdown
 ---
 version: 1
-run_mode: autonomous                    # or supervised — interview §9; governs check-in cadence, never the hard-stops (destructive/irreversible/human-prerequisite always ask). autonomous logs reversible decisions to .ai-dev/decision-log.md
+run_mode: autonomous                    # or collaborative (alias: supervised) — interview §9 / questionnaire R1; governs check-in cadence, never the hard-stops (destructive/irreversible/human-prerequisite always ask). autonomous logs reversible decisions, and any blank that needed a genuine fork, to .ai-dev/decision-log.md — blanks that took their documented default are recorded ONLY in answers_defaulted below, never duplicated into the decision log
+answers_source: questionnaire           # questionnaire | interview | questionnaire+interview (partial fill, collaborative) | defaults (autonomous, nothing supplied)
+answers_defaulted: [P4, S1, S2, S3, T1, L1, Q1, Q2]   # question IDs left blank and resolved to their documented default — the audit trail for "I never chose that". EXCLUDES gated questions whose gate didn't fire (a skipped D2/D3/C1/Q3 is not a blank at all, per Rule 0) and excludes genuine forks (those go in the decision log + run.log `decided=[…]`)
 project: { name: acme-shop, dev_domain: acme.local, brand_colors: { primary: "#C8102E", accent: null }, logo: null }   # logo: path/URL to a developer-supplied logo, or null = keep the shipped Spryker logo (flagged)
 namespace: { mode: custom, name: Acme }        # or { mode: keep-pyz }
 services:                               # deviations from the shipped deploy.dev.yml — omit/empty = keep demoshop defaults

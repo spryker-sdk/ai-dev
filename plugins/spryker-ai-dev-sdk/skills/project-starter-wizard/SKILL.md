@@ -1,6 +1,6 @@
 ---
 name: project-starter-wizard
-description: "Use at the very start of a new customer project, on a fresh un-booted clone of a Spryker b2b/b2b-marketplace demoshop — 'turn this demoshop into our project', 'start the project setup', 'run the project starter'. Also the resume entry when a prior run left .ai-dev/project-setup.md. The entry point that owns the developer interview and orchestrates the other project-start skills."
+description: "Use at the very start of a new customer project, on a fresh un-booted clone of a Spryker b2b/b2b-marketplace demoshop — 'turn this demoshop into our project', 'start the project setup', 'run the project starter'. Also the trigger for 'give me the setup questionnaire' / 'here are my filled setup answers — run it autonomously', and the resume entry when a prior run left .ai-dev/project-setup.md. Collects the nine setup decisions either from a pre-filled questionnaire (references/questionnaire.md — no interview) or a live batched interview, then orchestrates the other project-start skills in autonomous or collaborative mode."
 ---
 
 # Project Starter — Wizard
@@ -49,9 +49,38 @@ This is not cosmetic — it is the difference between an unattended run that com
 
 If not fresh/un-booted **and there is no `.ai-dev/project-setup.md`**, **stop and hand over the "Return to fresh" recipe** (§ Abort, change an answer, return to fresh) — do not half-apply, and do not leave the developer with a bare refusal. (An existing state file → Resume, per above.)
 
-## 1. Interview
+## 1. Collect the answers — questionnaire fast-path, or interview
 
-Conduct the interview per **`references/interview.md`** — read it BEFORE asking the first question. It carries the AskUserQuestion mechanics (structured options with the default first, pre-computed candidates for free-text values, batched sections — what makes this a wizard, not a form) and the **nine-section decision catalog**: identity, namespace, services/applications, stores + region, demo-data mode, catalog scope, localization, CI, and run mode (autonomous/supervised). Ask section by section; always show the demoshop default; accepting every default is a valid outcome.
+The nine decisions can arrive **two ways**, and the fast-path is the default preference:
+
+- **A filled questionnaire (`references/questionnaire.md`) — no interview.** It is the canonical
+  fillable question list (groups P/N/S/T/D/C/L/Q + run-config R, every question carrying its default
+  inline). **Minimum viable set: `P1` (project name), `R1` (mode), `R2` (hard-stop ack)** — with those
+  three the run proceeds on shipped defaults for everything else. If the developer supplied it (a path,
+  pasted text, a `yaml` answer block, or the values inline in their request), **skip the interview**.
+- **A live interview** — the batched AskUserQuestion path, when nothing was supplied.
+
+**Read `references/interview.md` BEFORE asking the first question.** It carries the collection rules
+that decide between those paths (**Rule 0** — filled/partial/missing detection and the parsing rules;
+**Rule 1** — offer "fill it yourself vs interview me"), the AskUserQuestion mechanics (structured
+options with the default first, pre-computed candidates for free-text values, batched sections — what
+makes this a wizard, not a form), and the **nine-section decision catalog**: identity, namespace,
+services/applications, stores + region, demo-data mode, catalog scope, localization, CI, and run mode.
+
+Three rules bind both paths:
+
+- **A blank is a default, not a question.** Every question except `P1`/`R1`/`R2` has a working default.
+  Under `run_mode: autonomous` a blank is resolved to that default — or, where there's a genuine fork,
+  **decided and logged to `.ai-dev/decision-log.md`** — never asked. Under `collaborative` the blanks
+  are asked. Coming back with questions on an autonomous run defeats the mode.
+- **`R1` is the one answer with no safe default.** If a questionnaire arrives without it, ask that one
+  question and nothing else — it decides whether every other blank becomes a question or a decision.
+- **A questionnaire skips questions, never checks.** Pre-flight (§0) runs in full either way, and its
+  developer-must-do findings are still surfaced as `⚠ ACTION NEEDED`. Re-run the namespace/volume
+  collision check as soon as `P1` is known.
+
+Keep the two files in sync: `questionnaire.md` is the question bank, `interview.md` is how to collect
+it. A decision added to one must be added to the other.
 
 ## Two rules that bind EVERY edit of the run (interview through execution)
 
@@ -67,17 +96,17 @@ In the same pass, create `.ai-dev/run.log` with the interview summary as its fir
 
 ## 3. Run the steps in order
 
-**Run mode — chosen in the interview (`run_mode: autonomous | supervised` in the state file).** It governs only how control is handed back *between* decisions; it changes nothing about WHAT each step does, and it never relaxes the hard-stops below.
+**Run mode — questionnaire `R1` / interview §9 (`run_mode: autonomous | collaborative` in the state file; `supervised` is an accepted alias for `collaborative`).** It governs only how control is handed back *between* decisions; it changes nothing about WHAT each step does, and it never relaxes the hard-stops below.
 
-- **Autonomous** — run steps 1–9 as **one continuous pass**; after a non-gated step completes, proceed to the next in the same turn (status update + one-line report happen inline, mid-run — don't end the turn to announce "step done — continue?"). At any **reversible, in-project decision point** — which value to pick, how to resolve a dangling reference, a strategy fork the interview didn't pin down — choose the best option, **record it in the decision log** (below), and keep going. The default is continue.
-- **Supervised** — do **not** silently stop, and do **not** run straight through. At each **step boundary**, end the turn with a one-line result and an explicit **"Continue to `<next step>`?"**, and wait. At any **decision point**, surface it as a question with the options and your recommendation (`AskUserQuestion`) and wait — never decide silently, never halt without a question. Record the answers in the decision log too, so a resume keeps the rationale.
+- **Autonomous** — run steps 1–9 as **one continuous pass**; after a non-gated step completes, proceed to the next in the same turn (status update + one-line report happen inline, mid-run — don't end the turn to announce "step done — continue?"). At any **reversible, in-project decision point** — which value to pick, how to resolve a dangling reference, a strategy fork the questionnaire didn't pin down, **or a questionnaire question left blank** — choose the best option, **record it in the decision log** (below), and keep going. The default is continue. **Asking a configuration question mid-run is a mode violation**: the answers were collected up front precisely so this pass needs none.
+- **Collaborative** — do **not** silently stop, and do **not** run straight through. At each **step boundary**, end the turn with a one-line result and an explicit **"Continue to `<next step>`?"**, and wait. At any **decision point**, surface it as a question with the options and your recommendation (`AskUserQuestion`) and wait — never decide silently, never halt without a question. Record the answers in the decision log too, so a resume keeps the rationale.
 
-**Hard-stops — control returns to the developer in BOTH modes** (autonomy never overrides these; supervised asks anyway):
+**Hard-stops — control returns to the developer in BOTH modes** (autonomy never overrides these; collaborative asks anyway). These are what questionnaire `R2` acknowledges — a filled questionnaire is never a promise of an uninterrupted run:
 - **(a) a `⚠ ACTION NEEDED` prerequisite** — something only the developer can do (start Docker/OrbStack, add the `/etc/hosts` line, supply a token). Surface it per the Communication rules and wait.
 - **(b) a deletion or data-destroying action — gated in BOTH modes, no exceptions.** Any of: deleting files/dirs (`rm`, `git clean`); removing rows/columns in place (`csv delete` / `filter --in-place` / `drop-columns --in-place` — these do **NOT** prompt at the OS level, so the gate is this rule, not a shell prompt); any DB/volume drop (`reset`/`clean-data`); `sudo`; or publishing outside the clone. Present the concrete blast radius (the file list, the row/column count, or what the drop wipes) and get an explicit go-ahead first. **This includes the routine happy-path deletions, not only recovery paths** — the `project-ci-generator` CI/deploy/install wipe (step 1), `define-stores`' removal of the non-canonical demo dirs + dangling manifests, and `project-data`'s strip passes. **Autonomous performs and logs reversible EDITS on its own** (value transforms, added columns, file writes — all git-revertable in a fresh clone) **but never a deletion, data wipe, or `sudo` unattended.**
 - **(c) a step failure** — stop with guidance, per the failure rule below.
 
-**Decision log (`.ai-dev/decision-log.md`) — the autonomous run's audit trail (and supervised's answer record).** Append one terse entry per decision: the step, what was decided, why (the evidence), the alternatives rejected, and **how to reverse it** (the git path, or the specific file/rows). Like the improvement log it is dev scaffolding, not developer-facing status — its purpose is that a reversible-but-wrong autonomous call costs a review-and-revert, not a silent broken shop. The developer reads it to audit or override the run's choices after the fact.
+**Decision log (`.ai-dev/decision-log.md`) — the autonomous run's audit trail (and collaborative's answer record).** Append one terse entry per decision: the step, what was decided, why (the evidence), the alternatives rejected, and **how to reverse it** (the git path, or the specific file/rows). **Questionnaire blanks are accounted for in exactly one of two places — never both.** A blank that resolved to its **documented default** (S1 → keep all engines) is recorded *only* as an ID in the state file's `answers_defaulted` list; it does NOT get a decision-log entry, because a mechanical default carries no rationale worth a line and duplicating all ~15 of them here would drown the real decisions. A blank that required a **genuine fork** — no documented default, or the default doesn't fit the answers (e.g. a region token whose literal candidate collides with a shipped one) — gets a full entry here *and* is listed in the run.log's `decided=[…]`. If you can point at the questionnaire text that names the value, it's a default; if you had to reason, it's a decision. Like the improvement log it is dev scaffolding, not developer-facing status — its purpose is that a reversible-but-wrong autonomous call costs a review-and-revert, not a silent broken shop. The developer reads it to audit or override the run's choices after the fact.
 
 ### Run logging — what, when, how, where
 
@@ -106,7 +135,7 @@ pipes, `&&`, and subshells) prompt regardless of the allowlist. Appending a line
 prompt and keeps the run hands-off. Keep entries terse — one line per event:
 
 ```
-[2026-08-10 14:02:11] INTERVIEW — 9 sections answered · run_mode=autonomous · data.mode=adapt
+[2026-08-10 14:02:11] INTERVIEW — SKIP (questionnaire pre-filled) · source=questionnaire · run_mode=autonomous · data.mode=adapt · defaulted=[S1,S2,C1,L1]
 [2026-08-10 14:02:40] STEP 1 project-ci-generator | START
 [2026-08-10 14:11:05] STEP 1 project-ci-generator | END done — 1 workflow kept, 14 files wiped (approved)
 [2026-08-10 14:11:20] STEP 5 define-stores | SKIPPED (data.mode=leave)
@@ -118,8 +147,11 @@ prompt and keeps the run hands-off. Keep entries terse — one line per event:
 **What.** One line per step boundary (`| START`, `| END <one-line outcome>`), plus every event a later
 reader would need to explain the run:
 
-- The interview summary: `run_mode`, and the answers that decide whether steps run (`data.mode`,
-  `reduce_catalog`, `localize`, the `ci:` plan).
+- The collection summary: **how the answers were collected** (`source=questionnaire | interview |
+  questionnaire+interview | defaults`, and `defaulted=[…]` — the questions resolved without the
+  developer choosing), `run_mode`, and the answers that decide whether steps run (`data.mode`,
+  `reduce_catalog`, `localize`, the `ci:` plan). The source and the defaulted list are what let a
+  later reader tell a deliberate choice from a taken default.
 - Each step's START/END with its terminal status, and each **conditional skip with its reason**
   (`SKIPPED (data.mode=leave)`) — a skip is a result, and it explains a "missing" step later.
 - Every **hard-stop** as it happens: a `⚠ ACTION NEEDED` prerequisite and how it resolved, each
@@ -184,7 +216,7 @@ When blocked on a human action, apply the **Communication** rules at the top: le
 
 ## Resume
 
-If invoked with an existing `.ai-dev/project-setup.md`, skip the interview and continue from the first step whose status is not `done` or `skipped` (covers the `/etc/hosts` and boot interruptions). **Append a `RESUME` line to `.ai-dev/run.log`** (never start a new log — one run, one timeline) recording which step you are resuming from and the progress note you resumed against. **Re-read `run_mode` from the state file first** — a resumed run honours the mode chosen at interview time (autonomous vs supervised), and any `## Required follow-ups` recorded there. **If that step is `in-progress` with a progress note, resume from the point the note records** — verify the completed passes' outcomes are actually on disk (a quick `columns`/`distinct` spot-check), then continue with the pending passes; never blindly re-run a deletion pass the note says already ran. (Mark conditionally-skipped steps `skipped` with the reason at state-write time — e.g. `define-stores: skipped (data.mode=leave)` — so Resume never lands on a step that must not run.)
+If invoked with an existing `.ai-dev/project-setup.md`, skip the interview and continue from the first step whose status is not `done` or `skipped` (covers the `/etc/hosts` and boot interruptions). **Append a `RESUME` line to `.ai-dev/run.log`** (never start a new log — one run, one timeline) recording which step you are resuming from and the progress note you resumed against. **Re-read `run_mode` from the state file first** — a resumed run honours the mode chosen at collection time (autonomous vs collaborative), and any `## Required follow-ups` recorded there. Never re-collect answers on a resume: the state file's frontmatter *is* the answer set (whatever its `answers_source`), so a resumed autonomous run asks no configuration questions either. **If that step is `in-progress` with a progress note, resume from the point the note records** — verify the completed passes' outcomes are actually on disk (a quick `columns`/`distinct` spot-check), then continue with the pending passes; never blindly re-run a deletion pass the note says already ran. (Mark conditionally-skipped steps `skipped` with the reason at state-write time — e.g. `define-stores: skipped (data.mode=leave)` — so Resume never lands on a step that must not run.)
 
 ## Abort, change an answer, return to fresh
 
@@ -225,7 +257,7 @@ Using a foreign interpreter *instead of* an available tool is the thing to avoid
 ## Rules
 
 - Stage changed/created files (`git add`); never branch or commit — that's the developer's decision, including whether to commit the state file.
-- **No further *configuration* questions after the interview.** All configuration decisions are collected up front (§1); every step then runs without new ones — including the boot, which runs in a detached pseudo-terminal (`script … docker/sdk up` in background; see boot-and-verify). Two honesty rules about what "hands-off" means:
+- **No further *configuration* questions after collection.** All configuration decisions are collected up front (§1 — questionnaire or interview); every step then runs without new ones — including the boot, which runs in a detached pseudo-terminal (`script … docker/sdk up` in background; see boot-and-verify). Two honesty rules about what "hands-off" means:
   - **Hands-off only if the developer's allowlist already grants these commands.** Without it the same steps run but each command prompts — still correct, just not hands-off; say so rather than implying silence (recommend the template, don't install it).
   - **Do not over-promise silence.** A real run still consults the developer on **destructive operations and on any data defect the boot surfaces** — in practice several times (a store-keyed money decision, a destructive-trim gate, a namespace collision, an empty-homepage or missing-entity defect the boot reveals). Frame it as "no further configuration questions; expect to be consulted on destructive operations and on any data defect the boot surfaces," never as an unattended run that never speaks again.
   - Human touch-points that remain regardless: (a) the `/etc/hosts` `sudo` line at the end — the server-side verification uses `curl --resolve` so it is **not a gate on the run completing**; only the browser-based verifier ACs need it, and declining it is a **terminal** `done (browser ACs BLOCKED — /etc/hosts declined)`, never a stall — never run `sudo` yourself; (b) **deletions** (`rm` of leftover region dirs / stale manifests) are deliberately NOT allowlisted, so they prompt — a safety choice; (c) a genuine boot environment limit → surface the plain `docker/sdk up` for the developer to run, never edit project config to force it. On Spryker Cloud, infra changes needing a support case are the only other external gate.
