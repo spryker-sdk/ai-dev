@@ -18,7 +18,14 @@
  * migration guides must be processed (Lane 0), so the log doubles as the guide worklist.
  *
  * Usage:
- *   php $UP/resolve-constraints.php [--max-rounds=8] [--dry-run]
+ *   php $UP/resolve-constraints.php [--max-rounds=8] [--dry-run] [--only=<glob,glob>]
+ *
+ * --only restricts composer to the listed package globs, leaving every other package at its locked
+ * version. Use it when the policy is "upgrade Spryker only, leave third-party alone":
+ *   php $UP/resolve-constraints.php --only="spryker/*,spryker-shop/*,spryker-eco/*,spryker-feature/*"
+ * A filtered update also side-steps unrelated root blockers (an unsatisfiable third-party pin, a
+ * package shadowed by a canonical VCS repo, an advisory-blocked version) that would otherwise abort
+ * a full update before any Spryker constraint is even considered.
  *
  * Exit codes: 0 = composer resolved, 1 = unresolved conflicts remain (see report), 2 = usage.
  */
@@ -34,9 +41,12 @@ $composerFile = $root . '/composer.json';
 
 $maxRounds = 8;
 $dryRun = false;
+$only = [];
 foreach (array_slice($argv, 1) as $arg) {
     if (preg_match('/^--max-rounds=(\d+)$/', $arg, $m)) {
         $maxRounds = max(1, (int)$m[1]);
+    } elseif (preg_match('/^--only=(.+)$/', $arg, $m)) {
+        $only = array_values(array_filter(array_map('trim', explode(',', $m[1]))));
     } elseif ($arg === '--dry-run') {
         $dryRun = true;
     } else {
@@ -94,9 +104,13 @@ function highestVersionIn(string $expression): ?string
  * no longer in the file. That produces phantom, unfixable conflicts. A release-group upgrade
  * touches the whole tree anyway, so resolve against the real composer.json every time.
  */
-function runComposerUpdate(string $root): array
+function runComposerUpdate(string $root, array $only = []): array
 {
-    $cmd = 'cd ' . escapeshellarg($root) . ' && composer update '
+    $filter = '';
+    foreach ($only as $glob) {
+        $filter .= escapeshellarg($glob) . ' ';
+    }
+    $cmd = 'cd ' . escapeshellarg($root) . ' && composer update ' . $filter
         . '--with-all-dependencies --ignore-platform-reqs --no-scripts --no-interaction 2>&1';
     $output = [];
     $exitCode = 0;
@@ -111,8 +125,12 @@ function runComposerUpdate(string $root): array
 function parseRootConflicts(string $output): array
 {
     $conflicts = [];
-    $pattern = '#require ((?:spryker|spryker-shop|spryker-eco|spryker-feature)/[a-z0-9-]+) '
-        . '([^\s]+(?:\s*\|\|\s*[^\s]+)*) -> found .*? but it conflicts with your root '
+    // Composer writes "<package> <version> requires <dep> <constraint> -> found ... but it
+    // conflicts with your root composer.json require (X)". Match "requires" as well as "require":
+    // anchoring on the singular silently parsed ZERO conflicts and reported them as an unparsed
+    // failure, which looks like a composer problem rather than a parser bug.
+    $pattern = '#requires?\s+((?:spryker|spryker-shop|spryker-eco|spryker-feature|spryker-sdk)/[a-z0-9-]+)'
+        . '\s+([^\s]+(?:\s*\|\|\s*[^\s]+)*)\s+-> found .*? but it conflicts with your root '
         . 'composer\.json require \(([^)]+)\)#';
 
     foreach (explode("\n", $output) as $line) {
@@ -122,14 +140,28 @@ function parseRootConflicts(string $output): array
             if ($wanted === null) {
                 continue;
             }
-            // keep the highest demand across all lines mentioning this package
-            if (!isset($conflicts[$package]) || version_compare($wanted, $conflicts[$package], '>')) {
-                $conflicts[$package] = $wanted;
+            // A demand can be a DISJUNCTION ("^4.0.0 || ^5.0.0"): the package accepts either major.
+            // Taking its highest alternative overshoots the release group — one module allowing
+            // "gui ^4.0.0 || ^5.0.0" pushed gui to ^5.0.0 while the release group's own feature
+            // package hard-required ^4.5.0, so the next round wanted to LOWER it and the run
+            // deadlocked. A HARD (single-branch) demand therefore always wins over a disjunction.
+            $isFlexible = str_contains($m[2], '||');
+            $known = $conflicts[$package] ?? null;
+            if ($known === null) {
+                $conflicts[$package] = ['version' => $wanted, 'flexible' => $isFlexible];
+                continue;
+            }
+            if ($known['flexible'] && !$isFlexible) {
+                $conflicts[$package] = ['version' => $wanted, 'flexible' => false];
+                continue;
+            }
+            if ($known['flexible'] === $isFlexible && version_compare($wanted, $known['version'], '>')) {
+                $conflicts[$package]['version'] = $wanted;
             }
         }
     }
 
-    return $conflicts;
+    return array_map(static fn (array $demand): string => $demand['version'], $conflicts);
 }
 
 function currentConstraint(array $composerJson, string $package): ?string
@@ -177,7 +209,7 @@ $history = [];
 
 for ($round = 1; $round <= $maxRounds; $round++) {
     printf("=== round %d: running composer update ===\n", $round);
-    $result = runComposerUpdate($root);
+    $result = runComposerUpdate($root, $only);
 
     if ($result['exitCode'] === 0 && !str_contains($result['output'], 'could not be resolved')) {
         printf("composer resolved successfully in round %d.\n", $round);

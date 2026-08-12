@@ -22,13 +22,60 @@ and write every snapshot and report into `<project>/.spryker-upgrade/state/`, wh
 self-gitignoring so no baseline or merge artifact can ever be committed.
 
 Orchestrated upgrade of a Spryker project to a newer release. Deterministic detection is done by
-the twelve scripts in `$UP/` (see `README.md` next to this skill); your job is to run
+the fourteen scripts in `$UP/` (see `README.md` next to this skill); your job is to run
 the phases in order, do the semantic resolution work, and stop at the decision gates that belong to
 the developer.
 
 Start by establishing whether the upgrade can be *verified* at all (Phase 0.5). Everything a Spryker
 project overrides fails quietly, so an upgrade with no tests over the override surface is not an
 upgrade you can report on — offer to close that gap before moving a single constraint.
+
+## Scope: an upgrade updates what the project already has. Nothing else.
+
+**The deliverable is the project doing exactly what it did before, on newer versions.** Not the
+project modernised, not the project on the vendor's latest recommended architecture.
+
+- **Moving a module to a newer version is not consent to adopt what that version enables.** A module
+  can arrive carrying a new architecture, a new DI mechanism, a new storage backend, a new extension
+  point. None of that gets integrated because the version moved.
+- **No new feature is integrated unless the developer explicitly asked for it.** This is the same rule
+  as Phase 6's new-features gate, and it applies with equal force to new capabilities that appear
+  *inside a module the project already had* — that case is easier to miss precisely because no new
+  package shows up in the lock diff.
+- **A missing feature is not damage.** Damage is the project's existing behaviour changing or
+  disappearing. A capability the project never used and still does not use is not a finding.
+
+Worked example, from the validation run. `spryker/container` 1.4.6 → 1.11.0 shipped
+`ContainerDelegator`, whose presence flips `Kernel::boot()` onto a Symfony-DI code path. The project
+had no `config/bundles.php`, so application plugins stopped booting and the Back Office login broke.
+
+- **Wrong resolution:** "adopt the Symfony container — add `config/bundles.php` and service config."
+  That integrates a new architecture the developer never asked for, in an upgrade ticket, and it is
+  what this skill first recommended. It is out of scope.
+- **Right resolution:** restore the behaviour the project had. Find the minimal way to keep
+  application plugins booting as before, and if the new version genuinely offers no such path, that is
+  a **vendor BC break** — report it as a blocker with evidence and let the developer decide, rather
+  than quietly re-architecting the project to route around it.
+
+**Restoring behaviour usually means a narrowly-guarded project-side shim.** When a vendor version
+changes a lifecycle the project depended on, the in-scope fix is to re-establish the old behaviour from
+project code — override the project's own bootstrap/factory and call what the vendor stopped calling.
+Two rules make this safe:
+
+- **Guard on the exact broken condition**, not on the version. The shim must disable itself once the
+  condition disappears — because the vendor fixed it, or because the project later adopted the new
+  path. A shim that always fires becomes a double-execution bug the moment upstream is fixed.
+- **Check for idempotence before assuming a re-run is harmless.** On the validation run
+  `Application::$booted` was never set to `true`, so calling `registerPluginsAndBoot()` unguarded would
+  have re-registered a security event subscriber on every request.
+
+Mark it as upgrade debt in the docblock, with the condition for removal and a pointer to the vendor
+issue. It is a bridge until upstream is fixed, not the destination.
+
+When the only apparent fix is "integrate the new thing", stop and say so. Presenting an
+architecture migration as an upgrade step, without ever asking, is the failure mode this section
+exists to prevent. Offer the new capability as a **separate, explicitly-scoped piece of work** with
+its own decision — never as a side effect of a version bump.
 
 **Sibling skills to use rather than reinvent:**
 - `spryker-docs-research` — locating and reading migration guides / release notes for Lane 0.
@@ -42,6 +89,22 @@ This was validated end to end on a real 202410.0 → 202606.0 upgrade across fiv
 actually hit rather than what the docs predicted.
 
 **Environment:**
+
+> **Never conclude the environment is unavailable from a missing or empty `docker/` directory.**
+> In most Spryker projects `docker/` is a **git submodule** and an un-initialised submodule looks
+> exactly like an absent one — an empty directory. Establish it with three commands before making
+> any claim, and re-run them before writing "not verifiable" in a report:
+> ```bash
+> git submodule status                 # a leading '-' means present but NOT initialised
+> git submodule update --init --depth 1 docker
+> docker info --format '{{.ServerVersion}} CPUs={{.NCPU}} Mem={{.MemTotal}}'
+> ```
+> This is not hypothetical: on the validation run the entire Phase 5 verification set was reported
+> as "no docker environment on this host" when the submodule simply had not been initialised and the
+> Docker daemon had been running the whole time. Everything downstream — migration diff, index map,
+> the asset build, every browser check — was reachable. Declaring work unverifiable is a
+> load-bearing claim; earn it.
+
 - Prefer running composer and CI-grade checks inside docker: `script -q /dev/null docker/sdk cli
   <cmd>` (a pseudo-TTY is required in non-interactive shells). The detector scripts use reflection
   or static parsing only and run fine on host PHP.
@@ -111,6 +174,19 @@ actually hit rather than what the docs predicted.
 | 52 | Test suite is **already red** before the upgrade, so "tests pass/fail" proves nothing afterwards | Phase 0 baseline suite run, results recorded | compare post-upgrade run against the recorded baseline, never against "green" |
 | 53 | A module's test directory holds only `_support/` helpers — looks like coverage, asserts nothing | `check-test-coverage.php` (`supportOnlyTestDirs`) | treat as uncovered |
 | 54 | The upgrade breaks the **tests** rather than the app: vendor `SprykerTest` helpers/Testers/fixtures moved or changed signature | `codecept build` + suite run in Phase 5 | fix the test-side usage; this is damage in the harness, report it separately from app damage |
+| 55 | A CSS framework major (Bootstrap 3→5) removes classes the project still uses — but most are **vendor conventions core still emits**, and some are selected by **vendor's own JS**, so blind migration causes the outage it was meant to prevent | grep the class in vendor's `*/src/**/<Layer>/**/*.twig` **and** `assets/<Layer>/js` **at the target release** — never reason from the framework's changelog | keep any class vendor still emits or selects; migrate only classes absent from vendor. Where vendor pairs old+new (`pull-left float-start`), mirror the pair |
+| 56 | Resolving on the **host** produces a lock that installs only there: the host's PHP is newer than the project's image, so dev-tool dependencies resolve to versions requiring a PHP the container does not have. `require.php: ">=8.3"` does **not** prevent this — a host on 8.5 satisfies it | `docker/sdk up` dies at `composer install` with *"lock file does not contain a compatible set of packages"*; or `composer check-platform-reqs` **inside the container** | set `config.platform.php` in `composer.json` to the deployment PHP (derive it from `image.tag` in every `deploy.*.yml`, and prefer the lowest patch that satisfies the lock, since `spryker/php:8.x` is a floating tag), then **re-resolve inside the container** |
+| 57 | The host is not a valid resolution environment at all — it is missing **extensions** the project requires (`ext-redis`, `ext-pgsql`), so composer cannot resolve those packages even with the platform pinned | `composer update` on the host reports *"ext-redis is missing from your system"* | run composer **in the container** (`docker/sdk cli composer …`). Never paper over it with `--ignore-platform-req`: that reintroduces #56 by pretending a requirement is met |
+| 58 | Tests pass on host PHP but the project runs a **different PHP minor** — the suite never exercised the deployed runtime | compare `php -v` against `image.tag`; any gap invalidates "tests pass" as an upgrade claim | re-run the suite in the container (Phase 5.5) before reporting any test result |
+| 59 | The verification plan assumes a storefront the project does not have (headless / API-only projects ship `zed` + `glue` and no `yves`) | `grep -oE "application: [a-z_]+" deploy.*.yml \| sort -u` | build the browser checklist from the applications that exist; for a headless project the Back Office is the only UI |
+| 60 | A **manifest** is bumped but its **lock** is not, so the thing that consumes the lock keeps installing the old version — silently. `package.json` vs `package-lock.json` is the common case: `npm ci` reads only the lock, so a Bootstrap-5 asset toolchain bump never reaches CI | `git diff --stat` shows the manifest changed and the lock did not; or run the asset build and see the lock move | update the lock **by running the installer** (`npm install`, `composer update <pkg>`), never by hand-editing. Any manifest edit verified only by reading is unverified |
+| 61 | `propel:install` **deletes tracked files** — it runs migration cleanup, removing `src/Orm/Propel/*/Migration_*` files. Gitignore does not protect them if they were committed before the ignore rule existed | `git status` immediately after Phase 5 | restore with `git checkout --`. Treat every Phase 5 command as potentially write-heavy and diff the working tree after each; never assume regeneration is read-only |
+| 62 | Generated artifacts land in a path the project does not ignore, so they show up as untracked noise in the upgrade diff (e.g. `src/Orm/Propel/*/Config/propel.json`) | untracked files appear after Phase 5 | add the path to `.gitignore` next to the sibling generated dirs; never commit generated output into the upgrade branch |
+| 63 | A live 500 whose failing call path is **identical in the pre-upgrade versions** — so the files in the stack trace look innocent | comparing the pre-upgrade file at its tag can only **exonerate those files**; it can NOT establish that the release is innocent, because the cause is often several layers above the trace. The only decisive test is a **version rollback**: check out the pre-upgrade tree, install its lock in the container, clear caches, reload the page | on the validation run this exact mis-inference produced a wrong "pre-existing, not upgrade damage" verdict on a release blocker. The rollback took ~15 min and reversed it. Roll back before you conclude; use file comparison only to *localise* a confirmed regression |
+| 64 | A vendor package adds a class whose **mere existence flips a runtime branch** (`class_exists(X)` feature detection), silently moving the project onto a code path it is not configured for | no signature changes, no removed methods, nothing any static detector sees. Found only by exercising the app | grep the new package version for `class_exists(` gates and check whether the project satisfies what the new branch requires. **Restore the project's previous behaviour — do NOT adopt the new path** (see Scope): that would be integrating an unrequested feature. If the version offers no way back, it is a vendor BC break — report it as a blocker. Validation run: `spryker/container` 1.4.6→1.11.0 added `ContainerDelegator`, flipping `Kernel::boot()` from booting application plugins immediately onto the Symfony-DI path, and the project had no `config/bundles.php` |
+| 65 | Application-plugin **boot lifecycle** moves between versions, so plugins that register fine never boot — every `boot()`-time side effect silently disappears (sessions, tracing, feature toggles) | a null/uninitialised service that the wiring clearly registers. Check whether the plugin's work happens in `provide()` or `boot()`, then whether anything still calls the boot stage | `spryker/application` 3.36→3.48 removed `bootPlugins()` from `handle()` and moved it to a public `registerPluginsAndBoot()` driven by the Kernel, leaving `Application::boot()` — which project entry points call — a **no-op**. Fix by restoring the boot behaviour the project had, not by migrating it to the new mechanism. Verify by loading a page that exercises a `boot()`-time service, never by unit tests |
+| 66 | **A missing harness environment variable makes a specific subset of suites fail in a way indistinguishable from upgrade damage.** The suite total stays identical while assertions drop, because the affected tests error before asserting | run any suspect suite **alone**. If it passes alone, the batch invocation differs from the single one — compare the two command lines before suspecting the code | on the validation run, omitting `SPRYKER_TESTING_ENABLED=1` made `tests/_bootstrap.php` fall back to `APPLICATION_ENV=devtest` instead of the real environment, so 4 suites lost their service config: 69→65 green, assertions 1326→1180 at an unchanged 630 tests. It presented twice and was misdiagnosed as test contention the first time. **Pin the exact invocation** (env vars included) alongside the baseline numbers, and re-use it verbatim for every comparison run |
+| 67 | **Editing a file on the host then immediately running composer/console in the container** — the container still sees the old file, so the command exits 0 having done nothing (a composer update reports no changes; `composer validate` later flags the lock as out of sync) | after any host-side edit, poll until the container observes the change before invoking the tool | mutagen/file sync is asynchronous. Verify with `docker exec … grep <the edit> <file>` in a short wait loop, then run the command. An exit 0 that changed nothing is the signature |
 | 55 | The project declares a class **in a vendor's own namespace** and force-loads it via `autoload.files`, so the vendor implementation never loads at all | `check-vendor-class-replacement.php` (VENDOR_CLASS_REPLACED) | **decide before upgrading** — the copy is frozen at an older version, so upstream changes are already being discarded; re-copy from the target release and re-apply the delta |
 | 56 | A copied vendor class **lost its namespace** and sits in the global namespace, so it overrides nothing while still being parsed on every request | `check-vendor-class-replacement.php` (GLOBAL_NAMESPACE_COPY) | verify nothing references the global name, then delete — the vendor class was in use all along |
 | 57 | A file under `src/Pyz/` declares a **non-Pyz namespace**, so PSR-4 cannot load it — it resolves only under an optimized/classmap dump, making behaviour differ between dev and prod | `check-vendor-class-replacement.php` (VENDOR_NAMESPACE_ADDITION) + `check-dead-overrides.php` (unloadable) | move it to the namespace's real path or delete it if unreferenced |
@@ -130,6 +206,7 @@ detectors (or Phase 5 checks) before finishing the run — the matrix must stay 
    php $UP/check-config-constants.php || true  # baseline: problems here = pre-existing damage
    php $UP/check-typed-members.php || true     # baseline: should be clean before upgrading
    php $UP/check-constraint-style.php || true  # baseline: patch-locked + merged constraints
+   php $UP/check-platform-alignment.php || true # is this host even valid to resolve on? (do this FIRST)
    php $UP/check-test-coverage.php || true     # baseline: is the override surface verifiable at all?
    php $UP/check-vendor-class-replacement.php || true  # baseline: classes declared in vendor namespaces
    mkdir -p .spryker-upgrade/state && cp composer.lock .spryker-upgrade/state/composer.lock.before
@@ -226,6 +303,48 @@ Never pick silently.
 
 ## Phase 1.5 — Constraint style (do this BEFORE the first composer update)
 
+### First: resolve for the project's platform, not the machine you are sitting on
+
+Do this before the *first* `composer update`, because every lock produced without it may be
+uninstallable and you will not find out until something tries to deploy.
+
+```bash
+php -v | head -1                                            # the machine you would resolve on
+grep -hoE 'tag: spryker/php:[0-9.]+' deploy*.yml | sort -u   # what the project actually runs
+python3 -c "import json;print(json.load(open('composer.json')).get('config',{}).get('platform','ABSENT'))"
+```
+
+If the host PHP minor differs from the image and `config.platform` is absent, **stop and fix that
+first**:
+
+```json
+"config": { "platform": { "php": "8.3.2" } }
+```
+
+`require.php` does **not** protect you — `">=8.3"` is satisfied by a host on 8.5, so composer will
+happily select dependencies (usually dev tooling: `doctrine/instantiator`, `symfony/*`,
+`phpunit`) that require a PHP the container does not have. Choose the **lowest patch that satisfies
+the lock** rather than the image's current patch, because `spryker/php:8.x` is a floating tag and
+environments pull it at different times.
+
+Then **run composer inside the container** anyway:
+
+```bash
+script -q /dev/null docker/sdk cli composer update …
+script -q /dev/null docker/sdk cli composer check-platform-reqs   # must be 0 failures
+```
+
+The platform pin fixes the PHP *version*; it does not give the host the project's *extensions*. A
+developer machine without `ext-redis` or `ext-pgsql` cannot resolve `spryker/redis` at all. Never
+reach for `--ignore-platform-req` to get past that — it re-creates exactly the unrunnable lock the
+pin was added to prevent.
+
+On the validation run this was found only when `docker/sdk up` failed at `composer install`, several
+phases after the damage was done, and it also meant the whole characterization suite had been
+running on the wrong PHP minor.
+
+### Then: the constraint style itself
+
 A Spryker project pins hundreds of individual modules next to the `spryker-feature/*`
 meta-packages. Any module pinned with `~x.y.z` (patch-only) or an exact version will produce
 "conflicts with your root composer.json require" instead of upgrading, so bumping the feature
@@ -313,14 +432,26 @@ For **each** package in the MAJOR list of `.spryker-upgrade/state/lock-diff-repo
    `docs.spryker.com/docs/pbc/all/<pbc>/<version>/base-shop/install-and-upgrade/upgrade-modules/upgrade-the-<module>-module.html`).
 2. WebFetch the page and extract the sections covering the crossed major boundary (a guide
    covers multiple majors; only the crossed range applies, e.g. 10.x → 11.0 section).
-3. Execute every applicable step: interface swaps, constant→config-method moves, plugin
-   rewiring, schema/transfer adjustments, console commands. Cross-check each step against the
-   detectors' findings — guide steps usually explain WHY a detector fired.
+3. **Sort the steps into two piles before executing any of them** — guides freely mix them, and the
+   distinction is the Scope rule in practice:
+   - **Required to keep working** — interface swaps, constant→config-method moves, plugin rewiring,
+     schema/transfer adjustments, console commands. Execute these; they restore existing behaviour.
+   - **New capability the guide offers** — "to use the new X, register Y", "enable the new Z by
+     adding this config". **Do not execute these.** They are Phase 6 material: list them for the
+     developer as separate opt-in work, even when the guide presents them as ordinary numbered steps
+     alongside the mandatory ones.
+
+   When a step is ambiguous, ask what breaks if it is skipped. If the answer is "nothing the project
+   currently does", it is a new capability, not a migration step. Cross-check the required pile
+   against the detectors' findings — guide steps usually explain WHY a detector fired; a step no
+   detector corroborates and no existing behaviour needs is a strong candidate for the second pile.
 4. If no guide exists (some modules have none), fall back to the module's CHANGELOG.md and the
    GitHub compare URL from the report; extract the `[BC]`/breaking notes for the crossed majors.
 5. If neither yields clarity, STOP for that module and surface it to the developer — never
    invent migration steps.
-6. Record per module: guide URL (or "none published"), steps applied, steps skipped + why.
+6. Record per module: guide URL (or "none published"), steps applied, steps **deliberately not**
+   applied because they introduce a new capability (with what they would have added), and steps
+   skipped for other reasons + why.
    This table goes into the final report verbatim.
 
 ## Lanes 1–4 — Conflict resolution
@@ -462,6 +593,45 @@ vendor hook (e.g. a form field whose only AI link was a `template_path` attribut
 removed partial was `{% embed %}`-ed **around** project markup, unwrap it rather than deleting the
 block, or the wrapped fields disappear with it.
 
+## Phase 4.9 — Boot the environment (attempt this; do not assume it is impossible)
+
+Everything from here on needs a running stack. Delegate the boot itself to the `local-dev-env` /
+`boot-and-verify` sibling skills where they apply; what follows is what an *upgrade* specifically
+needs from the boot.
+
+```bash
+git submodule update --init --depth 1 docker        # see the Environment note above
+script -q /dev/null docker/sdk boot deploy.dev.yml  # generation only, cheap, validates the deploy file
+script -q /dev/null docker/sdk up --build --assets --data
+```
+
+**Read the deploy file before booting — it changes the whole verification plan:**
+
+- **Which applications exist.** `grep -oE "application: [a-z_]+" deploy.*.yml | sort -u`. A project
+  with no `yves` entry is **headless**: there is no storefront to check, and the Back Office is the
+  only UI. Do not write a storefront checklist for a project that has no storefront (the validation
+  run nearly did).
+- **How many stores.** A 9-store deploy with 8 workers per application will not fit in a laptop's
+  Docker memory alongside OpenSearch, MariaDB, RabbitMQ and Jenkins. If `docker info` reports less
+  than ~16 GB, expect to verify against **one store**. Prefer an additive
+  `deploy.upgrade-verify.yml` (copy, one region/store, optional dev services dropped) over editing
+  the project's own deploy files — and say in the report that verification ran on a trimmed topology,
+  because a single-store boot does not exercise store-resolution paths.
+- **`docker.testing.store`** — the store the test suites will use.
+
+`boot` prints a `sudo … /etc/hosts` command. **You cannot run it** (it needs the developer's
+password): surface it verbatim and continue — the build and the whole CLI/test path do not need it,
+only browser access by hostname does.
+
+Run the build in the background with a monitor covering **failure** signatures, not just progress:
+a filter that greps only for success markers stays silent through an OOM kill or an image-pull
+failure, and silence is indistinguishable from "still building".
+
+If the boot genuinely cannot complete (insufficient memory, an image the project has no credentials
+for), that is a real limit — record *which* checks it costs, using the Phase 5/5.5/8 lists below as
+the inventory of what is now unproven. "Could not boot" is only acceptable after `git submodule
+status` and `docker info` have both been shown.
+
 ## Phase 5 — Regenerate artifacts & verify
 
 ```bash
@@ -475,7 +645,22 @@ script -q /dev/null docker/sdk cli vendor/bin/codecept build
 script -q /dev/null docker/sdk cli vendor/bin/codecept run -x Acceptance
 script -q /dev/null docker/sdk cli npm run yves
 ```
+**Check `git status` after every Phase 5 command.** They are not read-only: `propel:install` runs
+migration cleanup and **deletes** tracked `src/Orm/Propel/*/Migration_*` files (gitignore does not
+protect files committed before the ignore rule), `propel:config:convert` writes generated config into
+a path the project may not ignore, and `npm`/asset builds rewrite lock files. Restore deletions with
+`git checkout --`, gitignore new generated paths, and keep genuine lock updates in their own commit.
+
+Command names differ between projects and releases — **read `console list` instead of trusting this
+list**. On the validation project the commands were `propel:diff` and `search:setup:source-map`;
+`propel:migration:diff` and `search:setup:index-map` did not exist.
+
 - Non-empty `propel:migration:diff` → show the developer BEFORE anything touches a database.
+- **A clean `propel:diff` on a freshly-created database proves almost nothing.** `up --data` builds the
+  DB from the post-upgrade schema, so an XML↔DB comparison necessarily agrees. It does not tell you
+  what migration an *existing* production database needs. To answer that, boot the **pre-upgrade**
+  lock, import, then upgrade the code and diff against that database. Report which question you
+  actually answered.
 - Compare PHPStan/evaluator results against the Phase 0 baseline — only regressions block.
 - Compare the suite result against `.spryker-upgrade/state/codecept-baseline.txt`, per suite, and split the failures
   into two kinds — they have different fixes and belong in different parts of the report:
@@ -505,13 +690,80 @@ PHPStan needs `src/Generated/Client/Ide/AutoCompletion.php`, produced by
 PHPStan against a copy of `phpstan.neon` with the `bootstrapFiles` block removed rather than
 skipping static analysis — it is the only thing that catches constructor-arity breakage.
 
+## Phase 5.5 — The full suite against the final code, in the real environment
+
+Host PHP can run pure-logic suites. It cannot run anything needing a database, a search backend, a
+broker or a webdriver — and **an unrunnable suite is not a passing suite**. Until the suite has run
+in the booted environment against the *final* upgraded code, the tests have not verified the upgrade;
+they have verified the subset of it that fits on a laptop without infrastructure.
+
+```bash
+script -q /dev/null docker/sdk cli vendor/bin/codecept build
+script -q /dev/null docker/sdk testing codecept run 2>&1 | tee .spryker-upgrade/state/codecept-final.txt
+```
+
+Run it **after** Phase 5's artifact regeneration, never before: missing `Generated\` transfers and a
+stale Propel model produce a wall of failures that have nothing to do with the upgrade.
+
+Compare against `.spryker-upgrade/state/codecept-baseline.txt` **per suite**, and classify every
+failure before fixing anything — the three kinds have different fixes and belong in different parts
+of the report:
+
+| Kind | Signature | Correct response |
+|---|---|---|
+| **App damage** | behaviour changed; the test's assertion is still what the project wants | fix `src/`, not the test |
+| **Harness damage** | a vendor `SprykerTest` Tester/Helper/fixture moved, changed signature, or a `_support` class vanished; `codecept build` usually fails first | fix the test-side usage. Report separately — this is damage in the harness, not the app |
+| **Environment noise** | fails identically on the pre-upgrade baseline; missing fixture data, no webdriver | not upgrade fallout. Do not "fix" it into the upgrade commit |
+
+**A characterization test from Phase 0.5 that now fails is the gate working.** It means a real
+behaviour change. Explain it, get the developer to confirm the new behaviour is intended, and only
+then move the expectation — in its own commit, with the reason in the message. Never relax an
+assertion to get green, and never delete a test to get green.
+
+State the numbers honestly in the report: suites run, suites skipped **and why**, tests passed,
+failures per class above. "All tests pass" is only true if every suite actually executed.
+
 ## Phase 6 — New features gate (developer gate #3)
+
+Two kinds of "new" need this gate, and only the first is visible in the lock diff:
+
+1. **New packages** arriving with the release — the list below.
+2. **New capabilities inside modules the project already had.** No new package appears, so nothing
+   flags them; they surface as a migration guide step, a `class_exists` branch (matrix #64), or a new
+   extension point. These are governed by the same rule and are the easier ones to wave through by
+   accident. Per the Scope section, a version bump is never consent to integrate them.
 
 From the NEW list in `.spryker-upgrade/state/lock-diff-report.json`: fetch each package's description
 (`composer show <pkg>` + docs.spryker.com release notes). Present with AskUserQuestion
 (multiSelect): integrate now / defer / never. NOTHING new gets wired without an explicit yes.
 Each accepted feature: follow its official feature-integration guide, separate commit.
 REMOVED packages: explain each (replaced by what?) in the final report.
+
+## Phase 6.5 — Browser verification gate
+
+Tests assert what someone thought to assert. A release that crosses a **CSS framework major** or
+touches Back Office chrome breaks things no PHP test can see: a stylesheet that no longer defines a
+class, a table that renders but paginates wrongly, a layout that double-wraps, a JS bundle that
+throws on load and silently disables a widget. Derive the page list from **what the upgrade actually
+touched**, not from a generic smoke list.
+
+Drive the app through the `spryker-runtime` sibling skill (it owns login, session and Chrome
+mechanics). Per page, capture a screenshot **and** read the browser console — a clean-looking page
+with `Uncaught TypeError` in the console is a failure.
+
+Build the checklist from the run's own findings:
+
+| If the upgrade touched… | Verify |
+|---|---|
+| a `*-gui` / CSS framework major | every page whose template you merged in Lane 2, and any page using a legacy class the detector marked `KEEP (JS)` — that is where vendor JS meets project markup |
+| `AbstractTable` or any table override | one table with **filter + sort + paging applied together**, and the footer row count while a filter is active. Table bugs hide until the three interact |
+| a login / layout template | the login page and one authenticated page, checking the project's own delta (a font, a logo) actually survived |
+| a shadowed template you merged | that exact page, comparing against the pre-upgrade screenshot if Phase 0 captured one |
+| the asset toolchain (`oryx-*`, webpack, node) | that the build ran, **and** that the built bundle is what the page loads (a stale bundle in `public/` can mask a broken build) |
+
+Console errors, 500s and missing styling are upgrade damage. Record what you could not reach and why
+— an unvisited page is not a passing page. If the environment cannot boot, say which of these checks
+that costs rather than omitting the section.
 
 ## Phase 7 — Report & handoff
 
@@ -520,8 +772,16 @@ Lane 0), conflicts found/resolved per lane with file links, remaining `upgrade-d
 test results vs baseline, pending DB migrations, features accepted/deferred, deploy file
 changes. Ask before committing; suggest one PR per release group.
 
+Separate **what is proven** from **what merely has not failed yet**, and give each claim its scope —
+"243 unit tests green on host PHP" and "the suite passes" are different statements. For every check
+that did not run, name it and name the damage class it would have caught.
+
 ## Hard rules
 
+- **An upgrade changes versions, not architecture.** Never integrate a feature, DI mechanism or
+  storage backend the developer did not explicitly ask for, however strongly the new version invites
+  it. If restoring existing behaviour looks impossible without adopting the new thing, that is a
+  vendor BC break to report — not a re-architecture to perform. See Scope.
 - Lane 0 is not skippable: no major bump ships without its migration guide processed or an
   explicit "none published" record.
 - Re-run the detectors after EVERY resolution lane — fixes create new conflicts, and a fix in one
