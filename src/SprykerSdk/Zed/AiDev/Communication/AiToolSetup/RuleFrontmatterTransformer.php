@@ -12,10 +12,7 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
     protected const string FRONTMATTER_PATTERN = '/^---\r?\n(.*?)\r?\n---\r?\n(.*)/s';
 
     /**
-     * @param string $content
      * @param array<string, mixed> $spec
-     *
-     * @return string
      */
     public function transform(string $content, array $spec): string
     {
@@ -37,8 +34,6 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
     }
 
     /**
-     * @param string $content
-     *
      * @return array{array<string, string>, string}|null
      */
     protected function parseFrontmatter(string $content): ?array
@@ -51,8 +46,6 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
     }
 
     /**
-     * @param string $block
-     *
      * @return array<string, string>
      */
     protected function parseFields(string $block): array
@@ -114,9 +107,6 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
 
     /**
      * @param array<string, string> $fields
-     * @param string $body
-     *
-     * @return string
      */
     protected function serializeFrontmatter(array $fields, string $body): string
     {
@@ -135,11 +125,6 @@ class RuleFrontmatterTransformer implements RuleFrontmatterTransformerInterface
         return sprintf("---\n%s\n---\n%s", implode("\n", $lines), $body);
     }
 
-    /**
-     * @param string $value
-     *
-     * @return bool
-     */
     protected function requiresQuoting(string $value): bool
     {
         return (bool)preg_match('/[\s:,\[\]{}#&*!|>\'"%@`]/', $value);

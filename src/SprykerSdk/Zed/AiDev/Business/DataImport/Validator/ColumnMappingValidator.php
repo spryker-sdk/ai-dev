@@ -13,19 +13,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class ColumnMappingValidator implements ValidatorInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool
     {
         return $context->hasSourceFile() && !empty($context->columnMappings);
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array
@@ -42,9 +35,9 @@ class ColumnMappingValidator implements ValidatorInterface
 
         if ($errors) {
             return [
-                'code' => CsvConstants::INVALID_MAPPINGS,
-                'message' => 'Column mappings validation failed',
-                'details' => ['errors' => $errors],
+            'code' => CsvConstants::INVALID_MAPPINGS,
+            'message' => 'Column mappings validation failed',
+            'details' => ['errors' => $errors],
             ];
         }
 

@@ -289,11 +289,6 @@ trait CsvTestDataTrait
         return $mappedRows;
     }
 
-    /**
-     * @param string $delimiter
-     *
-     * @return string
-     */
     protected function buildCsvContent(string $delimiter = ','): string
     {
         $lines = [];

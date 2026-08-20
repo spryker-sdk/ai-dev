@@ -26,22 +26,12 @@ class OdsSplitter implements OdsSplitterInterface
 
     protected const int TOTAL_SHEETS_EMPTY = 0;
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\OdsReaderInterface $odsReader
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
-     */
     public function __construct(
         protected OdsReaderInterface $odsReader,
         protected CsvWriterInterface $csvWriter,
     ) {
     }
 
-    /**
-     * @param string $odsFilePath
-     * @param string $outputDirectory
-     *
-     * @return string
-     */
     public function split(string $odsFilePath, string $outputDirectory): string
     {
         $validationError = $this->validateFilePath($odsFilePath, OdsConstants::INVALID_PATH, ['file_path' => $odsFilePath]);
@@ -95,8 +85,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param string $outputDirectory
-     *
      * @return array<string, mixed>|null
      */
     protected function validateAndPrepareOutputDirectory(string $outputDirectory): ?array
@@ -110,8 +98,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param string $outputDirectory
-     *
      * @return array<string, mixed>|null
      */
     protected function ensureDirectoryExists(string $outputDirectory): ?array
@@ -141,8 +127,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param string $outputDirectory
-     *
      * @return array<string, mixed>|null
      */
     protected function ensureDirectoryIsWritable(string $outputDirectory): ?array
@@ -159,8 +143,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param string $odsFilePath
-     *
      * @return array<\SimpleXMLElement>
      */
     protected function extractSheets(string $odsFilePath): array
@@ -175,9 +157,6 @@ class OdsSplitter implements OdsSplitterInterface
         return $sheets;
     }
 
-    /**
-     * @return string
-     */
     protected function createEmptyResponse(): string
     {
         return $this->successResponse([
@@ -189,8 +168,6 @@ class OdsSplitter implements OdsSplitterInterface
 
     /**
      * @param array<\SimpleXMLElement> $sheets
-     * @param string $baseFileName
-     * @param string $outputDirectory
      *
      * @return array<string, array<string>>
      */
@@ -217,10 +194,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param \SimpleXMLElement $sheet
-     * @param string $baseFileName
-     * @param string $outputDirectory
-     *
      * @return array<string, mixed>
      */
     protected function processSingleSheet(SimpleXMLElement $sheet, string $baseFileName, string $outputDirectory): array
@@ -244,8 +217,6 @@ class OdsSplitter implements OdsSplitterInterface
 
     /**
      * @param array<array<string>> $rows
-     *
-     * @return bool
      */
     protected function isValidSheetData(array $rows): bool
     {
@@ -260,13 +231,6 @@ class OdsSplitter implements OdsSplitterInterface
         return is_array($rows[0]);
     }
 
-    /**
-     * @param string $baseFileName
-     * @param string $sheetName
-     * @param string $outputDirectory
-     *
-     * @return string
-     */
     protected function generateCsvFilePath(string $baseFileName, string $sheetName, string $outputDirectory): string
     {
         $sanitizedSheetName = $this->sanitizeSheetName($sheetName);
@@ -277,9 +241,6 @@ class OdsSplitter implements OdsSplitterInterface
 
     /**
      * @param array<array<string>> $rows
-     * @param string $csvFilePath
-     *
-     * @return bool
      */
     protected function writeSheetToCsv(array $rows, string $csvFilePath): bool
     {
@@ -324,7 +285,6 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param mixed $row
      * @param array<string> $headers
      *
      * @return array<string, string>|null
@@ -343,11 +303,6 @@ class OdsSplitter implements OdsSplitterInterface
         return $associativeRow;
     }
 
-    /**
-     * @param \SimpleXMLElement $sheet
-     *
-     * @return string
-     */
     protected function getSheetName(SimpleXMLElement $sheet): string
     {
         $attributes = $sheet->attributes(OdsConstants::NAMESPACE_TABLE);
@@ -359,11 +314,6 @@ class OdsSplitter implements OdsSplitterInterface
         return (string)$attributes['name'];
     }
 
-    /**
-     * @param string $sheetName
-     *
-     * @return string
-     */
     protected function sanitizeSheetName(string $sheetName): string
     {
         $sanitized = preg_replace('/[\/\\\:*?"<>|]/', '_', $sheetName);
@@ -390,10 +340,7 @@ class OdsSplitter implements OdsSplitterInterface
     }
 
     /**
-     * @param string $originalHeader
      * @param array<string, bool> $seen
-     *
-     * @return string
      */
     protected function generateUniqueHeader(string $originalHeader, array $seen): string
     {
@@ -431,7 +378,6 @@ class OdsSplitter implements OdsSplitterInterface
 
     /**
      * @param array<array<string>> $rows
-     * @param int $headerLength
      *
      * @return array<array<string>>
      */

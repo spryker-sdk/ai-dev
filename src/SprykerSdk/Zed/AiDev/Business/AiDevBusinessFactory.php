@@ -62,17 +62,11 @@ use SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface;
  */
 class AiDevBusinessFactory extends AbstractBusinessFactory
 {
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface
-     */
     public function createGitHubPromptsFetcher(): PromptsFetcherInterface
     {
         return new GitHubPromptsFetcher($this->createMarkdownPromptParser());
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface
-     */
     public function createLocalPromptsFetcher(): PromptsFetcherInterface
     {
         return new LocalPromptsFetcher(
@@ -87,22 +81,16 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function getPromptsFetchers(): array
     {
         return [
-            $this->createLocalPromptsFetcher(),
-            $this->createGitHubPromptsFetcher(),
+        $this->createLocalPromptsFetcher(),
+        $this->createGitHubPromptsFetcher(),
         ];
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface
-     */
     public function createMarkdownPromptParser(): MarkdownPromptParserInterface
     {
         return new MarkdownPromptParser();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Prompts\PromptsGeneratorInterface
-     */
     public function createPromptsGenerator(): PromptsGeneratorInterface
     {
         return new PromptsGenerator(
@@ -111,9 +99,6 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Oms\Reader\OmsTransitionsReaderInterface
-     */
     public function createOmsTransitionsReader(): OmsTransitionsReaderInterface
     {
         return new OmsTransitionsReader(
@@ -121,33 +106,21 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface
-     */
     public function createDatabaseQueryReader(): DatabaseQueryReaderInterface
     {
         return new DatabaseQueryReader();
     }
 
-    /**
-     * @return \Spryker\Zed\Oms\Business\OmsFacadeInterface
-     */
     public function getOmsFacade(): OmsFacadeInterface
     {
         return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_OMS);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface
-     */
     public function createCsvReader(): CsvReaderInterface
     {
         return new CsvReader();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface
-     */
     public function createCsvWriter(): CsvWriterInterface
     {
         return new CsvWriter(
@@ -155,17 +128,11 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface
-     */
     public function createFilterEvaluator(): FilterEvaluatorInterface
     {
         return new FilterEvaluator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvAnalyzerInterface
-     */
     public function createCsvAnalyzer(): CsvAnalyzerInterface
     {
         return new CsvAnalyzer(
@@ -173,9 +140,6 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvRowDeleterInterface
-     */
     public function createCsvRowDeleter(): CsvRowDeleterInterface
     {
         return new CsvRowDeleter(
@@ -185,9 +149,6 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvTransformerInterface
-     */
     public function createCsvTransformer(): CsvTransformerInterface
     {
         return new CsvTransformer(
@@ -206,10 +167,10 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function getRowOperations(): array
     {
         return [
-            $this->createColumnRemovalOperation(),
-            $this->createColumnMappingOperation(),
-            $this->createDefaultValuesOperation(),
-            $this->createTransformationOperation(),
+        $this->createColumnRemovalOperation(),
+        $this->createColumnMappingOperation(),
+        $this->createDefaultValuesOperation(),
+        $this->createTransformationOperation(),
         ];
     }
 
@@ -219,15 +180,12 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createTransformStrategies(): array
     {
         return [
-            $this->createAppendStrategy(),
-            $this->createReplaceStrategy(),
-            $this->createUpdateStrategy(),
+        $this->createAppendStrategy(),
+        $this->createReplaceStrategy(),
+        $this->createUpdateStrategy(),
         ];
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
-     */
     public function createAppendStrategy(): AbstractTransformStrategy
     {
         return new AppendStrategy(
@@ -238,9 +196,6 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
-     */
     public function createReplaceStrategy(): AbstractTransformStrategy
     {
         return new ReplaceStrategy(
@@ -251,9 +206,6 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
-     */
     public function createUpdateStrategy(): AbstractTransformStrategy
     {
         return new UpdateStrategy(
@@ -264,49 +216,31 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
-     */
     public function createColumnRemovalOperation(): RowOperationInterface
     {
         return new ColumnRemovalOperation();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
-     */
     public function createColumnMappingOperation(): RowOperationInterface
     {
         return new ColumnMappingOperation();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
-     */
     public function createDefaultValuesOperation(): RowOperationInterface
     {
         return new DefaultValuesOperation();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface
-     */
     public function createTransformationOperation(): RowOperationInterface
     {
         return new TransformationOperation();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\OdsReaderInterface
-     */
     public function createOdsReader(): OdsReaderInterface
     {
         return new OdsReader();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitterInterface
-     */
     public function createOdsSplitter(): OdsSplitterInterface
     {
         return new OdsSplitter(
@@ -321,51 +255,36 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createCsvValidators(): array
     {
         return [
-            $this->createModeValidator(),
-            $this->createTargetFileValidator(),
-            $this->createSourceFileValidator(),
-            $this->createColumnMappingValidator(),
-            $this->createFilterValidator(),
-            $this->createTransformationValidator(),
-            $this->createColumnRemovalValidator(),
+        $this->createModeValidator(),
+        $this->createTargetFileValidator(),
+        $this->createSourceFileValidator(),
+        $this->createColumnMappingValidator(),
+        $this->createFilterValidator(),
+        $this->createTransformationValidator(),
+        $this->createColumnRemovalValidator(),
         ];
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createModeValidator(): ValidatorInterface
     {
         return new ModeValidator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createTargetFileValidator(): ValidatorInterface
     {
         return new TargetFileValidator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createSourceFileValidator(): ValidatorInterface
     {
         return new SourceFileValidator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createColumnMappingValidator(): ValidatorInterface
     {
         return new ColumnMappingValidator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createFilterValidator(): ValidatorInterface
     {
         return new FilterValidator(
@@ -373,17 +292,11 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createTransformationValidator(): ValidatorInterface
     {
         return new TransformationValidator();
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface
-     */
     public function createColumnRemovalValidator(): ValidatorInterface
     {
         return new ColumnRemovalValidator();

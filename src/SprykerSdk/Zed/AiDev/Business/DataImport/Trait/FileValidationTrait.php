@@ -14,9 +14,6 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 trait FileValidationTrait
 {
     /**
-     * @param string $filePath
-     * @param string $errorCode
-     * @param string|null $errorMessage
      * @param array<string, mixed> $details
      *
      * @return array<string, mixed>|null Returns null if validation passes, error array if validation fails
@@ -37,9 +34,6 @@ trait FileValidationTrait
     }
 
     /**
-     * @param string $filePath
-     * @param string $errorCode
-     * @param string|null $errorMessage
      * @param array<string, mixed> $details
      *
      * @return array<string, mixed>|null Returns null if validation passes, error array if validation fails
@@ -60,9 +54,6 @@ trait FileValidationTrait
     }
 
     /**
-     * @param string $filePath
-     * @param string $errorCode
-     * @param string|null $errorMessage
      * @param array<string, mixed> $details
      *
      * @return array<string, mixed>|null Returns null if validation passes, error array if validation fails
@@ -83,8 +74,6 @@ trait FileValidationTrait
     }
 
     /**
-     * @param string $filePath
-     * @param string $errorCode
      * @param array<string, mixed> $details
      *
      * @return array<string, mixed>|null
@@ -122,8 +111,6 @@ trait FileValidationTrait
     }
 
     /**
-     * @param string $directoryPath
-     * @param string $errorCode
      * @param array<string, mixed> $details
      *
      * @return array<string, mixed>|null
@@ -149,11 +136,6 @@ trait FileValidationTrait
         return null;
     }
 
-    /**
-     * @param string $path
-     *
-     * @return bool
-     */
     protected function isAbsolutePath(string $path): bool
     {
         if (isset($path[0]) && $path[0] === '/') {

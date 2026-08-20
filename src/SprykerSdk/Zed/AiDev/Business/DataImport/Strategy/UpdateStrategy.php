@@ -12,19 +12,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
 
 class UpdateStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_UPDATE;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array
@@ -40,15 +33,14 @@ class UpdateStrategy extends AbstractTransformStrategy
         $columnsRemovedCount = count($context->config->columnsToRemove);
 
         return [
-            'rows_updated' => $result['processed_count'],
-            'columns_removed' => $columnsRemovedCount,
-            'total_rows' => count($context->targetRows),
+        'rows_updated' => $result['processed_count'],
+        'columns_removed' => $columnsRemovedCount,
+        'total_rows' => count($context->targetRows),
         ];
     }
 
     /**
      * @param array<int, array<string, mixed>> $rows
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      *
      * @return array<string, mixed>
      */
@@ -69,9 +61,9 @@ class UpdateStrategy extends AbstractTransformStrategy
         }
 
         return [
-            'rows' => $processedRows,
-            'processed_count' => $processedCount,
-            'filtered_count' => 0,
+        'rows' => $processedRows,
+        'processed_count' => $processedCount,
+        'filtered_count' => 0,
         ];
     }
 }

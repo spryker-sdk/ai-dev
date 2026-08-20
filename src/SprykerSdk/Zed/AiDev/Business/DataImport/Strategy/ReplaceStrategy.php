@@ -11,19 +11,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class ReplaceStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_REPLACE;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array
@@ -38,16 +31,16 @@ class ReplaceStrategy extends AbstractTransformStrategy
         );
 
         $unmappedSource = $context->sourceHeaders !== null
-            ? array_diff($context->sourceHeaders, array_keys($context->config->columnMappings))
-            : [];
+        ? array_diff($context->sourceHeaders, array_keys($context->config->columnMappings))
+        : [];
         $unmappedTarget = array_diff($context->targetHeaders, array_values($context->config->columnMappings));
 
         return [
-            'rows_written' => count($result['rows']),
-            'rows_filtered_out' => $result['filtered_count'],
-            'transformations_applied' => $result['processed_count'],
-            'unmapped_source_columns' => array_values($unmappedSource),
-            'unmapped_target_columns' => array_values($unmappedTarget),
+        'rows_written' => count($result['rows']),
+        'rows_filtered_out' => $result['filtered_count'],
+        'transformations_applied' => $result['processed_count'],
+        'unmapped_source_columns' => array_values($unmappedSource),
+        'unmapped_target_columns' => array_values($unmappedTarget),
         ];
     }
 }

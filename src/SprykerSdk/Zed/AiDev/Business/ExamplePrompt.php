@@ -14,10 +14,6 @@ use SprykerSdk\Shared\AiDev\AbstractPrompt;
 class ExamplePrompt extends AbstractPrompt
 {
     /**
-     * @param string $name
-     * @param string $role
-     * @param string $part
-     *
      * @return array<string, string>
      */
     #[\PhpMcp\Server\Attributes\McpPrompt(name: 'you_are_welcome', description: 'You are welcome!')]

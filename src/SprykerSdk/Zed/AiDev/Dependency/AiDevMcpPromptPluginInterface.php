@@ -14,8 +14,6 @@ interface AiDevMcpPromptPluginInterface
      * - Returns the name of the MCP prompt.
      *
      * @api
-     *
-     * @return string
      */
     public function getName(): string;
 
@@ -24,8 +22,6 @@ interface AiDevMcpPromptPluginInterface
      * - Returns the description of the MCP prompt.
      *
      * @api
-     *
-     * @return string
      */
     public function getDescription(): string;
 }

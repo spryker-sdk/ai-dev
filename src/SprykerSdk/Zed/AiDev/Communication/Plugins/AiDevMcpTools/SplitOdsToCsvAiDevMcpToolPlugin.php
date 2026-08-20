@@ -20,32 +20,20 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class SplitOdsToCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'splitOdsToCsv';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Split an ODS (OpenDocument Spreadsheet) file into separate CSV files, one per sheet. IMPORTANT: All paths must be relative to project root. Skips empty sheets and returns details about created files. Parameters: odsFilePath (required, relative path to .ods file), outputDirectory (required, relative path to output directory).';
     }
 
-    /**
-     * @param string $odsFilePath
-     * @param string $outputDirectory
-     *
-     * @return string
-     */
     public function splitOdsToCsv(string $odsFilePath, string $outputDirectory): string
     {
         return $this->getBusinessFactory()
-            ->createOdsSplitter()
-            ->split($odsFilePath, $outputDirectory);
+        ->createOdsSplitter()
+        ->split($odsFilePath, $outputDirectory);
     }
 }

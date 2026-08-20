@@ -13,24 +13,12 @@ use SimpleXMLElement;
 
 interface OdsReaderInterface
 {
-    /**
-     * @param string $filePath
-     *
-     * @return \SimpleXMLElement
-     */
     public function extractContent(string $filePath): SimpleXMLElement;
 
     /**
-     * @param \SimpleXMLElement $sheet
-     *
      * @return array<array<string>>
      */
     public function extractRows(SimpleXMLElement $sheet): array;
 
-    /**
-     * @param \SimpleXMLElement $cell
-     *
-     * @return string
-     */
     public function getCellValue(SimpleXMLElement $cell): string;
 }

@@ -13,12 +13,6 @@ use Generated\Shared\Transfer\AiDevGitHubPromptTransfer;
 
 class MarkdownPromptParser implements MarkdownPromptParserInterface
 {
-    /**
-     * @param string $content
-     * @param string $filename
-     *
-     * @return \Generated\Shared\Transfer\AiDevGitHubPromptTransfer
-     */
     public function parsePromptFile(string $content, string $filename): AiDevGitHubPromptTransfer
     {
         $frontmatter = $this->parseFrontmatter($content);
@@ -36,8 +30,6 @@ class MarkdownPromptParser implements MarkdownPromptParserInterface
     }
 
     /**
-     * @param string $content
-     *
      * @return array<string, string|array<string>>
      */
     protected function parseFrontmatter(string $content): array
@@ -79,11 +71,6 @@ class MarkdownPromptParser implements MarkdownPromptParserInterface
         return $frontmatter;
     }
 
-    /**
-     * @param string $content
-     *
-     * @return string
-     */
     protected function extractBody(string $content): string
     {
         if (!preg_match('/^---\\s*\\n.*?\\n---\\s*\\n(.*)$/s', $content, $matches)) {

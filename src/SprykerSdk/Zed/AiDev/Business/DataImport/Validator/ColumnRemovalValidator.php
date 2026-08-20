@@ -13,19 +13,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class ColumnRemovalValidator implements ValidatorInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool
     {
         return !$context->hasSourceFile() && !empty($context->columnsToRemove);
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array
@@ -35,9 +28,9 @@ class ColumnRemovalValidator implements ValidatorInterface
 
         if ($invalidColumns) {
             return [
-                'code' => CsvConstants::COLUMN_NOT_FOUND,
-                'message' => 'Cannot remove columns that do not exist',
-                'details' => ['invalid_columns' => array_values($invalidColumns)],
+            'code' => CsvConstants::COLUMN_NOT_FOUND,
+            'message' => 'Cannot remove columns that do not exist',
+            'details' => ['invalid_columns' => array_values($invalidColumns)],
             ];
         }
 

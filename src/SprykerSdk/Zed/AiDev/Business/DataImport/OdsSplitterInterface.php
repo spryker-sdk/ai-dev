@@ -11,11 +11,5 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 
 interface OdsSplitterInterface
 {
-    /**
-     * @param string $odsFilePath
-     * @param string $outputDirectory
-     *
-     * @return string
-     */
     public function split(string $odsFilePath, string $outputDirectory): string;
 }

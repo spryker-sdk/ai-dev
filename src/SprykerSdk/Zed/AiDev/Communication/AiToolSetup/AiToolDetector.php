@@ -9,17 +9,12 @@ namespace SprykerSdk\Zed\AiDev\Communication\AiToolSetup;
 
 class AiToolDetector implements AiToolDetectorInterface
 {
-    /**
-     * @param string $projectRoot
-     */
     public function __construct(protected string $projectRoot)
     {
     }
 
     /**
      * @param array<string, string> $detectionMap
-     *
-     * @return string|null
      */
     public function detect(array $detectionMap): ?string
     {

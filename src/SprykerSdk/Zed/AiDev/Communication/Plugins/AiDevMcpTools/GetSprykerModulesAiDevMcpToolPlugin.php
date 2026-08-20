@@ -19,34 +19,25 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class GetSprykerModulesAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'getSprykerModules';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Tool to get all Spryker modules from project and vendor. Returns a list of unique module names.';
     }
 
-    /**
-     * @return string
-     */
     public function getSprykerModules(): string
     {
         $allModules = $this->getFactory()
-            ->getModuleFinderFacade()
-            ->getModules();
+        ->getModuleFinderFacade()
+        ->getModules();
 
         $projectModules = $this->getFactory()
-            ->getModuleFinderFacade()
-            ->getProjectModules();
+        ->getModuleFinderFacade()
+        ->getProjectModules();
 
         $mergedModules = array_merge($allModules, $projectModules);
 

@@ -176,8 +176,6 @@ class AiDevConfig extends AbstractBundleConfig
 
     /**
      * @api
-     *
-     * @return string
      */
     public function getPromptClassTargetDirectory(): string
     {
@@ -186,8 +184,6 @@ class AiDevConfig extends AbstractBundleConfig
 
     /**
      * @api
-     *
-     * @return string
      */
     public function getPromptsDirectory(): string
     {
@@ -199,8 +195,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled AGENTS example markdown file.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsExampleFilePath(): string
     {
@@ -212,8 +206,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the project root directory where the generated file will be written.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsFileOutputDirectory(): string
     {
@@ -225,8 +217,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled skill examples directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getSkillsExamplesDirectory(): string
     {
@@ -238,8 +228,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled agent examples directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsExamplesDirectory(): string
     {
@@ -265,8 +253,6 @@ class AiDevConfig extends AbstractBundleConfig
      *
      * @api
      *
-     * @param string $tool
-     *
      * @return array<string, string|null>
      */
     public function getToolArtifacts(string $tool): array
@@ -279,8 +265,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the absolute path to the bundled rules source directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getRulesSourceDirectory(): string
     {
@@ -292,8 +276,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the tool name that requires extra confirmation on detection.
      *
      * @api
-     *
-     * @return string
      */
     public function getToolRequiringConfirmation(): string
     {
@@ -306,8 +288,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns an empty array when no spec is defined for the tool.
      *
      * @api
-     *
-     * @param string $tool
      *
      * @return array<string, mixed>
      */

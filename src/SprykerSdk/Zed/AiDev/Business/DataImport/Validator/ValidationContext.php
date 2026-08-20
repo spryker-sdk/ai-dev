@@ -24,15 +24,11 @@ class ValidationContext
     protected ?array $targetHeaders = null;
 
     /**
-     * @param string $mode
-     * @param string $sourcePath
-     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
      */
     public function __construct(
         public string $mode,
@@ -47,9 +43,6 @@ class ValidationContext
     ) {
     }
 
-    /**
-     * @return bool
-     */
     public function hasSourceFile(): bool
     {
         return $this->sourcePath !== '';

@@ -18,31 +18,20 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class GetOmsTransitionsByOrderAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Tool to get OMS state machine transitions for specified order from order\'s current state - helps to identify current state and possible transitions.';
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'getOrderOmsTransitions';
     }
 
-    /**
-     * @param string $orderReference
-     *
-     * @return string
-     */
     public function getOrderOmsTransitions(string $orderReference): string
     {
         return $this->getBusinessFactory()
-            ->createOmsTransitionsReader()
-            ->getOrderOmsTransitions($orderReference);
+        ->createOmsTransitionsReader()
+        ->getOrderOmsTransitions($orderReference);
     }
 }
