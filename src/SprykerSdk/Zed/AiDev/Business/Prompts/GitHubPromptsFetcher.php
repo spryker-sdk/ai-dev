@@ -79,6 +79,8 @@ class GitHubPromptsFetcher implements PromptsFetcherInterface
 
     /**
      * @throws \RuntimeException
+     *
+     * @return array<int, array<string, mixed>>
      */
     protected function getGitHubFilesRecursive(string $owner, string $repo, string $path = ''): array
     {
