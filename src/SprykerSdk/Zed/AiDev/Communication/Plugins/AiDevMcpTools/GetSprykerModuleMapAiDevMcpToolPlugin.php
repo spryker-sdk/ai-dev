@@ -147,8 +147,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $moduleName
-     *
      * @return array<string, mixed>
      */
     protected function buildModuleMap(string $moduleName): array
@@ -188,8 +186,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $moduleName
-     *
      * @return array<string, mixed>|null
      */
     protected function loadFromCache(string $moduleName): ?array
@@ -222,10 +218,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $moduleName
      * @param array<string, mixed> $moduleMap
-     *
-     * @return void
      */
     protected function saveToCache(string $moduleName, array $moduleMap): void
     {
@@ -241,19 +234,12 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         file_put_contents($cacheFilePath, $jsonData);
     }
 
-    /**
-     * @param string $moduleName
-     *
-     * @return string
-     */
     protected function getCacheFilePath(string $moduleName): string
     {
         return sprintf('%s/%s.json', static::CACHE_DIR, $moduleName);
     }
 
     /**
-     * @param string $moduleName
-     *
      * @return array<string>
      */
     protected function findAllModulePathsAbsolute(string $moduleName): array
@@ -290,8 +276,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $moduleName
-     *
      * @return array<string>
      */
     protected function findCustomNamespaceModulePaths(string $moduleName): array
@@ -340,8 +324,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $extensionModuleName
-     *
      * @return array<string>
      */
     protected function findExtensionModulePaths(string $extensionModuleName): array
@@ -407,10 +389,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $path
      * @param array<string, mixed> $moduleMap
-     *
-     * @return void
      */
     protected function extractFqnsFromPath(string $path, array &$moduleMap): void
     {
@@ -488,8 +467,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $filePath
-     *
      * @return array<string>
      */
     protected function extractFqnsWithMethods(string $filePath): array
@@ -511,8 +488,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $filePath
-     *
      * @return array<string>
      */
     protected function extractFqnsWithoutMethods(string $filePath): array
@@ -526,12 +501,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         return [$this->buildBaseFqn($parsedData['namespace'], $parsedData['className'])];
     }
 
-    /**
-     * @param string|null $namespace
-     * @param string $className
-     *
-     * @return string
-     */
     protected function buildBaseFqn(?string $namespace, string $className): string
     {
         if ($namespace === null) {
@@ -541,12 +510,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         return sprintf('%s\\%s', $namespace, $className);
     }
 
-    /**
-     * @param string $filePath
-     * @param string $basePath
-     *
-     * @return bool
-     */
     protected function isRootLevelFile(string $filePath, string $basePath): bool
     {
         $relativePath = str_replace($basePath . '/', '', $filePath);
@@ -554,11 +517,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         return !str_contains($relativePath, '/');
     }
 
-    /**
-     * @param string $absolutePath
-     *
-     * @return string
-     */
     protected function makePathRelative(string $absolutePath): string
     {
         $rootDir = APPLICATION_ROOT_DIR . '/';
@@ -571,8 +529,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $path
-     *
      * @return array<string|null>
      */
     protected function extractNamespaceAndLayer(string $path): array
@@ -585,10 +541,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $moduleName
      * @param array<string, mixed> $moduleMap
-     *
-     * @return void
      */
     protected function combineExtensionModuleData(string $moduleName, array &$moduleMap): void
     {
@@ -614,9 +567,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $directory
-     * @param string $pattern
-     *
      * @return array<string>
      */
     protected function findFilesRecursively(string $directory, string $pattern): array
@@ -641,8 +591,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param string $filePath
-     *
      * @return array<string, mixed>
      */
     protected function parsePhpFile(string $filePath): array
@@ -684,11 +632,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
             {
             }
 
-            /**
-             * @param \PhpParser\Node $node
-             *
-             * @return int|null
-             */
             public function enterNode(Node $node): ?int
             {
                 if ($node instanceof Namespace_) {

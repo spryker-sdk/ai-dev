@@ -11,19 +11,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class AppendStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_APPEND;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array
@@ -35,10 +28,7 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
-     *
-     * @return void
      */
     protected function writeResults(TransformContext $context, array $result): void
     {
@@ -54,10 +44,7 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
-     *
-     * @return void
      */
     protected function writeWithChangedHeaders(TransformContext $context, array $result): void
     {
@@ -70,7 +57,6 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
      *
      * @return array<string, mixed>
@@ -81,11 +67,11 @@ class AppendStrategy extends AbstractTransformStrategy
         $unmappedTarget = array_diff($context->targetHeaders, array_values($context->config->columnMappings));
 
         return [
-            'rows_appended' => count($result['rows']),
-            'rows_filtered_out' => $result['filtered_count'],
-            'transformations_applied' => $result['processed_count'],
-            'unmapped_source_columns' => array_values($unmappedSource),
-            'unmapped_target_columns' => array_values($unmappedTarget),
+        'rows_appended' => count($result['rows']),
+        'rows_filtered_out' => $result['filtered_count'],
+        'transformations_applied' => $result['processed_count'],
+        'unmapped_source_columns' => array_values($unmappedSource),
+        'unmapped_target_columns' => array_values($unmappedTarget),
         ];
     }
 }

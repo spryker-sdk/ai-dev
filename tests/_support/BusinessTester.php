@@ -50,11 +50,8 @@ class BusinessTester extends Actor
     use _generated\BusinessTesterActions;
 
     /**
-     * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
-     *
-     * @return void
      */
     public function createCsvFile(string $filePath, array $headers, array $rows): void
     {
@@ -63,9 +60,6 @@ class BusinessTester extends Actor
         $csvWriter->write($filePath, $headers, $rows);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\CsvTransformer
-     */
     public function createCsvTransformer(): CsvTransformer
     {
         $csvReader = new CsvReader();
@@ -107,11 +101,7 @@ class BusinessTester extends Actor
 
     /**
      * @param array<string, mixed> $resultData
-     * @param string $targetPath
-     * @param string $testName
      * @param array<string, mixed> $expectedAssertions
-     *
-     * @return void
      */
     public function assertCsvTransformSuccess(
         array $resultData,
@@ -147,10 +137,6 @@ class BusinessTester extends Actor
 
     /**
      * @param array<string, mixed> $resultData
-     * @param string $testName
-     * @param string $expectedErrorCode
-     *
-     * @return void
      */
     public function assertCsvTransformFailure(
         array $resultData,
@@ -161,13 +147,6 @@ class BusinessTester extends Actor
         $this->assertSame($expectedErrorCode, $resultData['error_code'], "Test '{$testName}' error code");
     }
 
-    /**
-     * @param string $filePath
-     * @param int $expectedCount
-     * @param string $testName
-     *
-     * @return void
-     */
     public function assertCsvFileHasRowCount(string $filePath, int $expectedCount, string $testName): void
     {
         $csvReader = new CsvReader();
@@ -176,11 +155,7 @@ class BusinessTester extends Actor
     }
 
     /**
-     * @param string $filePath
      * @param array<string, array<string>> $headerAssertions
-     * @param string $testName
-     *
-     * @return void
      */
     public function assertCsvFileHasHeaders(string $filePath, array $headerAssertions, string $testName): void
     {
@@ -197,11 +172,7 @@ class BusinessTester extends Actor
     }
 
     /**
-     * @param string $filePath
      * @param array<int, array<string, mixed>> $expectedRows
-     * @param string $testName
-     *
-     * @return void
      */
     public function assertCsvFileHasRows(string $filePath, array $expectedRows, string $testName): void
     {

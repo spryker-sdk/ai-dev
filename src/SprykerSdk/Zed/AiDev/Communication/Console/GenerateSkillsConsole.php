@@ -52,21 +52,12 @@ class GenerateSkillsConsole extends Console
         self::TOOL_AGENTS_CONVENTION => '.agents/skills/ — Agents convention (https://agentskills.io/home)',
     ];
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME)
             ->setDescription(static::COMMAND_DESCRIPTION);
     }
 
-    /**
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
-     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         foreach (static::TOOL_DESCRIPTIONS as $tool => $description) {
@@ -111,11 +102,6 @@ class GenerateSkillsConsole extends Console
         return static::CODE_SUCCESS;
     }
 
-    /**
-     * @param string $tool
-     *
-     * @return string
-     */
     protected function resolveOutputDirectory(string $tool): string
     {
         return match ($tool) {
@@ -126,12 +112,6 @@ class GenerateSkillsConsole extends Console
         };
     }
 
-    /**
-     * @param string $source
-     * @param string $destination
-     *
-     * @return void
-     */
     protected function copyDirectory(string $source, string $destination): void
     {
         if (!is_dir($destination)) {

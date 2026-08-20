@@ -33,14 +33,8 @@ class ValidatorsTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -52,9 +46,6 @@ class ValidatorsTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -70,13 +61,6 @@ class ValidatorsTest extends Unit
 
     /**
      * @dataProvider validateDataProvider
-     *
-     * @param string $validatorClass
-     * @param callable $contextFactory
-     * @param bool $shouldPass
-     * @param string|null $expectedErrorCode
-     *
-     * @return void
      */
     public function testValidate(
         string $validatorClass,
@@ -330,11 +314,7 @@ class ValidatorsTest extends Unit
     }
 
     /**
-     * @param string $validatorClass
-     *
      * @throws \RuntimeException
-     *
-     * @return object
      */
     protected function createValidator(string $validatorClass): object
     {
@@ -350,11 +330,6 @@ class ValidatorsTest extends Unit
         };
     }
 
-    /**
-     * @param string $fileName
-     *
-     * @return string
-     */
     protected function createTestFile(string $fileName): string
     {
         $filePath = $this->tempDir . '/' . $fileName;

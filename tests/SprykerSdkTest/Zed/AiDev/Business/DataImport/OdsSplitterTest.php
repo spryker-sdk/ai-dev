@@ -26,14 +26,8 @@ use ZipArchive;
  */
 class OdsSplitterTest extends Unit
 {
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -45,9 +39,6 @@ class OdsSplitterTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -59,10 +50,6 @@ class OdsSplitterTest extends Unit
 
     /**
      * Recursively remove directory and all its contents
-     *
-     * @param string $dir
-     *
-     * @return void
      */
     protected function removeDirectory(string $dir): void
     {
@@ -83,9 +70,6 @@ class OdsSplitterTest extends Unit
         rmdir($dir);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitCreatesMultipleCsvFiles(): void
     {
         // Arrange
@@ -112,9 +96,6 @@ class OdsSplitterTest extends Unit
         }
     }
 
-    /**
-     * @return void
-     */
     public function testSplitSkipsEmptySheets(): void
     {
         // Arrange
@@ -136,9 +117,6 @@ class OdsSplitterTest extends Unit
         $this->assertCount(1, $resultData['sheetsSkipped']);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitSanitizesSheetNames(): void
     {
         // Arrange
@@ -163,9 +141,6 @@ class OdsSplitterTest extends Unit
         $this->assertStringNotContainsString('?', $fileName);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitEnsuresUniqueHeaders(): void
     {
         // Arrange
@@ -191,9 +166,6 @@ class OdsSplitterTest extends Unit
         $this->assertSame('Header_2', $headers[2]);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitTrimsTrailingEmptyColumns(): void
     {
         // Arrange
@@ -216,9 +188,6 @@ class OdsSplitterTest extends Unit
         $this->assertCount(2, $headers);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitReturnsErrorWhenFileNotFound(): void
     {
         // Arrange
@@ -235,9 +204,6 @@ class OdsSplitterTest extends Unit
         $this->assertSame(OdsConstants::FILE_NOT_FOUND, $resultData['error_code']);
     }
 
-    /**
-     * @return void
-     */
     public function testSplitReturnsErrorWhenInvalidPath(): void
     {
         // Arrange
@@ -258,8 +224,6 @@ class OdsSplitterTest extends Unit
      * @param array<string, array<array<string>>> $sheets
      *
      * @throws \RuntimeException
-     *
-     * @return string
      */
     protected function createTestOdsFile(array $sheets): string
     {
@@ -280,8 +244,6 @@ class OdsSplitterTest extends Unit
 
     /**
      * @param array<string, array<array<string>>> $sheets
-     *
-     * @return string
      */
     protected function buildOdsContentXml(array $sheets): string
     {
@@ -326,9 +288,6 @@ class OdsSplitterTest extends Unit
         );
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\OdsSplitter
-     */
     protected function createOdsSplitter(): OdsSplitter
     {
         $odsReader = new OdsReader();

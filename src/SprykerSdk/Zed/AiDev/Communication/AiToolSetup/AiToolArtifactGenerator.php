@@ -14,11 +14,6 @@ use SprykerSdk\Zed\AiDev\AiDevConfig;
 
 class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 {
-    /**
-     * @param string $projectRoot
-     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformerInterface $frontmatterTransformer
-     */
     public function __construct(
         protected string $projectRoot,
         protected AiDevConfig $config,
@@ -27,9 +22,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     public function listRuleTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
@@ -47,9 +39,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @throws \RuntimeException
      *
@@ -102,12 +92,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         return $generated;
     }
 
-    /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
-     * @return string
-     */
     public function listAgentsFileTargetPath(string $tool, ArtifactMode $mode = ArtifactMode::Real): string
     {
         $artifactConfig = $this->config->getToolArtifacts($tool);
@@ -119,13 +103,9 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @throws \RuntimeException
-     *
-     * @return string|null
      */
     public function generateAgentsFile(string $tool, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): ?string
     {
@@ -158,9 +138,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     public function listSkillsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
@@ -172,9 +149,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @return array<string>
      */
@@ -209,9 +184,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     public function listAgentsTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
@@ -223,9 +195,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $tool
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
      *
      * @throws \RuntimeException
      *
@@ -262,11 +232,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         return $generated;
     }
 
-    /**
-     * @param string $absolutePath
-     *
-     * @return string
-     */
     public function toRelativePath(string $absolutePath): string
     {
         $prefix = rtrim($this->projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
@@ -279,11 +244,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $path
-     *
      * @throws \RuntimeException
-     *
-     * @return void
      */
     protected function ensureDirectory(string $path): void
     {
@@ -297,12 +258,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $source
-     * @param string $destination
-     *
      * @throws \RuntimeException
-     *
-     * @return void
      */
     protected function copyDirectory(string $source, string $destination): void
     {
@@ -327,12 +283,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         }
     }
 
-    /**
-     * @param string $rulesDir
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
-     * @return string
-     */
     protected function resolveRulesTargetDir(string $rulesDir, ArtifactMode $mode): string
     {
         $dir = $mode === ArtifactMode::Example ? $rulesDir . '-example' : $rulesDir;
@@ -341,9 +291,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $targetDir
-     * @param string $suffix
-     *
      * @return array<string>
      */
     protected function resolveRuleTargetPaths(string $targetDir, string $suffix): array
@@ -364,9 +311,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $targetDir
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     protected function resolveSkillTargetPaths(string $targetDir, ArtifactMode $mode): array
@@ -387,9 +331,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $targetDir
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     protected function resolveAgentTargetPaths(string $targetDir, ArtifactMode $mode): array
@@ -407,12 +348,6 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
         return $paths;
     }
 
-    /**
-     * @param string $fileName
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
-     * @return string
-     */
     protected function resolveAgentFileName(string $fileName, ArtifactMode $mode): string
     {
         if ($mode !== ArtifactMode::Example) {
@@ -426,11 +361,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     }
 
     /**
-     * @param string $path
-     *
      * @throws \InvalidArgumentException
-     *
-     * @return void
      */
     protected function assertPathIsWithinProjectRoot(string $path): void
     {

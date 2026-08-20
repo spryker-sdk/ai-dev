@@ -16,7 +16,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
 {
     /**
      * @param array<\SprykerSdk\Zed\AiDev\Business\Prompts\PromptsFetcherInterface> $promptsFetchers
-     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
      */
     public function __construct(
         protected array $promptsFetchers,
@@ -24,9 +23,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
     ) {
     }
 
-    /**
-     * @return void
-     */
     public function generate(): void
     {
         $aiDevGitHubPromptTransfers = $this->fetchAllPrompts();
@@ -56,8 +52,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
     }
 
     /**
-     * @param string $filename
-     *
      * @return array<string>
      */
     protected function transformFilenameToClassName(string $filename): array
@@ -72,11 +66,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
         ];
     }
 
-    /**
-     * @param \Generated\Shared\Transfer\AiDevGitHubPromptTransfer $aiDevGitHubPromptTransfer
-     *
-     * @return string
-     */
     protected function generateMethodContent(AiDevGitHubPromptTransfer $aiDevGitHubPromptTransfer): string
     {
         [$methodName, $promptName] = $this->transformFilenameToClassName($aiDevGitHubPromptTransfer->getFilename());
@@ -101,11 +90,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
         );
     }
 
-    /**
-     * @param string $methods
-     *
-     * @return string
-     */
     protected function generateClassContent(string $methods): string
     {
         $classStub = file_get_contents(__DIR__ . '/../../../../../../data/stubs/PromptClass.php.stub');
@@ -113,11 +97,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
         return str_replace('{{content}}', $methods, $classStub);
     }
 
-    /**
-     * @param string $content
-     *
-     * @return void
-     */
     protected function writePromptClass(string $content): void
     {
         $targetDirectory = $this->config->getPromptClassTargetDirectory();
@@ -130,8 +109,6 @@ class PromptsGenerator implements PromptsGeneratorInterface
     }
 
     /**
-     * @param string $content
-     *
      * @return array<string>
      */
     protected function parseParameters(string $content): array
@@ -141,21 +118,11 @@ class PromptsGenerator implements PromptsGeneratorInterface
         return array_unique($matches[1]);
     }
 
-    /**
-     * @param string $value
-     *
-     * @return string
-     */
     protected function escapeForPhpString(string $value): string
     {
         return addslashes($value);
     }
 
-    /**
-     * @param string $value
-     *
-     * @return string
-     */
     protected function escapeForHeredoc(string $value): string
     {
         return str_replace(['\\', '$'], ['\\\\', '\\$'], $value);

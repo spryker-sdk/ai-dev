@@ -33,14 +33,8 @@ class StrategiesTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -49,9 +43,6 @@ class StrategiesTest extends Unit
         mkdir($this->tempDir);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -62,9 +53,6 @@ class StrategiesTest extends Unit
         parent::tearDown();
     }
 
-    /**
-     * @return void
-     */
     public function testAppendStrategyAppendsRows(): void
     {
         // Arrange
@@ -109,9 +97,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Sony', $rows[1]['brand']);
     }
 
-    /**
-     * @return void
-     */
     public function testAppendStrategyPreservesExistingData(): void
     {
         // Arrange
@@ -154,9 +139,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Sony', $rows[1]['brand']);
     }
 
-    /**
-     * @return void
-     */
     public function testReplaceStrategyReplacesEntireFile(): void
     {
         // Arrange
@@ -201,9 +183,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Sony', $rows[0]['brand']);
     }
 
-    /**
-     * @return void
-     */
     public function testReplaceStrategyValidatesNewContent(): void
     {
         // Arrange
@@ -248,9 +227,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Canon', $rows[1]['brand']);
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateStrategyUpdatesExistingRows(): void
     {
         // Arrange
@@ -296,9 +272,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Electronics', $rows[1]['category']);
     }
 
-    /**
-     * @return void
-     */
     public function testUpdateStrategyPreservesNonMatchingRows(): void
     {
         // Arrange
@@ -344,9 +317,6 @@ class StrategiesTest extends Unit
         $this->assertSame('Electronics', $rows[1]['category']);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AppendStrategy
-     */
     protected function createAppendStrategy(): AppendStrategy
     {
         $csvReader = new CsvReader();
@@ -363,9 +333,6 @@ class StrategiesTest extends Unit
         return new AppendStrategy($csvReader, $csvWriter, $filterEvaluator, $rowOperations);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\ReplaceStrategy
-     */
     protected function createReplaceStrategy(): ReplaceStrategy
     {
         $csvReader = new CsvReader();
@@ -382,9 +349,6 @@ class StrategiesTest extends Unit
         return new ReplaceStrategy($csvReader, $csvWriter, $filterEvaluator, $rowOperations);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\UpdateStrategy
-     */
     protected function createUpdateStrategy(): UpdateStrategy
     {
         $csvReader = new CsvReader();
