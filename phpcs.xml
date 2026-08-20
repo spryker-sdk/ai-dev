@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ruleset name="AiDev">
+    <description>
+        AiDev coding standard: SprykerStrict without the mandatory doc block sniffs.
+    </description>
+
+    <rule ref="vendor/spryker/code-sniffer/SprykerStrict/ruleset.xml">
+        <!-- This module uses native parameter, return and property types instead of restating them
+             in doc blocks, which is what SprykerStrict.TypeHints.*.UselessAnnotation enforces since
+             spryker/code-sniffer 0.17.35. The sniffs below mandate a doc block with a @return tag on
+             every method, which for a fully typed method can only restate the native type, so they
+             are lifted here. spryker/code-sniffer does the same for its own sources, see
+             vendor/spryker/code-sniffer/phpcs.xml. -->
+        <exclude name="Spryker.Commenting.DocBlock.DocBlockMissing"/>
+        <exclude name="Spryker.Commenting.DocBlock.ReturnVoidMissing"/>
+        <exclude name="Spryker.Commenting.DocBlock.ConstructDesctructMissingDocBlock"/>
+        <exclude name="Spryker.Commenting.DocBlockReturnVoid.ReturnMissing"/>
+        <exclude name="Spryker.Commenting.DocBlockReturnVoid.ReturnVoidMissing"/>
+        <exclude name="Spryker.Commenting.DocBlockReturnVoid.ReturnMissingInInterface"/>
+    </rule>
+</ruleset>
