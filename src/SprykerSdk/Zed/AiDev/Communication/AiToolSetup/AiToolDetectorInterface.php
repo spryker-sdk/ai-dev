@@ -11,8 +11,6 @@ interface AiToolDetectorInterface
 {
     /**
      * @param array<string, string> $detectionMap
-     *
-     * @return string|null
      */
     public function detect(array $detectionMap): ?string;
 }

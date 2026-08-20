@@ -25,9 +25,6 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\TransformationOperatio
  */
 class RowOperationsTest extends Unit
 {
-    /**
-     * @return void
-     */
     public function testColumnRemovalOperationRemovesSingleColumn(): void
     {
         // Arrange
@@ -56,9 +53,6 @@ class RowOperationsTest extends Unit
         $this->assertArrayHasKey('price', $result);
     }
 
-    /**
-     * @return void
-     */
     public function testColumnRemovalOperationRemovesMultipleColumns(): void
     {
         // Arrange
@@ -87,9 +81,6 @@ class RowOperationsTest extends Unit
         $this->assertArrayHasKey('brand', $result);
     }
 
-    /**
-     * @return void
-     */
     public function testColumnRemovalOperationHandlesNonExistentColumn(): void
     {
         // Arrange
@@ -116,9 +107,6 @@ class RowOperationsTest extends Unit
         $this->assertArrayHasKey('price', $result);
     }
 
-    /**
-     * @return void
-     */
     public function testDefaultValuesOperationAddsDefaultValues(): void
     {
         // Arrange
@@ -141,9 +129,6 @@ class RowOperationsTest extends Unit
         $this->assertSame('Electronics', $result['category']);
     }
 
-    /**
-     * @return void
-     */
     public function testDefaultValuesOperationOverridesEmptyValues(): void
     {
         // Arrange
@@ -166,9 +151,6 @@ class RowOperationsTest extends Unit
         $this->assertSame('Electronics', $result['category']);
     }
 
-    /**
-     * @return void
-     */
     public function testDefaultValuesOperationPreservesExistingValues(): void
     {
         // Arrange
@@ -196,10 +178,6 @@ class RowOperationsTest extends Unit
      *
      * @param array<string, mixed> $transformation
      * @param array<string, mixed> $row
-     * @param string $expectedColumn
-     * @param mixed $expectedValue
-     *
-     * @return void
      */
     public function testTransformationOperation(
         array $transformation,
@@ -270,9 +248,6 @@ class RowOperationsTest extends Unit
         ];
     }
 
-    /**
-     * @return void
-     */
     public function testColumnMappingOperationMapsSingleColumn(): void
     {
         // Arrange
@@ -296,9 +271,6 @@ class RowOperationsTest extends Unit
         $this->assertArrayNotHasKey('brand', $result);
     }
 
-    /**
-     * @return void
-     */
     public function testColumnMappingOperationMapsMultipleColumns(): void
     {
         // Arrange
@@ -322,9 +294,6 @@ class RowOperationsTest extends Unit
         $this->assertSame('99.99', $result['cost']);
     }
 
-    /**
-     * @return void
-     */
     public function testColumnMappingOperationHandlesMissingSourceColumn(): void
     {
         // Arrange

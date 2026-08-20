@@ -23,27 +23,16 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'getInterfaceMethodsByNamespace';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Tool to retrieve all method signatures, parameters, return types, and PhpDoc for a given interface FQN.';
     }
 
-    /**
-     * @param string $namespace
-     *
-     * @return string
-     */
     public function getInterfaceMethodsByNamespace(string $namespace): string
     {
         if (!interface_exists($namespace)) {
@@ -61,8 +50,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param \ReflectionClass $reflectionInterface
-     *
      * @return array<int, array<string, mixed>>
      */
     private function extractPublicMethods(ReflectionClass $reflectionInterface): array
@@ -78,12 +65,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         return $methodsData;
     }
 
-    /**
-     * @param string $message
-     * @param string $namespace
-     *
-     * @return string
-     */
     private function buildErrorResponse(string $message, string $namespace = ''): string
     {
         $response = [
@@ -99,8 +80,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param \ReflectionMethod $reflectionMethod
-     *
      * @return array<string, mixed>
      */
     protected function getMethodStructure(ReflectionMethod $reflectionMethod): array
@@ -128,8 +107,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     }
 
     /**
-     * @param \ReflectionParameter $reflectionParameter
-     *
      * @return array<string, mixed>
      */
     protected function getParameterStructure(ReflectionParameter $reflectionParameter): array
@@ -160,11 +137,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         ];
     }
 
-    /**
-     * @param \ReflectionType $type
-     *
-     * @return string
-     */
     protected function getTypeName(ReflectionType $type): string
     {
         $typeName = '';
@@ -183,11 +155,6 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         return $typeName;
     }
 
-    /**
-     * @param string|false $docComment
-     *
-     * @return string
-     */
     protected function extractDocDescription(string|false $docComment): string
     {
         if (!$docComment) {

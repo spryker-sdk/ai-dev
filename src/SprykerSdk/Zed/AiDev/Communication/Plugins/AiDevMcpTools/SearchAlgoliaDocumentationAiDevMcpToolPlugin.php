@@ -55,17 +55,11 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
 
     protected const string MARKDOWN_EXTENSION = '.md';
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'searchAlgoliaDocumentation';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Searches and find Spryker documentation by query and returns array of matching document paths to fetch. ' .
@@ -75,11 +69,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
             'Download content from `github_api_url`';
     }
 
-    /**
-     * @param string $query
-     *
-     * @return string
-     */
     public function searchAlgoliaDocumentation(string $query): string
     {
         if (trim($query) === '') {
@@ -96,8 +85,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
     }
 
     /**
-     * @param string $query
-     *
      * @return array<array<string, string>>
      */
     protected function executeAlgoliaSearch(string $query): array
@@ -120,9 +107,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
         }
     }
 
-    /**
-     * @return string
-     */
     protected function buildAlgoliaUrl(): string
     {
         return sprintf(
@@ -145,8 +129,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
     }
 
     /**
-     * @param string $query
-     *
      * @return array<string, mixed>
      */
     protected function buildRequestBody(string $query): array
@@ -187,11 +169,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
         return array_values($uniquePaths);
     }
 
-    /**
-     * @param string $docsUrl
-     *
-     * @return string
-     */
     protected function convertDocsUrlToGithubUrl(string $docsUrl): string
     {
         $githubUrl = str_replace(
@@ -209,11 +186,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
         return $githubUrl . static::MARKDOWN_EXTENSION;
     }
 
-    /**
-     * @param string $docsUrl
-     *
-     * @return string
-     */
     protected function convertDocsUrlToGithubApiUrl(string $docsUrl): string
     {
         $path = str_replace(static::DOCS_SPRYKER_BASE_URL, '', $docsUrl);
@@ -231,11 +203,6 @@ class SearchAlgoliaDocumentationAiDevMcpToolPlugin extends AbstractPlugin implem
         );
     }
 
-    /**
-     * @param string $errorMessage
-     *
-     * @return string
-     */
     protected function formatErrorResponse(string $errorMessage): string
     {
         return json_encode([

@@ -23,9 +23,6 @@ class CsvTransformer implements CsvTransformerInterface
     use FileValidationTrait;
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
      * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface> $rowOperations
      * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy> $transformStrategies
      * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidatorInterface> $validators
@@ -43,17 +40,11 @@ class CsvTransformer implements CsvTransformerInterface
     /**
      * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      *
-     * @param string $sourcePath
-     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param string $mode
-     * @param bool $createBackup
-     *
-     * @return string
      */
     public function transform(
         string $sourcePath,
@@ -110,15 +101,10 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param string $mode
-     * @param string $sourcePath
-     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string> $columnsToRemove
-     *
-     * @return string|null
      */
     protected function validateRequest(
         string $mode,
@@ -156,15 +142,11 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param string $sourcePath
-     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     *
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext
      */
     protected function prepareContext(
         string $sourcePath,
@@ -212,11 +194,7 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param string $filePath
-     *
      * @throws \Exception
-     *
-     * @return string|null
      */
     protected function createBackup(string $filePath): ?string
     {
@@ -244,11 +222,7 @@ class CsvTransformer implements CsvTransformerInterface
     }
 
     /**
-     * @param string $mode
-     *
      * @throws \Exception
-     *
-     * @return \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\AbstractTransformStrategy
      */
     protected function getTransformStrategy(string $mode): AbstractTransformStrategy
     {
@@ -263,8 +237,6 @@ class CsvTransformer implements CsvTransformerInterface
 
     /**
      * @param array<string, mixed> $result
-     *
-     * @return string
      */
     protected function buildResponse(array $result): string
     {

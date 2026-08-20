@@ -12,19 +12,13 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 interface CsvWriterInterface
 {
     /**
-     * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
-     *
-     * @return void
      */
     public function write(string $filePath, array $headers, array $rows): void;
 
     /**
-     * @param string $filePath
      * @param array<int, array<string, mixed>> $rows
-     *
-     * @return void
      */
     public function append(string $filePath, array $rows): void;
 }

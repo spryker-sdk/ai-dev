@@ -18,7 +18,7 @@ class PromptCacheManager
     protected static array $runtimeCache = [];
 
     /**
-     * @return array|null
+     * @return array<int, array<string, mixed>>|null
      */
     public static function getCache(): ?array
     {
@@ -44,9 +44,7 @@ class PromptCacheManager
     }
 
     /**
-     * @param array $prompts
-     *
-     * @return void
+     * @param array<int, array<string, mixed>> $prompts
      */
     public static function setCache(array $prompts): void
     {
@@ -65,9 +63,7 @@ class PromptCacheManager
     }
 
     /**
-     * @param string $filename
-     *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public static function getPromptByFilename(string $filename): ?array
     {
@@ -87,9 +83,7 @@ class PromptCacheManager
     }
 
     /**
-     * @param string $query
-     *
-     * @return array
+     * @return array<int, array<string, mixed>>
      */
     public static function searchPrompts(string $query): array
     {
@@ -112,10 +106,7 @@ class PromptCacheManager
     }
 
     /**
-     * @param array $prompt
-     * @param string $queryLower
-     *
-     * @return bool
+     * @param array<string, mixed> $prompt
      */
     protected static function matchesQuery(array $prompt, string $queryLower): bool
     {

@@ -30,8 +30,6 @@ class FilterEvaluator implements FilterEvaluatorInterface
     /**
      * @param array<string, mixed> $row
      * @param array<int, array<string, mixed>> $criteria
-     *
-     * @return bool
      */
     public function evaluate(array $row, array $criteria): bool
     {
@@ -48,11 +46,6 @@ class FilterEvaluator implements FilterEvaluatorInterface
         return true;
     }
 
-    /**
-     * @param string $operator
-     *
-     * @return bool
-     */
     public function isValidOperator(string $operator): bool
     {
         return in_array($operator, static::SUPPORTED_OPERATORS, true);
@@ -100,8 +93,6 @@ class FilterEvaluator implements FilterEvaluatorInterface
     /**
      * @param array<string, mixed> $row
      * @param array<string, mixed> $criterion
-     *
-     * @return bool
      */
     protected function evaluateSingleCriterion(array $row, array $criterion): bool
     {

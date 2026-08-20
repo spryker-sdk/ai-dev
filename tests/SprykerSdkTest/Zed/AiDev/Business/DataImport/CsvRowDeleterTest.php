@@ -26,14 +26,8 @@ class CsvRowDeleterTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -45,9 +39,6 @@ class CsvRowDeleterTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -65,13 +56,7 @@ class CsvRowDeleterTest extends Unit
      * @dataProvider deleteRowsDataProvider
      *
      * @param array<int, array<string, mixed>> $criteria
-     * @param int $expectedRowsDeleted
-     * @param bool $createBackup
-     * @param bool $shouldSucceed
-     * @param string|null $expectedErrorCode
      * @param array<int, array<string, mixed>>|null $customRows
-     *
-     * @return void
      */
     public function testDeleteRows(
         array $criteria,
@@ -196,8 +181,6 @@ class CsvRowDeleterTest extends Unit
 
     /**
      * @param array<int, array<string, mixed>> $rows
-     *
-     * @return string
      */
     protected function buildCsvContentFromRows(array $rows): string
     {

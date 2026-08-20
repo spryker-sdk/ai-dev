@@ -14,27 +14,17 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface;
 
 class FilterValidator implements ValidatorInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
-     */
     public function __construct(
         protected FilterEvaluatorInterface $filterEvaluator,
     ) {
     }
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool
     {
         return !empty($context->rowFilters);
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array

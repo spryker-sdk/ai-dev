@@ -18,28 +18,16 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class GetOmsTransitionsByStateAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Tool to get OMS state machine transitions for a specific state. Returns all transitions that start from the given state, optionally filtered by process name. Returns transitions with source state, target state, event, and condition information.';
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'getOmsTransitionsByState';
     }
 
-    /**
-     * @param string $stateName
-     * @param string $processName
-     *
-     * @return string
-     */
     public function getOmsTransitionsByState(string $stateName, string $processName = ''): string
     {
         return $this->getBusinessFactory()

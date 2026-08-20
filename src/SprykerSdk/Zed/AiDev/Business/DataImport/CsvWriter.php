@@ -14,21 +14,15 @@ use RuntimeException;
 
 class CsvWriter implements CsvWriterInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
-     */
     public function __construct(protected CsvReaderInterface $csvReader)
     {
     }
 
     /**
-     * @param string $filePath
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
      *
      * @throws \RuntimeException
-     *
-     * @return void
      */
     public function write(string $filePath, array $headers, array $rows): void
     {
@@ -47,10 +41,7 @@ class CsvWriter implements CsvWriterInterface
     }
 
     /**
-     * @param string $filePath
      * @param array<int, array<string, mixed>> $rows
-     *
-     * @return void
      */
     public function append(string $filePath, array $rows): void
     {
@@ -65,11 +56,6 @@ class CsvWriter implements CsvWriterInterface
         $writer->insertAll($this->prepareRows($rows, $headers));
     }
 
-    /**
-     * @param string $filePath
-     *
-     * @return string
-     */
     protected function getDelimiterForWrite(string $filePath): string
     {
         if (!file_exists($filePath)) {
@@ -103,11 +89,7 @@ class CsvWriter implements CsvWriterInterface
     }
 
     /**
-     * @param string $filePath
-     *
      * @throws \RuntimeException
-     *
-     * @return void
      */
     public function ensureFileEndsWithNewline(string $filePath): void
     {

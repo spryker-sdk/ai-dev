@@ -9,10 +9,5 @@ namespace SprykerSdk\Zed\AiDev\Business\Database\Reader;
 
 interface DatabaseQueryReaderInterface
 {
-    /**
-     * @param string $query
-     *
-     * @return string
-     */
     public function executeQuery(string $query): string;
 }

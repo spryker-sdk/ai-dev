@@ -14,16 +14,9 @@ interface FilterEvaluatorInterface
     /**
      * @param array<string, mixed> $row
      * @param array<int, array<string, mixed>> $criteria
-     *
-     * @return bool
      */
     public function evaluate(array $row, array $criteria): bool;
 
-    /**
-     * @param string $operator
-     *
-     * @return bool
-     */
     public function isValidOperator(string $operator): bool;
 
     /**

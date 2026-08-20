@@ -20,28 +20,18 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class AnalyzeCsvFileAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'analyzeCsvFile';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Analyze CSV file metadata without loading full content. IMPORTANT: File path must be relative to project root. Returns headers, row count, sample rows, and optional column analysis (unique values, null counts). Use this before transforming or deleting data to understand file structure. Parameters: filePath (required, relative path), sampleRows (default 5), analyzeColumns (optional array of column names to inspect).';
     }
 
     /**
-     * @param string $filePath
-     * @param int $sampleRows
      * @param array<string> $analyzeColumns
-     *
-     * @return string
      */
     public function analyzeCsvFile(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string
     {

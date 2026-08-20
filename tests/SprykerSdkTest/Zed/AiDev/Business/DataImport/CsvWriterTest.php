@@ -23,14 +23,8 @@ class CsvWriterTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -42,9 +36,6 @@ class CsvWriterTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -63,10 +54,6 @@ class CsvWriterTest extends Unit
      *
      * @param array<string> $headers
      * @param array<int, array<string, mixed>> $rows
-     * @param string|null $existingContent
-     * @param string $expectedDelimiter
-     *
-     * @return void
      */
     public function testWrite(
         array $headers,

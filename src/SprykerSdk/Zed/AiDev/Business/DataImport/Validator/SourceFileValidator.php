@@ -16,19 +16,12 @@ class SourceFileValidator implements ValidatorInterface
 {
     use FileValidationTrait;
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool
     {
         return $context->hasSourceFile();
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array

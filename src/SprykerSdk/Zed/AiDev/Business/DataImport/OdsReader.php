@@ -15,11 +15,6 @@ use ZipArchive;
 
 class OdsReader implements OdsReaderInterface
 {
- /**
-  * @param string $filePath
-  *
-  * @return \SimpleXMLElement
-  */
     public function extractContent(string $filePath): SimpleXMLElement
     {
         $this->validateOdsFile($filePath);
@@ -34,8 +29,6 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param \SimpleXMLElement $sheet
-     *
      * @return array<array<string>>
      */
     public function extractRows(SimpleXMLElement $sheet): array
@@ -60,11 +53,6 @@ class OdsReader implements OdsReaderInterface
         return $this->trimTrailingEmptyRows($rows);
     }
 
-    /**
-     * @param \SimpleXMLElement $cell
-     *
-     * @return string
-     */
     public function getCellValue(SimpleXMLElement $cell): string
     {
         $this->registerNamespaces($cell);
@@ -80,11 +68,7 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param string $filePath
-     *
      * @throws \RuntimeException
-     *
-     * @return void
      */
     protected function validateOdsFile(string $filePath): void
     {
@@ -97,8 +81,6 @@ class OdsReader implements OdsReaderInterface
 
     /**
      * @throws \RuntimeException
-     *
-     * @return void
      */
     protected function validateRequiredExtensions(): void
     {
@@ -112,11 +94,7 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param string $filePath
-     *
      * @throws \RuntimeException
-     *
-     * @return string
      */
     protected function extractContentXml(string $filePath): string
     {
@@ -141,11 +119,7 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param string $content
-     *
      * @throws \RuntimeException
-     *
-     * @return \SimpleXMLElement
      */
     protected function parseXmlContent(string $content): SimpleXMLElement
     {
@@ -158,13 +132,6 @@ class OdsReader implements OdsReaderInterface
         return $xml;
     }
 
-    /**
-     * @param string $valueType
-     * @param \SimpleXMLElement $attributes
-     * @param \SimpleXMLElement $cell
-     *
-     * @return string
-     */
     protected function extractValueByType(string $valueType, SimpleXMLElement $attributes, SimpleXMLElement $cell): string
     {
         switch ($valueType) {
@@ -184,12 +151,6 @@ class OdsReader implements OdsReaderInterface
         }
     }
 
-    /**
-     * @param \SimpleXMLElement $attributes
-     * @param \SimpleXMLElement $cell
-     *
-     * @return string
-     */
     protected function extractStringValue(SimpleXMLElement $attributes, SimpleXMLElement $cell): string
     {
         $stringValue = $attributes['string-value'] ?? '';
@@ -201,11 +162,6 @@ class OdsReader implements OdsReaderInterface
         return (string)$stringValue;
     }
 
-    /**
-     * @param \SimpleXMLElement $cell
-     *
-     * @return string
-     */
     protected function extractTextContent(SimpleXMLElement $cell): string
     {
         $textNodes = $cell->xpath(OdsConstants::XPATH_TEXT_PARAGRAPH);
@@ -221,11 +177,6 @@ class OdsReader implements OdsReaderInterface
         return (string)$textNodes[0];
     }
 
-    /**
-     * @param \SimpleXMLElement $attributes
-     *
-     * @return string
-     */
     protected function extractBooleanValue(SimpleXMLElement $attributes): string
     {
         $boolValue = (string)($attributes['boolean-value'] ?? '');
@@ -236,8 +187,6 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param \SimpleXMLElement $tableRow
-     *
      * @return array<string>
      */
     protected function extractRowCells(SimpleXMLElement $tableRow): array
@@ -263,8 +212,6 @@ class OdsReader implements OdsReaderInterface
     }
 
     /**
-     * @param \SimpleXMLElement $tableCell
-     *
      * @return array<string>
      */
     protected function extractCellWithRepeats(SimpleXMLElement $tableCell): array
@@ -275,11 +222,6 @@ class OdsReader implements OdsReaderInterface
         return array_fill(0, $repeats + OdsConstants::REPEAT_OFFSET, $cellValue);
     }
 
-    /**
-     * @param \SimpleXMLElement $tableCell
-     *
-     * @return int
-     */
     protected function getColumnRepeats(SimpleXMLElement $tableCell): int
     {
         $attributes = $tableCell->attributes(OdsConstants::NAMESPACE_TABLE);
@@ -307,8 +249,6 @@ class OdsReader implements OdsReaderInterface
 
     /**
      * @param array<string> $row
-     *
-     * @return bool
      */
     protected function isRowEmpty(array $row): bool
     {
@@ -321,11 +261,6 @@ class OdsReader implements OdsReaderInterface
         return true;
     }
 
-    /**
-     * @param \SimpleXMLElement $xml
-     *
-     * @return void
-     */
     protected function registerNamespaces(SimpleXMLElement $xml): void
     {
         $xml->registerXPathNamespace('table', OdsConstants::NAMESPACE_TABLE);

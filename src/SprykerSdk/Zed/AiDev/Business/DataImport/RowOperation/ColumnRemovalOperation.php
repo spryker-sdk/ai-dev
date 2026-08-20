@@ -11,11 +11,6 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation;
 
 class ColumnRemovalOperation implements RowOperationInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
-     *
-     * @return bool
-     */
     public function isApplicable(RowProcessingConfig $config): bool
     {
         return !empty($config->columnsToRemove);
@@ -23,7 +18,6 @@ class ColumnRemovalOperation implements RowOperationInterface
 
     /**
      * @param array<string, mixed> $row
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      *
      * @return array<string, mixed>
      */

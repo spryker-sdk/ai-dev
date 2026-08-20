@@ -22,14 +22,8 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\OdsReader;
  */
 class OdsReaderTest extends Unit
 {
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -41,9 +35,6 @@ class OdsReaderTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -57,9 +48,6 @@ class OdsReaderTest extends Unit
         parent::tearDown();
     }
 
-    /**
-     * @return void
-     */
     public function testExtractContentThrowsExceptionWhenFileNotFound(): void
     {
         // Arrange
@@ -74,9 +62,6 @@ class OdsReaderTest extends Unit
         $odsReader->extractContent($filePath);
     }
 
-    /**
-     * @return void
-     */
     public function testExtractContentThrowsExceptionWhenFileIsInvalid(): void
     {
         // Arrange
@@ -94,11 +79,6 @@ class OdsReaderTest extends Unit
 
     /**
      * @dataProvider extractRowsDataProvider
-     *
-     * @param string $xmlContent
-     * @param int $expectedRowCount
-     *
-     * @return void
      */
     public function testExtractRows(string $xmlContent, int $expectedRowCount): void
     {
@@ -149,11 +129,6 @@ class OdsReaderTest extends Unit
 
     /**
      * @dataProvider getCellValueDataProvider
-     *
-     * @param string $cellXml
-     * @param string $expectedValue
-     *
-     * @return void
      */
     public function testGetCellValue(string $cellXml, string $expectedValue): void
     {
@@ -249,8 +224,6 @@ class OdsReaderTest extends Unit
 
     /**
      * @param array<array<string>> $rows
-     *
-     * @return string
      */
     protected function buildSheetXml(array $rows): string
     {

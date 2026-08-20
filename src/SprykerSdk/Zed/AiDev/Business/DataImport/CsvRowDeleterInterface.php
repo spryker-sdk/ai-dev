@@ -14,11 +14,7 @@ interface CsvRowDeleterInterface
     /**
      * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      *
-     * @param string $filePath
      * @param array<int, array<string, mixed>> $criteria
-     * @param bool $createBackup
-     *
-     * @return string
      */
     public function deleteRows(string $filePath, array $criteria, bool $createBackup = true): string;
 }

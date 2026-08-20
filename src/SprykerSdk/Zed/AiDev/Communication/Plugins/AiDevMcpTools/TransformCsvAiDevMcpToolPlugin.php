@@ -22,17 +22,11 @@ use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
  */
 class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpToolPluginInterface, AiDevMcpToolInputSchemaPluginInterface
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'transformCsv';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Transform and modify CSV files with three modes: 1) APPEND mode (default): Transfer data from source CSV to target CSV, mapping columns and adding new rows. Requires sourcePath and columnMappings. 2) REPLACE mode: Same as append but replaces entire target file instead of adding rows. Requires sourcePath and columnMappings. 3) UPDATE mode: Update existing rows IN PLACE in the target file based on filter criteria - NO source file needed, NO columnMappings needed. Use rowFilters to match rows (e.g., SKU contains pattern), then apply valueTransformations or defaultValues to update specific columns. UPDATE mode modifies only matched rows, leaves others unchanged. Can also REMOVE columns entirely using columnsToRemove parameter (works in UPDATE mode). IMPORTANT: All file paths must be relative to project root. Row filters use AND logic. Creates backup by default. Parameters: sourcePath (required for append/replace, NOT used in update mode), targetPath (always required), columnMappings (required for append/replace, NOT used in update mode), rowFilters (optional, but essential for update mode to match rows), valueTransformations (optional array: {column, find, replace} for string replacement OR {column, operation, value, sourceColumn} for math operations: add/subtract/multiply/divide), defaultValues (optional object: column => value to set), columnsToRemove (optional array of column names to delete from file, works in UPDATE mode), mode ("append"/"replace"/"update"), createBackup (default true).';
@@ -121,17 +115,11 @@ class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpT
     /**
      * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      *
-     * @param string $targetPath
-     * @param string|null $sourcePath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param string $mode
-     * @param bool $createBackup
-     *
-     * @return string
      */
     public function transformCsv(
         string $targetPath,

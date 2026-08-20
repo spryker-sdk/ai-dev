@@ -13,19 +13,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class TransformationValidator implements ValidatorInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool
     {
         return !empty($context->valueTransformations);
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array
@@ -87,7 +80,6 @@ class TransformationValidator implements ValidatorInterface
 
     /**
      * @param array<string, mixed> $transformation
-     * @param int $index
      * @param array<string> $mappedColumns
      *
      * @return array<string>
@@ -113,7 +105,6 @@ class TransformationValidator implements ValidatorInterface
 
     /**
      * @param array<string, mixed> $transformation
-     * @param int $index
      *
      * @return array<string>
      */

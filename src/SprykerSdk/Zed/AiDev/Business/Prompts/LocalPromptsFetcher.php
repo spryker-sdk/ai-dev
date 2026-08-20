@@ -17,10 +17,6 @@ use SprykerSdk\Zed\AiDev\AiDevConfig;
 
 class LocalPromptsFetcher implements PromptsFetcherInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
-     * @param \SprykerSdk\Zed\AiDev\Business\Prompts\MarkdownPromptParserInterface $markdownPromptParser
-     */
     public function __construct(
         protected AiDevConfig $config,
         protected MarkdownPromptParserInterface $markdownPromptParser,
@@ -52,8 +48,6 @@ class LocalPromptsFetcher implements PromptsFetcherInterface
     }
 
     /**
-     * @param string $directory
-     *
      * @return list<string>
      */
     protected function getMarkdownFilesRecursive(string $directory): array
@@ -76,11 +70,7 @@ class LocalPromptsFetcher implements PromptsFetcherInterface
     }
 
     /**
-     * @param string $filePath
-     *
      * @throws \RuntimeException
-     *
-     * @return string
      */
     protected function fetchFileContent(string $filePath): string
     {
