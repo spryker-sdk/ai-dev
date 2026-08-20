@@ -24,16 +24,16 @@ class TransformationValidator implements ValidatorInterface
     public function validate(ValidationContext $context): ?array
     {
         $mappedColumns = $context->hasSourceFile()
-        ? array_values($context->columnMappings)
-        : $context->getTargetHeaders();
+            ? array_values($context->columnMappings)
+            : $context->getTargetHeaders();
 
         $errors = $this->validateTransformations($context->valueTransformations, $mappedColumns);
 
         if ($errors) {
             return [
-            'code' => CsvConstants::INVALID_TRANSFORMATIONS,
-            'message' => 'Value transformations validation failed',
-            'details' => ['errors' => $errors],
+                'code' => CsvConstants::INVALID_TRANSFORMATIONS,
+                'message' => 'Value transformations validation failed',
+                'details' => ['errors' => $errors],
             ];
         }
 

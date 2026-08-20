@@ -31,7 +31,7 @@ class GetOmsTransitionsByOrderAiDevMcpToolPlugin extends AbstractPlugin implemen
     public function getOrderOmsTransitions(string $orderReference): string
     {
         return $this->getBusinessFactory()
-        ->createOmsTransitionsReader()
-        ->getOrderOmsTransitions($orderReference);
+            ->createOmsTransitionsReader()
+            ->getOrderOmsTransitions($orderReference);
     }
 }

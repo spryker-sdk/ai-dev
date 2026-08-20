@@ -182,8 +182,8 @@ class OdsReader implements OdsReaderInterface
         $boolValue = (string)($attributes['boolean-value'] ?? '');
 
         return $boolValue === OdsConstants::BOOLEAN_TRUE
-        ? OdsConstants::BOOLEAN_VALUE_TRUE
-        : OdsConstants::BOOLEAN_VALUE_FALSE;
+            ? OdsConstants::BOOLEAN_VALUE_TRUE
+            : OdsConstants::BOOLEAN_VALUE_FALSE;
     }
 
     /**

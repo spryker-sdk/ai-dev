@@ -33,7 +33,7 @@ class SplitOdsToCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcp
     public function splitOdsToCsv(string $odsFilePath, string $outputDirectory): string
     {
         return $this->getBusinessFactory()
-        ->createOdsSplitter()
-        ->split($odsFilePath, $outputDirectory);
+            ->createOdsSplitter()
+            ->split($odsFilePath, $outputDirectory);
     }
 }

@@ -43,9 +43,9 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         $methodsData = $this->extractPublicMethods($reflectionInterface);
 
         return json_encode([
-        'interface' => $reflectionInterface->getShortName(),
-        'namespace' => $namespace,
-        'methods' => $methodsData,
+            'interface' => $reflectionInterface->getShortName(),
+            'namespace' => $namespace,
+            'methods' => $methodsData,
         ], JSON_PRETTY_PRINT);
     }
 
@@ -68,8 +68,8 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     private function buildErrorResponse(string $message, string $namespace = ''): string
     {
         $response = [
-        'status' => 'error',
-        'message' => $message,
+            'status' => 'error',
+            'message' => $message,
         ];
 
         if ($namespace !== '') {
@@ -99,10 +99,10 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         }
 
         return [
-        'name' => $reflectionMethod->getName(),
-        'description' => $docDescription,
-        'return_type' => $returnTypeName,
-        'parameters' => $parameters,
+            'name' => $reflectionMethod->getName(),
+            'description' => $docDescription,
+            'return_type' => $returnTypeName,
+            'parameters' => $parameters,
         ];
     }
 
@@ -130,10 +130,10 @@ class GetInterfaceMethodsAiDevMcpToolPlugin extends AbstractPlugin implements Ai
         }
 
         return [
-        'name' => '$' . $reflectionParameter->getName(),
-        'type' => $typeName,
-        'is_optional' => $reflectionParameter->isOptional(),
-        'default' => $defaultValue,
+            'name' => '$' . $reflectionParameter->getName(),
+            'type' => $typeName,
+            'is_optional' => $reflectionParameter->isOptional(),
+            'default' => $defaultValue,
         ];
     }
 

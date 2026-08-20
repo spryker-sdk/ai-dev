@@ -38,7 +38,7 @@ class DeleteCsvRowsAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcp
     public function deleteCsvRows(string $filePath, array $criteria, bool $createBackup = true): string
     {
         return $this->getBusinessFactory()
-        ->createCsvRowDeleter()
-        ->deleteRows($filePath, $criteria, $createBackup);
+            ->createCsvRowDeleter()
+            ->deleteRows($filePath, $criteria, $createBackup);
     }
 }

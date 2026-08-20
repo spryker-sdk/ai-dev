@@ -33,9 +33,9 @@ class UpdateStrategy extends AbstractTransformStrategy
         $columnsRemovedCount = count($context->config->columnsToRemove);
 
         return [
-        'rows_updated' => $result['processed_count'],
-        'columns_removed' => $columnsRemovedCount,
-        'total_rows' => count($context->targetRows),
+            'rows_updated' => $result['processed_count'],
+            'columns_removed' => $columnsRemovedCount,
+            'total_rows' => count($context->targetRows),
         ];
     }
 
@@ -61,9 +61,9 @@ class UpdateStrategy extends AbstractTransformStrategy
         }
 
         return [
-        'rows' => $processedRows,
-        'processed_count' => $processedCount,
-        'filtered_count' => 0,
+            'rows' => $processedRows,
+            'processed_count' => $processedCount,
+            'filtered_count' => 0,
         ];
     }
 }

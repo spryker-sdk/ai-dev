@@ -25,9 +25,9 @@ class ModeValidator implements ValidatorInterface
     {
         if (!in_array($context->mode, CsvConstants::SUPPORTED_MODES, true)) {
             return [
-            'code' => CsvConstants::OPERATION_FAILED,
-            'message' => sprintf('Invalid mode "%s"', $context->mode),
-            'details' => ['mode' => $context->mode, 'supported_modes' => CsvConstants::SUPPORTED_MODES],
+                'code' => CsvConstants::OPERATION_FAILED,
+                'message' => sprintf('Invalid mode "%s"', $context->mode),
+                'details' => ['mode' => $context->mode, 'supported_modes' => CsvConstants::SUPPORTED_MODES],
             ];
         }
 

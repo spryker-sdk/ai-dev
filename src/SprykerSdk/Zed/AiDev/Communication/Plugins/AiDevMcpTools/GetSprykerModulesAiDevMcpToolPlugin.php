@@ -32,12 +32,12 @@ class GetSprykerModulesAiDevMcpToolPlugin extends AbstractPlugin implements AiDe
     public function getSprykerModules(): string
     {
         $allModules = $this->getFactory()
-        ->getModuleFinderFacade()
-        ->getModules();
+            ->getModuleFinderFacade()
+            ->getModules();
 
         $projectModules = $this->getFactory()
-        ->getModuleFinderFacade()
-        ->getProjectModules();
+            ->getModuleFinderFacade()
+            ->getProjectModules();
 
         $mergedModules = array_merge($allModules, $projectModules);
 

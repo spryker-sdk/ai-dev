@@ -67,15 +67,15 @@ class RowOperationsTest extends Unit
         );
 
         $row = [
-        'brand' => 'Canon',
-        'color' => 'Red',
-        'price' => '99.99',
+            'brand' => 'Canon',
+            'color' => 'Red',
+            'price' => '99.99',
         ];
 
-    // Act
+        // Act
         $result = $operation->execute($row, $config);
 
-    // Assert
+        // Assert
         $this->assertArrayNotHasKey('color', $result);
         $this->assertArrayNotHasKey('price', $result);
         $this->assertArrayHasKey('brand', $result);
@@ -95,8 +95,8 @@ class RowOperationsTest extends Unit
         );
 
         $row = [
-        'brand' => 'Canon',
-        'price' => '99.99',
+            'brand' => 'Canon',
+            'price' => '99.99',
         ];
 
         // Act
@@ -209,42 +209,42 @@ class RowOperationsTest extends Unit
     public function transformationDataProvider(): array
     {
         return [
-        'add operation' => [
-            'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_ADD, 'value' => 10],
-            'row' => ['price' => '99.99'],
-            'expectedColumn' => 'price',
-            'expectedValue' => 109.99,
-        ],
-        'subtract operation' => [
-            'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_SUBTRACT, 'value' => 10],
-            'row' => ['price' => '99.99'],
-            'expectedColumn' => 'price',
-            'expectedValue' => 89.99,
-        ],
-        'multiply operation' => [
-            'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_MULTIPLY, 'value' => 2],
-            'row' => ['price' => '99.99'],
-            'expectedColumn' => 'price',
-            'expectedValue' => 199.98,
-        ],
-        'divide operation' => [
-            'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_DIVIDE, 'value' => 2],
-            'row' => ['price' => '100'],
-            'expectedColumn' => 'price',
-            'expectedValue' => 50.0,
-        ],
-        'string replacement' => [
-            'transformation' => ['column' => 'brand', 'find' => 'Canon', 'replace' => 'Nikon'],
-            'row' => ['brand' => 'Canon IXUS'],
-            'expectedColumn' => 'brand',
-            'expectedValue' => 'Nikon IXUS',
-        ],
-        'handle null value' => [
-            'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_ADD, 'value' => 10],
-            'row' => ['price' => null],
-            'expectedColumn' => 'price',
-            'expectedValue' => 10,
-        ],
+            'add operation' => [
+                'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_ADD, 'value' => 10],
+                'row' => ['price' => '99.99'],
+                'expectedColumn' => 'price',
+                'expectedValue' => 109.99,
+            ],
+            'subtract operation' => [
+                'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_SUBTRACT, 'value' => 10],
+                'row' => ['price' => '99.99'],
+                'expectedColumn' => 'price',
+                'expectedValue' => 89.99,
+            ],
+            'multiply operation' => [
+                'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_MULTIPLY, 'value' => 2],
+                'row' => ['price' => '99.99'],
+                'expectedColumn' => 'price',
+                'expectedValue' => 199.98,
+            ],
+            'divide operation' => [
+                'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_DIVIDE, 'value' => 2],
+                'row' => ['price' => '100'],
+                'expectedColumn' => 'price',
+                'expectedValue' => 50.0,
+            ],
+            'string replacement' => [
+                'transformation' => ['column' => 'brand', 'find' => 'Canon', 'replace' => 'Nikon'],
+                'row' => ['brand' => 'Canon IXUS'],
+                'expectedColumn' => 'brand',
+                'expectedValue' => 'Nikon IXUS',
+            ],
+            'handle null value' => [
+                'transformation' => ['column' => 'price', 'operation' => CsvConstants::OPERATION_ADD, 'value' => 10],
+                'row' => ['price' => null],
+                'expectedColumn' => 'price',
+                'expectedValue' => 10,
+            ],
         ];
     }
 

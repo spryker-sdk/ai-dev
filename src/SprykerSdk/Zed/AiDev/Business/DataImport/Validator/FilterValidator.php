@@ -30,16 +30,16 @@ class FilterValidator implements ValidatorInterface
     public function validate(ValidationContext $context): ?array
     {
         $headers = $context->hasSourceFile()
-        ? $context->getSourceHeaders()
-        : $context->getTargetHeaders();
+            ? $context->getSourceHeaders()
+            : $context->getTargetHeaders();
 
         $filterErrors = $this->filterEvaluator->validateCriteria($context->rowFilters, $headers);
 
         if ($filterErrors) {
             return [
-            'code' => CsvConstants::INVALID_FILTERS,
-            'message' => 'Row filters validation failed',
-            'details' => ['errors' => $filterErrors],
+                'code' => CsvConstants::INVALID_FILTERS,
+                'message' => 'Row filters validation failed',
+                'details' => ['errors' => $filterErrors],
             ];
         }
 

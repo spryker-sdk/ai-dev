@@ -31,7 +31,7 @@ class GetOmsTransitionsByStateAiDevMcpToolPlugin extends AbstractPlugin implemen
     public function getOmsTransitionsByState(string $stateName, string $processName = ''): string
     {
         return $this->getBusinessFactory()
-        ->createOmsTransitionsReader()
-        ->getOmsTransitionsByState($stateName, $processName);
+            ->createOmsTransitionsReader()
+            ->getOmsTransitionsByState($stateName, $processName);
     }
 }

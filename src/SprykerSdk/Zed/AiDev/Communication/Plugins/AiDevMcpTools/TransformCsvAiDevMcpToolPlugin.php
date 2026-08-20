@@ -38,77 +38,77 @@ class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpT
     public function getInputSchema(): array
     {
         return [
-        'type' => 'object',
-        'properties' => [
-            'sourcePath' => [
-                'type' => 'string',
-                'description' => 'Relative path to source CSV file (required for append/replace modes, ignored in update mode)',
-            ],
-            'targetPath' => [
-                'type' => 'string',
-                'description' => 'Relative path to target CSV file',
-            ],
-            'columnMappings' => [
-                'type' => 'object',
-                'description' => 'Object mapping source column names to target column names (required for append/replace modes, ignored in update mode)',
-                'additionalProperties' => [
+            'type' => 'object',
+            'properties' => [
+                'sourcePath' => [
                     'type' => 'string',
+                    'description' => 'Relative path to source CSV file (required for append/replace modes, ignored in update mode)',
                 ],
-            ],
-            'rowFilters' => [
-                'type' => 'array',
-                'description' => 'Filters to match rows. In append/replace modes: excludes matching rows. In UPDATE mode: selects rows to update (essential for update mode)',
-                'items' => [
+                'targetPath' => [
+                    'type' => 'string',
+                    'description' => 'Relative path to target CSV file',
+                ],
+                'columnMappings' => [
                     'type' => 'object',
-                    'properties' => [
-                        'column' => ['type' => 'string', 'description' => 'Column name to filter on'],
-                        'operator' => ['type' => 'string', 'description' => 'Comparison operator (equals, contains, startsWith, endsWith, greaterThan, lessThan, etc.)'],
-                        'value' => ['type' => ['string', 'number', 'boolean'], 'description' => 'Value to compare against'],
+                    'description' => 'Object mapping source column names to target column names (required for append/replace modes, ignored in update mode)',
+                    'additionalProperties' => [
+                        'type' => 'string',
                     ],
                 ],
-            ],
-            'valueTransformations' => [
-                'type' => 'array',
-                'description' => 'Optional value transformations: string replacement {column, find, replace} or math operations {column, operation, value, sourceColumn}',
-                'items' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'column' => ['type' => 'string', 'description' => 'Target column name'],
-                        'find' => ['type' => 'string', 'description' => 'String to find (for replacement)'],
-                        'replace' => ['type' => 'string', 'description' => 'String to replace with (for replacement)'],
-                        'operation' => ['type' => 'string', 'enum' => ['add', 'subtract', 'multiply', 'divide'], 'description' => 'Math operation'],
-                        'value' => ['type' => 'number', 'description' => 'Value for math operation'],
-                        'sourceColumn' => ['type' => 'string', 'description' => 'Source column for math operation (defaults to column)'],
+                'rowFilters' => [
+                    'type' => 'array',
+                    'description' => 'Filters to match rows. In append/replace modes: excludes matching rows. In UPDATE mode: selects rows to update (essential for update mode)',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'column' => ['type' => 'string', 'description' => 'Column name to filter on'],
+                            'operator' => ['type' => 'string', 'description' => 'Comparison operator (equals, contains, startsWith, endsWith, greaterThan, lessThan, etc.)'],
+                            'value' => ['type' => ['string', 'number', 'boolean'], 'description' => 'Value to compare against'],
+                        ],
                     ],
                 ],
-            ],
-            'defaultValues' => [
-                'type' => 'object',
-                'description' => 'Optional default values for target columns (targetCol => value)',
-                'additionalProperties' => [
-                    'type' => ['string', 'number', 'boolean'],
+                'valueTransformations' => [
+                    'type' => 'array',
+                    'description' => 'Optional value transformations: string replacement {column, find, replace} or math operations {column, operation, value, sourceColumn}',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'column' => ['type' => 'string', 'description' => 'Target column name'],
+                            'find' => ['type' => 'string', 'description' => 'String to find (for replacement)'],
+                            'replace' => ['type' => 'string', 'description' => 'String to replace with (for replacement)'],
+                            'operation' => ['type' => 'string', 'enum' => ['add', 'subtract', 'multiply', 'divide'], 'description' => 'Math operation'],
+                            'value' => ['type' => 'number', 'description' => 'Value for math operation'],
+                            'sourceColumn' => ['type' => 'string', 'description' => 'Source column for math operation (defaults to column)'],
+                        ],
+                    ],
                 ],
-            ],
-            'columnsToRemove' => [
-                'type' => 'array',
-                'description' => 'Optional array of column names to remove from the file (works in UPDATE mode)',
-                'items' => [
+                'defaultValues' => [
+                    'type' => 'object',
+                    'description' => 'Optional default values for target columns (targetCol => value)',
+                    'additionalProperties' => [
+                        'type' => ['string', 'number', 'boolean'],
+                    ],
+                ],
+                'columnsToRemove' => [
+                    'type' => 'array',
+                    'description' => 'Optional array of column names to remove from the file (works in UPDATE mode)',
+                    'items' => [
+                        'type' => 'string',
+                    ],
+                ],
+                'mode' => [
                     'type' => 'string',
+                    'description' => 'Operation mode: "append" (add rows from source), "replace" (overwrite target with source), or "update" (modify existing rows in target based on filters)',
+                    'enum' => ['append', 'replace', 'update'],
+                    'default' => 'append',
+                ],
+                'createBackup' => [
+                    'type' => 'boolean',
+                    'description' => 'Whether to create a backup of the target file',
+                    'default' => true,
                 ],
             ],
-            'mode' => [
-                'type' => 'string',
-                'description' => 'Operation mode: "append" (add rows from source), "replace" (overwrite target with source), or "update" (modify existing rows in target based on filters)',
-                'enum' => ['append', 'replace', 'update'],
-                'default' => 'append',
-            ],
-            'createBackup' => [
-                'type' => 'boolean',
-                'description' => 'Whether to create a backup of the target file',
-                'default' => true,
-            ],
-        ],
-        'required' => ['targetPath'],
+            'required' => ['targetPath'],
         ];
     }
 
@@ -133,7 +133,7 @@ class TransformCsvAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMcpT
         bool $createBackup = true
     ): string {
         return $this->getBusinessFactory()
-        ->createCsvTransformer()
-        ->transform($sourcePath ?? '', $targetPath, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $columnsToRemove, $mode, $createBackup);
+            ->createCsvTransformer()
+            ->transform($sourcePath ?? '', $targetPath, $columnMappings, $rowFilters, $valueTransformations, $defaultValues, $columnsToRemove, $mode, $createBackup);
     }
 }

@@ -81,8 +81,8 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function getPromptsFetchers(): array
     {
         return [
-        $this->createLocalPromptsFetcher(),
-        $this->createGitHubPromptsFetcher(),
+            $this->createLocalPromptsFetcher(),
+            $this->createGitHubPromptsFetcher(),
         ];
     }
 
@@ -167,10 +167,10 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function getRowOperations(): array
     {
         return [
-        $this->createColumnRemovalOperation(),
-        $this->createColumnMappingOperation(),
-        $this->createDefaultValuesOperation(),
-        $this->createTransformationOperation(),
+            $this->createColumnRemovalOperation(),
+            $this->createColumnMappingOperation(),
+            $this->createDefaultValuesOperation(),
+            $this->createTransformationOperation(),
         ];
     }
 
@@ -180,9 +180,9 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createTransformStrategies(): array
     {
         return [
-        $this->createAppendStrategy(),
-        $this->createReplaceStrategy(),
-        $this->createUpdateStrategy(),
+            $this->createAppendStrategy(),
+            $this->createReplaceStrategy(),
+            $this->createUpdateStrategy(),
         ];
     }
 
@@ -255,13 +255,13 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createCsvValidators(): array
     {
         return [
-        $this->createModeValidator(),
-        $this->createTargetFileValidator(),
-        $this->createSourceFileValidator(),
-        $this->createColumnMappingValidator(),
-        $this->createFilterValidator(),
-        $this->createTransformationValidator(),
-        $this->createColumnRemovalValidator(),
+            $this->createModeValidator(),
+            $this->createTargetFileValidator(),
+            $this->createSourceFileValidator(),
+            $this->createColumnMappingValidator(),
+            $this->createFilterValidator(),
+            $this->createTransformationValidator(),
+            $this->createColumnRemovalValidator(),
         ];
     }
 

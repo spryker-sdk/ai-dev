@@ -33,7 +33,7 @@ class ExecuteDatabaseQueryAiDevMcpToolPlugin extends AbstractPlugin implements A
     public function executeDatabaseQuery(string $query): string
     {
         return $this->getBusinessFactory()
-        ->createDatabaseQueryReader()
-        ->executeQuery($query);
+            ->createDatabaseQueryReader()
+            ->executeQuery($query);
     }
 }

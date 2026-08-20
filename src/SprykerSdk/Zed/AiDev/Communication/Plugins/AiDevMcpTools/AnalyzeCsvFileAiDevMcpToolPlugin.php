@@ -36,7 +36,7 @@ class AnalyzeCsvFileAiDevMcpToolPlugin extends AbstractPlugin implements AiDevMc
     public function analyzeCsvFile(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string
     {
         return $this->getBusinessFactory()
-        ->createCsvAnalyzer()
-        ->analyze($filePath, $sampleRows, $analyzeColumns);
+            ->createCsvAnalyzer()
+            ->analyze($filePath, $sampleRows, $analyzeColumns);
     }
 }

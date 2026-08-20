@@ -35,9 +35,9 @@ class ColumnMappingValidator implements ValidatorInterface
 
         if ($errors) {
             return [
-            'code' => CsvConstants::INVALID_MAPPINGS,
-            'message' => 'Column mappings validation failed',
-            'details' => ['errors' => $errors],
+                'code' => CsvConstants::INVALID_MAPPINGS,
+                'message' => 'Column mappings validation failed',
+                'details' => ['errors' => $errors],
             ];
         }
 

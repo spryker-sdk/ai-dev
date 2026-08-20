@@ -67,11 +67,11 @@ class AppendStrategy extends AbstractTransformStrategy
         $unmappedTarget = array_diff($context->targetHeaders, array_values($context->config->columnMappings));
 
         return [
-        'rows_appended' => count($result['rows']),
-        'rows_filtered_out' => $result['filtered_count'],
-        'transformations_applied' => $result['processed_count'],
-        'unmapped_source_columns' => array_values($unmappedSource),
-        'unmapped_target_columns' => array_values($unmappedTarget),
+            'rows_appended' => count($result['rows']),
+            'rows_filtered_out' => $result['filtered_count'],
+            'transformations_applied' => $result['processed_count'],
+            'unmapped_source_columns' => array_values($unmappedSource),
+            'unmapped_target_columns' => array_values($unmappedTarget),
         ];
     }
 }

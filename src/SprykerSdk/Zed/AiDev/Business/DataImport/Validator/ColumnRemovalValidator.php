@@ -28,9 +28,9 @@ class ColumnRemovalValidator implements ValidatorInterface
 
         if ($invalidColumns) {
             return [
-            'code' => CsvConstants::COLUMN_NOT_FOUND,
-            'message' => 'Cannot remove columns that do not exist',
-            'details' => ['invalid_columns' => array_values($invalidColumns)],
+                'code' => CsvConstants::COLUMN_NOT_FOUND,
+                'message' => 'Cannot remove columns that do not exist',
+                'details' => ['invalid_columns' => array_values($invalidColumns)],
             ];
         }
 
