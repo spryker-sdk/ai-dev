@@ -105,8 +105,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
 
     /**
      * {@inheritDoc}
-     *
-     * @return string
      */
     public function getName(): string
     {
@@ -115,8 +113,6 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
 
     /**
      * {@inheritDoc}
-     *
-     * @return string
      */
     public function getDescription(): string
     {
@@ -128,9 +124,7 @@ class GetSprykerModuleMapAiDevMcpToolPlugin extends AbstractPlugin implements Ai
     /**
      * {@inheritDoc}
      *
-     * @param array $moduleNames
-     *
-     * @return string
+     * @param array<string> $moduleNames
      */
     public function getSprykerModuleMap(array $moduleNames): string
     {
