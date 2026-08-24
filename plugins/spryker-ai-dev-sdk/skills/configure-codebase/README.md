@@ -43,12 +43,12 @@ flowchart TD
     SEED["Seed module tests/NsTest/Shared/Example<br/>namespace: NsTest\\Shared\\Example<br/>LocatorHelper projectNamespaces: ['Ns','Pyz']<br/>ExampleCest + ProjectNamespaceCest<br/>assert via the actor, never static Assert::"]
     SEED --> SWEEP["Sweep EVERY projectNamespaces:<br/>already in tests/ and prepend Ns<br/>— can move test outcomes, apply deliberately"]
 
-    SWEEP --> E5["5 · Frontend build<br/>inspect frontend/settings.js SHAPE first<br/>(a) projectNamespaces array → add<br/>(b) no array → append to<br/>componentEntryPoints/shopUiEntryPoints dirs<br/>tsconfig include · package.json globs<br/>LEAVE tsconfig.yves.json paths aliases"]
+    SWEEP --> E5["5 · Frontend build — probe THREE shapes<br/>(a) projectNamespaces array → add<br/>(b) no array → append to<br/>componentEntryPoints/shopUiEntryPoints dirs<br/>(c) NO settings file — ShopUi ≥2.0.0<br/>vendorized builder → yves.settings.mts,<br/>else DEFER as post-boot verification<br/>tsconfig include · package.json globs<br/>LEAVE tsconfig.yves.json paths aliases"]
     E5 --> E6["6 · phpcs.xml<br/>add Ns to MethodAnnotation.* lists<br/>IF the clone ships them<br/>leave SprykerNamespace = Pyz"]
     E6 --> E7["7 · eslint.config.mjs<br/>fix the Yves-TS glob that matches<br/>no project code — a post-boot gate<br/>with a NAMED rollback"]
     E7 --> E8["8 · architecture-sniffer<br/>optional — flag, don't assume"]
 
-    E8 --> VER{"Verify (static)<br/>Grep PROJECT_NAMESPACE across ALL<br/>config_default*.php — Ns in every one?<br/>php -l · JSON-validate with php"}
+    E8 --> VER{"Verify (static)<br/>Grep PROJECT_NAMESPACE across ALL<br/>config_default*.php — Ns in every one?<br/>BOTH NsTest AND PyzTest in all 4<br/>codeception configs + both whitelists?<br/>ZERO projectNamespaces: ['Pyz'] in tests/?<br/>php -l · JSON-validate with php"}
     VER -- "an overlay still ['Pyz']" --> E1C
     VER -- "clean" --> POST(["Step done — but the codecept<br/>build/run GREEN PROOF is post-boot,<br/>carried by boot-and-verify"])
 ```
@@ -84,12 +84,29 @@ the namespace. All four are required — the first three pre-boot, the fourth ve
   `DEFAULT_STORE = 'DE'`, so a non-`DE` project throws `StoreNotFoundException` deep inside a plugin
   and reads as a code bug. The fix is a project-level helper resolving the store from the DB — with
   a detect-first grep, because recent clones already ship it.
-- **Inspect the file's real shape before editing it.** `frontend/settings.js` comes in two forms and
-  this demoshop ships the second; `phpcs.xml` may ship no `MethodAnnotation.*` rules at all. Match
-  what's there rather than forcing the expected shape.
+- **Inspect the file's real shape before editing it — and accept that it may not exist.**
+  `frontend/settings.js` comes in three shapes, the third being **absent**: ShopUi ≥2.0.0 vendorized
+  the Yves builder (`frontend/yves.settings.mts`, `yves:*` scripts re-pointed, Node 24+ — see
+  [`spryker-upgrade/EXAMPLE-UPGRADE-REPORT.md`](../spryker-upgrade/EXAMPLE-UPGRADE-REPORT.md)), and
+  `vendor/` doesn't exist pre-boot, so that half becomes a recorded **post-boot verification** rather
+  than a silent "done". `phpcs.xml` may ship no `MethodAnnotation.*` rules at all. Match what's
+  there rather than forcing the expected shape.
 - **`tsconfig.yves.json`'s `paths` aliases are deliberately left alone.** The build resolves each
   alias to its first entry, so prepending an empty `src/<Ns>/Yves` skeleton aborts
   `frontend:yves:build`. The namespace is wired through `settings.js` dirs instead.
+- **A mandate with no greppable check does not survive the run.** Step 4's two test-scoping
+  mandates were unexecuted in nearly every sampled project (aggregate configs: 4 of 6;
+  `projectNamespaces` sweep: 4 of 4) because § Verify only checked `config_default*.php`. It now
+  greps for `<Ns>Test` **and** `PyzTest` in all four codeception configs plus both coverage
+  whitelists, and for **zero** `projectNamespaces: ['Pyz']` under `tests/`. The failure is
+  bidirectional — one direction runs only `<Ns>`, the other only `Pyz`, and each reports `OK` while
+  testing half the code.
+- **An `include` glob that matches nothing is a project-wide fatal.** `include: tests/<Ns>Test/*/*`
+  without a real module `codeception.yml` under it makes `codecept` unloadable
+  (`Configuration file(s) could not be found in "tests/<Ns>Test/*/*"`) — nothing runs, not even
+  `PyzTest`. The include and the seed module are one atomic edit. And `<Ns>Test` gets no
+  auto-generated `@group` annotations (the upstream sniff matches `SprykerTest|PyzTest` only), so the
+  acceptance/api includes stay inert until each cest carries a hand-written group block.
 - **Project-authored test code goes in `tests/<Ns>Test/`, never `tests/PyzTest/`** — anything in the
   Pyz tree sits in the merge path the next time it re-syncs from upstream. Closing check:
   `find tests/PyzTest -newer composer.json`.

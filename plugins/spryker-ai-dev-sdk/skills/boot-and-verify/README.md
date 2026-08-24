@@ -32,7 +32,7 @@ flowchart TD
     VR -- "no" --> B["2 · Bootstrap<br/>docker/sdk bootstrap deploy.dev.yml<br/>capture the sudo /etc/hosts line"]
 
     B --> HOSTS["⚠ ACTION NEEDED<br/>surface the /etc/hosts line<br/>verbatim, before the 4c gate"]
-    HOSTS --> UP["3 · Boot, detached pty<br/>script -q .ai-dev/boot.log docker/sdk up<br/>run_in_background · 30–90+ min"]
+    HOSTS --> UP["3 · Boot, detached pty<br/>script -q .ai-dev/boot.log docker/sdk up -t<br/>-t = testing container + SPRYKER_TESTING_ENABLED<br/>run_in_background · 30–90+ min"]
 
     UP --> LOG{"Read .ai-dev/boot.log<br/>Overall Import status: OK<br/>&amp; no Aborted / SQLSTATE<br/>&amp; demodata section RAN?"}
     LOG -- "environment limit<br/>(ports · composer auth · disk · OOM)" --> DEV([Developer clears it;<br/>plain docker/sdk up as fallback])
@@ -54,7 +54,12 @@ flowchart TD
 
     G0{"4a0 · Volumes are NEW?<br/>KV _timestamp / index creation_date<br/>vs boot start; spy_store ids<br/>vs ids in KV payloads"}
     G0 -- "collision — false green" --> RANK([Ranked fix: developer removes<br/>own stale volumes / override the<br/>deploy namespace / new project name])
-    G0 -- "new" --> G1
+    G0 -- "new" --> GEN
+
+    GEN{"4a-gen · find src/Generated data/cache<br/>-name '*OLD_TOKEN*' → empty?"}
+    GEN -- "hit" --> REGEN["Delete the stale artifact,<br/>re-run its generator, re-probe"]
+    REGEN --> GEN
+    GEN -- "empty" --> G1
 
     G1{"4a · Publish queues<br/>drained &amp; error-free?<br/>project vhost, NOT /"}
     G1 -- "non-empty" --> DRAIN["queue:worker:start<br/>--stop-when-empty"]
@@ -65,10 +70,10 @@ flowchart TD
     G2 -- "0" --> FAILB([FAIL the boot —<br/>invisible unsellable catalog])
     G2 -- "&gt; 0" --> G3
 
-    G3["4b · Per-store HTTP probes<br/>only apps the project KEPT<br/>yves: /&lt;STORE&gt;/&lt;lang&gt; · logo box &gt; 0×0 ·<br/>add-to-cart PERSISTED · guest checkout<br/>backoffice: login + product list non-empty<br/>merchant-portal · glue via Store header"]
+    G3["4b · Per-store HTTP probes<br/>ONE PER APP the project KEPT<br/>yves: /&lt;STORE&gt;/&lt;lang&gt; · logo box &gt; 0×0<br/>≥N homepage slot blocks · add-to-cart PERSISTED<br/>guest checkout · anonymous /customer/overview → 302 login<br/>backoffice: login + product list non-empty<br/>merchant-portal · glue &amp; glue-backend:<br/>token + one REGISTERED resource<br/>(406 / 404 on the roots is CORRECT)"]
     G3 --> G4["The full grid<br/>stores × each locale × products<br/>never an aggregate total"]
 
-    G4 --> TI["Post-boot test infra<br/>codecept build + run on the seed<br/>DataBuilders non-empty → cy:run<br/>on host/CI, not the CLI container"]
+    G4 --> TI["Post-boot test infra<br/>seed run = pre-check only, then the GATE:<br/>docker/sdk testing codecept run<br/>-c tests/codeception.ci.functional.yml<br/>0 errors, upstream skips only, report counts<br/>DataBuilders non-empty → cy:run<br/>on host/CI, not the CLI container"]
 
     TI --> G5{"4c · spryker-verifier agent<br/>independent PASS/FAIL/BLOCKED<br/>per AC, from scratch"}
     G5 -- "FAIL" --> FIX["Fix the defect,<br/>re-run the verifier fresh"]
@@ -100,9 +105,10 @@ without it.
 | Gate | Asserts | The false green it catches |
 |------|---------|----------------------------|
 | **4a0** | KV/search/broker volumes are new (age + identity) | `up` recreates the DB but **reuses named volumes** — a fresh DB beside a prior project's read models, every signal correct while carrying foreign data. |
+| **4a-gen** | No `src/Generated` / `data/cache` artifact keyed by a **renamed** token | Gitignored build output no sweep or `git diff` sees — `validationEU.cache` survived a bucket renamed to `EUROPE`, and every API Platform request 500'd after a green boot. |
 | **4a** | Publish queues drained, error-free, on the **project vhost** | `list_queues` against the default `/` vhost returns an empty list — a dangerous "drained". A storefront hit before the queues settle is a false 500. |
 | **4a-search** | Per-store `*_page` product-doc count > 0, via `/_count` | A missing `product-approval-status` makes the publisher write **nothing** while import, queues and DB all read perfect. `_cat/indices` lags the merge and reads near-empty. |
-| **4b** | Per-store HTTP, add-to-cart **persisted**, the logo's rendered box | A 200 with an error flash or an empty quote is a FAIL; a correctly-configured logo can still render at 0×0. |
+| **4b** | Per-store HTTP for **every kept app**, add-to-cart **persisted**, the logo's rendered box, **≥ N homepage slot blocks**, anonymous `/customer/overview` **302 to login** | A 200 with an error flash or an empty quote is a FAIL; a correctly-configured logo can still render at 0×0; a block-less homepage passes a `<html lang=` probe; an unguarded `/multi-cart` returned 200 and rendered, so "not 500" passes the defect; Glue modelled as the Yves *fallback* left total API breakage unprobed. |
 | **grid** | Per store × each locale × products | An aggregate total hides a zero-locale or a price-less product slice. |
 | **4c** | An independent `spryker-verifier` agent's PASS/FAIL per AC | The agent that wrote the data judging its own work. |
 
@@ -124,6 +130,16 @@ without it.
   edits with a full teardown each time is the waste the ladder exists to prevent.
 - **Destructive commands are announced, then asked — every time**, even when the allowlist would
   let them through without a prompt.
+- **Boot with `up -t`, always.** `-t` provides the testing container and `SPRYKER_TESTING_ENABLED=1`;
+  on a plain `up`, `docker/sdk testing` is a silent no-op and codeception falls into a phantom
+  `devtest` env — 12 harness errors that read as project failures. A plain stack upgrades
+  non-destructively with a re-`up -t`.
+- **Operator consent cannot clear a red gate.** A broken customer-facing surface is not a decision to
+  offer; "leave as a known issue" is not an available option. The step records `failed`/`in-progress`
+  and the defect goes on the go-live debt list — the declined `/etc/hosts` is the only
+  terminal-with-caveat state.
+- **`script` is scoped to `up` and `reset`.** Wrapping a `console` command or `npx cypress run` in it
+  fails `tcgetattr/ioctl` with an *empty* log — a wrapper failure that reads as a dead import.
 - **`/etc/hosts` declining is terminal, not a stall.** Server-side checks use `curl --resolve` and
   still stand; the browser ACs record BLOCKED and the step closes
   `done (browser ACs BLOCKED — /etc/hosts declined)` so the run finishes honestly.

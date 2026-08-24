@@ -38,19 +38,20 @@ flowchart TD
     QUOTE --> S2
 
     S2["Step 2 — Region token, full surface<br/>deploy.dev.yml · 4 install recipes<br/>kept .github/deploy/*.yml<br/>mv the region dir, rewrite tokens<br/>rename store_EU.yml → store_&lt;REGION&gt;.yml"]
-    S2 --> S3["Step 3 — Hardcoded literals<br/>CodeBucketConfig (hard blocker)<br/>default_store · host mappings<br/>translator fallback · StockConfig<br/>CheckoutPageConfig"]
+    S2 --> S3["Step 3 — Hardcoded literals<br/>CodeBucketConfig (hard blocker)<br/>default_store · host mappings<br/>translator fallback · StockConfig<br/>CheckoutPageConfig<br/>CUSTOMER_SECURED_PATTERN +<br/>Yves firewall regexes (silent auth hole)<br/>per-locale date/time formats"]
     S3 --> S4["Step 4 — Dangling-manifest sweep<br/>grep ALL data/import/**/*.yml<br/>disposition every hit explicitly"]
 
     S4 --> V["Validate<br/>refs: store values ⊆ declared<br/>absent on CodeBucketConfig +<br/>default_store → ZERO hits"]
     V --> VD{"Zero hits on the<br/>must-be-clean files?"}
     VD -- "no" --> S3
     VD -- "yes" --> TRI["Broader absent over config/ + src/Pyz<br/>= triage aid, NOT a gate<br/>classify each hit"]
-    TRI --> DONE([Step done →<br/>hand off to project-data<br/>per data.mode])
+    TRI --> PAT["Second pass — PATTERN-shaped<br/>grep BARE en/de inside regexes<br/>a de_DE-shaped search cannot match them<br/>en_US-is-a-keep does NOT exempt it"]
+    PAT --> DONE([Step done →<br/>hand off to project-data<br/>per data.mode<br/>+ POST-BOOT: stale src/Generated<br/>and data/cache artifacts])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
     classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
-    class IN,S1,S1B,QUOTE,S2,S3,S4,V,TRI step;
+    class IN,S1,S1B,QUOTE,S2,S3,S4,V,TRI,PAT step;
     class SEED,YB,VD decision;
     class A,DONE,BAD terminal;
 ```
@@ -60,7 +61,7 @@ flowchart TD
 | File | Role |
 |------|------|
 | [`SKILL.md`](SKILL.md) | The single-source seeding rule, inputs, Steps 1–4, and the validation gate. |
-| [`references/literal-sweep.md`](references/literal-sweep.md) | **Authoritative** region-token surface and config-literal spots: `deploy.dev.yml`, install recipes, the Stripe boot-blocker recipe, orphaned per-store `<STORE>.yml` manifests, the hardcoded-literal table, the Back Office `getBackofficeUILocales()` override, leave-alone items, post-boot store-keyed decisions, the final sweep. |
+| [`references/literal-sweep.md`](references/literal-sweep.md) | **Authoritative** region-token surface and config-literal spots: `deploy.dev.yml`, install recipes, the Stripe boot-blocker recipe, orphaned per-store `<STORE>.yml` manifests, the hardcoded-literal table, the Back Office `getBackofficeUILocales()` override, leave-alone items, post-boot store-keyed decisions, the final sweep + the **pattern-shaped second pass** (firewall regexes) and the **post-boot generated-artifact obligation**. |
 | [`references/minimal-baseline.md`](references/minimal-baseline.md) | Spec of the minimal bootable tree — keep-populated / keep-with-transform / header-only / store relations. Consumed by `project-data`'s **clean** strategy as its build spec, not by this skill's own steps. |
 
 ## The seeding rule
@@ -86,17 +87,32 @@ source, project stores differ only by locale, currency, country and name — the
 - **Broken inert config is the worst outcome.** Deleting demo store dirs breaks every manifest that
   sources them, so Step 4 greps all of `data/import/**/*.yml` and dispositions each hit explicitly
   rather than leaving dangling YAML behind.
-- **Two owners never touch one tree.** The `b2b_robot/` fixture tree belongs to
-  `project-ci-generator`; this skill only *verifies* it was removed on a dropped lane and reports a
-  survivor as a gap.
+- **Two owners never touch one tree, and the disposition has exactly two states.** The `b2b_robot/`
+  fixture tree belongs to `project-ci-generator`; this skill only *verifies* it was removed on a
+  dropped lane and reports a survivor as a gap. The choice is **derived** from the CI `keep_suites`
+  answer, never asked: kept lane → fixture adaptation is a required follow-up in
+  `.ai-dev/project-setup.md`; dropped lane → ci-generator removes the tree. There is no
+  "leave alone for now".
 - **`vendor/` does not exist pre-boot.** Composer materializes it in-container during boot, so the
   Stripe fix authors a project-local store-assignment CSV plus a `stripe.yml` referencing the vendor
   paths (which resolve at import time) — never copying vendor files or hunting the filesystem.
 - **Extend the Pyz class, not the core class.** Under a custom namespace, `<Ns>\…Config extends
   \Pyz\…Config` — extending core instead wins resolution and silently drops every existing Pyz
   override in that class.
-- **The broad literal sweep is triage, not a gate.** Some hits are intentional keeps (`de_DE` in the
-  Back Office translator fallback, classic-mode `stores.php`); classify them, don't blind-fix.
+- **The broad literal sweep is triage, not a gate.** Some hits are intentional keeps (classic-mode
+  `stores.php`); classify them, don't blind-fix. `de_DE` in the Back Office translator fallback is
+  the one paired keep — it lives or dies **with** the `getBackofficeUILocales()` override, in one
+  logged decision, never as a silent default on a project that speaks neither German nor English.
+- **Two shapes of literal, two passes.** The list-shaped sweep hunts `xx_XX` locale tokens and store
+  names; it structurally cannot match a **bare** `(en|de)` alternation inside a firewall regex — which
+  is why `CUSTOMER_SECURED_PATTERN` survived every run and left `customer`, `cart`, `checkout` and
+  nine more routes unguarded on a non-`en`/`de` project. A *partially* correct pattern is the worst
+  case: `/en/` keeps working, so nothing looks broken.
+- **Some obligations can only be discharged after the first boot.** `src/Generated/**` and
+  `data/cache/**` are gitignored build output that doesn't exist pre-boot, so no sweep can see a
+  stale artifact keyed by the old region/store/bucket token (`validationEU.cache` 500'd every API
+  Platform request after a green boot). The reference carries it as an explicit post-boot step:
+  discover by token match, regenerate, delete the stale sibling.
 
 ## Packaging note
 

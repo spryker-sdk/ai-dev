@@ -472,13 +472,19 @@ echo "rules: $(ls .claude/rules/ | wc -l | tr -d ' ') files total"
 
 ## Final report
 
-In **3–5 lines**, tell the user:
+In **3–5 lines** — plus the two `MANDATORY` blocks, which are never trimmed for brevity — tell the user:
 
 - What was installed (package + version).
 - Which file was edited and how many consoles were added (state the *actual* file edited — Pyz or the project-namespace override).
 - That the MCP server is registered under the project root folder name (state the actual name used).
 - The outcome of Step 5 — list each of the two artifacts (`CLAUDE.md`, rules) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`.
 - ALWAYS highlight that the user must **restart Claude Code /exit** (or open a new session in this project directory) for the Spryker MCP tools to become available in-session — the running session will not pick them up automatically.
+- **MANDATORY — `Commit the SDK onboarding artifacts before running the wizard.`** Onboarding leaves the clone dirty, and `project-starter-wizard`'s pre-flight hard-stops on any **tracked** modification (` M`/` D` in `git status --porcelain`); `.ai-dev/` is not in its tolerated-untracked list either. List exactly what **this run** touched — tracked: `composer.json`, `composer.lock`, the `ConsoleDependencyProvider.php` actually edited; untracked: `CLAUDE.md`, `.claude/rules/`, `.ai-dev/` — and hand over the commit line for them, e.g. `git add composer.json composer.lock <the-edited-provider> CLAUDE.md .claude/rules && git commit -m "Install Spryker AI Dev SDK"`. Also suggest **adding `.ai-dev/` to `.gitignore`**: it is per-run log state, never worth committing. Failure signature when this line is omitted: the user's next command is a wizard run that aborts with "dirty clone — hard stop" naming files *this* skill created, and they reset or commit blind.
+- **MANDATORY — `What to do next`.** Never end the run without naming the next action. Exactly:
+  - New project from a demoshop clone → `/spryker-ai-dev-sdk:project-starter-wizard` (after the commit above).
+  - Feature work on an existing project → `/spryker-ai-dev-sdk:spryker-customization` (from a PRD or acceptance criteria), or `/spryker-ai-dev-sdk:product-requirement-document` first when there is no spec yet.
+  - Both require the **session restart** above before the Spryker MCP tools exist — restart first, then run the command.
+  - The full skill index is `plugins/spryker-ai-dev-sdk/README.md` (or the plugin's `README.md` after a marketplace install).
 - Suggest setup improvents:
   - Setup plugin with Language Server php-lsp@claude-plugins-official https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md
   - Setup MCP server for Context7 to work with Spryker documentation https://docs.spryker.com/docs/dg/dev/ai/ai-assistants/context7-mcp-server

@@ -376,6 +376,26 @@ tests/{PyzTest,SprykerTest}/
     └── codeception.yml
 ```
 
+**Project namespace — tests live in `tests/<Ns>Test/**`.** The tree above and every
+`tests/SprykerTest/…` path in this skill is the **core-package** layout. A project that registered a
+custom namespace instead of `Pyz` (`KernelConstants::PROJECT_NAMESPACES = ['<Ns>', 'Pyz']` in
+`config/Shared/config_default.php`) has a third tree, and that is where the project's own tests
+belong. Read the real namespaces from `composer.json` `autoload-dev.psr-4` before choosing a path —
+never assume `PyzTest`.
+
+- **Path + namespace:** `tests/<Ns>Test/<Layer>/<Module>/…`, mirroring the structure above, with
+  `namespace: <Ns>Test\<Layer>\<Module>` in its `codeception.yml`.
+- **`projectNamespaces: ['<Ns>', 'Pyz']`** in every suite config — project namespace first = highest
+  precedence. `LocatorHelper` **overwrites** the runtime `PROJECT_NAMESPACES` with the suite's own
+  value, so a suite left on `['Pyz']` resolves `src/Pyz` and never exercises the project's `src/<Ns>`
+  overrides. *Failure signature:* the suite is green and every assertion is about the inherited
+  demoshop's values instead of the project's — nothing fails, the values are just someone else's.
+- **`<Ns>Test` cests need HAND-WRITTEN `@group` annotations.** The upstream
+  `DocBlockTestGroupAnnotation2Sniff` matches `(SprykerTest|PyzTest)` only, so it generates nothing
+  for a custom namespace. *Failure signature:* `codecept run … -g <Group>` runs **zero** tests out of
+  `tests/<Ns>Test/**` while the files plainly exist — inclusive group filters require every named
+  group to be present on the test.
+
 ## Testing Console Commands
 
 Enable `ConsoleHelper` in codeception.yml:
@@ -462,6 +482,22 @@ When adding tests to a new module, follow this checklist:
 **Always run `codecept build` after**: creating a new module, adding helpers, or changing `codeception.yml`.
 
 ## Running Tests
+
+**Prerequisite — the stack MUST have been booted with `docker/sdk up -t`.** Every command in this
+section is `docker/sdk testing …`, which needs the testing container that only `-t` creates. On a
+stack booted with a plain `docker/sdk up` these commands are a **silent no-op**: no testing
+container, `SPRYKER_TESTING_ENABLED` unset, and codeception falls into a phantom `devtest`
+environment — so the output reads as project failures (or as nothing at all) with no error naming the
+real cause. An already-running plain stack **upgrades non-destructively**: just re-run
+`docker/sdk up -t` — no reset, no data loss. Other skills work around this by entering testing mode
+first (`script -q /dev/null docker/sdk testing "exit"`) without naming the root cause; the missing
+`-t` **is** the root cause — fix it there, don't rely on the workaround.
+
+**Scope `script` to commands that actually allocate a TTY** — `docker/sdk up`, `docker/sdk reset`,
+and entering an interactive `docker/sdk testing`/`cli` shell. Never wrap `docker/sdk console …` or
+`npx cypress run` in it: they need no TTY, and the wrapper fails with
+`tcgetattr/ioctl: Operation not supported on socket` plus an **empty log**, which reads as a project
+failure rather than a wrapper failure.
 
 **Build tests** (after adding helpers/changes):
 ```bash

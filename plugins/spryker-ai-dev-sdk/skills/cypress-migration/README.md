@@ -128,6 +128,11 @@ This skill's own removal is limited to the Composer packages (Step 2).
   `getCurrencyByIsoCode()` and its enable line in
   `tests/PyzTest/Zed/TestifyBackendApi/codeception.dynamic.fixtures.yml` — one without the other is a
   dangling reference. (No `codecept build` needed.)
+- **`cy.formatDisplayPrice` is not upstream.** It's absent from `cypress-boilerplate` HEAD and
+  implemented three incompatible ways in the wild. Post-vendor it must exist, derive currency and
+  locale from the resolved `CURRENCY_CODE`/`LOCALE_NAME`, and pass `currencyDisplay:
+  'narrowSymbol'` — ICU's default differs per runtime (UAH: `грн` under Electron, `₴` under Chrome
+  and the app's PHP formatter), which reads as an app bug.
 - **Never gate on `npm run code:check`.** The boilerplate defines it as `eslint . ; prettier . --check`
   — the `;` means the script exits with *prettier's* status, so a real ESLint failure reports success.
   Run `lint:check` and `prettier:check` separately; this is why the CI job runs them as two steps.

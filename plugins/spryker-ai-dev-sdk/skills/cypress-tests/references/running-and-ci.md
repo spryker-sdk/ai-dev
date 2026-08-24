@@ -123,5 +123,28 @@ fixed `cy.wait`, or a missing `"synchronize": true`.
 | `Fixture placeholder {{X}} could not be resolved` | Missing key in `.envs/.env.<environment>` — **unless** it's `STORE_NAME`/`LOCALE_NAME`/`LOCALE_PREFIX`/`CURRENCY_CODE`/`COUNTRY_ISO2`, which come from the shop; then the store lookup is what failed |
 | Fixture field is `undefined` in the spec | Operation has no `key`, or the fixture type doesn't match the JSON |
 | Product not found when searching the storefront | `"synchronize": true` missing, so publish & sync hadn't landed |
-| Passes locally, fails on CI | Timing (a fixed `cy.wait`), or a value hardcoded instead of read from fixtures/env |
+| Passes locally, fails on CI | Timing (a fixed `cy.wait`), or a value hardcoded instead of read from fixtures/env — but check the runner row below before either |
+| Format/locale string differs by environment | **Different browsers, different ICU.** `cy:open`/`cy:run` are Electron, which ships its own ICU; CI runs `--browser chrome`. Any `Intl` / `toLocaleString` / date-format assertion can differ between them — UAH renders `грн` under Electron and `₴` under Chrome and the app's PHP formatter. Reproduce with `npx cypress run --browser chrome` before blaming the app, and pass explicit `Intl` options (`currencyDisplay: 'narrowSymbol'`) instead of relying on defaults |
 | Passes alone, fails in a full run | Cross-spec state — the spec mutates data it didn't create |
+| Assertion passes but the resulting order/record is wrong | The spec asserted an optimistic DOM value before the ajax mutation persisted — see `conventions.md` § Optimistic UI vs. persisted state |
+
+Run any spec that asserts a formatted value (price, date, number) with `--browser chrome` at
+least once before calling it done — that's what CI uses, and it's the cheapest way to catch the
+ICU divergence above.
+
+### Is this the app or the harness?
+
+The two most expensive failures on record were both **harness** defects reported as product bugs,
+each costing a full developer bug-report round trip. Before filing an app bug, rule out all four:
+
+1. **A shared formatting helper.** `cy.formatDisplayPrice` and friends are project-local suite
+   code, not builtins (`conventions.md` § Specs). A mismatch that differs only in currency symbol
+   form, separator, or casing — same amount — is the helper.
+2. **Runner ICU.** Reproduce with `--browser chrome` before trusting an Electron-only failure.
+3. **Optimistic DOM vs. persisted state.** Re-`visit()` and re-read the value; if it changes, the
+   spec was asserting the optimistic DOM, not the server.
+4. **A retried-attempt flake.** Check the mochawesome report for a test that passed on attempt 2
+   or 3.
+
+Only after all four are ruled out: reproduce the flow by hand in a browser and quote *that* in the
+bug report, not the Cypress assertion.

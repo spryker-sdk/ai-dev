@@ -13,6 +13,40 @@ description: >-
 
 # Spryker Project Upgrade
 
+## Non-negotiables — read these before Phase 0, re-read them on every compaction
+
+Twelve phases and six lanes is more than fits in one working memory, and these four are the rules a
+long run has been observed to drop. They are not repeated in § Hard rules at the end of the file.
+
+1. **An upgrade changes versions, not architecture.** Never integrate a feature, DI mechanism,
+   storage backend or extension point the developer did not explicitly ask for, however strongly the
+   new version invites it. A missing capability is not damage. If restoring existing behaviour looks
+   impossible without adopting the new thing, that is a **vendor BC break to report**, not a
+   re-architecture to perform. Full rule + worked example: § Scope.
+   *Failure signature:* the plan contains a file the project never had (`config/bundles.php`, a new
+   service config, a new provider registration) that no phase's detector asked for.
+2. **Lane 0 is not skippable.** No major bump ships without its migration guide processed, or an
+   explicit `none published` record naming the module and version pair.
+   *Failure signature:* `list-major-bumps.php` lists a module that appears in no Lane 0 record.
+3. **Re-run the detectors after EVERY resolution lane.** Fixes create new conflicts, and a fix in
+   one lane routinely resolves or reveals entries in another.
+   *Failure signature:* a lane closed on a report file whose mtime predates that lane's last edit.
+4. **A red detector, PHPStan regression, or failing test blocks the next phase. Never suppress.**
+   Not with a baseline entry, not with a phpcs/phpstan ignore, not by narrowing the analysed paths.
+   *Failure signature:* the diff touches `phpstan-baseline.neon`, a `@phpstan-ignore`, or a
+   detector's exclude list — none of which is ever part of an upgrade's deliverable.
+
+**Plan tracking is mandatory, and it is what makes the above survive a multi-hour run.** At the end
+of Phase 0, arrange the phases and lanes as a task list with `TaskCreate` — one task each for
+Phase 0.5, 1, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.5, 7 — and
+drive it with `TaskUpdate`: `in_progress` on entry, `completed` only once that phase's or lane's
+detectors are green. On a re-run of the detectors that reopens a lane, reopen that lane's task rather
+than opening a new one. `TaskList` is the cheapest thing to read to re-orient, and it **survives
+compaction**, which the phase you are currently in otherwise does not. This is the same pattern
+`spryker-bugfix` drives its twelve stages with. An upgrade that has lost track of which lane it is in
+has also lost the "re-run the detectors after every lane" rule — the two failures always arrive
+together.
+
 **Locate the scripts:** `.claude/skills/spryker-upgrade/scripts/` (setup install, relative to the
 project cwd) or `${CLAUDE_PLUGIN_ROOT}/skills/spryker-upgrade/scripts/` (plugin install). `$UP`
 below is shorthand for whichever resolves — substitute it inline as a literal path; **never set a
@@ -230,6 +264,14 @@ detectors (or Phase 5 checks) before finishing the run — the matrix must stay 
    ```
    Record pass/fail/skip counts per suite. If a suite cannot run here at all (no DB, no search
    backend, no webdriver), say which and why — an unrunnable suite is not a passing suite.
+6. **Arrange the plan as a task list — last action of Phase 0, before any constraint moves.**
+   `TaskCreate` one task per phase and lane (`P0.5 Verifiability gate`, `P1 Target selection`,
+   `P1.5 Constraint style`, `P2 Composer update`, `P3 Detection`, `L0 Migration guides`,
+   `L1 Dead overrides`, `L2 Shadowed frontend`, `L3 Plugin stacks`, `L4 Config & transfers`,
+   `P4.9 Boot`, `P5 Regenerate & verify`, `P5.5 Full suite`, `P6 New features gate`,
+   `P6.5 Browser gate`, `P7 Report`), then drive it with `TaskUpdate` per § Non-negotiables. Add
+   `L5 No compatible release` only if Lane 5 is actually reached. Skipping this step is the single
+   change that most reliably loses the phase order on a long run.
 
 ## Phase 0.5 — Verifiability gate (developer gate #1)
 
@@ -295,11 +337,37 @@ so a unit suite does not drag in Propel or locator helpers it does not need.
 
 ## Phase 1 — Target selection (developer gate #2)
 
-Determine current release: `grep -m1 '"spryker-feature/' composer.json`. Find newer releases:
-`composer show -a spryker-feature/spryker-core | grep versions`. Ask with AskUserQuestion:
-- **Next release group (recommended)** — smallest reviewable step; repeat the skill per release.
-- **Latest release** — one big jump; more conflicts per pass.
-Never pick silently.
+**Build the current-state inventory from `composer.lock`. `composer.json` is the *intent*, not the
+state.** The lock records what is actually installed; the root constraints record what someone once
+asked for, and the two diverge routinely — unpinned or wildcard constraints, individual modules
+bumped since the feature was pinned, and release notes that never state which version to use. Every
+other lock-aware step already works this way (Phase 0 snapshots the lock; `list-major-bumps.php`
+diffs before/after; `check-platform-alignment.php` reads the lock's platform requirements;
+`unpin-feature-driven-modules.php` reads feature requirements from the lock because the metapackages
+install no files). Target selection was the last step reading the intent instead.
+
+```bash
+# authoritative current state — resolved versions
+php -r '$l=json_decode(file_get_contents("composer.lock"),true); foreach($l["packages"] as $p) { if (str_starts_with($p["name"],"spryker-feature/")) { echo $p["name"]," ",$p["version"],PHP_EOL; } }'
+# the intent, for comparison only
+grep '"spryker-feature/' composer.json
+```
+
+1. **Report divergence BEFORE the update**, one line per feature: `<feature>: lock <resolved> / json
+   <constraint>`. Name every constraint that does not pin the resolved version exactly (`^`, `~`,
+   `*`, `dev-*` — a loose constraint is a divergence to state, never a version to infer from) and
+   every feature present in one file and missing from the other. This is a finding for the developer,
+   not something to silently normalise — and it is the answer whenever a release note is vague about
+   which version the project is on. Coverage-matrix row 38 covers the extreme case (a lock stale
+   enough that composer reports constraints for packages no longer in `composer.json`); lock-first is
+   the normal path, that row is the escape hatch.
+   *Failure signature:* a target chosen from a `^x.y` constraint, so the "current" release named in
+   the report is not the release the lock installed — later phases then diff against a baseline the
+   project never ran.
+2. Find newer releases: `composer show -a spryker-feature/spryker-core | grep versions`.
+3. Ask with AskUserQuestion — never pick silently:
+   - **Next release group (recommended)** — smallest reviewable step; repeat the skill per release.
+   - **Latest release** — one big jump; more conflicts per pass.
 
 ## Phase 1.5 — Constraint style (do this BEFORE the first composer update)
 
@@ -778,15 +846,10 @@ that did not run, name it and name the damage class it would have caught.
 
 ## Hard rules
 
-- **An upgrade changes versions, not architecture.** Never integrate a feature, DI mechanism or
-  storage backend the developer did not explicitly ask for, however strongly the new version invites
-  it. If restoring existing behaviour looks impossible without adopting the new thing, that is a
-  vendor BC break to report — not a re-architecture to perform. See Scope.
-- Lane 0 is not skippable: no major bump ships without its migration guide processed or an
-  explicit "none published" record.
-- Re-run the detectors after EVERY resolution lane — fixes create new conflicts, and a fix in one
-  lane routinely resolves or reveals entries in another.
-- A red detector, PHPStan regression, or failing test blocks the next phase; never suppress.
+- **The four non-negotiables live at the top of this file — § Non-negotiables** (versions not
+  architecture; Lane 0 not skippable; re-run the detectors after every lane; never suppress a red
+  detector), together with the mandatory plan task list. Deliberately not duplicated here: a rule
+  read only at line 800 of an 800-line file has already been paged out by the time it matters.
 - All state lives in `.spryker-upgrade/state/` (gitignored); never commit baselines, reports or
   `*.merge-conflict` artifacts. Prefer explicit `git add <path>` over `git add -A` while a Lane 2
   pass is in flight.

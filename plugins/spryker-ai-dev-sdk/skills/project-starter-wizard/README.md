@@ -84,7 +84,7 @@ flowchart TD
     MODE -- "autonomous · reversible" --> LOG["Decide, log to<br/>.ai-dev/decision-log.md,<br/>keep going"]
     MODE -- "collaborative · step boundary" --> ASK["Ask 'Continue to next step?'<br/>and wait"]
     MODE -- "⚠ ACTION NEEDED<br/>(both modes)" --> HUMAN["Wait for the developer<br/>Docker · /etc/hosts · token"]
-    MODE -- "deletion / data wipe / sudo<br/>(both modes)" --> HUMAN2["Present blast radius,<br/>get explicit go-ahead"]
+    MODE -- "irrecoverable action<br/>or outsized magnitude<br/>(both modes)" --> HUMAN2["Present blast radius,<br/>get explicit go-ahead"]
     MODE -- "step failure" --> FAIL([Stop with guidance,<br/>state file records where])
 ```
 
@@ -130,8 +130,9 @@ resume. Same work either way — only the check-in cadence differs.
   It also asks the questionnaire's blanks instead of resolving them.
 
 Neither mode relaxes the hard-stops — this is what `R2` acknowledges: a `⚠ ACTION NEEDED`
-prerequisite, any deletion / data wipe / `sudo`, and a step failure all return control to the
-developer in **both** modes. **A filled questionnaire is not a promise of an uninterrupted run**;
+prerequisite, any **irrecoverable** action (what `git checkout` cannot undo — a DB/volume drop,
+`sudo`, deleting untracked files, any post-boot data deletion), a catalog reduction of outsized
+**magnitude**, and a step failure all return control to the developer in **both** modes. **A filled questionnaire is not a promise of an uninterrupted run**;
 it's a promise of no further *configuration* questions.
 
 ## Design decisions baked in
@@ -150,7 +151,17 @@ it's a promise of no further *configuration* questions.
   namespace collision check in particular is re-run as soon as the project name is known.
 - **Communication is load-bearing, not cosmetic.** A required human action leads the message as a
   single `⚠ ACTION NEEDED:` line, alone, above any status — a prerequisite buried under a
-  validation table reads as status, and the run stalls on an unread ask.
+  validation table reads as status, and the run stalls on an unread ask. Every control-returning turn
+  then **closes** with exactly one of `⚠ NEEDS YOU:` (numbered exact commands, each with the cost of
+  declining) or `✅ NEEDS NOTHING`; "Ready when you are" is banned, because it hands back control
+  without saying what is needed.
+- **An autonomous stall and a verbose step report are the same defect.** A message shaped like a
+  finished deliverable is what ends the turn — so a step report is capped at three lines and the next
+  skill's call must land in the *same* message as the state-file update and the `run.log` line.
+- **Recoverability gates deletions; magnitude gates intent.** The destructive gate asks "can
+  `git checkout` undo this?", not "does this say `rm`?" — and the catalog reduce pass confirms the
+  resolved category tree with product counts even under `autonomous`, because a perfectly reversible
+  drop can still not be what the developer meant.
 - **The state file is the run.** `.ai-dev/project-setup.md` carries the answers and a Steps table
   with per-step status and intra-step progress notes, so an interrupted run resumes precisely
   instead of blindly re-running a non-idempotent deletion pass.

@@ -65,9 +65,13 @@ N1. Your project's own private code area, kept separate from the demo code **so 
 The clone ships **every service and application enabled**. These questions only ask what to turn
 **off** or **swap** — there is nothing to turn on.
 
-S1. Infra engines to swap? `(default: keep all — mariadb / opensearch / rabbitmq / valkey)`
-    Only name a swap if your hosting requires it, e.g. `search: elasticsearch`.
-    (The database/search/cache your shop runs on. The demo's choices are the Cloud-recommended ones.)
+S1. Infra engines — a **confirmation, not a choice.** The database, search, broker and key-value store
+    your shop runs on ship as `mariadb` / `opensearch` / `rabbitmq` / `valkey` — the Cloud-recommended
+    set. They are **never disablable, only swappable**: the shop cannot run without any of them.
+    `(default: keep all four)`
+    **Answer only if your hosting mandates a different engine** — e.g. `search: elasticsearch`. Blank
+    means "keep the recommended set", and nothing here can be turned off. (Turning things *off* is
+    S2 — the optional dev services.)
 S2. Optional dev services to turn OFF? `(default: keep all)`
     Available: `mail_catcher`, `swagger`, `dashboard`, `redis-gui`, `webdriver`, `scheduler`.
 S3. Swap a kept dev service's engine? `(default: no)` e.g. `mail_catcher: mailhog`
@@ -85,9 +89,19 @@ S4. Applications to turn OFF? `(default: keep all)` Each is an independent toggl
 
 ## Group T — Stores  (→ interview §4, step `define-stores`)
 
-T1. Store mode? `(default: DMS — the modern shipped default; keep unless you have a specific reason)`
+T1. *(no longer a question — your project runs Spryker's modern multi-store mode; nothing in the
+    setup supports the legacy one, so there is nothing to choose. ID kept so T2/T3 don't shift.)*
 T2. Your stores. `(default: keep the shipped demo stores — EU: DE, AT)`
     **Leaving this blank is what unlocks `leave` mode in D1** (a rebrand-only project).
+    **This is the one default the wizard confirms OUT LOUD before acting on it, in both run modes.** A
+    blank T2 resolves out of a `deploy.dev.yml` you never edited and then cascades into
+    `data.mode: leave` — and a store answer inherited from an untouched file is not an answer. So
+    before `define-stores` runs you get a plain confirmation and it waits: **"your project will ship
+    the demo stores DE/AT in region EU, and the demo data stays exactly as shipped — confirm."**
+    **Your store code is public.** It appears in **every** storefront URL as `/<STORE>/<lang>/…` and in
+    the deploy and environment tokens — shoppers see it permanently. Short uppercase codes (**2–4
+    chars**, like the shipped `DE`/`AT`/`US`) are the convention; longer ones work but ship as-is (a
+    13-char code made every URL read `/WATERDELIVERY/uk/…`).
     One row per store — a small table is ideal:
 
     | store | locales (default first) | currencies (default first) | countries | timezone |
@@ -122,6 +136,10 @@ D1. What to do with the shipped demo catalog? `(default: adapt if T2 changed sto
       present and validate the result. Do not pick this for an autonomous run.
     - `leave` — leave the demo data exactly as shipped (rebrand-only; skips all store + data work).
       **Valid only if T2 is blank / unchanged.**
+    **Not an option, and never asked:** adding a generated catalog *alongside* the demo catalog.
+    Collision-handling for that is not built — and the disposition is derived anyway: `generate`
+    against a full demo catalog **replaces the demo domain and keeps the structural skeleton**; onto a
+    `clean` base it is a plain add.
 
 D2. `only if D1 = adapt or generate` Currency → rate table (drives price conversion).
     Rates are **relative to the demo catalog's shipped base currency, `EUR`** — `USD: 1.08` means one
@@ -151,6 +169,12 @@ D3. `only if D1 = generate` The generate inputs (stores/locales/currencies come 
       CMS-block authoring with no images at all.
     - content language `(default: native — author directly in your locales, so nothing needs
       translating later)` or `english` for placeholders to translate later.
+    - **homepage banners** — how many, and what each links to `(default: one per top-level category,
+      capped at the homepage carousel's slot count)`. The wizard resolves this against the home slot
+      map and the 64/128-character title/text limits so the answer is buildable as given.
+    - **merchant portal users** — how many per merchant, and the email convention
+      `(default: 1 per merchant, <merchant-slug>@<dev-domain>)`. The generated logins are
+      **go-live debt** and are listed in the close summary.
     - merchant sellers `(default: the shipped marketplace model)` — how many sellers per product and
       their names, or say `single-seller` for a simpler shop. Each additional seller is a distinct
       merchant (not one merchant selling the same product twice in the buy box).
@@ -160,8 +184,14 @@ D3. `only if D1 = generate` The generate inputs (stores/locales/currencies come 
 C1. `only if D1 = adapt` Does the project sell the whole demo catalog, or only part of it?
     `(default: keep all — most projects keep everything, the demo catalog is a placeholder they
     replace later)`
-    If a subset: say what to **keep or remove**, at the level you think in — usually category, e.g.
-    `remove: office-supplies, transport` or `keep: heat-recovery`.
+    If a subset: name the **top-level categories to remove**, e.g.
+    `remove: office-supplies, transport`.
+    **The wizard reads `category.csv` first and offers the branches BY NAME WITH THE PRODUCT COUNT
+    under each** — "Office (388)", "Transport (26)" — so you are choosing a *set*, not a label. A
+    themed phrase ("only heating & energy") is never acted on unresolved: the wizard shows you which
+    branches and counts it maps to and asks you to confirm that tree. If the resolved drop removes more
+    than ~50% of the catalog, or empties a branch you named as kept, it asks again **even in
+    `autonomous` mode** — that is intent verification, not a configuration question.
     This runs **pre-boot**, so the first boot imports the reduced set (no reset needed).
 
 ## Group L — Localization  (→ interview §7, step `translate-content`)
@@ -202,9 +232,19 @@ R1. `[REQUIRED]` Mode — `autonomous` or `collaborative`:
 
 R2. `[REQUIRED]` Acknowledge the hard-stops (they apply in **both** modes — autonomy never overrides
     them). Answer `ack`:
-    - **deletions and data-destroying actions** — the CI file wipe, removing demo region dirs and
-      dangling manifests, data strip passes, any DB/volume drop, `sudo`. You get the concrete blast
-      radius (the file list, the row/column count) and must say go.
+    - **irrecoverable actions** — anything `git checkout` cannot undo: any DB/volume drop
+      (`reset`/`clean-data`), `sudo`, publishing outside the clone, deleting untracked files, and any
+      data deletion after the first boot. You get the concrete blast radius (the file list, the
+      row/column count, what the drop wipes) and must say go. **Recoverable** pre-boot edits and
+      deletions — on a still-un-booted clone, on git-tracked paths, before any data is imported — run
+      on their own and are logged with their before→after counts and a literal revert command.
+    - **magnitude of intent** — a catalog reduction that removes an outsized share of the products is
+      confirmed against the resolved category set **even in `autonomous` mode**. That is not a
+      configuration question; it is the wizard checking it understood you.
+    - **standing approval, if you grant one** ("I approve all actions except commit and push") — it is
+      recorded in the state file with its scope, each covered act is still **announced** in one line,
+      and it **never** covers `reset`/`clean-data`/a volume drop or any post-boot data deletion: those
+      are re-announced with their blast radius and re-approved every time.
     - **human-only prerequisites** — starting Docker/OrbStack, the `/etc/hosts` line, supplying a
       GitHub token. The wizard cannot do these for you.
     - **a step failure** — it stops with guidance rather than pressing on.
@@ -247,7 +287,6 @@ N1: Acme                 # or Pyz, or `custom`
 S1:                      # engine swaps, blank = keep all
 S2: [swagger]            # dev services OFF
 S4: [static]             # applications OFF
-T1: dms
 T2: |
   | store | locales | currencies | countries | timezone |
   |---|---|---|---|---|

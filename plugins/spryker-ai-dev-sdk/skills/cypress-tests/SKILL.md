@@ -75,6 +75,11 @@ matching a neighbour is faster than deriving conventions from scratch:
    duplicating selector logic is the thing this structure exists to prevent.
 3. **Skim `references/conventions.md`** for the naming and locator rules if you're unsure
    where a new file goes or what to call it.
+4. **Record a baseline before you author anything.** `npm run cy:run` once, or at minimum the
+   specs that share the page objects, cy-commands and scenarios you plan to touch, and write
+   down which ones are already red. On an already-red suite "fails before, passes after" proves
+   nothing, and a pre-existing failure gets reported as a bug against your new work — that has
+   happened. The baseline is what lets you name the pre-existing failures in the final report.
 
 ## Step 2 — Create a test
 
@@ -89,7 +94,8 @@ matching a neighbour is faster than deriving conventions from scratch:
    `references/test-data.md`.
 3. **Type the fixtures** in `cypress/support/types/<app>/` and read them via
    `getFixtures<TDynamic, TStatic>()` in a `before` hook — that turns a fixture typo into a lint
-   error instead of a runtime `undefined`.
+   error instead of a runtime `undefined`. Re-export the new type file from that directory's
+   `index.ts` barrel, like its neighbours; skipping it is a separate broken-import fix later.
 4. **Write the spec** using `@support/*` and `@fixtures/*` aliases, with page-object calls for
    the steps and assertions on meaningful values taken from the fixtures (product name, price,
    order status) — not `.should('exist')` alone. An assertion should say what broke.
@@ -130,10 +136,31 @@ item yourself — don't report a test as complete without having run these:
 - [ ] **No selectors in the spec** — no `cy.get()`/`cy.visit()` in a `.cy.ts` file; no
   positional CSS, generated class hashes, or XPath anywhere.
 - [ ] **No fixed `cy.wait(<number>)`** — raise the timeout on the specific slow getter, or wait
-  on an intercepted alias. Fixed sleeps are the main source of CI-only flake.
-- [ ] **Data is declared, not assumed** — no hardcoded SKUs, emails, or prices that must
-  pre-exist; values come from the fixture pair and `.envs/`.
+  on an intercepted alias. Fixed sleeps are the main source of CI-only flake. The inverse is
+  mandatory too: every **ajax state mutation** (cart quantity, wishlist, shopping list) waits on
+  an intercepted 2xx, and any value money or checkout depends on is re-read after a `visit()` —
+  see `references/conventions.md` § Optimistic UI vs. persisted state. Skipping it produces a
+  passing assertion and a wrong order.
+- [ ] **Data is declared, not assumed** — no data whose existence the spec doesn't control:
+  values come from the fixture pair, `.envs/`, or the resolved store context. A project-seeded
+  catalog SKU is allowed only under the three conditions in `references/test-data.md`
+  § Choosing dynamic vs. static, and never inline in the spec.
 - [ ] **Assertions are specific** — each checks a real value, and a failure message would tell
   you what actually broke.
+- [ ] **Blast radius covered** — a change under `support/cy-commands/`, `support/page-objects/`,
+  `support/scenarios/` or `support/fixture-helper/` is not a one-spec change. `grep -rl <symbol>
+  cypress/e2e` and run **every** spec that uses it (`--spec "a.cy.ts,b.cy.ts,…"`), not only the
+  spec you wrote. One currency-helper fix reached 6 specs across all four apps and none of them
+  were re-run.
 
 If an item fails, fix it before reporting the test as done.
+
+Then **report the choices, not just the result** — this phase silently decides things that have
+more than one supportable answer, so state them:
+
+- The **fixture strategy**: generated data or a project-catalog SKU, and if the latter, the
+  coupling risk it carries (a catalog change breaks the spec).
+- Every **shared primitive** touched, and which specs you re-ran for it.
+- Which failures **pre-existed** your change, from the Step 1 baseline.
+
+A report that omits these hands the reviewer a test they can't evaluate.

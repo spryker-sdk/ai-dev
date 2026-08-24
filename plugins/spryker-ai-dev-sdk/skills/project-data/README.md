@@ -120,6 +120,11 @@ first.
 - **A finished project contains only its own stores, locales and currencies.** The add half
   (`duplicate-columns`) and the drop half (`drop-columns --suffix`) must be symmetric — reused demo
   files carry foreign `.<locale>` columns and `locale` rows that a green boot never flags.
+- **A blank per-locale cell is a finding; every row of a rewritten structural file must be accounted
+  for.** Two invariants the suite kept re-learning file by file: an empty `.<locale>` cell is a defect
+  unless a named importer inherits it (locale buckets are all-or-nothing), and a rewrite that touches
+  only the rows the brief named silently drops the rest — a "replace the 3 category links" brief wiped
+  the footer's legal links, social icons and payment logos, on a green boot.
 - **Keep the shipped import dependency order — never reorder it.** Reordering breaks it two ways: a
   store's `locale-store` after the catalog leaves a silently empty store; `currency-store` hoisted
   above `currency` aborts with `Currency not found`.

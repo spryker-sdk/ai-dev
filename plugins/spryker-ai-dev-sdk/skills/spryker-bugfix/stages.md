@@ -241,8 +241,19 @@ Turn the context into a crisp problem statement before touching code:
 - **What is reported** (verbatim symptom), **affected actor/surface**, **environment**.
 - **Provisional scope** — which module(s)/layer(s) likely involved (a guess to focus Step 3, not a
   commitment).
+- **`size`** — record it in the State Object: `trivial` (≤~10 changed lines in **1** file), `normal`, or
+  `complex` (multi-module / cross-layer / data-touching). It is an estimate here; **re-check it against
+  the real `git diff --stat` after Step 5** and update the State Object. It scales gate *weight*
+  downstream — Step 8's reviewer fan-out (`trivial` → 1, `normal` → the default 3–5, `complex` → 5) and
+  Step 9's QA scope.
 
 Keep this short. It exists so the later stages — and any subagents — share the same framing.
+
+**Gate weight scales, gate existence does not.** `size` changes how much machinery a gate spends, never
+whether it runs: on a one-line fix, tests, static, review, QA, Cypress (per its own condition) and the
+Step 10 final verification all still execute and still report their verdict honestly. "It's trivial" is
+never a reason to skip a step — that is a red flag, not a proportional mode
+([reference.md](reference.md) § Red flags).
 
 ## Step 2 — Create the bugfix branch (with safety check)
 
@@ -284,6 +295,26 @@ ticket, use `bugfix/no-ticket/brief-name`** and note it — the ticket is option
 (no JIRA key), rename `$BUGFIX_DIR` to `$PROJECT_DIR/.ai-dev/spryker-bugfix/no-ticket-<brief-name>/`,
 update `BUGFIX_DIR`/`BUGFIX_LOG`, and append the Step 2 boundary line. From here on, every run file stays
 under this stable folder.
+
+### Dirty-branch override (the sanctioned path after an override)
+
+The clean-tree gate **stays** — it is still surfaced, and still asked/aborted on. But real work often
+sits on a dirty branch, so when the developer overrides it there is a sanctioned path, and following it
+is not a deviation:
+
+- **Record the bug's file list** in the State Object as `scoped_paths` — the files this fix owns — plus a
+  one-line note of what unrelated changes were already in the tree.
+- **Scope Step 8** to those paths: hand `Skill(code-review)` that explicit file list as the review
+  target instead of `base...HEAD`, and treat findings outside it as out-of-scope.
+- **Narrow Steps 9 and 10** to the flows those paths affect. Pre-existing breakage from the unrelated
+  changes is reported separately — never as a gate failure of this fix, never inside the attempt budget.
+- **Say it in the Step 12 report:** which gates were scoped and to exactly which paths. A scoped green
+  is not a full green, and the report must not read like one.
+- **Known limitation:** `static-check-diff.sh` exposes no per-path option (`--repo`, `--base`, `--scope`,
+  `--tools`, `--include-tests`, `--fix`, `--dry-run` only), so Step 7 and any diff-based reviewer still
+  inherit the whole `base...HEAD` + working-tree diff. Scoping is therefore **by reviewer instruction,
+  not by a tool flag** — expect violations from unrelated files in the static output and triage them as
+  out-of-scope in the report instead of fixing them in this run.
 
 ## Step 3 — Reproduce & understand the bug
 
@@ -366,11 +397,22 @@ root-cause `file:line`, the changed files, and the repro scenarios; instruct it 
   `codeception.yml` — otherwise the first `codecept run` fails because the testing container/bootstrap
   isn't ready and an attempt is burned for an avoidable reason. Build the suite first if the module had
   none (`module-test-infrastructure` rule).
+- **Run the affected suite once BEFORE authoring anything (baseline).** The existing suite is not
+  assumed green: establish its colour first, because "fails before the fix, passes after" is
+  **meaningless on an already-red suite**. If the baseline is red — missing test-container wiring (e.g.
+  no `request_stack` service), a suite that never existed, unrelated failures — **attribute it before
+  concluding**: re-run those same failures against the pre-fix state (stash the diff, or run on the base
+  ref). Still red without the fix ⇒ **pre-existing rot**; red only with it ⇒ **fix-induced**, and it
+  indicts the fix like any other Step 6 failure. Record rot in the State Object as `pre_existing_rot`
+  (failing test names + the one-line cause), report it as its own line in Step 12 separate from the fix,
+  and treat repairing it as a **separately scoped decision** — it never consumes the 3-attempt budget and
+  never counts as a gate failure of this fix.
 - Prefer a regression test that **fails without the fix and passes with it** (prove it against the
   pre-fix state when feasible — the strongest evidence a fix actually addresses the bug).
 - Follow the skill's conventions (entry-point focus, AAA, helpers, correct suite name, `-c <dir>`,
   single-colon method filter).
-- **Write the full run to `$BUGFIX_DIR/tests-attempt<N>.log`** and return only: `pass|fail`, counts,
+- **Write the full run to `$BUGFIX_DIR/tests-attempt<N>.log`** and return only: the **baseline verdict**
+  (`green`, or `red` + which tests + the one-line cause), then `pass|fail`, counts,
   the path(s) of any test file it created/edited, and — if failing — the failing test names + the
   one-line assertion message each.
 
@@ -387,7 +429,11 @@ interim check `sh .claude/bash-local/validation.sh` is fine; the skill is the au
 
 ## Step 8 — Code review  ← GATE (loops back to Step 4)
 
-1. Run **`Skill(code-review)`** — it fans the diff out to `spryker-code-reviewer` subagents. Have the
+1. Run **`Skill(code-review)`**, passing the State Object's **`size`** so the fan-out scales — `trivial`
+   → **1** reviewer, `normal` → the default **3–5**, `complex` → **5** — and, if the Step 2 clean-tree
+   gate was overridden, the `scoped_paths` file list as the review target. A smaller fan-out is a
+   lighter gate, never a skipped one: the review still runs and its blocker/major findings still gate.
+   It fans the diff out to `spryker-code-reviewer` subagents. Have the
    review write its full findings to `$BUGFIX_DIR/review-attempt<N>.md` and surface back to the
    orchestrator only the **blocker/major** items (≤5, each: `file:line` + one-line issue). Nits stay in
    the file. The orchestrator keeps only that short blocker/major list in the State Object.
@@ -421,6 +467,10 @@ install, twig path-cache reset), the ticket key/description (whichever the run h
 return the full report.
 
 - QA must verify the **user-visible symptom is gone E2E** (not just a server-layer workaround).
+- **Scale the scope, not the gate.** For `size: trivial`, scope the QA request to the **single affected
+  flow** (the repro scenario plus what it directly touches) and say so in the request; for `complex`,
+  keep the full surrounding-feature sweep. Either way QA runs independently and returns an explicit
+  accept/reject — a small diff never converts this gate into a self-assessment.
 - **Accepted** → continue. **Rejected** (a real failure found) → treat like a Step 8 failure: return
   to Step 4 within the 3-attempt budget; if exhausted, STOP and report.
 
@@ -627,7 +677,11 @@ present a concise report to the user containing, in this order:
    genuinely empty.
 5. **Gate status** — tests / static / review / QA / Cypress E2E (run, skipped-with-reason, or off) /
    final verification / remote CI, each green/red with
-   the real result (never report green what wasn't).
+   the real result (never report green what wasn't). Also state, in one line each when they apply:
+   the **`size`** the gates were weighted for (e.g. "trivial — 1 reviewer, QA scoped to the login flow");
+   the **scoping** if the Step 2 clean-tree gate was overridden (which gates, and to exactly which
+   paths — a scoped green is not a full green); and **`pre_existing_rot`** as its own line, kept
+   separate from this fix's gates and never presented as caused by the change.
 6. **Extra expectations** — if the user set any Step 0 delta from the standard scope, confirm how each
    was handled (done / partially / not done + why). Omit this line only if there were none.
 7. **Log file path** — print the absolute path to the step log (`$BUGFIX_LOG`) and the decision log so

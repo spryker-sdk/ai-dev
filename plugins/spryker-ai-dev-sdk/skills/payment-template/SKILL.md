@@ -334,6 +334,14 @@ vendor/bin/spryker-ci spryker-ci --current
 
 Fix all errors before continuing to the next section. CI is a gate, not a checkpoint.
 
+**`--current` only sees COMMITTED work — stage or commit before running it.** It derives its module
+set from `git diff master...`, so on an uncommitted working tree it analyses **zero files and exits
+green**. Failure signature: a suspiciously fast green with **no module list** in the output — that is
+"nothing analysed", not "nothing wrong". Either commit the section first (the commit checkpoints in
+Phase 4 already give you the boundaries) or run the module-scoped direct gates instead. The
+authoritative diff gate is `Skill(static-validation)`: it collects committed, uncommitted **and**
+untracked files, so it is the one to trust while a section is still in flight.
+
 After any schema file change run:
 
 ```bash

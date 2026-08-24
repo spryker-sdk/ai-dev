@@ -8,12 +8,21 @@ The developer keeps only part of the demo catalog (e.g. "drop the office-supplie
 
 You supply the judgment (which categories/products, which columns are real product refs).
 
-## The method — keep-set → scan → prune → verify → (only then) boot
+## The method — keep-set → confirm the set → scan → prune → verify → (only then) boot
 
 ### 1. Fix the KEEP set (the source of truth)
 Decide keep-vs-remove at the level the developer stated (usually **category**), then resolve it to the concrete product SKUs that survive:
 - Filter the product spine to the kept products first: `product_abstract.csv` and `product_concrete.csv`. If removal is by category, first find the kept abstract SKUs from the category→product assignment (`product_category.csv` / category keys), then `php "$CSV" filter <product_abstract.csv> --in abstract_sku=<kept…>` (or `--in-file` for a large set) `--in-place`, and the same for concretes (keep concretes whose `abstract_sku` is kept).
 - After this, **the two product files ARE the kept-set**: the distinct `abstract_sku` in `product_abstract.csv` ∪ the distinct `concrete_sku` in `product_concrete.csv` = every valid product token. The scanner reads them directly — you don't maintain a separate list.
+
+### 1b. Confirm the resolved SET — before a single row is pruned
+The operator answered a question about *categories*; what you are about to delete is a *product set*. Reconcile the two here, once, cheaply — the alternative is a full adapt+reduce replay after the whole cascade has run.
+
+- **Render the resolved keep/drop tree by name with per-branch product counts** (`Office (388) → DROP`, `Heating & Energy (29) → KEEP`, totals `464 → 29`) and **confirm it**. Never confirm a themed label ("only heating & energy") — confirm the branches it resolved to.
+- **Disproportion gate — ASK even under `run_mode: autonomous`** if the drop removes **more than ~50% of products**, or **empties a top-level branch the operator named as kept**. Frame it explicitly as **intent verification, not a configuration question**: "this removes 435 of 464 products (94%) — is that what you meant?" This is the wizard's *magnitude-of-intent* gate, which `project-starter-wizard` SKILL.md §3 states is separate from the recoverability-based destructive-op gate — so asking here is **not** the mode violation §3 otherwise forbids. Failure signature: a reduce that cut 94% of the catalog on an intent of "remove only Office".
+- **Feature-coupling check — a category can own a shipped FEATURE, not just products.** Before removing a category, grep the deploy file and the install recipes for entry-points and build steps naming it (`*-configurator` applications, `frontend:*-configurator:build` steps) and check whether `product_configuration.csv` / `configurable_bundle_template*` reference its products. **Report every hit in the confirmation** — removing `process_technology` orphaned the shipped Water Treatment Configurator while `deploy.dev.yml` still published its host, so the boot came up green serving a dead feature. A hit is not an automatic stop; it is a disposition the operator must see (drop the feature too, or keep the branch).
+
+**The economics:** this confirmation costs one exchange now; getting it wrong costs the whole cascade — prune, reconcile, verify, then adapt+reduce again from a re-checkout.
 
 ### 2. Broad orphan scan — discover EVERY referencing file (don't curate a list)
 A hand-picked file list misses sku-bearing importers (`product_shipment_type`, `product_stock`, `product_measurement_base_unit`, `product_packaging_unit`, `product_abstract_approval_status`, and more) → a fresh boot-abort for each miss. **Use the scanner instead of guessing:**

@@ -55,6 +55,14 @@ Keep this small block current in your head and mirror it into the step log. Ever
   skipped, not attempted.
 - **Extra expectations** — any Step 0 delta from the standard scope (e.g. "also update JIRA", "fix
   related bugs too", "single module only"), so every later step honors it without re-asking.
+- **`size`** — `trivial` (≤~10 lines, 1 file) / `normal` / `complex`, set at Step 1 and re-checked
+  against the real diff after Step 5. It scales gate **weight** only — Step 8's reviewer count, Step 9's
+  QA scope. **Gate existence never scales.**
+- **`scoped_paths`** — set only when the Step 2 clean-tree gate was **overridden** on a dirty branch: the
+  file list this fix owns. Steps 8/9/10 are scoped to it and Step 12 must state that they were.
+- **`pre_existing_rot`** — the Step 6 baseline result when the affected suite was **already red before
+  the change**: failing test names + the one-line cause. Reported separately from the fix; repairing it
+  is its own scoped decision and never consumes an attempt.
 - **Repro:** 1–3 line scenario summary + path to the full repro notes file.
 - **Root cause:** the `file:line` references + one-sentence defect explanation.
 - **Diff:** `git diff --stat` summary (files + ±lines), not the diff body.
@@ -152,6 +160,15 @@ value) and whenever you make a non-obvious choice — do not wait until the end.
 - "Autonomous means I can also change permissions / delete data / merge the PR" → No. Autonomous
   authorizes the *bugfix-to-Draft-PR* path only; prohibited actions stay prohibited.
 - "Skip QA, the gates are green" → No. Independent QA acceptance is a required stage.
+- "It's a one-line fix, the review fan-out / QA / final verification is overkill" → Half right, and the
+  wrong conclusion. Scale the gate's **weight** via Step 1's `size` (1 reviewer instead of 3–5, QA
+  narrowed to the single affected flow) — never its **existence**. Deviating from a gate because the
+  diff is small is exactly the habit this list exists to prevent.
+- "The suite was already red, so my test proves nothing" → Correct, which is why Step 6 runs the
+  affected suite **before** authoring. "Fails before the fix, passes after" is unverifiable on an
+  already-red baseline, so establish the colour first: record a red baseline as `pre_existing_rot`,
+  report it separately from the fix, and repair it as its own scoped decision — never inside the attempt
+  budget, never counted as a fix-induced failure.
 - "Skip the final verification, tests and QA already passed" → No. Step 10 drives the running app one
   last time before commit and is a required gate; a FAIL loops back to Step 4 within the budget.
 - "In Autonomous mode I should ask the user which fix / whether this is in scope" → No. After Step 0,

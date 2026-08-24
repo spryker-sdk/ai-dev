@@ -161,7 +161,7 @@ Read the PRD / acceptance criteria. **Restate them as a numbered AC checklist**,
 
 Build the plan from the expert findings. For each AC, the plan covers:
 
-- **Files to edit** — project layer only — under the project's namespace directories in `src/`, never `vendor/`. Find the project namespaces via `composer.json` `autoload.psr-4`; there may be more than one.
+- **Files to edit** — project layer only — under the project's namespace directories in `src/`, never `vendor/`. Find the project namespaces via `composer.json` `autoload.psr-4`; there may be more than one. **When there is more than one, precedence decides — write to the highest-precedence namespace** (`KernelConstants::PROJECT_NAMESPACES[0]` in `config/Shared/config_default.php`, i.e. `src/<Ns>/…`) and **extend** the `Pyz` counterpart class rather than editing `src/Pyz` in place; extend core only when no Pyz counterpart exists. Editing the `Pyz` class instead is not merely "the wrong file": the higher-precedence namespace still resolves first, so **the Pyz overrides you just wrote are silently dropped** — nothing errors, the app just keeps the old behaviour. *Failure signature:* the change is verifiably in `src/Pyz/…` and verifiably absent from the running behaviour, and a `src/<Ns>/…` sibling of the same class exists. (Single-namespace / `Pyz`-only projects: `src/Pyz` **is** the project layer — edit it directly.)
 - **Post-change commands** required — delegated to `spryker-refresher`.
 - **Verification approach** — UI / API / DB / console (what `spryker-verifier` will exercise).
 

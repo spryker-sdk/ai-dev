@@ -176,6 +176,18 @@ running session loaded its MCP servers at startup and will not pick up the new o
 two optional additions: the `php-lsp@claude-plugins-official` language-server plugin, and a Context7
 MCP server for Spryker documentation.
 
+Two report blocks are **mandatory and never trimmed**:
+
+- **Commit the onboarding artifacts first.** Onboarding necessarily dirties the clone — tracked
+  `composer.json`, `composer.lock`, the edited `ConsoleDependencyProvider.php`; untracked `CLAUDE.md`,
+  `.claude/rules/`, `.ai-dev/`. `project-starter-wizard` hard-stops on any tracked modification, so the
+  report hands over the commit line and suggests `.ai-dev/` in `.gitignore`. Skipping it means the
+  user's next wizard run aborts on files this skill created.
+- **What to do next.** `/spryker-ai-dev-sdk:project-starter-wizard` for a new project;
+  `/spryker-ai-dev-sdk:spryker-customization` (or `…:product-requirement-document` first) for feature
+  work on an existing one — both after the session restart. Full index:
+  `plugins/spryker-ai-dev-sdk/README.md`.
+
 ## What it escalates instead of forcing
 
 - A `composer require` version conflict — surfaced, never force-installed with `--ignore-platform-reqs`

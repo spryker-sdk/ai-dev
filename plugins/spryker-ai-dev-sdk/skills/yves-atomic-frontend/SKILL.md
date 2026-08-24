@@ -93,6 +93,7 @@ Every component extends the component model:
 - Use `only` in includes to prevent scope leakage
 - Use `{% block body %}` as the main content block
 - Reference siblings: `atom('name')`, `molecule('name', 'ModuleName')`, `organism('name', 'ModuleName')`
+- `| trans` takes a **glossary key** (`cart.item.add`), **never a human sentence**. `{{ 'Add to cart' | trans }}` renders perfectly in English — the translator echoes the unknown key — and silently renders English in every other locale, so it is a latent i18n bug that no glossary or translation work can fix. Failure signature: a non-English storefront page showing fluent English strings with no raw dot-notation keys visible. Author the glossary row (`key,translation,locale`) alongside the component, in the same change.
 
 ### 3. Create the SCSS
 

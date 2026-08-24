@@ -63,6 +63,12 @@ flowchart TD
 
 ## Usage
 
+**Prerequisite for every command below: the stack must be booted with `docker/sdk up -t`.** Without
+`-t` there is no testing container, `SPRYKER_TESTING_ENABLED` is unset, and `docker/sdk testing …` is
+a **silent no-op** — codeception drops into a phantom `devtest` env and the output reads as project
+failures with nothing naming the cause. A running plain stack upgrades non-destructively: re-run
+`docker/sdk up -t`, no reset needed.
+
 ```bash
 # Build tester actions — required after a new module, new helper, or a codeception.yml change
 docker/sdk testing codecept build -c path/to/codeception.yml
@@ -88,6 +94,10 @@ docker/sdk testing console transfer:databuilder:generate
 
 - **Directory structure** for `tests/{PyzTest,SprykerTest}/` across Zed, Client, Service, Glue,
   Shared, and Yves — including where `_support/Helper/` and `_support/PageObject/` go.
+- **The project-namespace case**: on a project with a custom namespace the tests live in
+  `tests/<Ns>Test/**`, every suite config carries `projectNamespaces: ['<Ns>', 'Pyz']` (project
+  first = highest precedence, or the suite silently tests `src/Pyz`), and `<Ns>Test` cests need
+  hand-written `@group` blocks — the upstream sniff only generates them for `SprykerTest|PyzTest`.
 - **Module tester** at `tests/SprykerTest/[Layer]/[Module]/_support/[Module][Layer]Tester.php`, with
   the `have[Entity]()` / `see[Entity]()` method convention and the `@method` docblock that types
   `getFacade()` / `getFactory()`.

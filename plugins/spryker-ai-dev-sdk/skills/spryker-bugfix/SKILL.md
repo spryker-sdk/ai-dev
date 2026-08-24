@@ -99,11 +99,17 @@ handle the env-reset decision, and — only if a ticket was given and its tracke
 ticket for extra context. Read [stages.md](stages.md) § Step 0 before executing this stage.
 
 **Step 1 — Intake & framing.** Turn the context into a crisp problem statement: verbatim symptom,
-affected actor/surface, environment, provisional module/layer scope. Keep it short — it aligns
+affected actor/surface, environment, provisional module/layer scope, and the diff **`size`**
+(`trivial` ≤~10 lines in 1 file / `normal` / `complex`, re-checked against the real diff after Step 5).
+`size` scales the Step 8 reviewer fan-out and the Step 9 QA scope: **gate weight scales, gate existence
+does not** — every gate still runs on a one-liner and still reports honestly. Keep it short — it aligns
 later stages and subagents. Read [stages.md](stages.md) § Step 1 before executing this stage.
 
 **Step 2 — Create the bugfix branch. ← SAFETY GATE.** Verify a clean tree and an up-to-date base
-first; if dirty/stale, ask (Collaborative) or abort with a report (Autonomous). Branch
+first; if dirty/stale, ask (Collaborative) or abort with a report (Autonomous). If the developer
+**overrides** the clean-tree gate, take the sanctioned dirty-branch path: record the bug's file list as
+`scoped_paths`, scope Steps 8/9/10 to it, and state in the Step 12 report which gates were scoped and to
+what. Branch
 `bugfix/<jira-key>/<brief-kebab-name>` (lowercase; `no-ticket` fallback), then finalize
 `$BUGFIX_DIR`. Read [stages.md](stages.md) § Step 2 before executing this stage.
 
@@ -125,9 +131,12 @@ and confirm the symptom is gone with the same evidence. Read [stages.md](stages.
 executing this stage.
 
 **Step 6 — Functional test coverage (subagent).** One subagent with `Skill(codecept-functional)`:
-enter testing mode first, add/update a regression test (ideally fails without the fix, passes with
-it), write the run log to `$BUGFIX_DIR`, return only the pass/fail verdict + test paths. Confirm
-green before moving on. Read [stages.md](stages.md) § Step 6 before executing this stage.
+enter testing mode first, **run the affected suite once as a baseline before authoring** (an
+already-red suite makes "fails before, passes after" meaningless — record it as `pre_existing_rot`,
+report it separately, repair it as its own scoped decision outside the attempt budget), add/update a
+regression test (ideally fails without the fix, passes with
+it), write the run log to `$BUGFIX_DIR`, return only the baseline verdict + pass/fail verdict + test
+paths. Confirm green before moving on. Read [stages.md](stages.md) § Step 6 before executing this stage.
 
 **Step 7 — Static validation (subagent).** Subagent runs `Skill(static-validation)`
 (phpcbf/phpcs/phpstan on the diff), fixes and re-runs until clean, returns `clean` or the
