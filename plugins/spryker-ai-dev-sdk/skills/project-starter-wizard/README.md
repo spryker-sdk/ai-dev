@@ -1,6 +1,6 @@
 # project-starter-wizard
 
-Turn a **fresh, un-booted clone of a Spryker b2b / b2b-marketplace demoshop into the customer's
+Turn an **unmodified clone of a Spryker b2b / b2b-marketplace demoshop into the customer's
 project** — the setup decisions collected once up front, then nine orchestrated steps to a verified
 running shop.
 
@@ -28,20 +28,25 @@ questionnaire" and "here are my filled answers — run it autonomously". It is *
 entry** — if a prior run left `.ai-dev/project-setup.md`, invoking it skips collection entirely and
 continues from the first step that isn't `done` or `skipped`.
 
-Not for an already-booted or dirty clone with no state file — that stops with the
-**"Return to fresh" recipe**, never a bare refusal.
+**The gate is "still an unmodified demoshop?", not "un-booted".** A **booted** demoshop is fine (the
+run just needs a `clean-data` + re-boot for the data changes to land), and so is the AI Dev SDK's own
+onboarding delta (`composer.json`/`composer.lock`/`ConsoleDependencyProvider.php`, plus `.ai-dev/`,
+`CLAUDE.md`, `.claude/`) — no commit required. What stops the run is a clone **already customized into
+a project**: tracked changes under `src/`/`data/import/`/`config/`, a registered custom namespace,
+stores already changed, or real business data. That stops with the **"Return to fresh" recipe**, never
+a bare refusal.
 
 ## Flow schema
 
 ```mermaid
 flowchart TD
-    A([Invoked on a clone]) --> P["0 · Pre-flight<br/>flavor · fresh · un-booted<br/>docker volume collision<br/>ports · composer auth · disk<br/>.git.docker SDK pin · inventory"]
+    A([Invoked on a clone]) --> P["0 · Pre-flight<br/>flavor · unmodified demoshop?<br/>docker volume collision<br/>ports · composer auth · disk<br/>.git.docker SDK pin · inventory"]
 
     P --> PS{"State file<br/>.ai-dev/project-setup.md<br/>exists?"}
     PS -- "yes" --> RES["Resume<br/>re-read run_mode<br/>skip to first step<br/>not done/skipped"]
-    PS -- "no" --> PF{"Fresh &amp;<br/>un-booted?"}
+    PS -- "no" --> PF{"Still an unmodified<br/>demoshop?<br/>(booted is fine)"}
 
-    PF -- "no" --> STOP([Stop + hand over<br/>the Return-to-fresh recipe])
+    PF -- "no · already a project" --> STOP([Stop + hand over<br/>the Return-to-fresh recipe])
     PF -- "yes" --> Q{"1 · Answers supplied?<br/>references/questionnaire.md<br/>(interview.md Rule 0)"}
 
     Q -- "filled<br/>P1+R1+R2" --> FILL["Skip the interview<br/>blanks → shipped defaults<br/>log INTERVIEW | SKIP"]
@@ -84,7 +89,7 @@ flowchart TD
     MODE -- "autonomous · reversible" --> LOG["Decide, log to<br/>.ai-dev/decision-log.md,<br/>keep going"]
     MODE -- "collaborative · step boundary" --> ASK["Ask 'Continue to next step?'<br/>and wait"]
     MODE -- "⚠ ACTION NEEDED<br/>(both modes)" --> HUMAN["Wait for the developer<br/>Docker · /etc/hosts · token"]
-    MODE -- "irrecoverable action<br/>or outsized magnitude<br/>(both modes)" --> HUMAN2["Present blast radius,<br/>get explicit go-ahead"]
+    MODE -- "irrecoverable action<br/>(both modes; reset/clean-data<br/>exempt during setup)" --> HUMAN2["Present blast radius,<br/>get explicit go-ahead"]
     MODE -- "step failure" --> FAIL([Stop with guidance,<br/>state file records where])
 ```
 
@@ -106,7 +111,7 @@ The wizard runs these in this exact order; each links to its own README.
 | 1 | [project-ci-generator](../project-ci-generator/README.md) | Pre-boot, first — executes interview §8's `ci:` plan; owns a dropped suite's whole footprint. |
 | 2 | [configure-codebase](../configure-codebase/README.md) | Namespace + FE/test wiring; skipped on `keep-pyz`. |
 | 3 | [brand-project](../brand-project/README.md) | Identity half only — theming half runs in step 8. |
-| 4 | [configure-services](../configure-services/README.md) | Engines, dev services, applications into `deploy.dev.yml`. |
+| 4 | [configure-services](../configure-services/README.md) | Dev services and applications into `deploy.dev.yml` (engines are fixed). |
 | 5 | [define-stores](../define-stores/README.md) | Region + store definitions; skipped if `data.mode = leave`. |
 | 6 | [project-data](../project-data/README.md) | Strategy by `data.mode`: adapt / clean / generate / leave. |
 | 7 | [cypress-migration](../cypress-migration/README.md) | E2E infra; last pre-boot because it reads steps 1, 3, 4, 5 and 6's output. |
@@ -130,10 +135,11 @@ resume. Same work either way — only the check-in cadence differs.
   It also asks the questionnaire's blanks instead of resolving them.
 
 Neither mode relaxes the hard-stops — this is what `R2` acknowledges: a `⚠ ACTION NEEDED`
-prerequisite, any **irrecoverable** action (what `git checkout` cannot undo — a DB/volume drop,
-`sudo`, deleting untracked files, any post-boot data deletion), a catalog reduction of outsized
-**magnitude**, and a step failure all return control to the developer in **both** modes. **A filled questionnaire is not a promise of an uninterrupted run**;
-it's a promise of no further *configuration* questions.
+prerequisite, any **irrecoverable** action (`sudo`, publishing outside the clone, deleting untracked
+files, destructive operations on a project that already carries real data — `reset`/`clean-data`
+during first setup are **not** gated), and a step failure all return control to the developer in
+**both** modes. **A filled questionnaire is not a promise of an uninterrupted run**; it's a promise of
+no further *configuration* questions.
 
 ## Design decisions baked in
 
@@ -151,17 +157,18 @@ it's a promise of no further *configuration* questions.
   namespace collision check in particular is re-run as soon as the project name is known.
 - **Communication is load-bearing, not cosmetic.** A required human action leads the message as a
   single `⚠ ACTION NEEDED:` line, alone, above any status — a prerequisite buried under a
-  validation table reads as status, and the run stalls on an unread ask. Every control-returning turn
-  then **closes** with exactly one of `⚠ NEEDS YOU:` (numbered exact commands, each with the cost of
-  declining) or `✅ NEEDS NOTHING`; "Ready when you are" is banned, because it hands back control
-  without saying what is needed.
+  validation table reads as status, and the run stalls on an unread ask. In `autonomous` a turn that
+  needs nothing **doesn't return control at all** — it continues in the same message; control comes
+  back only for a blocking human action, closing with `⚠ NEEDS YOU:` (numbered exact commands, each
+  with the cost of declining). The `✅ NEEDS NOTHING — say "continue"` close is `collaborative`-only.
+  "Ready when you are" is banned in both, because it hands back control without saying what is needed.
 - **An autonomous stall and a verbose step report are the same defect.** A message shaped like a
   finished deliverable is what ends the turn — so a step report is capped at three lines and the next
   skill's call must land in the *same* message as the state-file update and the `run.log` line.
-- **Recoverability gates deletions; magnitude gates intent.** The destructive gate asks "can
-  `git checkout` undo this?", not "does this say `rm`?" — and the catalog reduce pass confirms the
-  resolved category tree with product counts even under `autonomous`, because a perfectly reversible
-  drop can still not be what the developer meant.
+- **Recoverability gates deletions; catalog scope is settled in the interview.** The destructive gate
+  asks "can `git checkout` undo this?", not "does this say `rm`?" — and `reset`/`clean-data` during
+  first setup aren't gated at all. The resolved category tree with product counts is confirmed once,
+  when the answers are collected; the reduce pass reports it and prunes, never re-asking mid-run.
 - **The state file is the run.** `.ai-dev/project-setup.md` carries the answers and a Steps table
   with per-step status and intra-step progress notes, so an interrupted run resumes precisely
   instead of blindly re-running a non-idempotent deletion pass.

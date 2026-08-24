@@ -73,7 +73,7 @@ flowchart TD
     G3["4b · Per-store HTTP probes<br/>ONE PER APP the project KEPT<br/>yves: /&lt;STORE&gt;/&lt;lang&gt; · logo box &gt; 0×0<br/>≥N homepage slot blocks · add-to-cart PERSISTED<br/>guest checkout · anonymous /customer/overview → 302 login<br/>backoffice: login + product list non-empty<br/>merchant-portal · glue &amp; glue-backend:<br/>token + one REGISTERED resource<br/>(406 / 404 on the roots is CORRECT)"]
     G3 --> G4["The full grid<br/>stores × each locale × products<br/>never an aggregate total"]
 
-    G4 --> TI["Post-boot test infra<br/>seed run = pre-check only, then the GATE:<br/>docker/sdk testing codecept run<br/>-c tests/codeception.ci.functional.yml<br/>0 errors, upstream skips only, report counts<br/>DataBuilders non-empty → cy:run<br/>on host/CI, not the CLI container"]
+    G4 --> TI["Post-boot test infra<br/>seed run = pre-check only, then the GATE:<br/>docker/sdk testing codecept run<br/>-c tests/codeception.ci.functional.yml<br/>BOTH PyzTest and NsTest trees<br/>0 errors, upstream skips only, report counts<br/>DataBuilders non-empty → cy:run<br/>on host/CI, not the CLI container"]
 
     TI --> G5{"4c · spryker-verifier agent<br/>independent PASS/FAIL/BLOCKED<br/>per AC, from scratch"}
     G5 -- "FAIL" --> FIX["Fix the defect,<br/>re-run the verifier fresh"]
@@ -105,10 +105,10 @@ without it.
 | Gate | Asserts | The false green it catches |
 |------|---------|----------------------------|
 | **4a0** | KV/search/broker volumes are new (age + identity) | `up` recreates the DB but **reuses named volumes** — a fresh DB beside a prior project's read models, every signal correct while carrying foreign data. |
-| **4a-gen** | No `src/Generated` / `data/cache` artifact keyed by a **renamed** token | Gitignored build output no sweep or `git diff` sees — `validationEU.cache` survived a bucket renamed to `EUROPE`, and every API Platform request 500'd after a green boot. |
+| **4a-gen** | No `src/Generated` / `data/cache` artifact keyed by a **renamed** token | Gitignored build output no sweep or `git diff` sees — a `validation<OLD>.cache` surviving a renamed code bucket 500s every API Platform request after a green boot. |
 | **4a** | Publish queues drained, error-free, on the **project vhost** | `list_queues` against the default `/` vhost returns an empty list — a dangerous "drained". A storefront hit before the queues settle is a false 500. |
 | **4a-search** | Per-store `*_page` product-doc count > 0, via `/_count` | A missing `product-approval-status` makes the publisher write **nothing** while import, queues and DB all read perfect. `_cat/indices` lags the merge and reads near-empty. |
-| **4b** | Per-store HTTP for **every kept app**, add-to-cart **persisted**, the logo's rendered box, **≥ N homepage slot blocks**, anonymous `/customer/overview` **302 to login** | A 200 with an error flash or an empty quote is a FAIL; a correctly-configured logo can still render at 0×0; a block-less homepage passes a `<html lang=` probe; an unguarded `/multi-cart` returned 200 and rendered, so "not 500" passes the defect; Glue modelled as the Yves *fallback* left total API breakage unprobed. |
+| **4b** | Per-store HTTP for **every kept app**, add-to-cart **persisted**, the logo's rendered box, **≥ N homepage slot blocks**, anonymous `/customer/overview` **302 to login** | A 200 with an error flash or an empty quote is a FAIL; a correctly-configured logo can still render at 0×0; a block-less homepage passes a `<html lang=` probe; an unguarded `/multi-cart` returns 200 and renders, so "not 500" passes the defect; Glue modelled as the Yves *fallback* leaves total API breakage unprobed. |
 | **grid** | Per store × each locale × products | An aggregate total hides a zero-locale or a price-less product slice. |
 | **4c** | An independent `spryker-verifier` agent's PASS/FAIL per AC | The agent that wrote the data judging its own work. |
 
@@ -132,7 +132,7 @@ without it.
   let them through without a prompt.
 - **Boot with `up -t`, always.** `-t` provides the testing container and `SPRYKER_TESTING_ENABLED=1`;
   on a plain `up`, `docker/sdk testing` is a silent no-op and codeception falls into a phantom
-  `devtest` env — 12 harness errors that read as project failures. A plain stack upgrades
+  `devtest` env — harness errors that read as project failures. A plain stack upgrades
   non-destructively with a re-`up -t`.
 - **Operator consent cannot clear a red gate.** A broken customer-facing surface is not a decision to
   offer; "leave as a known issue" is not an available option. The step records `failed`/`in-progress`

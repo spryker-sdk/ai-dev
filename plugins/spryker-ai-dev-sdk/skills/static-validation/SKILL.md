@@ -25,8 +25,8 @@ executed inside the container via `docker/sdk cli`.
 It replaces fixed, single-base validation scripts with a single flexible engine:
 
 - **Any base branch** — `--base <ref>`, or auto-detected (`master` → `main` →
-  remote default). Handles the diff via merge-base (`base...HEAD`) plus uncommitted working-tree
-  edits and brand-new untracked files, so in-progress work is fully covered.
+  remote default). Handles the diff via merge-base (`base...HEAD`) plus working-tree changes against
+  `HEAD`, so staged and unstaged in-progress work is covered.
 - **Worktree-aware** — resolves the current worktree's root with `git rev-parse --show-toplevel`
   for file/diff detection, and locates `docker/sdk` in the **main** working tree via
   `git rev-parse --git-common-dir` (a linked worktree doesn't contain the SDK-provided,
@@ -150,11 +150,11 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
 
 ## Notes & caveats
 
-- **Coverage: committed + uncommitted + untracked — which makes this the authoritative diff gate.** The
-  analysed set is `base...HEAD` **plus** working-tree edits **plus** brand-new untracked files, so
-  in-progress work is checked before it is ever committed. Contrast `vendor/bin/spryker-ci spryker-ci
-  --current`, which derives its module set from the **committed** diff: on an uncommitted tree it exits
-  green having analysed nothing, so it is not a substitute for this run.
+- **Before pushing, confirm every file the change needs is actually staged.** The analysed set is the
+  merge-base diff (`base...HEAD`), working-tree changes against `HEAD`, **and untracked non-ignored
+  files** — so a brand-new file can be analysed green and still never reach the commit, because it was
+  never `git add`ed. A green run is not evidence the work is complete in git. Check
+  `git status --porcelain` for `??` lines belonging to the change and stage them before you push.
 - Runs against a **running** Spryker environment (`docker/sdk cli`). If containers are down,
   start them first (see the `spryker-docker-sdk` skill).
 - **Frontend tools run wherever `node_modules` actually is.** eslint/stylelint must resolve the plugins

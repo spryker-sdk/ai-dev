@@ -60,7 +60,7 @@ flowchart TD
     CM1 --> P4["Phase 4 — execute IMPLEMENTATION.md<br/>sections 1-9 only<br/>skip 10 Testing · 13 Docs · 14 Deployment"]
     P4 --> SEC{"Per file: read before modifying ·<br/>implement TODO stubs from the requirements ·<br/>apply the Hard Rules · never transfer->toArray()"}
     SEC --> COND["Skip the conditional sections whose<br/>condition wasn't met (webhooks, redirect,<br/>js-sdk, line items)"]
-    COND --> CI{"CI gate after EVERY section<br/>vendor/bin/spryker-ci spryker-ci --current<br/>stage/commit first — --current reads<br/>git diff master... and greens on an<br/>uncommitted tree"}
+    COND --> CI{"CI gate after EVERY section<br/>vendor/bin/spryker-ci spryker-ci --current"}
     CI -- "errors" --> SEC
     CI -- "schema file changed" --> GEN["transfer:generate + propel:install"] --> CI
     CI -- "clean, sections remain" --> SEC
@@ -149,11 +149,7 @@ Whole implementation items are skipped when their condition isn't met:
 
 - **CI is a gate, not a checkpoint.** `vendor/bin/spryker-ci spryker-ci --current` runs after *each*
   `IMPLEMENTATION.md` section and all errors are fixed before the next one starts — so a break is
-  attributed to the section that caused it, not discovered at the end. **Caveat: `--current` derives
-  its module set from `git diff master...`, so on an uncommitted tree it analyses nothing and exits
-  green** — stage/commit the section first, or use the module-scoped direct gates.
-  `Skill(static-validation)` is the authoritative diff gate (it covers uncommitted *and* untracked
-  files). A fast green with no module list in the output means it analysed nothing.
+  attributed to the section that caused it, not discovered at the end.
 - **Commit checkpoints, not one big commit.** Scaffolding → persistence → Yves layer → plugin wiring
   and import data, each with a fixed message shape. The plan shows them before any code is written.
 - **Async means the pending status is written on command execution**, with the final status set by the

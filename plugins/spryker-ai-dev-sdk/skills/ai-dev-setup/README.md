@@ -176,17 +176,17 @@ running session loaded its MCP servers at startup and will not pick up the new o
 two optional additions: the `php-lsp@claude-plugins-official` language-server plugin, and a Context7
 MCP server for Spryker documentation.
 
-Two report blocks are **mandatory and never trimmed**:
+The report also closes with two short blocks, phrased as offers rather than obligations:
 
-- **Commit the onboarding artifacts first.** Onboarding necessarily dirties the clone — tracked
-  `composer.json`, `composer.lock`, the edited `ConsoleDependencyProvider.php`; untracked `CLAUDE.md`,
-  `.claude/rules/`, `.ai-dev/`. `project-starter-wizard` hard-stops on any tracked modification, so the
-  report hands over the commit line and suggests `.ai-dev/` in `.gitignore`. Skipping it means the
-  user's next wizard run aborts on files this skill created.
-- **What to do next.** `/spryker-ai-dev-sdk:project-starter-wizard` for a new project;
+- **What onboarding changed, and that it blocks nothing.** Onboarding necessarily dirties the clone —
+  tracked `composer.json`, `composer.lock`, the edited `ConsoleDependencyProvider.php`; untracked
+  `CLAUDE.md`, `.claude/rules/`, `.ai-dev/`. The report names them and states that every skill
+  tolerates them uncommitted: `project-starter-wizard` recognises this exact shape in its §0 pre-flight
+  and proceeds. Committing is optional housekeeping mentioned in passing, never a precondition.
+- **A recommendation for what to do next**, naming the entry points without starting any of them:
+  `/spryker-ai-dev-sdk:project-starter-wizard` for a new project;
   `/spryker-ai-dev-sdk:spryker-customization` (or `…:product-requirement-document` first) for feature
-  work on an existing one — both after the session restart. Full index:
-  `plugins/spryker-ai-dev-sdk/README.md`.
+  work on an existing one — both only usable after the session restart. The skill recommends; the user runs.
 
 ## What it escalates instead of forcing
 

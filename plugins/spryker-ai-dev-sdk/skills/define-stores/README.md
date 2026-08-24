@@ -38,14 +38,14 @@ flowchart TD
     QUOTE --> S2
 
     S2["Step 2 — Region token, full surface<br/>deploy.dev.yml · 4 install recipes<br/>kept .github/deploy/*.yml<br/>mv the region dir, rewrite tokens<br/>rename store_EU.yml → store_&lt;REGION&gt;.yml"]
-    S2 --> S3["Step 3 — Hardcoded literals<br/>CodeBucketConfig (hard blocker)<br/>default_store · host mappings<br/>translator fallback · StockConfig<br/>CheckoutPageConfig<br/>CUSTOMER_SECURED_PATTERN +<br/>Yves firewall regexes (silent auth hole)<br/>per-locale date/time formats"]
+    S2 --> S3["Step 3 — Hardcoded literals<br/>CodeBucketConfig (hard blocker)<br/>default_store · host mappings<br/>translator fallback · StockConfig<br/>CheckoutPageConfig<br/>CUSTOMER_SECURED_PATTERN +<br/>Yves firewall regexes (silent auth hole)<br/>per-locale date/time formats<br/>installer/admin user locales"]
     S3 --> S4["Step 4 — Dangling-manifest sweep<br/>grep ALL data/import/**/*.yml<br/>disposition every hit explicitly"]
 
     S4 --> V["Validate<br/>refs: store values ⊆ declared<br/>absent on CodeBucketConfig +<br/>default_store → ZERO hits"]
     V --> VD{"Zero hits on the<br/>must-be-clean files?"}
     VD -- "no" --> S3
     VD -- "yes" --> TRI["Broader absent over config/ + src/Pyz<br/>= triage aid, NOT a gate<br/>classify each hit"]
-    TRI --> PAT["Second pass — PATTERN-shaped<br/>grep BARE en/de inside regexes<br/>a de_DE-shaped search cannot match them<br/>en_US-is-a-keep does NOT exempt it"]
+    TRI --> PAT["Second pass — PATTERN-shaped<br/>grep BARE en/de inside regexes<br/>a de_DE-shaped search cannot match them<br/>en_US-is-a-keep does NOT exempt it<br/>removed locale → drop .locale columns,<br/>routes, config branches too"]
     PAT --> DONE([Step done →<br/>hand off to project-data<br/>per data.mode<br/>+ POST-BOOT: stale src/Generated<br/>and data/cache artifacts])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
@@ -103,15 +103,29 @@ source, project stores differ only by locale, currency, country and name — the
   `stores.php`); classify them, don't blind-fix. `de_DE` in the Back Office translator fallback is
   the one paired keep — it lives or dies **with** the `getBackofficeUILocales()` override, in one
   logged decision, never as a silent default on a project that speaks neither German nor English.
+- **Two translation layers, never confused.** `TRANSLATION_ZED_FALLBACK_LOCALES` and
+  `getBackofficeUILocales()` govern the **Back Office/Zed** layer, whose translations ship as
+  per-module `translations/` / `data/translation/` files (project overrides under
+  `src/<Ns>/Zed/Translator/data/`). `glossary.csv` is the **storefront** layer — keeping or dropping a
+  glossary file has no effect on Back Office translations, and vice versa.
 - **Two shapes of literal, two passes.** The list-shaped sweep hunts `xx_XX` locale tokens and store
   names; it structurally cannot match a **bare** `(en|de)` alternation inside a firewall regex — which
-  is why `CUSTOMER_SECURED_PATTERN` survived every run and left `customer`, `cart`, `checkout` and
+  is why `CUSTOMER_SECURED_PATTERN` survives that pass and leaves `customer`, `cart`, `checkout` and
   nine more routes unguarded on a non-`en`/`de` project. A *partially* correct pattern is the worst
   case: `/en/` keeps working, so nothing looks broken.
+- **Removing a locale removes everything keyed to it.** Not just the `xx_XX` tokens: the
+  `.<locale>`-suffixed data-import columns, the URL/route segments in that language, and the config
+  branches and regex alternations naming it. The single deliberate exception is a glossary file kept
+  as a technical fallback layer — a kept fallback glossary is never permission to keep the locale
+  everywhere else.
+- **Installer/admin users must sit on a locale the project still has.** Back Office data is
+  locale-specific, so an admin seeded with a removed locale opens the BO to blank product names,
+  attributes and category names. When the locale set changes, repoint every
+  `UserConfig::getInstallerUsers()` entry's `localeName` (or drop that admin).
 - **Some obligations can only be discharged after the first boot.** `src/Generated/**` and
   `data/cache/**` are gitignored build output that doesn't exist pre-boot, so no sweep can see a
-  stale artifact keyed by the old region/store/bucket token (`validationEU.cache` 500'd every API
-  Platform request after a green boot). The reference carries it as an explicit post-boot step:
+  stale artifact keyed by the old region/store/bucket token (a surviving `validation<OLD_REGION>.cache`
+  500s every API Platform request after a green boot). The reference carries it as an explicit post-boot step:
   discover by token match, regenerate, delete the stale sibling.
 
 ## Packaging note

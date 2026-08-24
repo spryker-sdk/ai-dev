@@ -5,12 +5,12 @@ and prune a disabled app's build steps out of the install recipes, so a dropped 
 boot time as well as serving traffic.
 
 The clone ships **everything enabled**. So every edit here is a *deviation* from the shipped deploy
-file — a swap or a disable, never an "enable". An empty or absent `services` block in the state file
+file — a disable (or a dev-service swap), never an "enable" and never an infra-engine swap. An empty or absent `services` block in the state file
 means keep the demoshop default untouched.
 
 ## When it triggers
 
-When changing what infrastructure a Spryker project runs on: swap or disable an engine (database,
+When changing what infrastructure a Spryker project runs on: disable optional services or applications (infra engines are fixed — never swapped) (database,
 search, broker, key-value store, session), turn off an optional dev service (mail catcher, swagger,
 dashboard, redis-gui, webdriver, scheduler), disable an application, or build a new environment
 deploy file (`deploy.<project>-<env>.yml`).
@@ -30,7 +30,7 @@ flowchart TD
     EMPTY -- "yes" --> KEEP([Keep the shipped<br/>deploy.dev.yml untouched])
     EMPTY -- "no" --> E1
 
-    E1["Engines · services.engines<br/>change engine:/version: ONLY for<br/>the listed keys<br/>warn on a database swap<br/>— MariaDB is Cloud-recommended"]
+    E1["Infra engines · services.&lt;svc&gt;.engine<br/>database/broker/session/<br/>key_value_store/search<br/>NEVER swap an engine value —<br/>version: bumps only"]
     E1 --> E2["Dev services<br/>dev_services_disabled → remove the block<br/>dev_services_engine → change only engine:<br/>everything unnamed stays ON"]
 
     E2 --> E3{"applications_disabled<br/>contains backend-gateway<br/>or backoffice?"}
