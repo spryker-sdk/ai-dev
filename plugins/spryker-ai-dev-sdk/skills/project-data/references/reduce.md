@@ -8,12 +8,18 @@ The developer keeps only part of the demo catalog (e.g. "drop the office-supplie
 
 You supply the judgment (which categories/products, which columns are real product refs).
 
-## The method — keep-set → scan → prune → verify → (only then) boot
+## The method — keep-set → report the set → scan → prune → verify → (only then) boot
 
 ### 1. Fix the KEEP set (the source of truth)
 Decide keep-vs-remove at the level the developer stated (usually **category**), then resolve it to the concrete product SKUs that survive:
 - Filter the product spine to the kept products first: `product_abstract.csv` and `product_concrete.csv`. If removal is by category, first find the kept abstract SKUs from the category→product assignment (`product_category.csv` / category keys), then `php "$CSV" filter <product_abstract.csv> --in abstract_sku=<kept…>` (or `--in-file` for a large set) `--in-place`, and the same for concretes (keep concretes whose `abstract_sku` is kept).
 - After this, **the two product files ARE the kept-set**: the distinct `abstract_sku` in `product_abstract.csv` ∪ the distinct `concrete_sku` in `product_concrete.csv` = every valid product token. The scanner reads them directly — you don't maintain a separate list.
+
+### 1b. Report the resolved SET — before a single row is pruned
+**The scope decision was already made and confirmed at interview time** (wizard §1 / questionnaire `C1`, where the branches were shown by name with product counts). This step **reports** the resolution; it does **not** re-ask. Do not stop mid-run over the size of the drop — if the developer asked for a handful of products, a handful of products is correct.
+
+- **Render the resolved keep/drop tree by name with per-branch product counts** (`Office (n) → DROP`, `Heating & Energy (n) → KEEP`, plus the before → after total) as a one-line report, and **record it in `.ai-dev/decision-log.md`** with the revert path. Never act on a themed label ("only heating & energy") — act on the branches it resolved to, and log those.
+- **Feature-coupling check — a category can own a shipped FEATURE, not just products.** Before removing a category, grep the deploy file and the install recipes for entry-points and build steps naming it (`*-configurator` applications, `frontend:*-configurator:build` steps) and check whether `product_configuration.csv` / `configurable_bundle_template*` reference its products. **Every hit goes into the report and the decision log** — the standard resolution is to drop the orphaned feature's endpoint and build steps along with the branch. Signature it prevents: a green boot still publishing the host of a configurator whose category is gone.
 
 ### 2. Broad orphan scan — discover EVERY referencing file (don't curate a list)
 A hand-picked file list misses sku-bearing importers (`product_shipment_type`, `product_stock`, `product_measurement_base_unit`, `product_packaging_unit`, `product_abstract_approval_status`, and more) → a fresh boot-abort for each miss. **Use the scanner instead of guessing:**

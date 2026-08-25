@@ -1,8 +1,12 @@
 # code-review
 
-**Parallel code review by fan-out.** Splits the code under review across 3–5
-`spryker-code-reviewer` subagents by directory, runs them at once, then combines their findings into
-one list you pick from.
+**Parallel code review by fan-out.** Splits the code under review across `spryker-code-reviewer`
+subagents by directory, runs them at once, then combines their findings into one list you pick from.
+**The fan-out scales with the change: a small change — a handful of files — gets a single reviewer,
+not 3–5. The 3–5 fan-out is for large or complex diffs.** A caller may pass an explicit count, or a
+diff `size` (`trivial` → 1, `normal` → 3–5, `complex` → 5), and may pass an explicit file list as the
+review target; with neither supplied the default is still 3–5. A single reviewer is a smaller
+fan-out, never a skipped review — it applies the same criteria and gates the same way.
 
 The skill itself is deliberately thin — it is the dispatcher. The actual Spryker review criteria
 live in the `spryker-code-reviewer` subagent it delegates to.
@@ -21,7 +25,7 @@ flowchart TD
     ASK --> S3
     Q -- "yes" --> S3
 
-    S3[3 · Split by directories across<br/>3–5 spryker-code-reviewer subagents<br/>delegate in PARALLEL]
+    S3[3 · Resolve reviewer count<br/>a few files → 1 reviewer ·<br/>large/complex diff → 3–5<br/>explicit count · else size<br/>trivial 1 / normal 3–5 / complex 5<br/>default 3–5 · then split by<br/>directories and delegate in PARALLEL]
     S3 --> S4[4 · Wait for every subagent<br/>to finish]
     S4 --> S5[5 · Combine the results<br/>and present them to the user]
     S5 --> S6["6 · Interactive terminal selection —<br/>the user picks which exact issues<br/>to fix, ungrouped"]

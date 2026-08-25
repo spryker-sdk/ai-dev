@@ -71,6 +71,18 @@ Before marking any AC **PASS**, run through this mentally:
 
 If any answer is no, the AC is **not** PASS. Strengthen the assertion, or mark `PASS (server only)` / BLOCKED as appropriate.
 
+### Anti-false-FAIL rules
+
+A false FAIL is cheap to write and expensive to believe: it sends someone fixing a defect that does not exist, and it discredits the gate. **This is derive-then-probe discipline, NOT lower sensitivity** — digging past a bare status code is exactly right and stays required; the error is concluding from a probe you invented.
+
+1. **Derive the probe surface from what the app REGISTERS — never from plausibility.** Before probing an app, read what it actually registers (its dependency-provider resource/plugin list, or the router's own listing) and probe only that. **A 404 on a resource the project never registers is not evidence of anything** — it is your probe being wrong, and it may not appear in a report as a finding. (`spryker-runtime` owns the per-app commands; ask it rather than hard-coding a grep.)
+2. **Require a positive control before declaring an app dead.** If **any** endpoint on that host answers (a token endpoint, one registered resource, a fixture endpoint), the verdict is **"resource X not available"**, scoped to that resource — never "no routes compiled" or "the app is dead". Reserve an **app-level FAIL for when NOTHING answers.**
+3. **Probe with the method and content type the resource DECLARES.** A wrong method or content type returns **404** in this stack (not 405), so "the route is missing" is unfounded until you have tried the declared ones.
+4. **Absence of generated artifacts is not absence of routes.** An empty generated-API directory can be an app's shipped default (Glue Backend, for example), not a defect.
+5. **Weigh contradicting evidence before committing to a FAIL.** A green E2E suite that demonstrably **transacts through** the app under test contradicts "the app is dead" — reconcile the two or mark **BLOCKED**; never report a FAIL over the top of evidence that refutes it. Generally: when two observations disagree, the correct verdict is the one that explains **both**.
+
+A FAIL that survives all five stands — report it with the same evidence discipline as any other. **What is banned is the unexamined leap from "my probes 404'd" to "the app is broken".**
+
 ## Output Format
 
 Report in the unified `spryker-qa-coverage` format. Each row is one acceptance criterion; the **Layer** column carries the execution layer `spryker-qa-coverage` tagged (E2E / endpoint(button-driven) / endpoint(synthetic) / storage / console).
@@ -121,7 +133,7 @@ Report in the unified `spryker-qa-coverage` format. Each row is one acceptance c
   - **Objective (verifier asserts):** the element renders (DOM `querySelector` returns non-null), the element uses an existing atom/molecule class from `Theme/default/components/`, the element's CSS classes match the convention of its siblings on the same page (`.button`, `.label`, etc.), no plain unstyled `<span>` containing raw text where siblings use a styled atom.
   - **Subjective (verifier reports, does NOT verdict):** *"does this colour/spacing/typography look right for the shop?"*. Capture a screenshot; include it in the evidence column; never mark PASS *or* FAIL on the basis of "it looks good / bad". Mark **PASS (visual-review needed)** instead, with the screenshot inline, and leave the visual judgment to the user at the commit gate.
   - **Hard fail signal that IS objective**: a `<span>` / `<div>` containing the new text with NO matching atom class while siblings have one. That's an integration miss, not subjective design — mark FAIL.
-- **NEVER mark PASS when uncertain.** A false PASS is worse than a FAIL — it commits a broken feature behind the "all ACs passed" gate. If your assertion didn't specifically exercise the AC's behavior, if the evidence is ambiguous, if you skipped a part of a compound AC — mark BLOCKED, not PASS.
+- **NEVER mark PASS when uncertain.** A false PASS is worse than a FAIL — it commits a broken feature behind the "all ACs passed" gate. If your assertion didn't specifically exercise the AC's behavior, if the evidence is ambiguous, if you skipped a part of a compound AC — mark BLOCKED, not PASS. **This does not license a FAIL you haven't earned:** "worse than a FAIL" is not "FAIL is free" — a FAIL derived from probes the app never registered is its own defect. Ambiguity resolves to **BLOCKED**, not to FAIL (see **Anti-false-FAIL rules**).
 - **Do not infer PASS from absence-of-error.** A 200 status, a non-empty page, no JS console errors — none of these PROVE the AC passes; they just prove the plumbing didn't break. The AC's specific behavior must be directly observed and asserted.
 - **Do not skip parts of compound ACs.** Every conjunct gets its own assertion. If you can't assert one, the verdict is BLOCKED, not PASS.
 - **A `PASS (server only)` is never a clean PASS for a user-flow AC.** A synthetic 200 (Mode 4/5) proves the server, not the button. Keep the UI-flow assertion FAIL/BLOCKED and record the server result as its `PASS (server only)` companion.

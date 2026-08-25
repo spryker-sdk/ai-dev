@@ -44,8 +44,10 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 
 | Org               | Path | Purpose                                                   |
 |-------------------|---|-----------------------------------------------------------|
-| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | Project-level overrides/extensions of core modules        |
-| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | Project-level overrides/extensions of Pyz or core modules |
+| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | Inherited demoshop layer — overrides/extensions of core modules |
+| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer — write here**: overrides of Pyz or core, and all new project code |
+
+**CRITICAL**: If a custom namespace is defined, **always write there** — overrides and new code alike. It is registered ahead of `Pyz` in `PROJECT_NAMESPACES` (`config/Shared/config_default.php`), so its class always wins; editing the `Pyz` copy instead changes nothing and raises no error. A near-empty `src/CustomNamespace/` is normal on a new project.
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
 

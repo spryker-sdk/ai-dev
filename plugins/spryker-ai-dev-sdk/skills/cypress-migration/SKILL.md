@@ -207,6 +207,17 @@ Then adapt, discovering each value rather than assuming a default is correct:
   - `DEFAULT_PASSWORD` — the password every fixture-created customer/admin/merchant user is given.
   - `PRODUCT_PRICE_ABOVE_THRESHOLD` — a fixture price above the store's hard-minimum and below its
     soft-minimum `spy_sales_order_threshold`; no API exposes those thresholds, so it lives here.
+- **Verify `cy.formatDisplayPrice` exists and is store-derived** — post-vendor, before any spec
+  asserts a price. It is **absent from upstream `spryker-projects/cypress-boilerplate` HEAD**, and
+  the copies in the wild are incompatible: two projects hardcode `€` with
+  `toLocaleString('en-US')` (wrong on any non-EUR store), one calls `Intl.NumberFormat` with no
+  `currencyDisplay`. Grep `cypress/support/cy-commands/` for it and require all three: it exists;
+  it takes currency and locale from the resolved `CURRENCY_CODE`/`LOCALE_NAME` rather than
+  literals; it passes `currencyDisplay: 'narrowSymbol'`. Without that last option ICU's default
+  differs per runtime — UAH renders `грн` under Electron's bundled ICU and `₴` under
+  Chrome (what CI uses) and the app's own PHP formatter. Signature of skipping this: a price
+  assertion failing on a string that differs only in symbol form, read as an app bug; it cost a
+  full false-failure investigation.
 - **One fact the shop can't expose — ship a helper in the project test namespace.** Fixtures need the
   currency's DB id (`fkCurrency`), which no API returns. Add a ~10-line `CurrencyDataHelper` extending
   `SprykerTest\Shared\Currency\Helper\CurrencyDataHelper` that overrides `getCurrencyByIsoCode()` →

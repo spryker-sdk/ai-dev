@@ -161,9 +161,32 @@ Read the PRD / acceptance criteria. **Restate them as a numbered AC checklist**,
 
 Build the plan from the expert findings. For each AC, the plan covers:
 
-- **Files to edit** — project layer only — under the project's namespace directories in `src/`, never `vendor/`. Find the project namespaces via `composer.json` `autoload.psr-4`; there may be more than one.
+- **Files to edit** — project layer only — under the project's namespace directories in `src/`, never `vendor/`. **If the project has a custom namespace, EVERY file you create or edit goes there** — overrides and new code alike. Find it via `composer.json` `autoload.psr-4`; it is the one registered ahead of `Pyz` in `KernelConstants::PROJECT_NAMESPACES` (`config/Shared/config_default.php`), so its class always wins. Two cases, both landing in `src/<Ns>/…`:
+  - **Overriding something that already exists** → `src/<Ns>/…` **extending** the `Pyz` counterpart (extend core only when no Pyz counterpart exists). Editing the `Pyz` class in place is not merely "the wrong file": the higher-precedence namespace still resolves first, so **the Pyz overrides you just wrote are silently dropped** — nothing errors, the app keeps the old behaviour.
+  - **Brand-new project code with no counterpart anywhere** (a new plugin, a new service, a new DependencyProvider override that `Pyz` never had) → also `src/<Ns>/…`. This is not an override case and has no `Pyz` sibling by definition; **the absence of a counterpart is not a reason to fall back to `src/Pyz`.**
+  - **A sparse or near-empty `src/<Ns>/` is NOT evidence the namespace is unused.** On a new project it is *expected* to hold only a handful of files. Likewise, research output in which most verified paths are `src/Pyz/…` reflects what the demoshop shipped, not where *your* new code belongs.
+  - (Single-namespace / `Pyz`-only projects: `src/Pyz` **is** the project layer — edit it directly.)
+  - **Inserting a plugin at a fixed position in a parent's flat literal array** (a `get…PluginStack()` where the new plugin must sit between two named neighbours). **Decide this yourself, in this order — do not ask the developer; it is an implementation detail they have no context on:**
+    1. **Follow the project's own pattern.** Grep the project layer for an existing override of a plugin-stack method and do what it already does. An established convention wins outright.
+    2. **No pattern → `parent::` plus a positional insert** (splice/merge), anchored on the **named neighbour class**, never a numeric index — the parent's array is free to grow.
+    3. **Only if the stack genuinely has to change wholesale → redefine the whole array** and move on. Note the divergence in the plan so an upgrade review can find it.
+    Whichever route you take, it decides **this file only** — every other file still follows the precedence rule above.
 - **Post-change commands** required — delegated to `spryker-refresher`.
 - **Verification approach** — UI / API / DB / console (what `spryker-verifier` will exercise).
+
+### Namespace resolution (mandatory, ALWAYS — emit it before the file list)
+
+**Before listing a single file**, emit this block. A rule satisfiable by silent reasoning gets reasoned away; a rule that must produce a line of output cannot.
+
+```
+## Namespace resolution
+
+PROJECT_NAMESPACES = ['<Ns>', 'Pyz']   (config/Shared/config_default.php)
+Target for ALL new/edited project files: src/<Ns>/
+Evidence: grep 'extends' src/<Ns>/** -> <n>/<m> are <Ns>\X extends Pyz\X
+```
+
+Run the `grep` — it takes seconds and it is the thing that settles the question. Then **every path in the file list below must sit under that target**; a `src/Pyz/…` entry is a contradiction you must justify explicitly or fix. If the project has one namespace, say so in the block and move on.
 
 ### If PoC: PoC collapse mapping (mandatory)
 
@@ -246,6 +269,8 @@ Apply changes per the chosen quality bar.
 - **Visual fit is mandatory for any new UI element.** When adding a badge, label, button, form field, banner, widget, table column, or any other visible UI piece — to Yves, Zed, Merchant Portal — **invoke the `yves-atomic-frontend` skill** (via the `Skill` tool) for guidance on extending the project's atomic design system properly. Reuse existing atoms/molecules/organisms from `Theme/default/components/` rather than writing standalone HTML. The output must look like part of the shop, not like raw text pasted onto a polished page. This rule applies equally to PoC and MVP — *"PoC"* is about code minimum, not visual minimum.
 - **Hard pre-edit gate for any `.scss` / `.ts` / atomic-component file.** The `yves-atomic-frontend` skill MUST be invoked **before** the first `Write` or `Edit` on any file under `Theme/default/components/`, or any new `.scss` / `.ts` file in that tree — not after. Common failure mode: codegen writes a new SCSS file that references an undefined mixin (e.g. `@include pyz-foo-tag`) or doesn't follow the project's atom convention (style.scss split, index.ts export, etc.), and `frontend:yves:build` fails in Step 5. Self-correction signal: if you're about to create a new `Theme/default/components/atoms/<name>/<name>.scss` file and you haven't loaded `yves-atomic-frontend` in this run, **stop** — load it first, then write the file using the skill's templates.
 - **No defensive comments.** Don't add inline comments or PHPDoc to justify what the code does, why a review flag was addressed, or what an identifier means — well-named identifiers and the PR description carry that information. Specifically forbidden: class-level docblocks (already covered above), multi-line inline comments, references to recent reviews / fixes / iterations (*"addressed CR feedback"*, *"fixes #123"*, *"after refactor"*, *"per static-validation"*), explanations of *"why this approach over the obvious one"*, and `// TODO` markers that exist only because the model wasn't sure what to do. If the *why* is non-obvious enough to need text, that's a signal the code needs restructuring, not commenting. Self-correction signal: if you're about to type the words *"because"*, *"to handle"*, *"workaround for"*, *"to satisfy"*, *"per review"*, or *"fixes"* inside a comment — **stop**, the comment shouldn't be there.
+- **One hard case does not set policy for the easy ones.** If you catch yourself applying a decision you reached for one genuinely awkward file to files that **do not share that difficulty** — stop and re-decide per file. The awkward case is the one that needs the exception; the others inherit nothing from it.
+- **Challenged on an instruction → re-read the instruction, don't answer from memory.** If you are told you failed to follow a rule, **open the rule and read it again before composing a reply.** Not "consider whether it applies" — re-read it. Answering from a remembered headline is what turns a placement mistake into a defence of that mistake. The same applies after any long research phase: **before emitting a plan, re-read the step that governs it** — a single sentence read upstream does not survive a few hundred thousand tokens of findings.
 - **Workaround = re-plan signal, not a comment.** If you catch yourself about to write code you'd describe as a *"workaround"*, *"non-obvious framework trick"*, *"we have to do this because Spryker..."*, or any wording that admits the chosen extension point doesn't fit — **stop**. The right answer is almost never *"write the workaround and explain it in a comment"*. Re-invoke `spryker-feature-expert` with a specific follow-up about the seam you're fighting (e.g. *"the post-execute hook doesn't see the form submission yet — what's the canonical pre-render extension point for this step?"*). 9/10 the canonical seam exists and you missed it on the first research pass. Only after the expert confirms there is no clean seam do you proceed with the workaround; even then, the justification belongs in the PR description, never in an inline comment.
 
 **PoC quality bar:** minimum files, hardcoded values OK, skip plugin/expander indirection when a direct edit works, no tests, no locale completeness beyond default, no ACL ceremony beyond what an AC demands.

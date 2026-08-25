@@ -79,7 +79,7 @@ byte-diff. Unmapped values are left as-is, so extending the map and re-running i
 |---|---|
 | `name`, `description`, `meta_title` / `meta_description` / `meta_keywords`, `title`, `content`, `alt_text`, `placeholder` / `placeholder.content` (including the `cms-block-email--*` bodies), glossary `translation` | The **unsuffixed** machine columns `key` and `values` in `product_management_attribute.csv` |
 | `key_translation.<locale>` — the attribute **label** on the PDP ("Color", "Body Material"). Easy to miss: left English, the storefront shows an English label next to a translated value | **`attribute_key_N.<locale>`** on `product_abstract` / `product_concrete` — the named exception |
-| `value_translations.<locale>` — the attribute **values**, often a comma-list. Preserve item count, order and commas: it is positionally aligned with the machine `values` column | `url.<locale>` (structural — `project-data` adapt), `is_searchable.<locale>`, `css_class`, `*imageUrl` / `*link` / asset URLs, any bare key/SKU/FK |
+| `value_translations.<locale>` — the attribute **values**, often a comma-list. Preserve item count, order and commas: it is positionally aligned with the machine `values` column | `is_searchable.<locale>`, `css_class`, `*imageUrl` / `*link` / asset URLs, any bare key/SKU/FK. **`url.<locale>` is never *translated* but must be *re-pointed* in two cases** — after a category `name` translation regenerates its slug, and before a glossary path points at a CMS page that doesn't exist in that locale |
 | `value_N.<locale>` on `product_abstract` / `product_concrete`; `key.<locale>` in `product_search_attribute.csv` (key-ish name, but display text) | Any other locale's columns — only the one `X.<locale>` you target |
 
 **The rule is not the suffix — it is whether the value must equal an identifier declared elsewhere.**
@@ -108,10 +108,23 @@ names. A translation that drops a token or breaks markup is a defect.
   language prefix (`/en/gtc` → `/nb/gtc`) — some keys are used as a raw `href` with no
   `generatePath()`, so the prefix has to live in the data. Exempt `/assets/` and require a
   `/<lang>/` word boundary, or the sweep false-positives on image paths and ASCII-art email bodies.
+  **But the rewrite is conditional on the referent existing:** a well-formed `/it/gtc` is still a 404
+  when `cms_page.csv` is `en_US`-only, so the target locale must be served by the store
+  (`locale_store.csv`) and the CMS page's `url.<locale>` must be populated — otherwise localize the
+  page first rather than rewriting into a 404.
+- **A locale is done per FILE, not per column family.** `glossary.<locale>.csv`,
+  `navigation_node.csv`, `content_banner.csv` and `cms_page.csv` must all be consistent for the
+  locale — label *and* URL columns. `project-data` localizes catalog and category nodes only, and a
+  real run left three of those four files English. `content_banner`'s per-locale set
+  (`title`/`subtitle`/`click_url`/`imageUrl`/`altText`) is all-or-nothing.
+- **Green import ≠ published read model.** Queues draining to zero is not evidence; one locale of four
+  silently kept boot-time KV values. The gate is a per-locale `kv:translation:<locale>:<key>`
+  timestamp/value comparison *across* locales, with `publish:trigger-events -r translation` as the fix.
 - **Verify the attribute labels specifically.** `key_translation.<locale>` still equal to the English
   copy is the known first-run bug — the PDP then shows a translated value beside an English label.
 - **Say what isn't covered.** The SEO half of localization — localized URL slugs (adapt changes only
-  the language prefix), sitemap regeneration, `hreflang`, robots — is owned by no skill in this
+  the language prefix; translating a category `name` *does* regenerate its slug, which is why the
+  URL rebuild exists), sitemap regeneration, `hreflang`, robots — is owned by no skill in this
   plugin, and is named in the closing report every time a locale is localized. So is the map's one
   structural limit: one target per distinct source string, so context-dependent wording collapses to
   a single translation.

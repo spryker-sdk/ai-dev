@@ -41,6 +41,11 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
   re-orients from it. It complements the `run.log` timeline and the `decisions.md` rationale.
 - **The bug is the contract.** A fix is "done" only when the user-visible symptom no longer reproduces
   with evidence **and** every gate is green.
+- **Gate weight scales, gate existence does not.** Step 1 records a diff `size` (`trivial` / `normal` /
+  `complex`) that shrinks the Step 8 reviewer fan-out (1 instead of 3–5) and narrows Step 9's QA scope to
+  the single affected flow — but no gate is ever skipped for a small diff, and each still reports its own
+  verdict honestly. Same rule after a dirty-branch override: the gates are **scoped** to the fix's file
+  list and the report says so.
 - **Cypress E2E coverage is a first-class, conditional stage.** Step 0 asks how to handle it (auto /
   always / skip); Step 9b — after QA has accepted the fix — delegates to `Skill(cypress-tests)` to
   **fix** a spec the bug broke, **improve** assertions that would have missed it, or **add** a new

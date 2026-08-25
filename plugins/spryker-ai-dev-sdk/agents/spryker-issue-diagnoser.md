@@ -82,7 +82,9 @@ Confirm the directory structure with `ls data/logs/` first — projects sometime
 - Do **not** run raw SQL via `Bash`, `docker/sdk cli`, `docker exec ... psql/mysql/mariadb`, PHP PDO/Doctrine in heredocs, or any other bypass — regardless of MCP availability.
 - **Fallback when the Spryker MCP is unavailable:** include this exact suggestion in your report so the user knows how to fix the cause (not just the symptom):
 
-  > *"The Spryker MCP server isn't available in this session. To enable `executeDatabaseQuery` and the other MCP tools, see [the Spryker AI Dev MCP Server setup doc](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html) — installation is one command from the project root: `claude mcp add spryker-project \"$(pwd)/docker/sdk console ai-dev:mcp-server -q\"`. Meanwhile I'll continue with logs and ask you to run any DB queries I need."*
+  > *"The Spryker MCP server isn't available in this session. To enable `executeDatabaseQuery` and the other MCP tools, run `Skill(ai-dev-setup)` from the project root — it verifies the package and console wiring, then registers the server under this project's folder name; background in [the Spryker AI Dev MCP Server setup doc](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html). Meanwhile I'll continue with logs and ask you to run any DB queries I need."*
+
+  **Never quote a `claude mcp add` line from memory into that report** — `Skill(ai-dev-setup)` § Step 3 owns the exact form, so it cannot drift.
 
   Then proceed with the best-effort path: (a) work from logs alone where they're sufficient; (b) ask the user to run a specific SQL query and paste the result; (c) if neither is possible, report *"DB MCP not available — diagnosis limited to logs and observable state"* and continue with what you can.
 

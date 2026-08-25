@@ -128,10 +128,20 @@ a dropped job happened to reference it.**
 
 1. **Write the final CI first** (the rest of this step), so the surviving job list is settled and
    the references you are about to resolve are the real, final ones.
-2. **Build the KEEP set from that final CI.** For every job in it, collect every
-   `docker/sdk boot .github/deploy/<f>.yml` it names, then read each of those deploy files and
-   collect every `pipeline:` value they declare. That gives you two keep-lists: deploy files and
-   install recipes.
+2. **Build the KEEP set from that final CI — THREE keep-lists, all resolved BEFORE any deletion.**
+   For every job in it, collect every `docker/sdk boot .github/deploy/<f>.yml` it names, then read
+   each of those deploy files and collect every `pipeline:` value they declare. That gives keep-lists
+   (a) deploy files and (b) install recipes. **Then keep-list (c): fixture data.** For every
+   surviving job AND every surviving install recipe, open the **import manifests** it names
+   (`data/import/**/*.yml` referenced from the recipe's `data:` / import steps or the job's own
+   `console data:import --config=…`) and collect every `source:` directory those manifests reference.
+   Resolve (c) **before deleting anything** — fixture dirs are reachable *only* through a manifest,
+   so the moment a manifest is deleted the reference chain to its fixture tree is cut and the
+   consumers can no longer be found. *Failure signature:* a `data/import/<something>/` tree with
+   dozens of CSVs that no surviving manifest names, discovered later by someone else's
+   dangling-manifest sweep. Observed: dropping a robot suite correctly removed its CI jobs, deploy
+   files, install recipes, `data/import/b2b_robot/` and the `*_ROBOT.yml` manifests — and left
+   `data/import/robot/{AT,DE,common}` (~85 files) fully orphaned.
 3. **Only then walk the drop list.** Delete a `.github/deploy/*.yml` only if **no** job in the
    final CI boots it. Delete a `config/install/<recipe>.yml` only if `<recipe>` is **absent from
    the KEEP set built in (2)**. Verify each recipe with
@@ -139,8 +149,16 @@ a dropped job happened to reference it.**
    deploy files routinely share one `pipeline:` value, so keep it if ANY surviving deploy file
    still names it.
 4. **On any doubt, KEEP.** An orphaned `config/install/` file is harmless; a deleted-but-referenced
-   one breaks the boot — and the workflow YAML still parses, so step 5's validation will **not**
+   one breaks the boot — and the workflow YAML still parses, so § 5 Validate will **not**
    catch it.
+5. **After the wipe, re-derive the fixture closure from disk — belt and braces.** Keep-list (c) can
+   only be as complete as the manifests you thought to open, so prove it instead of trusting it: run
+   `validate.php orphan-files <surviving manifest> data/import` — the `spryker-import-tools`
+   script, invoked by its literal path from the project cwd, per that skill's invocation discipline;
+   add `--base .` when the manifest's paths are project-relative — once per surviving manifest. Report
+   every `data/import/**` directory no surviving manifest references. Exit 2 means orphans. Surface them
+   rather than silently deleting — a dir the *project's* own runtime import still needs is not the
+   dropped suite's leftover.
 
 Three traps, all instances of the same rule (decide by reference, never by name): (1) a KEPT job and a DROPPED job can have near-identical filenames (`…cypress-boilerplate.yml` kept vs `…cypress.yml` dropped) — and a typo'd sibling (`…postgress….yml`) can sit alongside both; delete by which surviving job references it, not by the name; (2) a fixture/import config named for a suite (`*_ROBOT.yml`) may ALSO be referenced by the regular demodata pipeline — grep its literal filename repo-wide **without a file-type filter** (consumers include non-YAML config such as `*.json`) and read the actual `source:`/`command:` lines before deleting, or an unrelated import breaks; (3) a recipe whose name merely *resembles* a dropped suite may be the one a KEPT deploy file still points at. Under the project-starter wizard this makes ci-generator the **single owner** of removing an old test-suite's CI jobs + its deploy/install/fixture configs (the robot/acceptance-fixture lane decision comes from the interview `keep_suites`); the suite's Composer-package removal and the new suite's vendoring stay with `cypress-migration`.
 
@@ -205,6 +223,11 @@ report it — this is what proves the CI folder was actually cleaned, not just a
       nothing dropped is still present.
 - [ ] **No orphans kept.** Every file that remains is either the project CI itself or a
       support file that a surviving job references. Nothing survives "just in case."
+- [ ] **No orphaned fixture tree.** `validate.php orphan-files <surviving manifest> data/import` ran
+      after the wipe, and every `data/import/**` directory it reports as unreferenced is listed in
+      the report with a keep/drop decision. A fixture dir is reachable only through a manifest, so
+      deleting the manifest first hides its tree from every reference check — this is the pass that
+      catches it.
 - [ ] **No dangling references.** No surviving job points at a file, action, or script that
       was deleted; and no deleted job is still named as a dependency.
 - [ ] **Surviving references resolve on disk.** Every `docker/sdk boot` target named by a job in

@@ -85,12 +85,12 @@ flowchart TD
 | Rule | What it means |
 |------|---------------|
 | **No selectors in specs** | Specs call page-object methods only — no `cy.get()`/`cy.visit()` in a `.cy.ts`. Selectors live in page objects so markup changes stay one-line. |
-| **Locators** | `data-qa="..."` (the project's Twig convention), then stable semantics already in use (`[itemprop="price"]`, `cart-items-list`), then a new `data-qa`. Never positional CSS, class hashes, or XPath. |
+| **Locators** | `data-qa="..."` (the project's Twig convention), then stable semantics already in use (`[itemprop="price"]`, `cart-items-list`), then a new `data-qa`. Never positional CSS, class hashes, or XPath. Pick the selector from the **rendered** DOM — Twig is pre-hydration and a custom element (`<quantity-counter>`) may have replaced the markup. |
 | **Page objects** | Extend `AbstractPage`; `PAGE_URL` from `Cypress.env(...)`, never a hardcoded host. Getters return `Cypress.Chainable` and don't assert — the spec owns the claim. |
-| **Data is declared** | A `dynamic-*.json`/`static-*.json` pair named after the spec, resolved from the spec's path. No hardcoded SKUs/emails/prices that must pre-exist. |
+| **Data is declared** | A `dynamic-*.json`/`static-*.json` pair named after the spec, resolved from the spec's path. No data whose existence the spec doesn't control — a project-catalog SKU only under the conditions in `test-data.md`. |
 | **`synchronize: true`** | Required when the spec browses or searches a catalog, so publish & sync lands the data in Redis/Elasticsearch first. |
 | **Assertions** | Assert real values from fixtures (name, price, status), not `.should('exist')` alone — a failure should say what broke. |
-| **Waiting** | Raise the timeout on the specific slow getter, or wait on an intercepted alias. No fixed `cy.wait(<number>)` — the main source of CI-only flake. |
+| **Waiting** | Raise the timeout on the specific slow getter, or wait on an intercepted alias. No fixed `cy.wait(<number>)` — the main source of CI-only flake. An ajax mutation (cart quantity, wishlist) *must* wait on an intercepted 2xx and be re-read after a `visit()`: the optimistic DOM makes a wrong order pass. |
 | **Aliases** | Import via `@support/*` and `@fixtures/*`, not relative `../../..` paths. |
 
 ## Usage

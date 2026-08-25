@@ -147,9 +147,41 @@ Use `getProductName(product)` from `@support/fixture-helper/fixture-helper` to r
 product name — it resolves `localized_attributes` against `LOCALE_NAME` and throws a clear
 error when the locale is missing, rather than silently yielding `undefined`.
 
+A new type file must also be **re-exported from `cypress/support/types/<app>/index.ts`**, matching
+its neighbours — that barrel is the conventional import path for the directory, so a type file
+without its export line is unreachable by the path every other spec uses, and gets discovered as
+a separate follow-up edit after the import fails.
+
+## Choosing dynamic vs. static
+
+**Dynamic by default.** State the rule by property, not by name: a spec must not depend on **data
+whose existence the spec does not control**. "No hardcoded SKUs, emails or prices" is the
+shorthand; the actual test is *who guarantees this record exists on a fresh CI database* — if the
+answer isn't "this spec's own `dynamic-*.json`", it needs a deliberate home and a reason.
+
+Static is right for:
+
+- **Project configuration the shop can't create on demand** — payment method names, Glue
+  shipment/payment identifiers, `defaultPassword` (see § What can't be generated).
+- **A SKU seeded by the project's own catalog**, but only when the spec is *about* that curated
+  catalog — a merchandising or store-specific flow where a generated product wouldn't exercise
+  the thing under test. All three conditions apply:
+  - the SKU lives in the `static-*.json` file, **never inline in the spec** — one file to fix
+    when the catalog moves;
+  - the fixture names which catalog it came from, so the coupling is readable;
+  - you accept the known risk: **a catalog-reduction pass invalidates it silently.** One logged
+    reduce pass cut 464 products to 29. Specs of this kind are therefore part of the reduce
+    pass's own regression set — say so in the report, and re-run them after any catalog change.
+
+If the spec isn't about the curated catalog, generate the product instead. Failure signature of
+getting this wrong: the spec passes today and fails weeks later after a data change nobody
+connected to tests, as "product not found" or an empty listing — indistinguishable from an
+application bug.
+
 ## What can't be generated
 
-Two documented exceptions stay as configuration, per the boilerplate README:
+Two exceptions stay as configuration, per the boilerplate README (the curated-catalog SKU case
+above is a third, narrower one, and carries its own conditions):
 
 - **Payment methods** — bound to a registered payment plugin (see above); the method *name*
   lives in the static fixture.
