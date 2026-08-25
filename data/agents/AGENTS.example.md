@@ -44,8 +44,15 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 
 | Org               | Path | Purpose                                                   |
 |-------------------|---|-----------------------------------------------------------|
-| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | Project-level overrides/extensions of core modules        |
-| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | Project-level overrides/extensions of Pyz or core modules |
+| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | The inherited demoshop layer — overrides/extensions of core modules |
+| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer.** Overrides/extensions of Pyz or core, **and all brand-new project code** |
+
+**Precedence:** `KernelConstants::PROJECT_NAMESPACES` (in `config/Shared/config_default.php`) is ordered
+highest-first — `['CustomNamespace', 'Pyz']`. When both define a class, the **first** wins. So every file
+you create or edit belongs in `PROJECT_NAMESPACES[0]`, whether it overrides something or is entirely new.
+Editing the `Pyz` copy instead fails silently: nothing errors, the higher-precedence class still resolves,
+and the behaviour never changes. A sparse `src/CustomNamespace/` is normal on a new project and is **not**
+evidence the namespace is unused.
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
 
