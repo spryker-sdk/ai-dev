@@ -44,15 +44,10 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 
 | Org               | Path | Purpose                                                   |
 |-------------------|---|-----------------------------------------------------------|
-| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | The inherited demoshop layer — overrides/extensions of core modules |
-| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer.** Overrides/extensions of Pyz or core, **and all brand-new project code** |
+| `Pyz`             | `src/Pyz/{Layer}/{Module}/` | Inherited demoshop layer — overrides/extensions of core modules |
+| `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer — write here**: overrides of Pyz or core, and all new project code |
 
-**Precedence:** `KernelConstants::PROJECT_NAMESPACES` (in `config/Shared/config_default.php`) is ordered
-highest-first — `['CustomNamespace', 'Pyz']`. When both define a class, the **first** wins. So every file
-you create or edit belongs in `PROJECT_NAMESPACES[0]`, whether it overrides something or is entirely new.
-Editing the `Pyz` copy instead fails silently: nothing errors, the higher-precedence class still resolves,
-and the behaviour never changes. A sparse `src/CustomNamespace/` is normal on a new project and is **not**
-evidence the namespace is unused.
+**CRITICAL**: If a custom namespace is defined, **always write there** — overrides and new code alike. It is registered ahead of `Pyz` in `PROJECT_NAMESPACES` (`config/Shared/config_default.php`), so its class always wins; editing the `Pyz` copy instead changes nothing and raises no error. A near-empty `src/CustomNamespace/` is normal on a new project.
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
 
