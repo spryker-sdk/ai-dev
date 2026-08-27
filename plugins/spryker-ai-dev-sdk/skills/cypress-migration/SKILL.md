@@ -9,8 +9,8 @@ description: >
   request to replace `spryker/cypress-tests` / `spryker/robotframework-suite-tests` with a
   project's own Cypress setup. This is a one-time setup/migration skill — it removes the old
   suites, vendors in the already-adapted `tests/cypress-boilerplate/` implementation from the
-  spryker-shop/b2b-demo-marketplace repository (the proven reference implementation — not the
-  raw spryker-projects/cypress-boilerplate template), wires up CI, and generates the companion
+  spryker-shop/b2b-demo-marketplace repository (the proven reference implementation), wires up
+  CI, and generates the companion
   day-to-day `cypress-tests` skill for the target project. It is written to be project-agnostic
   for the *target* project: every step discovers the target's actual conventions (hostnames,
   fixtures, CI patterns) before acting rather than assuming they match the reference project.
@@ -150,13 +150,12 @@ grep -rl "data-cy=" src/ --include="*.twig" 2>/dev/null | wc -l
 
 ## Step 7 — Vendor the `tests/cypress-boilerplate/` implementation from b2b-demo-marketplace
 
-The source of truth is no longer the raw `spryker-projects/cypress-boilerplate` template —
-it's the **already-adapted, already-battle-tested** copy committed at
+The source of truth is the **already-adapted, already-battle-tested** copy committed at
 `tests/cypress-boilerplate/` in `spryker-shop/b2b-demo-marketplace`. That copy has had real
 bugs found and fixed against a live Spryker B2B Marketplace instance (locator fixes, OMS
-transition timing/race fixes, search-index sync timing, DataTables-based list filtering, etc.)
-that the raw upstream template does not have. Vendoring from it means the target project
-starts from a working baseline instead of rediscovering the same bugs from scratch.
+transition timing/race fixes, search-index sync timing, DataTables-based list filtering, etc.).
+Vendoring from it means the target project starts from a working baseline instead of
+rediscovering the same bugs from scratch.
 
 ```bash
 git clone --depth 1 https://github.com/spryker-shop/b2b-demo-marketplace.git <scratch-dir>
@@ -208,10 +207,10 @@ Then adapt, discovering each value rather than assuming a default is correct:
   - `PRODUCT_PRICE_ABOVE_THRESHOLD` — a fixture price above the store's hard-minimum and below its
     soft-minimum `spy_sales_order_threshold`; no API exposes those thresholds, so it lives here.
 - **Verify `cy.formatDisplayPrice` exists and is store-derived** — post-vendor, before any spec
-  asserts a price. It is **absent from upstream `spryker-projects/cypress-boilerplate` HEAD**, and
-  the copies in the wild are incompatible: two projects hardcode `€` with
-  `toLocaleString('en-US')` (wrong on any non-EUR store), one calls `Intl.NumberFormat` with no
-  `currencyDisplay`. Grep `cypress/support/cy-commands/` for it and require all three: it exists;
+  asserts a price. A naive implementation gets this wrong in ways that only surface on non-EUR
+  stores: hardcoding `€` with `toLocaleString('en-US')` breaks on any non-EUR store, and calling
+  `Intl.NumberFormat` with no `currencyDisplay` misses the narrow-symbol requirement below. Grep
+  `cypress/support/cy-commands/` for it and require all three: it exists;
   it takes currency and locale from the resolved `CURRENCY_CODE`/`LOCALE_NAME` rather than
   literals; it passes `currencyDisplay: 'narrowSymbol'`. Without that last option ICU's default
   differs per runtime — UAH renders `грн` under Electron's bundled ICU and `₴` under
