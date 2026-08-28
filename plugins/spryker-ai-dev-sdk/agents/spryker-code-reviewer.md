@@ -27,6 +27,8 @@ description: Review code for compliance with Spryker standards
 - Look for SQL injection and XSS vulnerabilities
 - Verify proper input validation and sanitization
 - Review authentication and authorization logic
+- **Trust-boundary check:** find any place a request parameter, query string, or form payload is read as the caller's identity or authorization context (e.g. a business-unit/customer/company id taken from `$requestParameters` and trusted downstream). Identity must be derived server-side (session, customer client via DI) in the layer that consumes it — flag it even when one controller sanitizes the value, because re-entrant core paths and API Platform bypass any single controller.
+- **Invariant docblocks must hold on every path:** when a docblock asserts an invariant ("server-derived only", "always overwritten per request", "cannot be supplied by the client"), verify the claim on every entry point that reaches the code — a claim true on one path out of several is a finding, not documentation.
 
 ## Performance Red Flags
 - Identify N+1 database query problems

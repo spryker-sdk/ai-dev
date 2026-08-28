@@ -26,6 +26,10 @@ Do not silently skip a missing tool. Note it, then proceed with whatever remains
 
 **No MCP server at all?** You can still research: option (c) below searches the docs over plain `curl` against the public Algolia DocSearch API — no MCP required. Prefer the MCP tools when connected (richer, no public-key dependency); fall back to (c) otherwise.
 
+## Running as one of several parallel research agents
+
+Callers often fan this skill out across concepts. If your prompt states a scope boundary ("agent B covers Product Lists — don't"), **respect it**: research and report only your assigned concept, and where a neighbouring concept is clearly relevant, name it in one line under Open questions instead of researching it — duplicated deep-dives across parallel agents have cost ~300k tokens for the same ground. If your prompt states no boundary and the topic obviously spans concepts, say in your output which slice you covered so the caller can see the seams.
+
 ## Research workflow
 
 Goal: understand the official concept, terminology, supported actors, and documented capabilities. Two complementary search options are available — use whichever are available, and combine them: Algolia finds the exact doc pages, and the docs corpus gives conceptual depth and examples.
@@ -81,4 +85,6 @@ Every piece of content carries its **Source** URL. Reproduce documentation subst
 - **Short Algolia queries** (2–3 words) outperform long ones.
 - **Cite sources.** Every piece of content and every claim carries its doc URL.
 - **Public docs only.** If a question needs the installed code (exact module names, transfer fields, real endpoint paths), say so in "Open questions / gaps" — that is out of scope here and belongs to a code-investigation step.
+- **Docs are not trusted for identifier spellings.** The docs contradict themselves on exact names (`full-text` vs `full_text`, `string-facet` vs `string_facet`). Report the concept, but flag every field/index/route identifier as *"confirm in code or a live mapping"* — never present a doc spelling as the authoritative name.
+- **Anything you clone or download is ephemeral.** A docs-repo clone in the scratchpad is a working copy, not a deliverable — say so if you mention it (or clean it up); never report its path as a durable artifact.
 - **Surface gaps loudly.** A missing tool or an unanswered question is a finding, not something to paper over.

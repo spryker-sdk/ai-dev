@@ -132,6 +132,7 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 ### Caveats (manual steps the caller should consider)
 - Queue workers may need restart if publisher plugins changed.
 - Storefront cache may need browser hard-refresh.
+- **If the file list touched a DependencyProvider, `ApplicationServices.php`, or other DI/container wiring:** a clean exit code does NOT prove the application still serves — remind the caller to run the wiring smoke check (one Back Office route + one backend-gateway route) before continuing. A stateful-plugin DI mistake exits 0 here and 500s every route at runtime.
 ```
 
 ## What you do NOT do

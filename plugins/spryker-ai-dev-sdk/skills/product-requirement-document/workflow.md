@@ -148,7 +148,24 @@ If user requests changes:
 
 ### Phase 3: User Stories - Iterative Creation 🔄 INTERACTIVE
 
-**CRITICAL:** Create user stories ONE AT A TIME, not all at once.
+**Step 3.0: Ask the pacing question — once, before the first story**
+
+```json
+{
+  "questions": [{
+    "question": "How do you want to review stories and acceptance criteria?",
+    "header": "Review pacing",
+    "options": [
+      {"label": "Per story (Recommended)", "description": "Each story + its criteria presented as one batch — ~1 checkpoint per story"},
+      {"label": "Per criterion", "description": "Every story AND every criterion approved individually — most checkpoints, finest control"},
+      {"label": "Draft then review", "description": "Full draft of all stories + criteria, then one revision pass"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+Honour the answer through Phases 3–4. The steps below describe the finest granularity (per-criterion); at coarser pacing, run the same drafting steps but **collapse the approval questions to the chosen batch size** — the story checkpoint content (story + actor + endpoint together) is mandatory at every pacing, and corrections stay possible at whichever checkpoints occur.
 
 **Step 3.1: Identify Story Count**
 
@@ -243,15 +260,15 @@ Show the drafted story together with its actor and affected endpoint, then ask t
 
 ### Phase 4: Acceptance Criteria - Per Story Iteration 🔄 INTERACTIVE
 
-**CRITICAL:** For the approved user story from Phase 3, create acceptance criteria ONE SCENARIO AT A TIME.
+For the approved user story from Phase 3, create acceptance criteria and present them **at the pacing chosen in Step 3.0** — individually (per-criterion), as the story's batch (per-story), or collected for the draft review.
 
 **Step 4.1: Draft Initial Scenarios**
 
-Based on the user story, draft 2-3 Gherkin scenarios that test different aspects.
+Based on the user story, draft the Gherkin scenarios that test different aspects — typically 2–4, but the cap is advisory: the story carrying the feature's primary behavior may need more (happy path, isolation, anonymous, no-regression, collision are distinct behaviors). Never merge distinct behaviors to fit the count.
 
-**Step 4.2: Present Each Scenario Individually**
+**Step 4.2: Present the Scenario(s) per the chosen pacing**
 
-For each scenario:
+At per-criterion pacing, for each scenario:
 
 **a) Show the scenario:**
 ```markdown

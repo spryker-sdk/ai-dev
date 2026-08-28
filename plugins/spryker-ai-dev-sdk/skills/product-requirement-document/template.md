@@ -81,6 +81,19 @@ Scenario: [Specific behavior being tested]
 ### Scalability
 - [Growth / volume projections]
 
+## Constraints
+
+[Discovered hard constraints that change what can be promised — business-phrased, mechanism-free. These come from Phase 0 research: things that are neither implementation detail nor goals, but limit or shape the promise. Omit the section only if genuinely none were discovered — never silently drop one.]
+
+- [e.g. "Customer-specific identifiers must physically reside in the shared search index — a confidentiality trade-off the customer must accept"]
+- [e.g. "Search text analysis cannot be changed in place after go-live; changes require a re-index"]
+
+## Decisions & Accepted Risks
+
+[User choices with a cost they explicitly accepted. State the decision, the cost in plain language, and that it was accepted. This is the audit trail for "we knew, and we chose".]
+
+- **[Decision]** — [its cost, plainly] — accepted by [user] on [date].
+
 ## Success Metrics
 
 [Define HOW we measure if goals are achieved]
