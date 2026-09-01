@@ -16,10 +16,9 @@ the orchestrator skims the map and the shared conventions.
   Auth0, sample volume tables, sample diagrams). Preserve the heading structure, the `*Corresponds to
   [arc42 Section N]*` footer, and the table shapes; swap the *content* for this project's reality from
   `intake.md`. Never leave a mix of real and example content without marking the example part.
-- **Ground, don't guess.** Anything about how Spryker behaves comes from `research-docs.md`; anything
-  about the real running system comes from `research-current-state.md`; external facts from
-  `research-web.md`. If a fact isn't in the inputs, write `> **TODO:** <what's missing and who can
-  answer it>` instead of inventing it.
+- **Ground, don't guess.** Anything about how Spryker behaves comes from `research-docs.md`; external
+  facts from `research-web.md`; facts about *this* project from `intake.md`. If a fact isn't in the
+  inputs, write `> **TODO:** <what's missing and who can answer it>` instead of inventing it.
 - **Diagrams as code — Mermaid (`.mmd`) ONLY, for every diagram type including ERDs.** Use Mermaid
   `flowchart`/`sequenceDiagram`/`erDiagram`/etc. for flow, context, sequence, data-flow, integration,
   AND entity-relationship diagrams. **Do NOT use PlantUML (`.puml`)** — it can't render client-side, so
@@ -106,7 +105,7 @@ from the project's own `CLAUDE.md`/`.claude/rules` where relevant.
 ## § 03 — System Scope and Context  ⟶ C1
 
 **File:** `03-system-scope-and-context.md`. **Inputs:** intake B, C; `research-docs.md` (actor names,
-integration patterns); `research-current-state.md` (real integrations, for existing projects).
+integration patterns). Integrations come from the intake (Q7 systems, Q20 connections).
 
 - **Business Context:** the system and every communication partner (actors + external systems), with
   the business reason for each. Point to the C1 diagram.
@@ -150,8 +149,8 @@ gate** naming the fork, its trigger, and the ADR that will record the resolution
 
 ## § 05 — Building Block View  ⟶ C2, C3
 
-**File:** `05-building-block-view.md`. **Inputs:** intake B; `research-docs.md`;
-`research-current-state.md` (installed modules, for existing projects).
+**File:** `05-building-block-view.md`. **Inputs:** intake (Q11 out-of-scope, Q25 capability
+classification); `research-docs.md`.
 
 - **C4 Level 2 (Container):** the main Spryker containers in scope (Yves, Zed, Glue, DB, Redis,
   Elasticsearch/OpenSearch, RabbitMQ, plus any project-specific service) and their responsibilities.
@@ -159,8 +158,6 @@ gate** naming the fork, its trigger, and the ADR that will record the resolution
 - **C4 Level 3 (Component):** decompose the containers relevant to this project — for Zed, the
   standard layers (Presentation / Communication / Business / Persistence, + Service); for a custom
   domain, the real modules. Pair with `diagrams/c4/c3-*.mmd`.
-- For an **existing project**, list the actual custom modules under `src/Pyz` / other namespaces
-  (from current-state research), not a generic module list.
 - **Size the custom domains:** give each custom module/domain row a rough t-shirt effort estimate
   (S/M/L/XL + a one-line driver) so the table plans, not just enumerates — see
   [architecture-depth.md](architecture-depth.md) ("build-ready", item 1). Mark it as a planning
@@ -179,13 +176,14 @@ checkout, and OMS flows have canonical shapes; don't paraphrase from memory. Reu
 
 ## § 07 — Deployment View
 
-**File:** `07-deployment-view.md`. **Inputs:** intake F (topology);
-`research-current-state.md` (`deploy.*.yml`, infra, for existing projects).
+**File:** `07-deployment-view.md`. **Inputs:** intake (Q10 hosting, Q8 markets, Q26 targets);
+`research-docs.md` (Spryker Cloud topology).
 
 Fill the infrastructure table and deployment pattern for the project's real hosting model — Spryker
 Cloud (PaaS) vs custom Kubernetes vs on-prem/hybrid. The template flags that this section matters most
 for non-standard/on-prem setups — if that's the case, go deeper (network topology, data residency,
-scaling). For existing projects, read the deploy files rather than guessing.
+scaling). Where the hosting answer is `Too complex to decide now`, carry a Solution Design pointer
+rather than an invented topology.
 
 **Multi-store setup (required when >1 store/country):** document the store strategy explicitly —
 region(s), stores per country, one-DB-vs-per-store, shared codebase, and whether **Dynamic
@@ -253,8 +251,8 @@ mitigation patterns in [architecture-depth.md](architecture-depth.md).
 
 Fill the Risks table (risk / impact / mitigation) and Technical Debt table (item / impact / plan) with
 project-specific entries. Integration uncertainties, external-system delivery risks, migration risks,
-high-volume import / Publish & Sync performance, large category trees, and any debt surfaced during
-current-state research are prime candidates. **Where a mitigation relies on a Spryker capability, name
+high-volume import / Publish & Sync performance, large category trees, and any constraint the
+intake flagged as inherited from existing systems (Q27) are prime candidates. **Where a mitigation relies on a Spryker capability, name
 it and link its docs page** (Persistence ACL, Merchant Relationship, Merchant Product Restrictions,
 Comments module, BO user roles, Data Import & P&S optimization guidelines, Dynamic Multi-Store, Data
 Exchange API) — confirm it exists via docs research first. The run's own OPEN QUESTIONS from

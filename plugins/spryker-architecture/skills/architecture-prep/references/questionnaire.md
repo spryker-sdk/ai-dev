@@ -1,233 +1,693 @@
-# Architecture intake questionnaire (the fillable question list)
+# Architecture intake questionnaire
 
-This is the canonical list of questions the architecture-prep skill needs answered to fill an
-`architecture/` folder to decision-grade depth WITHOUT interviewing you live. It is distilled from
-real Spryker TADs (the same fields a Target Architecture Definition captures) and refined by gap
-audits against the Scania, Daimler, and NORMA TADs so a full answer set is enough for a fully
-autonomous run.
+53 questions across four levels of depth — 9 at Level 1, 21 at Level 2, 21 at Level 3, 2 at Level 4. A project answers only the levels it needs, and within a level only the questions whose condition is met.
 
-## Three ways to use it
-1. **Pre-fill and skip the interview.** Copy this file, answer inline under each question, and give
-   the skill the filled copy (a path, or paste). If every REQUIRED question is answered, the skill
-   runs with NO interview - exactly like the TAD fast-path.
-2. **Partial fill.** Answer what you know, leave the rest blank. The skill reads your answers and
-   the interview asks ONLY the still-blank questions.
-3. **Interactive.** Give nothing; the skill either hands you this whole list to fill at your own pace,
-   or walks you through it in batched questions - your choice.
+## How to read this
 
-However it is collected, EVERY answer is written to the run's input artifact (`intake.md`) with its
-source noted, so the section writers all read the same grounded input.
+**Depth is chosen per topic, not once for the whole project.** A project can go deep on integrations and stay shallow on volumes.
 
-## How to answer
-- Plain, short answers. A number, a name, a yes/no, one or two sentences. Ranges are fine.
-- "unknown" / "TBD" is a VALID answer - it becomes an honest, owner-named TODO in the doc, not a
-  fabricated value. Do not guess.
-- Every question is tagged `[REQUIRED]` or `[optional]`, and shows `-> feeds arc42 section NN`.
-- `[REQUIRED]` = the skill cannot write a grounded document without it (or an explicit "unknown").
-- Questions are grouped A-J (+ run-config R). If a whole group does not apply (e.g. no external
-  systems, single-store, no multi-tier org), write "none" or "n/a" once at the group top.
-- Groups C and the per-integration questions repeat PER external system - a small table is ideal.
+**Four capability gates** — pricing, availability, payment and assortment — each ask a single question at Level 2 establishing whether the topic is standard, handled elsewhere, or genuinely complex. Their detail is asked at Level 3 only when the gate says it is needed.
+
+**Two kinds of unknown, and they are not the same.** `Too complex to decide now — needs investigation` produces a recommended Solution Design. `Not decided yet` produces an open item with an owner and a decide-by date. Neither is ever silently dropped, and no default is asserted for an element whose answer is missing — it is drawn provisionally and labelled.
+
+**Tables are not walked through in conversation.** They arrive as a pre-filled file with an owner and a return date.
 
 ---
 
-## Group A - Project frame  (-> section 01)
-A1. `[REQUIRED]` What is this project, in one sentence? (What are you building and for whom?)
-A2. `[REQUIRED]` Is it a brand-new build (greenfield), or changes to an existing running system?
-A3. `[REQUIRED]` Business model: B2B, B2C, B2B2C / marketplace, or D2C?
-A4. `[REQUIRED]` Is it a full production build, an MVP, or a POC (proof of concept)?
-A5. `[REQUIRED]` Are you re-platforming from an existing system? If yes, name the old system AND why
-    now (end-of-life / support ending, cost, missing capability, scale). -> also feeds 01 objectives
-A6. `[REQUIRED]` Target go-live date (or "unknown"). If technical and public go-live differ, give both.
-A6b. `[optional]` If technical and public go-live differ, what happens in the window between them
-    (soft launch, data load, integration cut-over, pilot)? -> feeds sections 01, 10
-A7. `[REQUIRED]` Pick and rank your top 3-5 quality goals: performance, scalability, maintainability,
-    security, time-to-market, cost, availability, on-time-low-risk-go-live.
-A8. `[optional]` Frontend approach: Spryker Yves (traditional), headless/API-first, or both (and any
-    long-term plan to change)?
+# Level 1 — High-level vision
 
-## Group B - Scope and stakeholders  (-> sections 01, 03, 05, 12)
-B1. `[REQUIRED]` List the main capabilities/features IN scope. Examples: catalog, cart, checkout, OMS,
-    quotes/RFQ, pricing, promotions, search, CMS, asset management, returns (portal + carrier labels),
-    order splitting / multi-shipment, drop-shipment (incl. via the marketplace data model),
-    merchant/dealer onboarding, product-feed generation.
-B2. `[REQUIRED]` List anything explicitly OUT of scope (now, or "later phase").
-B3. `[REQUIRED]` Which user types/actors are in scope? (Customer, B2B Company User, Back Office User,
-    Merchant/Merchant Portal user, Agent, API consumer, other.)
-B4. `[optional]` For each phase, which capabilities land in Phase 1 (go-live) vs later phases?
-    (If you do not phase, say "all Phase 1".)
-B5. `[optional]` Key stakeholders and what each expects from the system.
-B6. `[optional]` Returns handling: is there a customer-facing returns portal (native or custom-built in
-    Yves)? Which carriers issue return labels (DHL, DPD, GLS, ...)? -> feeds sections 01, 03, 06
-B7. `[optional]` For each in-scope CUSTOM capability/module, any known build-complexity/effort signal
-    (rough S/M/L/XL, or "unknown"). The skill sizes this itself; this only captures a hint if you have
-    one. -> feeds section 05 t-shirt sizing
+Produces the introduction, the scope, and a system context diagram with named external systems. Every question here is asked on every project.
 
-## Group C - External systems and integrations  (-> sections 02, 03, 06, 11)
-Answer once per external system. If none: write "none - native Spryker only".
-C1. `[REQUIRED]` List every external system to integrate, with its role. Cover the usual kinds if
-    present: ERP, PIM, CIAM/identity, PSP/payment, tax, OMS/fulfilment, search, CDN, middleware
-    (ETL / service bus), CRM/marketing, returns carriers, DWH/BI, address verification, consent
-    management, tag manager, analytics / behaviour analytics, A/B testing & experimentation, product
-    recommendations, order-confirmation / post-purchase tools, conversion tracking API, CAPTCHA / bot
-    protection, dynamic FAQ / help, form builders, product-feed generation. (Integration-heavy B2C
-    projects often have 15-25; list them all, JS widgets too.)
-C2. `[REQUIRED]` For EACH system: which real product is it? (e.g. SAP, Plentymarkets, Akeneo, Auth0,
-    Adyen, Payone, Talend, Emarsys, SiteSearch360, Usercentrics, Kameleoon, DHL - or "TBD".)
-C3. `[REQUIRED]` For EACH system: direction (Spryker pulls / pushes / both), protocol (REST, SOAP,
-    GraphQL, file via SFTP or S3, AMQP, webhook, JS widget, OAuth redirect, linkout/redirect
-    round-trip, VPN DB link), and sync-or-async. If several systems serve the SAME role (e.g. two
-    stock providers), describe the selection/fallback rule.
-C4. `[REQUIRED]` For EACH system: classify it - storefront JS widget (client-side in Yves, no Spryker
-    backend module), backend integration (server-side: REST/SOAP/file/AMQP/ACP/DB-link), or both.
-    (Widgets are architecturally different - consent-gated, perf-budgeted, no backend module.)
-    -> feeds sections 02, 03, 11
-C5. `[optional]` For EACH system: frequency + data volume + any constraints (rate limits, batch
-    windows, messages/day). Numbers here make the doc size-able; "TBD" is fine.
-C6. `[optional]` For EACH system: who owns it (you/customer, integration partner, 3rd party). And -
-    `[REQUIRED] if the project is phased` - in which phase it is needed (Phase 1 / later).
-C7. `[REQUIRED]` How do users authenticate? Native Spryker login, or an external IdP/SSO/social login?
-    If external, which provider, and is it storefront login, headless/API login, or Back Office?
-    (Note: Spryker storefront SSO is supported; Glue/API-level SSO has gaps - the skill will flag it.)
-C8. `[optional]` If an external IdP/SSO is used: on first login of an unknown user, does Spryker
-    auto-create (JIT-provision) the customer from the IdP payload, or must the user pre-exist? What
-    happens if creation fails (hard error / retry / silent skip)? -> feeds sections 06, 09
-C9. `[optional]` For any identity/IdP system: what fields does its payload carry (name, email, company,
-    country, roles, entitlements / purchased products)? Do its roles map to Spryker Company Roles, and
-    1:1 or many:1? -> feeds sections 03, 08, 09
-C10. `[optional]` Are any cart line items NOT real catalog products (services, quotes, configured or
-    bundled items created on the fly)? If so, where does their price come from (external API at
-    add-to-cart, at checkout, or both), and is the price locked when added or re-validated before
-    order? -> feeds sections 04, 06, 09
-C11. `[optional]` Does Spryker fire outbound notifications/calls to any external system from OMS state
-    transitions (order created, paid, shipped...)? For each: how many, at which state, and delivery
-    guarantee (fire-and-forget vs retried/guaranteed)? -> feeds sections 06, 03
-C12. `[optional]` For EACH system: is the API spec/contract available now, or still TBD from the owner?
-    Is there an existing/reference implementation you can reuse or reverse-engineer? -> feeds 03, 11
-C13. `[optional]` Is there a consent-management platform, and which storefront widgets are gated behind
-    consent? Is there a frontend performance budget for third-party scripts (max added page-load ms,
-    or a script-count limit)? -> feeds sections 08, 10, 11
-C14. `[optional]` Does any external system (DWH/BI/reporting) require direct database-level access to
-    Spryker data (vs API)? Spryker has no native external-DB connection; the skill will flag
-    site-to-site VPN / Data Exchange API options. -> feeds sections 03, 04, 11
-C15. `[optional]` Are any CORE storefront functions delegated to an EXTERNAL system rather than owned
-    by Spryker - product search, catalog browsing, category tree, filtering, or pricing? For each:
-    which function, which system, and what minimal data does Spryker still hold locally (e.g. "names +
-    price only")? (This inverts the standard architecture - the skill treats it as a headline decision.)
-    -> feeds sections 03, 05, 06, 09
+*9 questions.*
 
-## Group D - Migration  (-> section 01, maybe a Solution Design)
-If not migrating: write "no migration - greenfield".
-D1. `[REQUIRED]` Which data entities must be migrated? (products, customers, orders, open/in-flight
-    orders, returns, carts, encrypted passwords, price/rebate classes, dealer-customer relations...)
-D2. `[REQUIRED]` Roughly how many of each? (counts or ranges, or "unknown".) `[REQUIRED when
-    re-platforming]` - a 20-year re-platforming cannot be sized without these.
-D3. `[optional]` Full one-time load, or delta/incremental, or full-built-on-delta? Source format?
-D4. `[optional]` Migration timeline / cut-over constraints. `[REQUIRED when re-platforming]`.
+## General
 
-## Group E - Constraints and conventions  (-> sections 02, 07, 08)
-E1. `[REQUIRED]` Hosting model: Spryker Cloud (PaaS), self-hosted Kubernetes, on-prem, or hybrid?
-E2. `[REQUIRED]` Compliance/legal constraints: GDPR, PCI, data residency, country-specific rules?
-E3. `[optional]` Mandated technologies or legacy systems that cannot change.
-E4. `[optional]` Browser/device support requirements.
-E5. `[optional]` Team size, delivery method (e.g. Scrum, sprint length), release cadence, hard
-    deadlines/milestones.
-E6. `[optional]` Coding conventions: PHPStan level, coding standard, branching model. (Defaults
-    pulled from the project's CLAUDE.md if not given.)
-E7. `[optional]` Who owns integration prerequisites - outbound egress / allow-listing, secret &
-    credential management, per-adapter timeout/retry/circuit-breaker policy? (customer side vs Spryker
-    Cloud networking) -> feeds sections 07/08 integration-readiness checklist
+### Q1. Before we ask you anything: is there existing material we should read instead — a requirements document, RFP or tender response, a target-architecture write-up, interface specifications from your back-office systems, or current system diagrams (even a photo of a whiteboard)?
 
-## Group F - Volumes and quality  (-> section 10)
-Give figures at Go-Live and +1 year (add +2/+5Y if you have them). "TBD" is fine per cell.
-F1. `[REQUIRED]` Products: # active, # abstract, avg/max concretes per abstract, # bundles.
-F2. `[REQUIRED]` Categories: how many (root + sub)?
-F3. `[REQUIRED]` Prices: which price types (standard, RRP, sale, customer-specific), single or multiple
-    price dimensions?
-F4. `[REQUIRED]` Load: visitors/sessions per day or month; orders per day; conversion rate;
-    seasonality (peak months).
-F5. `[optional]` Cart size: average and maximum line items.
-F6. `[REQUIRED]` People (per phase where they change): # customers, # Back Office users, # merchants
-    (if marketplace - e.g. "N/A now, 300 dropshippers later").
-F7. `[optional]` Peak concurrency: max concurrent customers / BO users / merchants. (If unknown, the
-    skill derives an interim number from F4 and flags it as an assumption.)
-F8. `[REQUIRED]` Country expansion per phase: # regions, # countries, # stores per country, # languages,
-    # currencies.
-F9. `[optional]` Per-store infrastructure: shared DB/Redis/ES across stores, or separate per store?
-F10. `[REQUIRED]` Data import/export: what data, frequency, full vs delta, push vs pull, format, and
-    size/speed (e.g. "delta every 10 min ~50 products", "full XML on S3, import < 30 min",
-    "~1.5M XML tags"). -> also feeds 05/07/11
-F16. `[optional]` Do any volumes grow dramatically post-go-live (an order of magnitude within a year,
-    e.g. 300k -> 26M products), or does the import/processing volume itself pose a scaling risk? Give
-    the trajectory and any known mitigation direction. The skill treats this as a central design
-    driver, not a footnote. -> feeds sections 05, 07, 10, 11, 09
-F11. `[optional]` What is shared vs separate across stores/countries (products, customers, prices)?
-F12. `[optional]` Data residency / firewall restrictions (multi-store only).
-F13. `[optional]` Staging/non-prod environments planned (dev, staging, pre-prod, prod).
-F14. `[optional]` Testing strategy: CI/CD, test data, ability to simulate external integrations.
-F15. `[optional]` Concrete measurable targets: page load, search latency, API p95, batch/import time.
+*document*
 
-## Group G - Runtime, deployment, cross-cutting  (-> sections 06, 07, 08)
-G1. `[REQUIRED]` Which key runtime flows deserve a sequence diagram? (e.g. checkout+payment,
-    publish & sync, a headline integration flow, order fulfilment, login/SSO, returns, data import.)
-G2. `[optional]` Deployment topology details beyond E1: environments, CI/CD, monitoring/APM, backup.
-G3. `[optional]` Multi-store strategy (if >1 store): one region vs per-country regions; one domain?;
-    is Dynamic Multi-Store (DMS) intended? (Shared-vs-separate data + residency are covered in F9/F11/F12.)
-G4. `[optional]` Cross-cutting needs: authorization/permission model, logging/observability, error
-    handling, i18n, caching strategy, security patterns.
+### Q2. What is this platform called?
 
-## Group H - Decisions and exploration  (-> sections 04, 09, 11; only if those are selected)
-H1. `[optional]` Decisions already MADE that should be recorded as ADRs (with the "why"). e.g.
-    "invoice-only, no PSP for POC", "Payone direct module not ACP", "single shared DB".
-H2. `[optional]` Open decisions / hard problems that need an RFC-style Solution Design before building
-    (e.g. dynamic pricing model, large-scale import strategy, dealer hierarchy, returns portal).
-H3. `[optional]` Known open questions / risks to carry into the doc as TODOs or decision gates. For any
-    launch-blocking one, give an owner AND a resolve-by date so it becomes a pre-Go-Live decision gate
-    rather than standing debt. -> feeds section 11 decision gates
+*shorttext*
 
-## Group I - Document governance  (-> section 01 header, 04/09 metadata)
-I1. `[REQUIRED]` Document status for this run: Draft / In Review / Approved? Optional RAG (Red/Amber/
-    Green). -> feeds section 01 status block
-I2. `[REQUIRED]` Author/Driver name(s) for the document. -> feeds sections 01, 04, 09
-I3. `[optional]` Approver(s) / sign-off owners - internal approver + external/client approver (with
-    dates or "TBD"). -> feeds section 01
-I4. `[optional]` Document version label (e.g. 0.1, 1.0), and any handover session (date, attendees).
-    -> feeds section 01
-(Key dates default to today; ADR/SD dates the skill fills - you need not supply those.)
+### Q3. In one line each, what are the three to five business outcomes it must deliver — and for each, what is not working today that makes it necessary?
 
-## Group J - Organization & access model  (-> sections 03, 05, 08, 11; B2B / multi-tenant / multi-market)
-If the project is a single flat B2C shop with no org hierarchy: write "n/a" once here.
-J1. `[optional]` Is there a multi-tier commercial hierarchy (e.g. Headquarter -> Market/Region ->
-    Dealer/Merchant -> Customer)? Describe the tiers and who manages whom. -> feeds sections 03, 05
-J2. `[optional]` Do merchants/dealers have an internal hierarchy (main instance + subordinate branches,
-    shared vs branch-specific pricing, cross-branch login)? -> feeds sections 05, 08 + likely an SD
-J3. `[optional]` Is there a customer-approval-before-order workflow (customer requests access to a
-    dealer/merchant; the dealer approves before the customer can buy; merchant-specific customer IDs)?
-    -> feeds sections 06, 08 + likely an SD
-J4. `[optional]` Data isolation: must each market/store/tenant see ONLY its own data in the Back Office
-    (with only HQ seeing all)? -> feeds sections 08, 11 (skill will consider Persistence ACL)
-J5. `[optional]` Any HQ/central monitoring or reporting across markets/stores (import status, revenue
-    thresholds, legal-info status)? -> feeds sections 05, 11
-J6. `[optional]` Any per-store / per-country CUSTOM functionality (e.g. license-plate search in one
-    country, a price-upload rule or integration only one store needs)? -> feeds sections 01, 03, 05, 07
-J7. `[optional]` Do stores/markets need their own legal or content templates (T&C, warranty,
-    disclaimers, sales regulations) with a default + per-store override/fallback? Who authors them and
-    who consumes them (e.g. dealers reuse a market template)? -> feeds sections 05, 08
-J8. `[optional]` Is there order-level messaging between buyer and merchant/dealer (customer comments on
-    an order, merchant replies, thread in order history)? -> feeds sections 05, 06, 09
+*table*
+
+| Outcome | What is wrong today that drives it |
+|---|---|
+| "open four new country markets" | "every new market is a six-month project" |
+| "let business customers reorder without phoning us" | "our service desk retypes 200 orders a week" |
+| "replace the old shop before support ends" | "the vendor stops patching it in March" |
+
+### Q4. Is this a new build, or does it replace or extend something you already run? If it replaces something, name the system being replaced.
+
+*pick*
+
+- New build, nothing to replace
+- Replaces a commercial commerce platform (name it)
+- Replaces a shop we built ourselves (name it)
+- Replaces a shop embedded in our back-office system
+- Extends a commerce platform we already run
+- Consolidates several existing shops into one
+- Replaces part of a system that keeps running alongside indefinitely
+- Other — please describe
+
+### Q5. Which of these people and organisations will use the platform? Pick all that apply.
+
+*pick*
+
+- Consumers / end shoppers
+- Business buyers ordering for their company
+- Budget approvers inside the buying company
+- Account managers or agents ordering on a customer's behalf
+- Customer service staff
+- Merchandisers and content editors
+- Order and logistics back-office staff
+- Third-party sellers or dealers who run their own catalogue and orders
+- Suppliers or drop-ship partners
+- System administrators and operations
+- Other — please describe
+
+### Q6. Through which channels will people place orders at launch? Pick all that apply.
+
+*pick*
+
+- Web storefront (desktop and mobile web)
+- Native mobile app
+- A frontend built by us or another vendor calling the platform's APIs
+- The customer's own procurement system (their buyer shops in our catalogue and returns the basket to their tool)
+- Machine-to-machine order intake from a customer's system (EDI)
+- In-store ordering at a till or counter
+- Call-centre or field team ordering for a customer
+- Partner or distributor portal
+- No orders are placed on this platform — catalogue, search, quotes or portal use only
+- Other — please describe
+
+### Q7. Which other IT systems does this platform work with? One row per system — we are drawing the boxes here, not the arrows.
+
+*table*
+
+| Column | Example |
+|---|---|
+| Name / what you call it | "Group ERP", "Webshop PIM" |
+| Product or engine | SAP S/4, Payone, Salesforce, Akeneo, in-house |
+| What it does for you | one line |
+| What it is the master for | product data · prices · stock · customers · orders · invoices · content · media · sellers · none — pick any number |
+| Who owns it | you · a partner · a third party |
+| How we authenticate with it | API key · OAuth · certificate · VPN · not known yet |
+| Test or sandbox instance | yes, available now · yes, from &lt;date&gt; · no · not known yet |
+| Notes | anything you want us to know |
+
+### Q8. List the markets, countries or brands the platform serves — one row each — and against each one the phase it arrives in, in your own words (e.g. "Germany / internal go-live", "France / public go-live", "Switzerland / not committed").
+
+*table*
+
+### Q9. Pick the three to five qualities you would actually spend money to protect — not the ones that sound good.
+
+*pick*
+
+- Fast pages for the shopper
+- Surviving extreme peaks without failing
+- Uptime
+- Speed of change (new markets and features quickly, without a project)
+- Correctness and freshness of data against the source systems
+- Security and protection of customer data
+- A small team can operate it
+- Running cost
+- Cheap upgrades to new platform releases
+- Accessibility and legal conformance
+- Other — please describe
 
 ---
 
-## Run-configuration questions (always confirm, regardless of the above)
-These decide HOW the skill runs, not the architecture content:
-R1. `[REQUIRED]` Which arc42 sections to produce this run? (Default: all 12 + C4 + ADRs + SDs.)
-R2. `[REQUIRED]` Mode: Autonomous (interview once, then write everything) or Gated (confirm each
-    batch)?
-R3. `[REQUIRED]` Output target: the git-tracked `architecture/` folder in place (default), or a
-    worktree/branch/PR (default for multi-deliverable runs)?
-R4. `[optional]` For an EXISTING project: may the skill read the codebase / run the app to ground
-    sections in the real system?
+# Level 2 — Core foundation
 
-## Minimum viable answer set (if you answer nothing else)
-A1-A7, B1-B3, C1-C4, C7, D1-D2, E1-E2, F1-F4, F6, F8, F10, G1, I1-I2, R1-R3. With just these the skill
-can produce a grounded first draft; everything else becomes an honest TODO. Groups H and J are only
-needed when ADRs/SDs are selected (H) or the project has a real org/tenant hierarchy (J).
+Adds the building-block view, the runtime flows worth drawing, and quality requirements with real numbers. This is the level most projects should reach.
+
+*21 questions.*
+
+## Hosting
+
+### Q10. Where will the platform run?
+
+*pick*
+
+- The vendor's managed cloud (the standard option)
+- Your own cloud account, run by you or a partner
+- Another public cloud
+- Your own data centre
+- Hybrid — part cloud, part on-premises
+- Too complex to decide now — needs investigation
+
+## What the platform does not do
+
+### Q11. Which of these will be delivered by a separate product or a separately built application, rather than by the commerce platform itself? Name the product for each one you pick.
+
+*pick*
+
+- The shopper-facing storefront itself (a separately built frontend calling our APIs)
+- Search and product listing
+- Content and landing pages
+- Digital asset management
+- Tax calculation
+- Payment orchestration
+- Customer login and identity
+- Personalisation and recommendations
+- Product data authoring and enrichment
+- Promotions or loyalty
+- Other — please describe
+
+## Storefronts and markets
+
+### Q12. If you will run more than one storefront (per market, brand or channel): what must genuinely be the same across them — one catalogue, one customer base, one pool of orders — and what must be separate?
+
+*pick*
+
+- Only one storefront — not applicable
+- Everything shared: one catalogue, one customer base, one order pool
+- Catalogue shared, customers and orders separate
+- Nothing shared — each storefront is its own world
+- Other — please describe
+- Too complex to decide now — needs investigation
+- Not decided yet
+
+## The four capability gates
+
+### Q13. How complicated is pricing? Pick the closest.
+
+*pick*
+
+- Standard — one price per product, per market and currency
+- Another system calculates it (name it)
+- Negotiated prices or contracts per customer, or a price per seller
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q14. How does the platform decide whether an item is available to order? Pick the closest.
+
+*pick*
+
+- Not applicable — availability is never shown
+- Standard — one stock figure per item, refreshed by import
+- Another system owns it (name it)
+- Stock per warehouse or location that must be resolved into one answer, or reservations, batches, lead times
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q15. Where is the shopper's payment handled? Pick the closest.
+
+*pick · asked when Q6 ≠ "no orders"*
+
+- No payment is taken here this phase — invoiced or charged elsewhere
+- Standard — one provider covers the methods we need
+- Another system takes the money (name it)
+- Several providers, money split between sellers, funds held, instalments or credit checks
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q16. Does every signed-in customer see the same products, or does it depend on who they are? Pick the closest.
+
+*pick*
+
+- Standard — everyone sees the same catalogue
+- Another system owns who sees what (name it)
+- An agreed catalogue per customer or site, or visibility by contract, licence or region
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q17. For each market: which payment methods must shoppers be able to use, and how does the shopper interact with each — stay on your pages, embedded form, sent to the provider, or no interaction because it is invoiced?
+
+*table · asked when Q15 ≠ "no payment"*
+
+## Orders
+
+### Q18. Once an order is placed on this platform, which system runs it to completion — payment, picking, shipping, returns?
+
+*pick · asked when Q6 ≠ "no orders"*
+
+- The platform runs the process and the back-office system reports back
+- The platform hands the order over immediately and only mirrors its status
+- A dedicated order management system runs it
+- Split — the platform up to payment, the back-office system from there
+- Other — please describe
+- Not decided yet
+
+## Integration
+
+### Q19. Does the platform talk to your back-office systems directly, or does everything pass through one integration layer in the middle? Name it if there is one.
+
+*pick · asked when 2+ systems named in Q7*
+
+- Direct point-to-point to each system
+- An enterprise service bus or integration platform (name it)
+- An event streaming platform (name it)
+- A cloud integration service (name it)
+- Middleware you built and own yourselves (name it)
+- Mixed — middleware for some systems, direct for others
+- Other — please describe
+- Not decided yet
+
+### Q20. Now the arrows. For each system in Q7 and each kind of data it exchanges, one row. Fill in what you know — leave the rest blank rather than guessing.
+
+*table*
+
+| Column | Options / example |
+|---|---|
+| System | pre-filled from Q7 |
+| What data | pre-filled from what that system is master for, plus anything it only receives |
+| Direction | we send · we receive · both |
+| How it travels | real-time API · scheduled API · file drop (SFTP/S3) · message queue · manual upload · database link · other |
+| Waiting or background | must finish while a user waits · can run in the background |
+| How often, how much | "every 10 min, ~50 products" · "nightly full, 1.5M rows" |
+| Trigger | what starts it |
+| If it is unavailable | what should happen |
+| Notes | anything else |
+
+### Q21. Who signs in through your existing company or customer login system rather than with a shop password?
+
+*pick*
+
+- Nobody — accounts are held in the shop
+- Shoppers
+- Business buyers, using their own company's login
+- Back-office staff
+- Third-party sellers' users
+- Machine-to-machine API clients
+- Other — please describe
+- Not decided yet
+
+## Business customers and sellers
+
+### Q22. How are your business customers organised, and how much of that must the platform model?
+
+*pick · asked when Q5 includes business buyers*
+
+- Flat company with a list of users
+- Company with departments, sites or branches, and user roles
+- As above, plus spending limits and approval before an order is placed
+- As above, plus quote negotiation before ordering
+- Dealers or distributors that have their own sub-branches underneath them
+- Other — please describe
+- Not decided yet
+
+### Q23. How do new sellers get onto the platform? Pick the closest.
+
+*pick · asked when Q5 includes third-party sellers*
+
+- They register themselves and are live immediately
+- They register themselves; your staff approve before they go live
+- Your staff create and set up each seller by hand
+- Created automatically from another system (name it)
+- Migrated in bulk from the platform you run today
+- Mixed — bulk migration first, self-service later
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+## Migration
+
+### Q24. What must be moved out of the old systems before go-live — and roughly how much of it is there today?
+
+*pick · asked when Q4 ≠ new build*
+
+- Customer companies and their sites
+- User accounts
+- Stored passwords
+- Product catalogue
+- Price lists and contracts
+- Historical orders
+- Orders still in flight at cutover
+- Content pages and navigation
+- Nothing — clean start
+- Other — please describe
+
+## Numbers and targets
+
+### Q25. Fill in the size and load figures — one column per phase you named in Q8.
+
+*table*
+
+- 0
+- N/A
+- -
+
+### Q26. Fill in the targets you have agreed — one column per phase. We have pre-filled our defaults; correct them, and mark any target that is agreed but not yet met with its current value.
+
+*table*
+
+## Constraints inherited from what you already run
+
+### Q27. Which limitations of your existing systems must the new platform live with?
+
+*pick · asked when Q4 ≠ new build*
+
+- None we know of
+- Data formats we cannot change
+- An interface that only works one way
+- A system that can only be reached in batch windows
+- Identifiers or codes we cannot restructure
+- A release cycle we do not control
+- A contract or licence that limits what we may change
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+## Runtime
+
+### Q28. Which end-to-end journeys are important or risky enough to need a step-by-step diagram?
+
+*pick*
+
+- A shopper places an order and it reaches the back-office system
+- Payment authorisation and capture
+- Order status and shipment updates coming back
+- Product and price import
+- Stock check and reservation
+- Login handoff from another application
+- Approval or quote before an order
+- Ordering from the customer's own procurement system
+- Return or cancellation
+- Seller onboarding and offer publishing
+- Other — please describe
+
+## Confirmations (not questions — accept or correct)
+
+### Q29. Here is the context diagram and the container list we derived from your answers, including the commerce model we inferred. Confirm or correct it before we draw anything else.
+
+*confirm*
+
+### Q30. Here are the risks we derived from your answers, each with a proposed likelihood and impact. Correct any rating you disagree with, and add what we have missed.
+
+*confirm*
+
+---
+
+# Level 3 — Design intelligence
+
+Constraints, deployment, decisions, and the detail behind any topic a Level 2 gate flagged as non-standard. Nothing here is asked unless its condition is met.
+
+*21 questions.*
+
+## Behind the pricing gate — *when Q13 ≠ standard*
+
+### Q31. Which price variations must the shop support?
+
+*pick*
+
+- One list price per product, everywhere
+- A different price per market and currency
+- Both tax-included and tax-excluded prices
+- Quantity or scale prices (cheaper per unit above a threshold)
+- Prices per customer group or per named price list
+- Prices negotiated per individual company or contract
+- Prices set independently by each seller in a marketplace
+- Time-limited prices with a start and end date (campaigns, promotions)
+- A customer-specific discount applied at checkout rather than a stored price
+- Prices per unit of measure (per metre, per kilo, per pack) alongside per-item prices
+- Other — please describe
+- Too complex to decide now — needs investigation
+- Not decided yet
+
+### Q32. Where does the price shown on a product page come from?
+
+*pick*
+
+- Held in the platform
+- Imported on a schedule from another system
+- Asked live from another system while the shopper waits
+- Mixed — list price held here, contract price asked live
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+## Behind the stock gate — *when Q14 ≠ standard and ≠ not applicable*
+
+### Q33. How often does this platform learn that a stock figure has changed?
+
+*pick*
+
+- Live, on every request
+- Every few minutes
+- Hourly
+- Nightly
+- Only when someone imports a file
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q34. How out of date may the availability shown to a shopper be before it causes a problem?
+
+*pick*
+
+- Seconds
+- Minutes
+- Hours
+- A day
+- We show bands, not numbers
+- We never promise availability until the order is confirmed
+- Other — please describe
+
+### Q35. How is your stock organised physically?
+
+*pick*
+
+- One central figure
+- One warehouse
+- Several warehouses or sites
+- Per seller
+- Per market or storefront
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+### Q36. Does where the stock sits change what a shopper can buy?
+
+*pick*
+
+- No — one total, anyone can buy it
+- Yes — the shopper's site or region decides
+- Yes — reservations or allocations decide
+- Other — please describe
+- Too complex to decide now — needs investigation
+
+## Behind the assortment gate — *when Q16 ≠ standard*
+
+### Q37. What decides which products a signed-in customer may see?
+
+*pick*
+
+- Everyone sees the same catalogue
+- The market or storefront decides it, nothing more
+- A catalogue per customer group or per price list
+- A named product list per individual company or contract
+- A different list per delivery site or location inside the same company
+- The list is decided by another system and fetched while the shopper browses
+- Sellers decide which customers may see their offers
+- Some products are hidden by licence, certification or age (e.g. prescription items, dangerous goods)
+- Other — please describe
+- Too complex to decide now — needs investigation
+- Not decided yet
+
+## Markets and back office — *when Q8 lists more than one market*
+
+### Q38. Must any market's data physically stay inside a particular country or region?
+
+*pick*
+
+- One region, no residency requirement
+- One region, EU only
+- One region, a named country only
+- One or more markets need their own country or region
+- A second region for failover only
+- Not yet checked with legal
+- Other — please describe
+
+### Q39. In which part of the world should the platform run?
+
+*pick*
+
+- Western or Central Europe
+- Northern Europe (Nordics)
+- United Kingdom
+- North America — east
+- North America — west
+- Middle East
+- Asia-Pacific (e.g. Singapore, Japan)
+- Australia or New Zealand
+- Other — please describe
+- Too complex to decide now — needs investigation
+- Not decided yet
+
+### Q40. In the back office, must staff be prevented from seeing data belonging to other markets, brands or sellers?
+
+*pick*
+
+- No — all back-office staff may see everything
+- Yes — staff are scoped to one market or brand
+- Yes — sellers may only see their own data
+- Both of the above
+- A restriction exists but has not been defined
+- Other — please describe
+- Not decided yet
+
+### Q41. How different is the business logic between your markets?
+
+*pick*
+
+- Identical everywhere; only text, currency and prices differ
+- Small configuration differences only
+- One or two markets need genuinely different process steps
+- Markets differ so much they are effectively different shops
+- Other — please describe
+- Not decided yet
+
+### Q42. How is a new market or storefront onboarded?
+
+*shorttext*
+
+## Constraints and delivery
+
+### Q43. Which technical choices are already fixed by your organisation and not open for discussion?
+
+*pick*
+
+- Cloud provider and region
+- Hosting must be self-managed or on-premises
+- A corporate identity provider for logins
+- A specific content delivery network, web application firewall or bot protection
+- A specific payment provider
+- A specific back-office or product data system that cannot be changed or extended
+- A specific monitoring, logging or performance-tracing tool
+- Security logs must reach our own security monitoring system
+- A specific build and release toolchain
+- A specific email or notification provider
+- Other — please describe
+
+### Q44. What actually makes that one fixed?
+
+*pick*
+
+- It is written into a contract, licence or group-wide policy we cannot change
+- Another department or group IT owns the decision, not this project
+- It is required by law, by an auditor, or by a certification we hold
+- The product is already bought and paid for
+- Changing it would need a budget decision above this project
+- Honestly — we could just decide otherwise
+- Other — please describe
+- Not decided yet
+
+### Q45. Which legal or regulatory obligations apply to this platform?
+
+*pick*
+
+- General data protection rules
+- Card payment security rules
+- Data must stay in a specific country or region
+- Accessibility conformance (state the level)
+- Country-specific electronic invoicing
+- Sector rules (pharma, food, chemicals, defence, financial services, age-restricted goods)
+- Export control or restricted-party screening
+- An internal security certification or customer security review
+- Audit evidence for every production change
+- None beyond standard data protection
+- Other — please describe
+
+### Q46. Who builds this platform, and who operates it after go-live?
+
+*pick*
+
+- A partner builds and runs it
+- A partner builds it, your team runs it after handover
+- Your own team builds and runs it
+- A mixed team throughout
+- Several partners working in parallel
+- …and releases are frozen during peak trading
+- …and releases are frozen around financial year end
+- Other — please describe
+
+### Q47. Are there periods when nothing may be changed on the live platform?
+
+*pick*
+
+- No freeze periods
+- Peak trading season
+- Financial year end
+- Fixed change windows only
+- Customer-specific blackout dates
+- Other — please describe
+
+### Q48. Which environments must exist besides development and production?
+
+*pick*
+
+- Staging only
+- Staging plus a business acceptance environment
+- Plus a performance and load-test environment
+- Plus a training environment
+- Plus a hotfix or pre-production environment
+- Plus a standby environment in a second region
+- Development and production only
+- Other — please describe
+
+### Q49. How are non-production environments filled with test data?
+
+*pick (multi)*
+
+- Fixed static demo data
+- Anonymised production data
+- A copy of production as it is
+- Generated synthetic data
+- The same interfaces as production, pointed at sandboxes
+- Created by hand by the team
+- They start empty
+- Other — please describe
+- Not decided yet
+
+## Transition — *when Q4 ≠ new build*
+
+### Q50. How do you move from what you run today to the new platform?
+
+*pick*
+
+- A single switch-over on one date
+- Market by market
+- Brand by brand
+- A pilot customer group first
+- Gradually replace capabilities while the old shop stays live
+- Other — please describe
+- Not decided yet
+
+## Identity — *when Q21 ≠ nobody*
+
+### Q51. The first time someone signs in from your other application and has no account here yet, what should happen?
+
+*pick*
+
+- Reject the login — the account must be created in advance
+- Create a plain shopper account automatically
+- Create the account and attach it to the right company automatically
+- Different rules for staff and for shoppers
+- Other — please describe
+- Not decided yet
+
+---
+
+# Level 4 — Full
+
+Cross-cutting concepts and glossary. Opt-in depth.
+
+*2 questions.*
+
+## Glossary and release cadence
+
+### Q52. Do you have a glossary of business terms? Please share it.
+
+*document*
+
+### Q53. How often will you take new platform releases after go-live, and what must be true before one may go live?
+
+*pick*
+
+- Continuously, as releases appear
+- Quarterly
+- Twice a year
+- Once a year
+- Only when forced to
+- Other — please describe
+- Not decided yet

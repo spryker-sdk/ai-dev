@@ -15,7 +15,7 @@ root so it's stable regardless of the current working directory:
 ${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/architecture-prep/<run-id>/
 ```
 
-`<run-id>` is a short slug: a JIRA key if the work is ticketed, else a date + brief name (e.g.
+`<run-id>` is a short slug: the ticket key if the work is ticketed, else a date + brief name (e.g.
 `2026-07-23-marketplace-arch`). Note the project's rule that temporary/draft `.md` go under
 `.claude/local-trash/` — the cache folder above is that spirit; keep **all** scratch here and never
 scatter run files into `architecture/`. Set it once at Step 0:
@@ -27,7 +27,7 @@ ARCH_LOG="$ARCH_DIR/run.log"
 ```
 
 Files that live here: `run.log`, `decisions.md`, `intake.md`, `research-docs.md`, `research-web.md`,
-`research-current-state.md`, and any per-section notes. The **deliverable** (the filled arc42 files
+and any per-section notes. The **deliverable** (the filled arc42 files
 and diagrams) is written into the output target — by default the git-tracked `architecture/` folder —
 never into `$ARCH_DIR`.
 
@@ -73,7 +73,12 @@ bulky lives in a file you re-open on demand.
 - **Extra expectations** — any Step 0 delta from the standard flow (e.g. "also produce ADR-001",
   "single store only", "explore ERP integration as an SD"), so every later step honors it.
 - **Interview status** — done? path to `intake.md`. One-line note of any big gaps.
-- **Research summaries** — for each source (docs / web / current-state): a 1–3 line takeaway + path
+- **Every fact in `intake.md` carries its source**, one of exactly these:
+  `interview` · `questionnaire (pre-filled)` · `derived (confirmed) — <doc> §<loc>` ·
+  `derived (unconfirmed) — <doc> §<loc>` · `<document name>` · `unanswered`.
+  Section writers cite these and the reviewer checks them, so the vocabulary is fixed, not free text.
+  A `derived (unconfirmed)` fact must read as an assumption wherever it appears in the deliverable.
+- **Research summaries** — for each source (docs / web / derived-from-documents): a 1–3 line takeaway + path
   to the findings file. Not the findings themselves.
 - **Per-section verdict** — for each selected section: `written | pending | skipped`, its TODO count,
   and the file path. For a section with open TODOs, keep only the ≤5 TODO items, not the prose.
