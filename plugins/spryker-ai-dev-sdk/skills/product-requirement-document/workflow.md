@@ -11,18 +11,20 @@ This document provides the detailed phase-by-phase breakdown of the interactive 
 
 ### Phase 0: Research FIRST 🔬 REQUIRED (before any requirement)
 
-Ground everything in real Spryker before drafting. Codebase facts (Step 0.2) are always gathered; docs research (Step 0.1) and running-app validation (Step 0.3) are **opt-in — ask the user with `AskUserQuestion` before running each**.
+Ground everything in real Spryker before drafting — **code first, then docs**: the codebase facts are cheap inline calls that settle most questions and target the expensive docs research. Codebase facts (Step 0.1) are always gathered; docs research (Step 0.2) and running-app validation (Step 0.3) are **opt-in — ask the user with `AskUserQuestion` before running each**.
 
-**Step 0.1 — Public documentation research (ASK FIRST; run as subagent[s])**
-Ask the user whether docs research is needed: *"Should I research the official Spryker docs for this feature first?"* Some features are project-specific or already clear from the codebase and need none. **Only if yes**, dispatch the research to **subagent(s) via the Agent tool** — never inline in the main loop — each subagent's prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only). This keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** launch one subagent per concept/PBC/actor-area in a single message so they run in parallel; use a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs.
-- If a subagent reports a missing MCP tool, tell the user and suggest enabling it before continuing.
-
-**Step 0.2 — Codebase facts (inline, Spryker tooling MCP server)**
-Confirm against the real install and pin exact names — match tools by tool name (server names vary by install):
+**Step 0.1 — Codebase facts (inline, first, Spryker tooling MCP server)**
+Establish against the real install what exists and pin exact names — match tools by tool name (server names vary by install):
 - `getSprykerModules` — exact module name(s).
-- `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.)
+- `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.) **Take vendor paths from the map's output — never guess `Business/...` sub-paths.**
 - `getTransferStructureByName` — real transfer field names/types. Never invent fields.
+- **Project-overlap sweep:** grep the project namespace for the feature's nouns and read the registered plugin stacks in the touched modules' project DependencyProviders — what has *this project* already built that overlaps? Anything found becomes a story input.
 **If the tooling MCP server is not connected / not running** (tool unavailable or `/mcp` reconnect failed): **start the underlying server first** — it backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up — then **ask the user to reload the MCP connection** (run `/mcp` to reconnect) and wait for confirmation before continuing. Don't guess names; if the reconnect keeps failing, fall back to reading the codebase directly (grep/Read) and say so.
+From these facts, **form a hypothesis** about the feature's shape — the docs research below confirms or refutes it instead of sweeping blind.
+
+**Step 0.2 — Public documentation research (one folded question; run as subagent[s] or inline per the user's choice)**
+Ask one research-depth question via `AskUserQuestion`: *(a) docs research via subagents (recommended)*, *(b) docs research inline* (for a harness that forbids unrequested subagents), *(c) skip*. Some features are project-specific or already settled by Step 0.1 and need none. On **(a)**, dispatch **subagent(s) via the Agent tool**, each prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only) and naming the Step 0.1 hypothesis/concepts to confirm — this keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** one subagent per concept/PBC/actor-area in a single message, **each given an explicit non-overlap boundary** ("agent B covers Product Lists — don't"); a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs. On **(b)**, run the skill inline and say so. Docs are **not trusted for identifier spellings** — real field/route names come from Step 0.1.
+- If a subagent reports a missing MCP tool, tell the user and suggest enabling it before continuing.
 
 **Step 0.3 — Validate existing flows (ASK FIRST; only when the behavior already exists)**
 If the feature modifies or extends an existing flow, ask the user: *"This extends an existing flow (<name> → <endpoint>). Should I run the app and validate how it behaves today?"* **Only if yes**, invoke the **`spryker-runtime`** skill to see how it behaves today — run a `docker/sdk cli console` command, call the endpoint over HTTP, or log in and drive the UI in Chrome (start the app with `script -q /dev/null docker/sdk run` if it's down). Use the observed status/response/UI to write accurate acceptance criteria and the correct endpoint path. Skip this (and the question) for greenfield behavior that cannot be run yet.
@@ -30,7 +32,7 @@ If the feature modifies or extends an existing flow, ask the user: *"This extend
 **Step 0.4 — Hold the findings**
 Keep what you gathered: real module/transfer names always; documented behavior (if researched) and observed behavior (if validated) when applicable. They feed Phases 3–5 directly. Do not invent any of these later.
 
-**CHECKPOINT:** Do not draft requirements until codebase facts are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
+**CHECKPOINT:** Do not draft requirements until codebase facts (incl. the project-overlap sweep) are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
 
 ### Phase 1: Initial Requirements Gathering 🔄 INTERACTIVE
 

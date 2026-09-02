@@ -31,6 +31,12 @@
 
 **Affected endpoint:** `[URL path resolved from deploy.dev.yml host or user-specified target]` (existing | greenfield — closest neighbor: [path]; [Module name])  <!-- path only — no controller/action class; the FQCN goes in {feature-name}.refs.md -->`
 
+<!-- Only for a story whose scope includes adding a dependency — composer package names + versions are REQUIRED in the body (product identifiers, not code references): -->
+**Packages to add:**
+| Package | Version constraint | Status |
+|---|---|---|
+| [vendor/package-name] | [^X.Y — resolved against composer.lock during Phase 0] | [not installed, dependency-clean | needs upgrade of Z] |
+
 **Acceptance Criteria:**
 
 Scenario: [Specific behavior being tested]
@@ -90,8 +96,9 @@ Scenario: [Specific behavior being tested]
 
 ## Decisions & Accepted Risks
 
-[User choices with a cost they explicitly accepted. State the decision, the cost in plain language, and that it was accepted. This is the audit trail for "we knew, and we chose".]
+[User choices with a cost they explicitly accepted. State the decision, the cost in plain language, and that it was accepted. This is the audit trail for "we knew, and we chose". One line per item. Genuinely undecided items that block implementation go FIRST, in the OPEN shape — never dressed up as decided — and are repeated in the save hand-off message.]
 
+- **OPEN — blocks implementation:** [the undecided question] — [what it blocks until answered].
 - **[Decision]** — [its cost, plainly] — accepted by [user] on [date].
 
 ## Success Metrics

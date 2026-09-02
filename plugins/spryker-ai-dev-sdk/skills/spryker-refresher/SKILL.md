@@ -50,6 +50,8 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | `*.schema.xml` changed (project layer) | `propel:install` |
 | A `.php` file is **added, renamed, moved, or deleted** under a project namespace in `src/` | `composer dumpautoload --apcu` |
 | A `.php` file under a project namespace is added or deleted whose **fully-qualified class name matches an existing vendor class** (the file is a project-layer override — same FQCN minus the `Spryker\` vs project root) | `cache:class-resolver:build` |
+| A **new module directory** appears under a project namespace (`src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<NewModule>/`) | `dev:ide-auto-completion:generate` — regenerates the locator stub so `$this->getLocator()-><newModule>()` exists. Without it the app runs fine but **phpstan fails with `Call to an undefined method …LocatorLocatorInterface::<newModule>()`**, surfacing two steps later as a phantom code defect. The project's own install recipe runs this (see `config/install/development.yml`). |
+| Locator/IDE stubs were regenerated (the row above ran) and phpstan will run later in the chain | `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`) — phpstan's result cache keeps reporting the stale locator error after the stub is fixed; clearing it saves a wasted diagnostic cycle. |
 | `*DependencyProvider.php` changed (plugin chain edit, body or new file) | `cache:empty-all` |
 | `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
 | Yves Twig / JS / SCSS changed | `frontend:yves:build` → `twig:cache:warmer` |
