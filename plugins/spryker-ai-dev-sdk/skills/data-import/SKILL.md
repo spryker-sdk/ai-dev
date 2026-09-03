@@ -46,7 +46,7 @@ Do not run propel:install or transfer:generate — write code only.
 
 This skill builds the import path — CSV → validator/writer steps → database rows. **How those rows
 reach search or key-value storage is a separate, deliberate design decision that belongs to the
-feature's technical plan** (the `spryker-customization` skill's §P&S section: is propagation needed
+feature's solution design** (the `spryker-customization` skill's §P&S section: is propagation needed
 at all, which single mechanism, what transaction boundary). Never wire a publish into an
 after-import hook as a side effect of building the import — that decision was made outside any
 review once, and it shipped a synchronous publish that bypassed the queue while the declared event

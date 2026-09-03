@@ -48,12 +48,12 @@ The workflow has these phases. **Show the user the list, mark each ON/OFF with s
 | Phase | Default | Reason a user might skip |
 |---|---|---|
 | Intake + plan | **always on** | (required) |
-| Technical plan (independent architect pass — Step 3a, gated on user approval) | **on for MVP — always proposed; the user turns it off if not needed. Off for PoC (still proposable).** Module count is NOT the test: a single-module feature can need it just as much (search/KV, identity, imports, or any design worth reviewing). | The user judges the design not worth a review pass for this change; they own the design themselves; accepted risk. A skip is logged in `run.log` with the reason and listed in the Step 8 Caveats — a skip is a decision, not an omission. |
+| Solution design (independent architect pass — Step 3a, gated on user approval) | **on for MVP — always proposed; the user turns it off if not needed. Off for PoC (still proposable).** Module count is NOT the test: a single-module feature can need it just as much (search/KV, identity, imports, or any design worth reviewing). | The user judges the design not worth a review pass for this change; they own the design themselves; accepted risk. A skip is logged in `run.log` with the reason and listed in the Step 8 Caveats — a skip is a decision, not an omission. |
 | Branch + edit | **always on** | (required) |
 | Tests (write tests for non-trivial logic alongside the edit) | **on for MVP, off for PoC** | User will write tests later, or the feature isn't stable enough to test yet |
 | Refresh (post-change console / composer commands via `spryker-refresher`) | **on** | User wants to inspect the diff first, run commands manually |
 | Verification (per-AC via `spryker-verifier`) | **on** | User will verify manually, or AC list is too ambiguous to verify automatically |
-| QA-thorough coverage (expand ACs into 4-bucket test plan via `spryker-qa-coverage` skill before verifier runs) | **on for MVP, off for PoC** | PoC verifies literal ACs only — thoroughness is overkill. MVP wants Happy + Negative + Authorization + Corner coverage. |
+| QA-thorough coverage (expand ACs into 5-bucket test plan via `spryker-qa-coverage` skill before verifier runs) | **on for MVP, off for PoC** | PoC verifies literal ACs only — thoroughness is overkill. MVP wants Happy + Negative + Authorization + Corner + Scale/NFR coverage. |
 | Self-correction on red ACs (`spryker-issue-diagnoser` + retry) | **on if verification is on** | User wants to see red ACs and decide manually, no automatic retries |
 | Cypress E2E coverage (fix/improve/add an E2E spec via the `cypress-tests` skill once all ACs are green) | **on for MVP, off for PoC** | PoC is throwaway; or the feature has no user-visible E2E surface (pure console/import/queue), or the user will cover E2E separately |
 | Static validation (lint / phpcs / phpstan via the `static-validation` skill) | **on** | Catches style, architecture, and type errors automatically before commit. Skip only for very small / throwaway changes. |
@@ -72,7 +72,7 @@ Intake (Step 1) needs a PRD or acceptance criteria to read. Before assuming one,
 - **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **confirm before relying on it** — don't silently assume it's current, since requests drift from stale PRDs. Use `AskUserQuestion` with options: (a) *Use this PRD* (recommended), (b) *Refresh/extend the existing one* via `Skill(product-requirement-document)`, (c) *Create a new PRD from scratch* via `Skill(product-requirement-document)`.
 - **No PRD is present:** ask how to proceed. Use `AskUserQuestion` with options: (a) *I'll provide a PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* via `Skill(product-requirement-document)` (recommended), (c) *Proceed from acceptance criteria / a feature description only* — no PRD; intake works from what the user states directly (note in the final report that the build wasn't PRD-grounded).
 
-When the user chooses to create or refresh a PRD, hand off to `Skill(product-requirement-document)` and resume at Step 1 once it returns. Only after the PRD source is settled do you proceed to Intake.
+When the user chooses to create or refresh a PRD, hand off to `Skill(product-requirement-document)` and **resume at Step 0d** once it returns — the scale envelope is never skipped on the PRD-creation path. Only after the PRD source is settled do you proceed to Step 0d and then Intake.
 
 For a user new to the suite: the full feature path is `product-requirement-document` → **this skill** (plan → build → verify → commit gate) → optionally deeper QA via `spryker-qa-coverage` and E2E via `cypress-tests` (both already wired in as phases here). The PRD skill is the only upstream stop — everything after it is driven from this workflow.
 
@@ -80,8 +80,8 @@ For a user new to the suite: the full feature path is `product-requirement-docum
 
 A feature verified only against demo data ships designs that die at customer scale (a real run indexed per-business-unit data into every product's search document — fine at 9k demo documents, `products × business units` at a real customer). Before intake, establish the volumes and NFR numbers the design must hold:
 
-1. **Read the project's own numbers first.** If the project carries an `architecture/` folder, read `architecture/10-quality-requirements.md` — its Volume Planning table (Go-Live / +1Y columns) and Quality Scenarios answer most of this step without asking anything. Ask the user only for what's empty or missing: catalog size (abstract/concrete products), customers / companies / business units, the expected row count for whatever entity this feature introduces — **today AND at go-live** — and the NFR numbers (search/page response time, index growth budget, import volume + frequency, concurrency). Ask in the same round as the other Step 0 questions.
-2. **No numbers from either source → the baseline volumes apply**, from [references/baseline-volumes.md](references/baseline-volumes.md), **upper bound**. The design floor is the Spryker baseline volumes, never demo-data reality. Where §10 exists but is empty, you may offer to seed it via the `architecture-prep` skill (`spryker-architecture` plugin) — if the plugin isn't installed or the user declines, keep the envelope in `decisions.md` for this run only, record the decline once, and don't re-ask on later runs.
+1. **Read the project's own numbers first.** If the project carries an `architecture/` folder, read `architecture/10-quality-requirements.md` — its Volume Planning table (Go-Live / +1Y columns) and Quality Scenarios answer most of this step without asking anything. Ask the user only for what's empty or missing: catalog size (abstract/concrete products), customers / companies / business units, the expected row count for whatever entity this feature introduces — **today AND at go-live** — and the NFR numbers (search/page response time, index growth budget, import volume + frequency, concurrency). This step runs **after the PRD source is settled** (the feature-entity row needs the PRD); batch whatever must be asked into one round.
+2. **No numbers from either source → the baseline volumes apply**, from [references/baseline-volumes.md](references/baseline-volumes.md), **upper bound**. The design floor is the Spryker baseline volumes, never demo-data reality. Where the `architecture/` folder is missing, or §10 exists but is empty, you may offer to create/seed it via the `architecture-prep` skill (`spryker-architecture` plugin) — if the plugin isn't installed or the user declines, keep the envelope in `decisions.md` for this run only, record the decline once, and don't re-ask on later runs.
 3. **Emit the envelope as a forced-output block** — the same discipline as Step 3's Namespace-resolution block, for the same reason: a rule satisfiable by silent reasoning gets reasoned away.
 
 ```
@@ -203,17 +203,18 @@ Use the chain as the feature-expert describes. The MVP-grade check verifies that
 
 That is the **floor**. MVP also has a **ceiling**: canonical where canonical earns its keep, never maximum skeleton. Every class beyond the canonical chain must name what breaks without it — or match the convention resolved in the Code-convention block above, which decides the interface question. The PoC justification check is not PoC-only; MVP runs it too. (A real MVP run shipped 9 single-implementation interfaces because "canonical patterns" was read as *maximum skeleton* — the completeness floor with no ceiling is exactly how that happens.)
 
-### Step 3a: Technical plan — independent architect pass (if the phase is on)
+### Step 3a: Solution design — independent architect pass (if the phase is on)
 
-When the Technical plan phase is ON (Step 0b), the design is authored by an **architect that is not the implementing context**: dispatch a **fresh subagent** (`general-purpose` — never a fork; a fork inherits the forming implementation bias, and an author can't see its own gaps) with the brief and template in [references/technical-plan.md](references/technical-plan.md). Hand it: the PRD + `.refs.md`, the Step 0d scale envelope, the feature-expert findings, project CLAUDE.md, and **this project's actual wiring** (`ApplicationServices.php` / DI registrations — read, not assumed; a whole-project outage once hid in exactly that file). When the project has an `architecture/` folder, the architect also reads `02-constraints.md`, `05-building-block-view.md`, and existing ADRs before designing, and writes the plan as `architecture/04-solution-designs/sd-XXX-<feature>.md` (the folder's own Solution Design template); otherwise it writes `$BUILD_DIR/technical-plan.md`.
+When the Solution-design phase is ON (Step 0b), the design is authored by an **architect that is not the implementing context**: dispatch a **fresh subagent** (`general-purpose` — never a fork; a fork inherits the forming implementation bias, and an author can't see its own gaps) with the brief and template in [references/solution-design.md](references/solution-design.md). Hand it: the PRD + `.refs.md`, the Step 0d scale envelope, the Step 3 **Namespace-resolution block and `Convention:` line** (the plan's class list is checked against both), the feature-expert findings, project CLAUDE.md, and **this project's actual wiring** (`ApplicationServices.php` / DI registrations — read, not assumed; a whole-project outage once hid in exactly that file). When the project has an `architecture/` folder, the architect also reads `02-constraints.md`, `05-building-block-view.md`, and existing ADRs before designing, and writes the plan as `architecture/04-solution-designs/sd-XXX-<feature>.md` (the folder's own Solution Design template); otherwise it writes `$BUILD_DIR/solution-design.md`.
 
-The architect has **authority to reject** the approach on scale or code-volume grounds and demand a re-cut; its verdict goes to the user at the plan gate, never around them. Step 4 starts from the **approved** technical plan; deviating from it mid-build is a logged decision that must be re-surfaced, not silently absorbed.
+The architect has **authority to reject** the approach on scale or code-volume grounds and demand a re-cut; its verdict goes to the user at the plan gate, never around them. Step 4 starts from the **approved** solution design and **executes its Short implementation plan task by task — re-reading the task from the document before starting it, not from memory of the whole design**; deviating from it mid-build is a logged decision that must be re-surfaced, not silently absorbed.
 
 **When the phase is OFF** (logged skip), three of its checks survive as single items in the consolidated questions below — cheap, and each prevents a failure that shipped once already:
 
 - **Search/KV-touching feature** → the one-question P&S assessment: is propagation needed at all (is the data read from Yves/Glue, and is staleness tolerable — product data yes, credentials/authorization state never), what staleness window, and which single mechanism (event-behavior-plus-subscriber vs deliberate direct publish)?
 - **Per-actor data isolation** → where is the trust boundary enforced, named per entry point (Yves controller, API Platform, Glue, suggestion/count paths, core re-entrant calls)?
 - **Multi-store write sequence** (DB + index, DB + KV, delete + publish) → the transaction boundary, or an explicit "non-atomic + recovery path" statement.
+- **A new module, or new persistent names** (table, index/KV field) → the two-line `Modules:` / `Names:` header from the solution design's implementation plan (one module unless justified in writing; platform-entity names; domain word over mechanism word; one concept = one guessable name across PRD/module/DB/index) — as a consolidated-questions item the user confirms.
 
 ### PRD refinement (look at the PRD again, post-research)
 
@@ -322,9 +323,9 @@ Skip Step 6a only if the feature has zero Yves changes (pure BO / backend / cons
 
 **If the QA-thorough phase is on** (default for MVP):
 
-1. Invoke the `spryker-qa-coverage` Skill (via the `Skill` tool) and pass it the AC list from Step 1.
-2. The skill returns a structured test plan with cases bucketed as Happy / Negative / Authorization / Corner — each case tagged with its lightest verification mode (DB / Console / API / Chrome / Mailpit / Queue-UI / Redis-UI).
-3. **Order matters**: run **UI / Chrome cases first** for the Happy bucket (they cheap-fail if something visual is broken), then API/DB/Console cases, then Negative/Authorization/Corner.
+1. Invoke the `spryker-qa-coverage` Skill (via the `Skill` tool) and pass it the AC list from Step 1 **and the Step 0d scale envelope** — without the envelope its Scale/NFR bucket reports "no envelope provided" and the whole NFR chain silently degrades.
+2. The skill returns a structured test plan with cases bucketed as Happy / Negative / Authorization / Corner / Scale-NFR — each case tagged with its lightest verification mode (DB / Console / API / Chrome / Mailpit / Queue-UI / Redis-UI).
+3. **Order matters**: run **UI / Chrome cases first** for the Happy bucket (they cheap-fail if something visual is broken), then API/DB/Console cases, then Negative/Authorization/Corner, then the Scale/NFR measurements last (they need a working feature to measure).
 4. **Login session pre-warm + reuse.** Before fan-out: group the Chrome cases by required user (Admin / Buyer / Buyer_With_Limit / Approver / Merchant user / etc.). For each unique required user, log in once via Chrome — that browser tab is now the "warm session" for that user. When invoking `spryker-verifier` per case, **pass the live browser/tab and a hint *"this browser is already logged in as <user>"* in the verifier's prompt** so the verifier skips its own login (saves ~5s per case). The verifier respects the hint per its body's instructions.
 5. Invoke `spryker-verifier` per test case from the plan. Parallelise across independent cases within a bucket (one Agent tool call per case, issued in a single message). Each case becomes its own green/red verdict with evidence.
 6. **Functional tests** (facade-level codecept tests, when the tests phase is on) run **after** the UI verification cases — never before. If UI Happy cases are red, don't run functional tests; the feature isn't ready.
@@ -461,7 +462,7 @@ grep -rn '<Ns>\\Shared\\.*Events' src/ config/        # an events interface refe
 
 A schema event behavior with no subscriber (or the inverse), or an events interface with zero consumers, means a **half-built propagation path** — the exact shape that shipped once: events emitted that nobody reads, plus a synchronous publish bypassing the queue. Exactly **one** propagation mechanism ships, per the plan's §P&S decision (event-behavior-plus-subscriber, or deliberate direct publish) — never both half-present. A hit here goes back through the Step 7 loop, not into a comment.
 
-**Static validation (if the phase is on):** invoke the **`static-validation`** skill (via the `Skill` tool — it's a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. **Run it in `--working-tree` mode** — this workflow's normal state at Step 7b is a fresh `ai-customize/<slug>` branch with all work uncommitted, and a base-diff run either refuses (same commit as HEAD) or analyses nothing; working-tree mode validates exactly the uncommitted + untracked changes and keeps the frontend linters (eslint/stylelint/prettier) in the run instead of losing them to a hand-rolled `phpcs`/`phpstan` fallback. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
+**Static validation (if the phase is on):** invoke the **`static-validation`** skill (via the `Skill` tool — it's a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. **Run it in `--working-tree` mode** — the branch's work is uncommitted at this step, which a base-diff run refuses. If an intermediate commit was made on the branch (nothing forbids the user doing so), pass `--base <the branch point>` instead, or working-tree mode covers only the uncommitted residue. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
 
 **Code review (if the phase is on):** invoke `spryker-code-reviewer` after static validation passes — that way the reviewer sees a clean diff, not one cluttered with automated fixes. The reviewer's findings go into the final report.
 
@@ -527,8 +528,8 @@ Quality bar: <PoC | MVP>
   - src/<project-namespace>/... — <one-line purpose>
   - ...
 
-### Caveats (PoC only — shortcuts taken, worth flagging)
-- <e.g. hardcoded values, single-locale coverage, ACL skipped, etc.>
+### Caveats (skipped phases, accepted risks, PoC shortcuts)
+- <e.g. solution-design phase skipped (reason), demo-scale accepted, hardcoded values, single-locale coverage, ACL skipped, overruled warnings with their predicted failure>
 
 ### Run log
 - `<absolute path to $BUILD_DIR/run.log>`
@@ -573,7 +574,7 @@ setup install (`.claude/agents/`); if it fails to resolve, retry with the
 | Subagent | When to invoke |
 |---|---|
 | `spryker-feature-expert` | Before planning — *"how does this feature work?"*, *"how is X configured in this project?"*, *"what's the extension point for Y?"*. Parallel-invoke for multiple Spryker domains. |
-| *(architect pass)* | Step 3a when the Technical plan phase is on — a **fresh `general-purpose` subagent** briefed per [references/technical-plan.md](references/technical-plan.md). Never a fork and never the implementing context. (A dedicated `spryker-architect` agent definition may replace this later.) |
+| *(architect pass)* | Step 3a when the Solution-design phase is on — a **fresh `general-purpose` subagent** briefed per [references/solution-design.md](references/solution-design.md). Never a fork and never the implementing context. (A dedicated `spryker-architect` agent definition may replace this later.) |
 | `spryker-verifier` | After refresh — per-AC verification (parallel for independent ACs). |
 | `spryker-issue-diagnoser` | When verifier returns red or refresher fails — diagnose root cause before retrying. |
 | `spryker-data-seeder` | When a verification needs test data that doesn't yet exist. |
@@ -587,7 +588,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke via t
 |---|---|
 | `product-requirement-document` | Step 0c — when the user has no PRD (or wants to create/refresh one) before intake. Creates the business-facing PRD that Step 1 reads. |
 | `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
-| `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list into a 4-bucket test plan before invoking the verifier. |
+| `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list + scale envelope into a 5-bucket test plan before invoking the verifier. |
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
 | `cypress-tests` | Step 7a (when the Cypress E2E phase is on) — once all ACs are green, fix / improve / add a Cypress E2E spec locking in the user-visible behavior, run it targeted + the suite's quality gate. |
 | `static-validation` | Step 7b — lint / phpcs / phpstan over the final diff before commit. |

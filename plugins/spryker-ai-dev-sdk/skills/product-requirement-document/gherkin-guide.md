@@ -54,13 +54,11 @@ Scenario: Currency selection persists through checkout
   Given I have selected EUR as my currency on the cart page
   When I navigate to the checkout page
   Then the checkout page displays all prices in EUR
-  And my currency selection is preserved
 
 Scenario: Default currency matches geolocation
   Given I am accessing the site from France
   When I view the cart page for the first time
-  Then the default currency is automatically set to EUR
-  And I can manually change it if desired
+  Then the currency selector shows EUR as the selected value
 ```
 
 ## Common Mistakes
@@ -85,9 +83,9 @@ Scenario: Fast currency conversion
 ### ✅ CORRECT - Quantified Gherkin:
 ```markdown
 Scenario: Currency conversion performance
-  Given I select EUR from the currency dropdown
-  When the currency conversion completes
-  Then all prices update within 500 milliseconds
+  Given I am on the cart page with prices shown in USD
+  When I select EUR from the currency dropdown
+  Then all prices update to EUR within 500 milliseconds
   And no page reload occurs
 ```
 

@@ -364,7 +364,7 @@ Business-level quality attributes only — no tooling, no test-suite commands:
 - Security (data protection, auth, compliance)
 - Scalability (growth/volume projections)
 
-Quantify every attribute (no "fast"/"reliable"). Do NOT add tooling commands, test suites, or "quality gates" — those belong to planning, not the PRD.
+Quantify every attribute (no "fast"/"reliable"). **When the user has no numbers, propose the baseline volumes explicitly** (`spryker-customization`'s `references/baseline-volumes.md`; a filled `architecture/10-quality-requirements.md` volume table overrides them) **and mark each number user-supplied vs baseline-default.** Do NOT add tooling commands, test suites, or "quality gates" — those belong to planning, not the PRD.
 
 **Step 6.2: Present for Review**
 
@@ -406,7 +406,12 @@ For each selected addition: ask the user to describe it, draft the specific requ
 
 **CHECKPOINT:** Do not proceed until NFRs are approved.
 
-### Phase 7: Success Metrics & Scope
+### Phase 7: Constraints, Decisions, Success Metrics & Scope
+
+**Step 7.0: Draft Constraints and Decisions & Accepted Risks**
+
+- `## Constraints` — discovered hard constraints that change what can be promised, business-phrased and mechanism-free, one line per item (they typically surfaced during Phase 0; cross-check `architecture/02-constraints.md` when the project has it).
+- `## Decisions & Accepted Risks` — one line per item: `**[Decision]** — [its cost, plainly] — accepted by [user] on [date]`. Genuinely undecided items that block implementation go **first**, as `**OPEN — blocks implementation:** <question> — <what it blocks>` — never dressed up as decided.
 
 **Step 7.1: Draft Success Metrics**
 
@@ -449,6 +454,10 @@ Present these sections and ask for quick approval or additions.
 
 ### Phase 8: Final Review & Save 🔄 INTERACTIVE
 
+**Step 8.0: Scenario lint pass**
+
+Run the mechanical audit from [gherkin-guide.md](gherkin-guide.md) over every scenario: one `Given`/`When`/`Then` spine (no `When` missing, no two actions or two assertions chained), every `Then` comparison value stated literally upstream (no bare "the same/unchanged/as before"), no dependency-free quantities in the `Given`, no `or` in a `Then`, titles naming exactly what the body asserts. Split compounds rather than merging behaviors.
+
 **Step 8.1: Red Flag Check**
 
 Review the complete PRD and remove anything matching:
@@ -461,6 +470,9 @@ Review the complete PRD and remove anything matching:
 - ❌ **Any code reference in the body** — FQCN, `Class::method()`, controller/action/plugin/facade/transfer/repository class name, or file path (anywhere, including Dependencies). Move it to `{feature-name}.refs.md`; in the body use module/feature names and configuration names; endpoints show the URL path only.
 - ❌ Vague goals or unquantified criteria ("fast", "good", "works well")
 - ❌ Acceptance criteria not in Gherkin, >4 steps, or multiple behaviors per scenario
+- ❌ A `Then` comparing against a value never stated in the `Given`/`When` ("the same", "unchanged", "as before" with no literal)
+- ❌ An assertion that cannot fail (an `or` in a `Then`; "renders as before"; externally unobservable claims)
+- ❌ Paragraph-form entries in Constraints / Decisions / Dependencies / Out of Scope (one line per item)
 - ❌ Missing business justification or success metrics
 
 Quick grep before saving (the body should be clean): `grep -nE '::|\\\\[A-Z][A-Za-z]+\\\\|/src/' {feature-name}.prd.md` — hits other than the linked attachment path mean code leaked into the body.
@@ -493,14 +505,17 @@ Ask the user which location:
 
 **Step 8.5: Save PRD + the code-reference attachment** with the `Write` tool. Write the code-free `{feature-name}.prd.md` **and** its sibling `{feature-name}.refs.md` (same directory) containing the code references discovered during research — see [refs-attachment.md](refs-attachment.md). Ensure the PRD research header links the attachment.
 
-**Step 8.6: Confirm Completion** — mention both files.
+**Step 8.6: Confirm Completion** — mention both files, and **repeat every `OPEN — blocks implementation` item in the hand-off message itself** (the planner must see the blockers without opening the document).
 
 ```
 PRD saved to: [path]/{feature-name}.prd.md (business requirements, code-free)
 Code references saved to: [path]/{feature-name}.refs.md (controller/action FQCNs, transfers, configuration keys, file paths — for the planner)
 
+OPEN decisions blocking implementation (from Decisions & Accepted Risks):
+- [each OPEN item, verbatim — or "none"]
+
 Next steps:
-- Use this PRD (and its .refs.md attachment) as input for implementation planning (e.g. the prd-to-planning skill)
+- Build it with the `spryker-customization` skill (it takes this PRD + .refs.md as input and drives plan → build → verify → commit gate)
 - Share with stakeholders for alignment
 - Update as requirements evolve
 ```

@@ -43,6 +43,7 @@ shape of a `run.log` line:
 later reader would need:
 
 - The Step 0 answers: quality bar, and which phases are ON/OFF (an OFF phase explains a missing step later).
+- **When a solution design with a Short implementation plan exists: one boundary line per task** (`STEP 4 — T3 | START` / `| END <verify result>`), not just per step — the task list is what the build executes from, so the log mirrors it.
 - The resolved PRD source from Step 0c, the Step 0d scale envelope, and the AC checklist count from Step 1.
 - The branch cut in Step 2.
 - Each subagent invocation: which agent, for what, and its compact verdict — plus the file holding its raw output.

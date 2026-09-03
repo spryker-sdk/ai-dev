@@ -34,7 +34,8 @@
 #                            files  — validate only the changed PHP files.
 #                            module — validate every module that has a changed file.
 #       --include-tests    Include /tests/ files in phpcs/phpcbf (default: excluded from phpmd/phpstan only).
-#       --tools <list>     Comma subset of: phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier (default: all).
+#       --tools <list>     Comma subset of: phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier
+#                            (default: all except phpcbf, which mutates source — opt in via --fix or by naming it).
 #       --fix              Autofix where supported (phpcbf always; eslint/stylelint/prettier --fix/--write).
 #       --dry-run          Print what would be validated, run nothing.
 #   -h, --help             Show this help.
@@ -268,7 +269,11 @@ fi
 if [ "$WORKING_TREE" -eq 1 ]; then
     _wt_changes="$(git diff --name-only --diff-filter=d HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
     if [ -z "$_wt_changes" ]; then
-        err "--working-tree: the working tree is clean — there are no uncommitted or untracked changes to validate."
+        if [ -n "$(git diff --name-only HEAD 2>/dev/null)" ]; then
+            err "--working-tree: the only working-tree changes are deletions — there is nothing lintable to validate."
+        else
+            err "--working-tree: the working tree is clean — there are no uncommitted or untracked changes to validate."
+        fi
         exit 2
     fi
     info "Mode: WORKING TREE — validating uncommitted + untracked changes against HEAD."
@@ -312,7 +317,7 @@ if [ "$WORKING_TREE" -eq 0 ]; then
     current_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
     if [ "$(git rev-parse "$BASE_REF" 2>/dev/null)" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
         err "Base '$BASE_REF' resolves to the same commit as HEAD — there is nothing to diff."
-        _guard_wt="$(git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
+        _guard_wt="$(git diff --name-only --diff-filter=d HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
         if [ -n "$_guard_wt" ]; then
             err "The working tree DOES carry uncommitted/untracked changes. To validate exactly"
             err "those (a fresh branch mid-build is the normal case), re-run with --working-tree."

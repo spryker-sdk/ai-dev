@@ -68,8 +68,8 @@ flowchart TD
 
     P6{"Phase 6 CHECKPOINT<br/>Business NFRs — quantified,<br/>no tooling commands"}
     P6 -- "no" --> P6
-    P6 -- "yes" --> P7["Phase 7 — Success metrics,<br/>Out of Scope, Dependencies<br/>quick confirmation"]
-    P7 --> P8{"Phase 8 — Red-Flag check<br/>+ full PRD presented<br/>Final approval?"}
+    P6 -- "yes" --> P7["Phase 7 — Constraints ·<br/>Decisions & Accepted Risks (OPEN first) ·<br/>Success metrics, Out of Scope,<br/>Dependencies — quick confirmation"]
+    P7 --> P8{"Phase 8 — Scenario lint pass<br/>+ Red-Flag check<br/>+ full PRD presented<br/>Final approval?"}
     P8 -- "no" --> P3
     P8 -- "yes" --> SAVE(["Save BOTH:<br/>&lt;feature&gt;.prd.md (code-free)<br/>+ &lt;feature&gt;.refs.md (crosswalk)<br/>and tell the user about both"])
 

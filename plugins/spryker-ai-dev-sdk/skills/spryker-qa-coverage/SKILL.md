@@ -76,7 +76,7 @@ When in doubt, run inline — losing context is a worse failure than a slightly 
 
 ### Step 1 — Build the test checklist and test cases
 
-For each user story / acceptance criterion, derive test cases from these four buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
+For each user story / acceptance criterion, derive test cases from these five buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
 
 - **Happy path** — the documented behavior works for the intended actor.
 - **Negative / validation** — missing or malformed input, wrong values, empty state, "no results".
@@ -186,7 +186,7 @@ ALWAYS structure the final report like this:
 
 - "I'll just run phpstan/spryker-ci to check it" → NO. This skill never runs static analysis.
 - "I'll write a Codeception test for this" → NO. That's `codecept-functional`. Here you execute against the running app.
-- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all four buckets.
+- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all five buckets (Scale/NFR when an envelope is supplied — else note its absence).
 - "It probably works" / "the code looks right" → NO. QA reports *observed* behavior with evidence, not inferences from code.
 - "The endpoint returns 200, so the feature works" → NO. A synthetic/endpoint hit is a layer below the UI. If the AC is a user flow, prove it through the real UI (E2E); otherwise mark it `PASS (server only)` and keep the UI-flow case FAIL/BLOCKED. Reading code is fine to *understand what to test* — it is never a substitute for *observing* the running flow.
 - "The button did nothing once, so it's a blocker" → NO. Reproduce on ≥3 fresh loads (hard reload + navigate-back) and rule out your own driver first. Spryker Zed front-end bootstrap bugs are often intermittent races — works-on-some-loads is a *minor/flaky* finding, not a blocker. One dead load is a hypothesis, not a verdict.

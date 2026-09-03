@@ -113,7 +113,9 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
    ```bash
    bash "$SCD" --scope module --dry-run
    ```
-   Report the detected base branch and the module/file list back to the user.
+   Report the detected base branch and the module/file list back to the user. **On a fresh branch
+   whose work is uncommitted** (the same-commit guard fires, or you already know that's the state —
+   e.g. `spryker-customization` Step 7b), add `-w` to the dry-run too: `bash "$SCD" -w --dry-run`.
 
 2. **Run the check.** The default set validates PHP + frontend changes together and **touches
    nothing** — `phpcbf` is deliberately excluded from it, so a bare run is safe to point at anyone's
@@ -148,7 +150,9 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
    otherwise one missing generated directory would silence a gate that mostly worked.
 
 4. **Base branch choice.** If the user names a base ("vs main", "against develop"), pass it with
-   `--base`. Otherwise let auto-detect run and state which base it picked.
+   `--base`. Otherwise let auto-detect run and state which base it picked. For uncommitted work on a
+   branch at the same commit as its base, there is no base to pick — use `--working-tree` and say the
+   run covered the working tree only.
 
 ## Notes & caveats
 

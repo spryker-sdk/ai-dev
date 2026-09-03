@@ -34,7 +34,7 @@ If you catch yourself adding any of the above, stop and remove it.
 
 ## Terseness is the default
 
-A PRD's length is overhead for every reader; the default register is **narrow and sharp**, expanding only where the user asks for detail. A 40%-shorter draft that loses no story, no distinct behaviour and no quantified target is strictly better — and that is the measured outcome of applying these rules to a real draft. Concretely:
+Default to **narrow and sharp**; expand only where the user asks for detail. Cut anything whose removal loses no story, no distinct behaviour, and no quantified target:
 
 - **One behaviour, one scenario.** Merge scenarios that differ only in input (past-date and beyond-max-horizon are one range check; filter and search are one query check) — distinct behaviours stay distinct, variations of one behaviour don't.
 - **Never write an `And` that restates the `Then`** in different words. Every `And` adds a new observable fact or it goes.
@@ -76,7 +76,7 @@ Write Background (WHY) and 3–5 measurable Goals. **CHECKPOINT:** present, get 
 - **Assign the actor strictly** from the canonical Spryker actor set — see [actors.md](actors.md). Never write "As a user". Pick Back Office user, Customer, **Company user (Customer)** — the most common storefront actor on B2B projects — Agent, Merchant user, or Merchant Agent. For Back Office, you MAY name a narrower ACL role keeping the canonical actor mapped — e.g. `As a Back Office content manager (Back Office user)`. When unsure which roles exist on this install, confirm at `http://<backoffice-host>/user` (users) and `/acl` (roles) via `spryker-runtime` (resolve `<backoffice-host>` from the `backoffice` application in deploy.dev.yml).
 - Format: `As a [canonical actor], I want [action], so that [benefit]`.
 - **Resolve the affected endpoint now** (Phase 5 rules) so it can be confirmed together with the story — do not defer it to after approval.
-- **Resolving a route proves where a story lands — not that the thing it decorates exists.** For any story whose criteria assert something is **displayed**, confirm the **rendering surface** too: read the view template (does the page render an item list / the block the story extends at all?) or hit the page. A criterion decorating a surface that doesn't exist is a different, larger story ("build the list, then add the field") — surface that scope to the user instead of letting an estimate absorb it. (Real case: `/checkout/success` resolved perfectly; the template renders order items only as invisible `<meta>` tags — the user caught it, the skill didn't.)
+- **Resolving a route proves where a story lands — not that the thing it decorates exists.** For any story whose criteria assert something is **displayed**, confirm the **rendering surface** too: read the view template (does the page render an item list / the block the story extends at all?) or hit the page. A criterion decorating a surface that doesn't exist is a different, larger story ("build the list, then add the field") — surface that scope to the user instead of letting an estimate absorb it. (Real case: `/checkout/success` resolved perfectly; the template renders order items only as invisible `<meta>` tags.)
 - **CHECKPOINT — the story-approval question MUST present, and ask the user to confirm, all three together:**
   1. the **story text**,
   2. the **actor** (the exact canonical actor / role chosen, so the user can correct a wrong actor), and
@@ -120,7 +120,7 @@ Business-level quality attributes only: performance targets, reliability/availab
 Quick confirmation.
 
 ### Phase 8: Final Review & Save 🔄 INTERACTIVE
-Run the **scenario lint pass** (see the checklist in [gherkin-guide.md](gherkin-guide.md) — one Given/When/Then spine, quantified inputs, no unfailable assertions, titles match bodies), then the Red-Flag check (below), present the complete PRD, get final approval, then save. Fixing lint findings at authoring time costs nothing; a reader finding them costs their trust in every scenario they haven't yet read.
+Run the **scenario lint pass** (see the checklist in [gherkin-guide.md](gherkin-guide.md) — one Given/When/Then spine, quantified inputs, no unfailable assertions, titles match bodies), then the Red-Flag check (below), present the complete PRD, get final approval, then save.
 
 **For the detailed phase-by-phase script, see [workflow.md](workflow.md).**
 
