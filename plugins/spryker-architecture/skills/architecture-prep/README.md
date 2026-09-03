@@ -120,7 +120,7 @@ finding ends either *fixed* or *converted to a triaged owned gap*; nothing is si
 ## The arc42 sections
 
 `01` introduction & goals · `02` constraints · `03` system scope & context (+C1) · `04` solution
-designs · `05` building block view (+C2/C3) · `06` runtime view (+sequences) · `07` deployment view ·
+design candidates · `05` building block view (+C2) · `06` runtime view (+sequences) · `07` deployment view ·
 `08` crosscutting concepts · `09` architecture decisions (ADRs) · `10` quality requirements (volumes) ·
 `11` risks & technical debt · `12` glossary. Step 0 asks which to produce this run; only those are
 written.

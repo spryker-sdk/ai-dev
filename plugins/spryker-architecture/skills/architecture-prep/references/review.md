@@ -5,11 +5,18 @@ produced the sections — an independent reader catches what the author's contex
 reads the written `architecture/` files, the run's `intake.md`, and this checklist, then returns a
 **per-section verdict + a ranked defect list**, not a rewrite.
 
-The bar is not "does it look like arc42" — it's **"could a Spryker delivery lead build from this on
-day 1, and would an architect sign it off?"** A generic arc42 checklist (goals count, page length,
-stakeholder table) is necessary but not sufficient here. What makes *this* review Spryker-specific is
-that every claim about the platform must be grounded in real Spryker capabilities, and the depth bar
-(release phasing, sizing, named-feature mitigations) must actually be met — not gestured at.
+The bar is **"is every sentence here earning its place, and is it true?"** — in that order. The
+document is long-lived context that later work depends on, so excess is a defect in its own right,
+not a harmless surplus.
+
+Run in two passes, reduction first:
+
+| Pass | Question | Output |
+|---|---|---|
+| **1 — Reduction** | What should not be here at all? | Cut list |
+| **2 — Correctness** | Is what remains true and grounded? | Ranked defect list |
+
+Reduction comes first so pass 2 never spends effort fact-checking content that is about to be cut.
 
 ## How the reviewer runs
 
@@ -26,6 +33,37 @@ that every claim about the platform must be grounded in real Spryker capabilitie
 - **Verdict per section:** `PASS` / `PASS-with-TODOs` / `NEEDS-WORK`, plus one overall verdict.
 - An honest, well-owned `> **TODO:**` is **not** a defect — it's a professional outcome. A *fabricated*
   number, an *invented* integration, or a TODO where the intake gave a real answer **is** a defect.
+
+## Pass 1 — Reduction (run this first, and be ruthless)
+
+Every item below is a **cut**, not a suggestion. The writer's job was to be lean; this pass catches
+what slipped through.
+
+- [ ] **Duplication, within and across sections.** The same fact stated in a section, a table, and a
+      diagram is two defects. Keep the one authoritative place, replace the rest with a cross-reference.
+- [ ] **Duplicate diagrams.** Two diagrams showing the same relationships — most commonly a runtime
+      diagram restating the context diagram. Cut the redundant one.
+- [ ] **Any trace of the process that produced the document.** Deliberation, self-correction, review
+      history, "this was derived from…", notes about what the AI decided or fixed. The document is a
+      **snapshot of the current architecture**, not a record of how it was written. Reasoning stays in
+      the session.
+- [ ] **Content the intake never covered.** If no question asked about it, it does not belong —
+      however sensible it looks.
+- [ ] **Content generated because a value was missing.** Derived figures, interim assumptions, load
+      test plans, capacity projections, mitigation plans for unstated problems. Replace the whole
+      passage with one line naming the gap and its owner.
+- [ ] **Detail beyond what was asked.** Where the intake gave a direction but no specifics, a short
+      suggestion is right; a plan with numbers, phases and owners is not. The user can ask for depth.
+- [ ] **Authored Solution Designs or ADRs.** `sd-XXX-*.md` / `adr-XXX-*.md` files, or anything marked
+      `Accepted`, are out of scope — this skill produces candidate lists only.
+- [ ] **Findings mined from project config files.** Placeholder credentials, permissive CORS, default
+      regions: properties of the template, not of this project. Cut entirely.
+- [ ] **Source material copied into `architecture/`.** Briefs, TADs, exports, notes. Cut; cite by name.
+- [ ] **Surviving template examples.** Example entities (SAP, Akeneo, Auth0, sample volumes) and
+      example diagram files unrelated to this project.
+
+Report the cut list first, with a line count. If reduction removes more than a third of a section,
+say so plainly — that is a signal the writer misjudged the bar, worth naming.
 
 ## A — Grounding & honesty (Spryker-specific, highest weight)
 
@@ -52,41 +90,25 @@ The failure mode that a generic reviewer misses. Check every platform claim:
       (client-owned `TODO` w/ owner · launch-blocking → decision gate w/ spike/owner/date ·
       derivable-but-unconfirmed → stated interim assumption). Everything dumped as a bare `TODO` is MAJOR.
 
-## B — Depth bar met (from architecture-depth.md)
+## B — Substance (from architecture-depth.md)
 
-Decision-grade, not template-thin. For the sections in scope:
+Lean is the target, but lean is not empty. For the sections in scope:
 
-- [ ] **Release phasing.** Scope items and integrations carry a **Phase 1 / Phase 2** tag; the roadmap
-      and the volume table's +1Y/+…Y columns tell the same phased story. (§01/§03/§10)
-- [ ] **Components + Connectors rationale tables** accompany every architecture diagram — never a
-      diagram alone. Connector rows carry a real Type (REST/SOAP/SFTP/Widget/Redirect/AMQP/OAuth/VPN DB)
-      and put the numbers in the Constraints cell (or an honest `TBD`). (§03/§05)
-- [ ] **Volume table is rich and per-phase** — Go-Live / +1Y / +…Y columns, and it goes beyond the
-      stock rows where relevant (price types & dimensions, bundles, delta-vs-full import, per-store
-      infra split, historical migration counts). (§10)
-- [ ] **Multi-store strategy is explicit** when >1 country/store: region/store/DB/codebase split,
-      Dynamic Multi-Store noted where it applies. (§07)
-- [ ] **Risk mitigations name real Spryker features** with a docs link, not generic advice. (§11)
-
-## C — Build-ready additions (the review-proven five)
-
-What a delivery lead needs on day 1 — reach for these wherever the inputs allow; where they don't, the
-**bounded/interim form** is required, not silence:
-
-- [ ] **Sized, not just sequenced.** T-shirt effort (S/M/L/XL + one-line driver) per custom module in
-      §05/SDs; first-pass infra sizing (hot-table row counts, Redis key volume, worker/queue counts) in
-      §07/§10 where volumes were given. A large volume jump (e.g. 300k→26M) is *worked through* as the
-      central scaling decision, not just flagged.
-- [ ] **Every Solution Design has a real Data Model section** — table sketches (Propel-style names, key
-      columns, FKs), transfers, read/write ownership. A directional SD with a bare-TODO data model is a
-      MAJOR defect; if genuinely underivable, it must be a **named spike** (question/owner/timebox).
-- [ ] **Launch-blocking unknowns are decision gates**, not standing tech debt: decision + spike + owner
-      + resolve-by date tied to the roadmap, in §11 (ADR stays `Proposed` until the gate closes).
-- [ ] **Load/capacity tests are anchored** by an explicit interim assumption derived from what IS given
-      (visitors × conversion × seasonality), stated as "replace on client confirmation". (§10)
-- [ ] **One integration-readiness checklist** (egress/allow-listing per system, secret management,
-      per-adapter timeout/retry/circuit-breaker) with named owners in §07/§08, cross-linked from §11 —
-      not scattered one-line footnotes.
+- [ ] **Every answer the intake gave is reflected somewhere.** A supplied fact that reached no section
+      is the one gap that matters — the interview cost the user time for nothing.
+- [ ] **Release phasing.** Scope items and integrations carry the phase names the intake supplied, and
+      the volume table columns use the same names. (§01/§03/§10)
+- [ ] **Components + Connectors tables accompany the context diagram** — never a diagram alone.
+      Connector rows carry a real Type and put numbers (or an honest `TBD`) in the constraints cell.
+      This detail appears **only** here, not also in the diagram or the prose. (§03)
+- [ ] **Volume table records what was given, and lists what was not** as one grouped gap list with
+      owners. No derived figures. (§10)
+- [ ] **Risk mitigations name real Spryker features** with a docs link, not generic advice. Feature
+      availability is verified, never asserted from memory. (§11)
+- [ ] **Solution Design and ADR candidates are listed** where the intake flagged something as needing
+      investigation — as candidates, two or three sentences each, never authored.
+- [ ] **Each section returned its top 1–3 depth candidates** to the orchestrator, and none of that
+      content was written into the document.
 
 ## D — arc42 structure & internal consistency (the generic-but-necessary layer)
 
@@ -94,7 +116,7 @@ What a delivery lead needs on day 1 — reach for these wherever the inputs allo
       Approver(s), key dates, version.
 - [ ] **Quality goals**: 3–5, each with a measurable scenario (a real number/threshold), prioritized.
 - [ ] **Stakeholders**: each party has a stated expectation; deployment/ops roles present if §07 written.
-- [ ] **Cross-links resolve**: §03→C1, §05→C2/C3, §06→sequences; every "See diagram" link points at a
+- [ ] **Cross-links resolve**: §03→C1, §05→C2, §06→sequences; every "See diagram" link points at a
       file that exists; §04/§09 README indexes list their SDs/ADRs.
 - [ ] **Terminology reconciles with §12** — every domain/Spryker term used is defined in the glossary.
 - [ ] **External systems are consistent** across §03/§02/§06/§11 and the diagrams (same names, no system

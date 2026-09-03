@@ -7,12 +7,11 @@ description: >
   decision-grade depth (release-phased scope, components/connectors tables, per-phase volume planning,
   multi-store strategy). Runs in ANY Spryker project/demoshop and scaffolds the
   mandatory `architecture/` folder if missing — for greenfield, an existing build (onboarding), or
-  turning a business brief into an architecture doc that feeds a PRD. Accepts a Spryker TAD (Target
-  Architecture Definition Confluence page) or similar structured brief as the complete intake — no
-  interview — and handles batch runs: N TADs/briefs → N architecture docs → N PRs, one git worktree
+  turning a business brief into an architecture doc that feeds a PRD. Accepts a target architecture
+  document or similar structured brief as the complete intake — no interview — and handles batch runs: N TADs/briefs → N architecture docs → N PRs, one git worktree
   per deliverable. Trigger on "prepare/fill in the architecture", "set up the architecture folder",
   "do the arc42/C4 docs", "document the system context / building blocks / runtime flows", "capture
-  this as an ADR/solution design", or "turn this TAD / these TADs into architecture docs (as PRs)" —
+  this as an ADR/solution design", or "turn this architecture document into arc42 docs (as PRs)" —
   even without saying "arc42" or "C4". Do NOT use to write a PRD (product-requirement-document),
   build from a PRD (prd-development-local), or fix a bug (spryker-bugfix).
 ---
@@ -102,7 +101,7 @@ the step that needs it, not all up front:
   me", group the questions into `AskUserQuestion` batches, ask for existing docs first, and **always
   write every answer to `intake.md`**. **Read before Step 1 — unless a TAD/structured brief was
   provided (then tad-mapping.md replaces it).**
-- [references/tad-mapping.md](references/tad-mapping.md) — the **TAD fast-path**: when a Spryker TAD
+- [references/tad-mapping.md](references/tad-mapping.md) — the **fast-path**: when a target architecture document
   (or similar structured brief) is the input, it IS the intake — the TAD-section → arc42-section
   mapping, diagram harvesting, and what TADs typically leave open. **Read at Step 0 whenever the
   intake includes a structured architecture doc.**
@@ -181,7 +180,7 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
 ### Step 0 — Intake & mode
 
 0. **Classify the intake shape first** — it decides how the rest of Step 0/1 runs:
-   - **Structured brief(s) provided** (a Spryker TAD Confluence page or equivalent): read
+   - **Structured brief(s) provided** (a target architecture document or equivalent): read
      [references/tad-mapping.md](references/tad-mapping.md). The document replaces the interview;
      from the opening batch below, ask only what neither the doc nor the user's request already
      states (typically: sections, mode, output target) — and if the request states those too, ask
@@ -199,20 +198,27 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
    current project's root. If no local source is reachable, recreate the structure from the section
    list below and the templates described in `sections.md`. Never invent a different structure — the
    arc42 + C4 layout is the standard. Tell the user you scaffolded it and from where.
-2. **Ask the opening batch** (one or more `AskUserQuestion` calls — this is the "multi-tab section in
-   the beginning" the user wants). Cover at minimum, in this order of priority:
-   - **Existing documents first.** "Can you share any business requirements, briefs, RFPs, discovery
-     notes, slide decks, existing diagrams, or tickets? Paste text or give file paths." This is the
-     highest-value input — ask for it before anything else and read everything provided.
-   - **Which arc42 sections** to produce this run (multi-select — see the list below). Default-suggest
-     the template's recommended path (1, 3, 10, then 5, 2) but let the user pick.
-   - **Autonomy mode:** Gated (confirm before writing each section batch) or Autonomous (interview
-     once, then write everything, logging decisions).
-   - **ADRs / Solution Designs:** any decisions already made to capture as ADRs, or areas to explore
-     as Solution Designs?
-   See [references/interview.md](references/interview.md) for the full question bank and how to group
-   it into tabs. Batch aggressively (up to 4 questions per `AskUserQuestion`, several calls) so the
-   user is interviewed carefully but in one pass, not drip-fed.
+2. **Ask the opening batch** (one or more `AskUserQuestion` calls). **Ask in the user's language, not
+   arc42's** — never make them choose "arc42 sections". Which sections get written follows from what
+   they can tell you. Cover, in this order:
+   - **Existing material first.** "Can you share anything that already exists — a requirements
+     document, an RFP or tender response, a target architecture document, discovery notes, slide
+     decks, existing diagrams, or tickets? Paste the text or give me file paths." Highest-value
+     input; read everything provided before asking anything else.
+   - **Your role**, which decides how the document addresses people and who is named as its author:
+     `I work for the company that will run this platform` · `I work for Spryker` · `I work for an
+     implementation partner or agency` · `Other`. Use it to phrase gaps as "ask your customer" vs
+     "ask your team", and record the answer as the document's author. Never take an author name from
+     a provided document.
+   - **What you want covered this run** — offer plain-language areas, not section numbers:
+     `The whole picture (recommended)` · `Just the essentials — goals, context, integrations` ·
+     `A specific area I'll name`. Map the answer to arc42 sections yourself, and say which sections
+     that means in one line so the mapping is visible.
+   - **Autonomy mode:** Gated (confirm before writing each batch) or Autonomous (ask once, then write).
+
+   Batch aggressively (up to 4 questions per `AskUserQuestion`) so the user is interviewed in one
+   pass, not drip-fed. Do **not** ask here about ADRs or Solution Designs — those emerge as
+   candidates from the intake.
 3. **Set up the run.** Create the run directory, the `run.log`, the decision log, and the State Object
    per run-lean.md. Record: template path, output target (default `architecture/` in place), chosen
    sections, mode, project stage, grounding permission. Log the Step 0 config as one line.
@@ -225,7 +231,7 @@ The 12 arc42 sections (offer as the multi-select):
 | 02 | `02-constraints.md` | Technical / organizational / convention constraints |
 | 03 | `03-system-scope-and-context.md` | Boundaries, external systems, integrations (+ C1) |
 | 04 | `04-solution-designs/` | RFC-style exploration docs (on request) |
-| 05 | `05-building-block-view.md` | Decomposition, containers, components (+ C2/C3) |
+| 05 | `05-building-block-view.md` | Decomposition, containers (+ C2) |
 | 06 | `06-runtime-view.md` | Runtime scenarios (+ sequence diagrams) |
 | 07 | `07-deployment-view.md` | Infrastructure & topology |
 | 08 | `08-crosscutting-concepts.md` | Cross-cutting patterns |
@@ -328,8 +334,10 @@ Otherwise spawn **one teammate per selected section**, in parallel. Each teammat
 - fills the section with project-specific content, replacing example content, and marks any
   unfillable part with a `> **TODO:** …` note naming what's missing;
 - produces the paired **diagram file(s)** as Mermaid/PlantUML following the color/style convention;
-- edits the real file(s) under the output target and returns a compact "done + what I wrote + open
-  TODOs" summary.
+- edits the real file(s) under the output target and returns a compact summary: files written, 2–3
+  lines on what went in, open TODOs, **and its top 1–3 depth candidates** (one line each, ranked —
+  see [architecture-depth.md](architecture-depth.md)). The candidates are a list for the orchestrator
+  to offer at Step 7; the writer never writes that content itself.
 
 Sections 04 (Solution Designs) and 09 (ADRs), if selected, follow their dedicated sub-workflow in
 sections.md (they create numbered `sd-XXX` / `adr-XXX` files from the templates, not the section body).
@@ -344,7 +352,7 @@ This is the one step the orchestrator does itself, because it needs all sections
 light. (Exception: in a multi-deliverable run each deliverable teammate already ran this pass for
 its own document — the orchestrator only spot-checks each: README indexes list the SDs/ADRs, "See
 diagram" links resolve, TODO counts match the teammate's report.) Read the written sections and:
-- fix cross-references (section 3 → C1, section 5 → C2/C3, section 6 → sequences, the "See diagram"
+- fix cross-references (section 3 → C1, section 5 → C2, section 6 → sequences, the "See diagram"
   links must point at files that exist);
 - reconcile terminology against section 12 (every domain/tech/Spryker term used should be defined);
 - ensure external systems named in section 3 match those in 2/6/11 and the diagrams;
@@ -412,7 +420,30 @@ human-judgment artifact, so in Gated mode the user's review remains the final si
 
 ### Step 7 — Handoff
 
-State plainly that the architecture folder is filled and ready to feed a **PRD** (point at the
+**Never report "all done" without accounting for what was not answered.** Before anything else, state
+coverage explicitly:
+
+```
+Answered: 31 of 53 questions.
+Not answered:
+  L2 Core foundation      4  (Q17 payment methods, Q20 integrations, Q25 volumes, Q26 targets)
+  L3 Design intelligence  2  (Q38 data residency, Q43 fixed technical choices)
+```
+
+Then offer, as an `AskUserQuestion`:
+`Answer the outstanding questions now` · `Send the remaining tables as homework files` ·
+`Leave them as owned TODOs and finish here`
+
+A question skipped because its gate was closed is **not** outstanding — never list it. Only genuinely
+unanswered ones count.
+
+**Offer the depth candidates.** Each section writer returned its top 1–3 candidates for deeper
+treatment (see [architecture-depth.md](architecture-depth.md)). Present them in tiers, most valuable
+first: all rank-1 candidates, then rank-2, then rank-3. One line each, grouped by section. The user
+picks any subset, or none; only what they pick gets written. **Never write a candidate unasked** —
+the lean document is the deliverable, and this offer is what makes leanness safe.
+
+Then state that the architecture folder is ready to feed a **PRD** (point at the
 `product-requirement-document` skill) and then development (`prd-development-local`). Do **not** commit
 automatically — architecture docs are reviewed via pull request (per the template's own guidance);
 suggest the branch/commit and let the user run it, unless they explicitly asked you to commit. List the

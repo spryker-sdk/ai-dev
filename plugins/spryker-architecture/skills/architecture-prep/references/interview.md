@@ -9,12 +9,12 @@ batched interview, then research to fill what people couldn't answer. Read this 
 The canonical list of questions is the standalone, fillable **[questionnaire.md](questionnaire.md)**
 (progressive levels L1–L4; each question typed and most carrying a condition naming the earlier
 answer that opens it). This file defines the *collection procedure* that feeds those questions in.
-Always drive the interview from questionnaire.md so the live
-interview, a pre-filled questionnaire, and a TAD all populate the same fields.
+Always drive the interview from questionnaire.md so a live interview, a pre-filled questionnaire,
+and a provided document all populate the same fields.
 
 ## Rule 0 — A structured brief replaces the interview
 
-If the intake already includes a Spryker **TAD** (Target Architecture Definition) or an equivalently
+If the intake already includes a **target architecture document** or an equivalently
 structured architecture brief, **the interview is skipped** — the document IS the intake, and it is
 usually richer than a live interview. Read [tad-mapping.md](tad-mapping.md) and follow its fast-path
 instead of the rules below. The rest of this file applies only when no structured document exists,
@@ -27,7 +27,7 @@ Before interviewing, check whether the user already gave answers to
 request:
 
 - **Fully filled** (all of L1 and L2 answered, including explicit unknowns): treat it exactly
-  like a TAD — **skip the interview**, copy the answers verbatim into `intake.md`, and log
+  like a provided document — **skip the interview**, copy the answers verbatim into `intake.md`, and log
   `INTERVIEW | SKIP (questionnaire pre-filled)`.
 - **Partially filled:** parse which questions are answered, and **ask ONLY the still-blank ones** —
   never re-ask something already answered. Map each remaining blank to its question ID (Q6, Q13…)
@@ -44,7 +44,7 @@ A line saying "unknown"/"TBD"/"n/a" = ANSWERED (an honest gap), not a question t
 
 ## Rule 1b — Offer "fill the list yourself" vs "interview me"
 
-When no filled questionnaire and no TAD exist, don't just launch into questions. First offer the user
+When no filled questionnaire and no structured document exist, don't just launch into questions. First offer the user
 both paths (a single `AskUserQuestion` is fine):
 
 > "I can either (a) hand you the intake questionnaire to fill in at your own pace and then run with no
@@ -54,7 +54,7 @@ both paths (a single `AskUserQuestion` is fine):
   content), tell them **Level 1 alone (Q1–Q9) is enough for a grounded first draft**, and **wait**
   for their filled answers before proceeding. Then treat the result per Rule 0b.
 - If they choose **interview**: run the batched interview below.
-- In a **fully autonomous / no-questions** run, do not offer the choice — use whatever answers/TAD were
+- In a **fully autonomous / no-questions** run, do not offer the choice — use whatever answers or documents were
   provided and mark the rest as TODOs.
 
 ## Rule 1 — Ask for existing documents first, before any structured questions
