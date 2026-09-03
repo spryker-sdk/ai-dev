@@ -67,6 +67,7 @@ bash "$SCD" --repo /path/to/project [options]
 |---|---|
 | `-r, --repo <path>` | Project root to validate. Defaults to the current working directory's git repo. Also reads `$STATIC_CHECK_REPO`. |
 | `-b, --base <ref>` | Base branch/ref to diff against. Omit to auto-detect. Also reads `$STATIC_CHECK_BASE`. |
+| `-w, --working-tree` | Validate ONLY uncommitted + untracked changes against `HEAD` — no base ref. **This is the right mode for a fresh branch whose work is not yet committed** (the normal shape mid-build, e.g. `spryker-customization` Step 7b before the commit gate). Mutually exclusive with `--base`; errors on a clean tree instead of passing vacuously; the run output states the mode so the narrower coverage is explicit. |
 | `-s, --scope <mode>` | `files` (default) or `module`. PHP grouping only — frontend files are always individual. |
 | `--tools <list>` | Comma subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. Default is every tool **except `phpcbf`**, which mutates source and is therefore opt-in via `--fix` or by naming it here. |
 | `--fix` | Autofix where supported: adds `phpcbf` to the tool set, and switches `eslint`/`stylelint` to `--fix` and `prettier` to `--write`. **Rewrites files.** Also via `STATIC_CHECK_FIX=1`. |
@@ -84,7 +85,8 @@ report those as violations and do **not** try to "fix" code for them — resolve
 for `src/Generated/Client/Ide/AutoCompletion.php` (phpstan's bootstrap file — `transfer:generate` alone
 does **not** create it), `docker/sdk cli npm install` for `node_modules`. An unknown `--tools` name and a
 base that resolves to the same commit as `HEAD` are also exit 2 — both would otherwise analyse nothing
-and look like a pass.
+and look like a pass. When that same-commit guard fires and the working tree carries uncommitted or
+untracked changes, the error names the fix: re-run with `--working-tree` to validate exactly those.
 
 ### Environment overrides
 
@@ -111,7 +113,9 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
    ```bash
    bash "$SCD" --scope module --dry-run
    ```
-   Report the detected base branch and the module/file list back to the user.
+   Report the detected base branch and the module/file list back to the user. **On a fresh branch
+   whose work is uncommitted** (the same-commit guard fires, or you already know that's the state —
+   e.g. `spryker-customization` Step 7b), add `-w` to the dry-run too: `bash "$SCD" -w --dry-run`.
 
 2. **Run the check.** The default set validates PHP + frontend changes together and **touches
    nothing** — `phpcbf` is deliberately excluded from it, so a bare run is safe to point at anyone's
@@ -146,7 +150,9 @@ STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
    otherwise one missing generated directory would silence a gate that mostly worked.
 
 4. **Base branch choice.** If the user names a base ("vs main", "against develop"), pass it with
-   `--base`. Otherwise let auto-detect run and state which base it picked.
+   `--base`. Otherwise let auto-detect run and state which base it picked. For uncommitted work on a
+   branch at the same commit as its base, there is no base to pick — use `--working-tree` and say the
+   run covered the working tree only.
 
 ## Notes & caveats
 

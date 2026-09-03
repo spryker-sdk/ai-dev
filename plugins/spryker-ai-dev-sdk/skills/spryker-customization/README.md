@@ -26,10 +26,12 @@ flowchart TD
     S0B --> S0C{"Step 0c — PRD source"}
     S0C -- "PRD in context" --> S0C1{"Confirm: use it ·<br/>refresh it · new one"}
     S0C -- "no PRD" --> S0C2{"I'll provide one ·<br/>create one · ACs only"}
-    S0C1 -- "refresh / new" --> PRD["Skill: product-requirement-document"] --> S1
+    S0C1 -- "refresh / new" --> PRD["Skill: product-requirement-document"] --> S0D
     S0C2 -- "create" --> PRD
-    S0C1 -- "use it" --> S1
-    S0C2 -- "provide / ACs only" --> S1
+    S0C1 -- "use it" --> S0D
+    S0C2 -- "provide / ACs only" --> S0D
+
+    S0D["Step 0d — Scale envelope<br/>read architecture/§10 first ·<br/>ask only empty rows · baseline<br/>volumes as the floor · forced-output block<br/>(PoC: one caveat line)"] --> S1
 
     S1{"Step 1 — Intake<br/>restate as a numbered AC checklist<br/>flag ambiguity, missing info,<br/>conflicts with the quality bar<br/>USER CONFIRMS"}
     S1 -- "not confirmed" --> S1
@@ -37,12 +39,15 @@ flowchart TD
     S2 -- "dirty" --> ASKB{"Ask before proceeding"} --> S3
     S2 -- "clean" --> S3["Cut ai-customize/&lt;slug&gt; from HEAD<br/>not from master"]
 
-    S3 --> S3P["Step 3 — Plan<br/>ALWAYS spryker-feature-expert first,<br/>one parallel Agent call per domain.<br/>Never grep vendor/ yourself"]
+    S3 --> S3P["Step 3 — Plan<br/>ALWAYS spryker-feature-expert first,<br/>one parallel Agent call per domain.<br/>Discovery = expert's; confirming a<br/>named symbol = inline, cite file:line"]
     S3P --> BAR{"Which bar?"}
     BAR -- "PoC" --> COLLAPSE["PoC collapse mapping (mandatory)<br/>per class: what breaks if inlined?<br/>'just organization' → inline it"]
-    BAR -- "MVP" --> CANON["Preserve the canonical chain<br/>check nothing is MISSING:<br/>plugin registration, transfer XML,<br/>config/DI, all locales, ACL"]
-    COLLAPSE --> REFINE
-    CANON --> REFINE["PRD refinement — re-read the PRD<br/>with the research in hand"]
+    BAR -- "MVP" --> CANON["Preserve the canonical chain — floor AND ceiling<br/>nothing MISSING: plugins, transfer XML,<br/>config/DI, locales, ACL ·<br/>nothing UNEARNED: convention resolution<br/>decides interfaces, growth formula per structure"]
+    COLLAPSE --> ARCH
+    CANON --> ARCH{"Step 3a — Solution design<br/>phase on?"}
+    ARCH -- "on" --> SD["Fresh architect subagent<br/>(never a fork) → sd-XXX /<br/>solution-design.md · short impl plan ·<br/>may REJECT on scale or code volume"]
+    SD --> REFINE
+    ARCH -- "off (logged skip)" --> REFINE["PRD refinement — re-read the PRD<br/>with the research in hand"]
     REFINE --> CONSOL["Consolidate EVERY later question now:<br/>PRD items · credentials per AC ·<br/>test data · locale/store scope"]
     CONSOL --> GATE1{"Plan + questions —<br/>one round of answers"}
     GATE1 -- "user pivots scope" --> COST["Restate the cost:<br/>+N files, ~M lines. Confirm."] --> S3P
@@ -102,8 +107,8 @@ flowchart TD
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
     classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
-    class S0B,PRD,S3,S3P,COLLAPSE,CANON,REFINE,CONSOL,COST,S4,FE,DBG,S5,DIAG5,WARM,QA,ORDER,LIT,FAN,S7,DBG2,FIX,CY,S7B,CAP,S8 step;
-    class S0A,S0C,S0C1,S0C2,S1,S2,ASKB,BAR,GATE1,S6A,SMOKE,S6B,RED,SIG,REV,STUCK,VIS,S7A,S7C,GATE2 decision;
+    class S0B,S0D,PRD,S3,S3P,COLLAPSE,CANON,SD,REFINE,CONSOL,COST,S4,FE,DBG,S5,DIAG5,WARM,QA,ORDER,LIT,FAN,S7,DBG2,FIX,CY,S7B,CAP,S8 step;
+    class S0A,S0C,S0C1,S0C2,S1,S2,ASKB,BAR,ARCH,GATE1,S6A,SMOKE,S6B,RED,SIG,REV,STUCK,VIS,S7A,S7C,GATE2 decision;
     class A,ESC,ESC2,C,L terminal;
 ```
 
@@ -129,10 +134,11 @@ off, the workflow **skips its subagents entirely**.
 
 | Phase | Default |
 |---|---|
+| Solution design (independent architect pass, Step 3a) | on for MVP (always proposed, user may turn off), off for PoC |
 | Tests alongside the edit | on for MVP, off for PoC |
 | Refresh (`spryker-refresher`) | on |
 | Verification (`spryker-verifier` per AC) | on |
-| QA-thorough 4-bucket coverage (`spryker-qa-coverage`) | on for MVP, off for PoC |
+| QA-thorough 5-bucket coverage (`spryker-qa-coverage`) | on for MVP, off for PoC |
 | Self-correction on red ACs | on if verification is on |
 | Cypress E2E coverage (`cypress-tests` skill, once all ACs are green) | on for MVP, off for PoC |
 | Static validation | on |
@@ -155,7 +161,7 @@ via the **`Skill`** tool. The two are never swapped.
 | 4 / 7 | `ai-runtime-debugging` — when runtime values aren't in logs / DB / browser state | Skill |
 | 4 / 6 | `spryker-data-seeder` — whenever a case needs data that doesn't exist | Agent |
 | 5 | `spryker-refresher` — mandatory; the orchestrator must not inline console commands | Skill |
-| 6 | `spryker-qa-coverage` — expand ACs into the 4-bucket plan | Skill |
+| 6 | `spryker-qa-coverage` — expand ACs + scale envelope into the 5-bucket plan | Skill |
 | 6a / 6b | `spryker-verifier` — smoke check, then per case, parallel within a bucket | Agent |
 | 7 | `spryker-issue-diagnoser` — on every red AC and every refresher failure | Agent |
 | 7a | `cypress-tests` — once all ACs are green: fix / improve / add an E2E spec, run targeted + quality gate | Skill |
@@ -169,11 +175,12 @@ via the **`Skill`** tool. The two are never swapped.
   workflow in its head and gathers every question that will come up later — PRD refinements surfaced
   by the research, which seeded user each AC's verification needs, what test data must exist, locale
   and store scope. The user answers once; execution then runs uninterrupted to the commit gate.
-- **Never research Spryker yourself.** No grep, sed, awk, or reading of `vendor/` and transfer XMLs.
-  Field lookups go through `getTransferStructureByName`, interfaces through
-  `getInterfaceMethodsByNamespace`, modules through `getSprykerModules` — all via
-  `spryker-feature-expert`. If its first answer isn't enough, ask a sharper follow-up rather than
-  falling back to manual grep.
+- **Discovery research is the expert's; confirmation is inline.** Which mechanism, which extension
+  point, how a feature works, which fields a transfer has — all via `spryker-feature-expert`
+  (`getTransferStructureByName`, `getInterfaceMethodsByNamespace`, `getSprykerModules`); if its first
+  answer isn't enough, ask a sharper follow-up rather than falling back to exploratory grep. But
+  **confirming a symbol you can already name** (exact signature, spelling, stack position) is one
+  inline grep with a mandatory `file:line` citation — never an agent dispatch.
 - **Static validation runs exactly once, at Step 7b.** Its own description fires aggressively on any
   PHP edit, so Steps 4, 5, and every iteration of 7 carry an explicit guard against it. Running it
   earlier lets `phpcbf` reformat interim code the verifier hasn't checked and adds lint findings to a

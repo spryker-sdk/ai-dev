@@ -10,8 +10,8 @@ This document provides a complete PRD example and anti-patterns to avoid.
 
 | Mistake | Why It's Wrong | Fix |
 |---------|----------------|-----|
-| Writing the whole PRD in one pass | Skips user validation at checkpoints | Use the interactive workflow; approve at each phase |
-| Skipping research (Phase 0) | Invents module/transfer/endpoint names | Run `spryker-docs-research` as subagent(s) first, gather codebase facts inline (module map/transfers), and validate existing flows with `spryker-runtime` |
+| Writing the whole PRD in one pass without the user choosing that | Skips the validation the user expected | Ask the pacing once at Phase 3 (per-criterion / per-story / draft-then-review) and honour it — draft-then-review still gets a full revision pass |
+| Skipping research (Phase 0) | Invents module/transfer/endpoint names | Gather codebase facts inline **first** (module map/transfers, project-overlap sweep), then targeted `spryker-docs-research` per the user's research-depth choice, and validate existing flows with `spryker-runtime` |
 | "As a user" / "As an admin" | Actor is ambiguous | Use a canonical actor from [actors.md](actors.md) |
 | Guessed endpoint path | Doesn't match the real app | Resolve host from `deploy.dev.yml`; path from the research brief |
 | Code references in the body (FQCN, `Class::method`, file path) | PRD is business-facing, not code | Use module/feature + configuration names; endpoint = URL path only; put code refs in `{feature-name}.refs.md` |
@@ -27,9 +27,9 @@ This document provides a complete PRD example and anti-patterns to avoid.
 
 ## Red Flags — STOP and Revise
 
-- "I'll write the whole PRD and show the user" → NO. Interactive checkpoints.
-- "I'll skip the research" → NO. Phase 0 first; no invented names.
-- "I'll run docs research inline" → NO. Dispatch `spryker-docs-research` as subagent(s) via the Agent tool.
+- "I'll write the whole PRD and show the user" → NO — unless the user chose draft-then-review pacing at Phase 3 (which still includes a revision pass).
+- "I'll skip the research" → NO. Phase 0 first, codebase facts before docs; no invented names.
+- "I'll run docs research inline without the user choosing that" → NO. The research-depth question offers subagents / inline / skip — the user picks; inline is legitimate only as their explicit choice.
 - "As a user…" → NO. Canonical actor from [actors.md](actors.md).
 - "I'll guess the endpoint path" → NO. From the research brief + `deploy.dev.yml` host.
 - "I'll put the class/method/file in the body" → NO. Code-free body; refs go in `{feature-name}.refs.md`.
@@ -80,10 +80,9 @@ This document provides a complete PRD example and anti-patterns to avoid.
 **Acceptance Criteria:**
 
 Scenario: Load the latest abandoned cart for an impersonated customer
-  Given I am authenticated as an Agent and impersonating customer "sonia@acme.com"
+  Given I am impersonating customer "sonia@acme.com", whose abandoned cart holds 3 items (SKUs 001, 002, 003)
   When I open the customer's abandoned-cart panel
-  Then the cart loads with all previously added items within 2 seconds
-  And the item count matches the customer's last saved cart exactly
+  Then the panel lists exactly those 3 items (SKUs 001, 002, 003) within 2 seconds
 
 Scenario: No abandoned cart exists
   Given I am impersonating a customer with no abandoned cart
@@ -102,10 +101,9 @@ Scenario: No abandoned cart exists
 **Acceptance Criteria:**
 
 Scenario: Restored cart syncs to the customer's storefront
-  Given an Agent has restored my abandoned cart
+  Given an Agent has restored my abandoned cart of 3 items (SKUs 001, 002, 003) totalling 149.90 EUR
   When I refresh my storefront cart page while logged in
-  Then I see the exact items the agent restored within 1 second of page load
-  And the cart total matches the agent's view to the cent
+  Then my cart lists those 3 items (SKUs 001, 002, 003) with a total of 149.90 EUR within 1 second of page load
 
 ## Non-functional Requirements
 
@@ -173,7 +171,7 @@ This example demonstrates:
 - ✅ Affected endpoint as a **URL path + module name** (no controller::action in the body)
 - ✅ **Code-free body** — no FQCNs/`::method`/file paths, including Dependencies (module/feature + configuration names only)
 - ✅ Code references captured in the sibling `.refs.md` attachment
-- ✅ Gherkin acceptance criteria, quantified
+- ✅ Gherkin acceptance criteria, quantified — outcomes AND inputs (every `Then` comparison value stated literally in the `Given`)
 - ✅ Business-level NFRs (no tooling/test commands)
 - ✅ Success metrics with measurement tools; Out of Scope and Dependencies
 - ✅ NO Quality Gates, NO Tasks, NO priority tiers

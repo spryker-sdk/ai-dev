@@ -26,11 +26,16 @@
 #   -r, --repo <path>      Project root to validate (default: the current working
 #                            directory's git repo). Also reads $STATIC_CHECK_REPO.
 #   -b, --base <ref>       Base branch/ref to diff against (default: auto-detect).
+#   -w, --working-tree     Validate ONLY uncommitted + untracked changes against HEAD.
+#                            No base ref involved. For a fresh branch whose work is not
+#                            yet committed (the normal shape mid-build). Mutually
+#                            exclusive with --base. The report states this mode was used.
 #   -s, --scope <mode>     files | module   (default: files) — PHP module grouping only.
 #                            files  — validate only the changed PHP files.
 #                            module — validate every module that has a changed file.
 #       --include-tests    Include /tests/ files in phpcs/phpcbf (default: excluded from phpmd/phpstan only).
-#       --tools <list>     Comma subset of: phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier (default: all).
+#       --tools <list>     Comma subset of: phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier
+#                            (default: all except phpcbf, which mutates source — opt in via --fix or by naming it).
 #       --fix              Autofix where supported (phpcbf always; eslint/stylelint/prettier --fix/--write).
 #       --dry-run          Print what would be validated, run nothing.
 #   -h, --help             Show this help.
@@ -46,6 +51,7 @@ set -uo pipefail
 # Defaults
 # ----------------------------------------------------------------------------
 BASE_REF=""
+WORKING_TREE=0
 SCOPE="files"
 INCLUDE_TESTS=0
 DRY_RUN=0
@@ -103,6 +109,7 @@ while [ $# -gt 0 ]; do
         --repo=*)           REPO_OVERRIDE="${1#*=}"; shift ;;
         -b|--base)          BASE_REF="${2:-}"; shift 2 ;;
         --base=*)           BASE_REF="${1#*=}"; shift ;;
+        -w|--working-tree)  WORKING_TREE=1; shift ;;
         -s|--scope)         SCOPE="${2:-}"; shift 2 ;;
         --scope=*)          SCOPE="${1#*=}"; shift ;;
         --include-tests)    INCLUDE_TESTS=1; shift ;;
@@ -254,46 +261,76 @@ info "Repo root (worktree): $REPO_ROOT"
 # ----------------------------------------------------------------------------
 ref_exists() { git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1; }
 
-if [ -z "$BASE_REF" ] && [ -n "${STATIC_CHECK_BASE:-}" ]; then
+if [ "$WORKING_TREE" -eq 1 ] && [ -n "$BASE_REF" ]; then
+    err "--working-tree and --base are mutually exclusive: working-tree mode diffs against HEAD only."
+    exit 2
+fi
+
+if [ "$WORKING_TREE" -eq 1 ]; then
+    _wt_changes="$(git diff --name-only --diff-filter=d HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
+    if [ -z "$_wt_changes" ]; then
+        if [ -n "$(git diff --name-only HEAD 2>/dev/null)" ]; then
+            err "--working-tree: the only working-tree changes are deletions — there is nothing lintable to validate."
+        else
+            err "--working-tree: the working tree is clean — there are no uncommitted or untracked changes to validate."
+        fi
+        exit 2
+    fi
+    info "Mode: WORKING TREE — validating uncommitted + untracked changes against HEAD."
+    info "Committed history is NOT analysed in this mode; the result covers only the working tree."
+fi
+
+if [ "$WORKING_TREE" -eq 0 ] && [ -z "$BASE_REF" ] && [ -n "${STATIC_CHECK_BASE:-}" ]; then
     BASE_REF="$STATIC_CHECK_BASE"
 fi
 
-if [ -z "$BASE_REF" ]; then
+if [ "$WORKING_TREE" -eq 0 ] && [ -z "$BASE_REF" ]; then
     for candidate in master main; do
         if ref_exists "$candidate"; then BASE_REF="$candidate"; break; fi
     done
 fi
 
 # Fall back to the remote's default branch (e.g. origin/HEAD -> origin/main).
-if [ -z "$BASE_REF" ]; then
+if [ "$WORKING_TREE" -eq 0 ] && [ -z "$BASE_REF" ]; then
     default_remote_branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"
     if [ -n "$default_remote_branch" ] && ref_exists "$default_remote_branch"; then
         BASE_REF="$default_remote_branch"
     fi
 fi
 
-if [ -z "$BASE_REF" ]; then
-    err "Could not auto-detect a base branch. Pass one with --base <ref>."
-    exit 2
-fi
+if [ "$WORKING_TREE" -eq 0 ]; then
+    if [ -z "$BASE_REF" ]; then
+        err "Could not auto-detect a base branch. Pass one with --base <ref>, or use --working-tree"
+        err "to validate only uncommitted + untracked changes."
+        exit 2
+    fi
 
-if ! ref_exists "$BASE_REF"; then
-    err "Base ref '$BASE_REF' does not resolve in this repository."
-    err "Available local branches:"; git branch --format='  %(refname:short)' >&2
-    exit 2
-fi
+    if ! ref_exists "$BASE_REF"; then
+        err "Base ref '$BASE_REF' does not resolve in this repository."
+        err "Available local branches:"; git branch --format='  %(refname:short)' >&2
+        exit 2
+    fi
 
-# Guard: comparing a branch against itself yields no committed diff, so a run that
-# analysed nothing would be reported as "passed". Compare resolved SHAs — this also
-# catches a differently-named branch sitting on the same commit.
-current_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-if [ "$(git rev-parse "$BASE_REF" 2>/dev/null)" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
-    err "Base '$BASE_REF' resolves to the same commit as HEAD — there is nothing to diff."
-    err "Only uncommitted and untracked changes would be analysed, which would report"
-    err "a clean run as 'passed'. Pass an explicit --base <upstream-ref>."
-    exit 2
+    # Guard: comparing a branch against itself yields no committed diff, so a run that
+    # analysed nothing would be reported as "passed". Compare resolved SHAs — this also
+    # catches a differently-named branch sitting on the same commit.
+    current_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    if [ "$(git rev-parse "$BASE_REF" 2>/dev/null)" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
+        err "Base '$BASE_REF' resolves to the same commit as HEAD — there is nothing to diff."
+        _guard_wt="$(git diff --name-only --diff-filter=d HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
+        if [ -n "$_guard_wt" ]; then
+            err "The working tree DOES carry uncommitted/untracked changes. To validate exactly"
+            err "those (a fresh branch mid-build is the normal case), re-run with --working-tree."
+        else
+            err "Pass an explicit --base <upstream-ref>."
+        fi
+        exit 2
+    fi
+    info "Comparing: ${current_ref:-<detached>}  vs  base '$BASE_REF'"
+else
+    current_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    info "Comparing: working tree of ${current_ref:-<detached>}  vs  HEAD (no base ref)"
 fi
-info "Comparing: ${current_ref:-<detached>}  vs  base '$BASE_REF'"
 
 # ----------------------------------------------------------------------------
 # Collect changed files (existing on disk, added/modified — not deleted).
@@ -304,7 +341,8 @@ info "Comparing: ${current_ref:-<detached>}  vs  base '$BASE_REF'"
 # Collected as a newline-delimited string then split — keeps us bash-3.2 safe
 # (no mapfile, no associative arrays: macOS ships bash 3.2).
 _raw_changes="$(
-    git diff --name-only --diff-filter=d "${BASE_REF}...HEAD" 2>/dev/null
+    # Committed diff vs base — skipped entirely in --working-tree mode (no base ref).
+    [ "$WORKING_TREE" -eq 0 ] && git diff --name-only --diff-filter=d "${BASE_REF}...HEAD" 2>/dev/null
     # Also include uncommitted working-tree changes so in-progress edits are covered.
     git diff --name-only --diff-filter=d HEAD 2>/dev/null
     # And brand-new untracked files (not git-ignored) — freshly created code during
@@ -339,7 +377,11 @@ EOF
 
 if [ "${#changed_php[@]}" -eq 0 ] && [ "${#changed_jsts[@]}" -eq 0 ] \
    && [ "${#changed_style[@]}" -eq 0 ] && [ "${#changed_fmt[@]}" -eq 0 ]; then
-    warn "No changed PHP/JS/TS/CSS/SCSS files found between '$BASE_REF' and HEAD (incl. working tree)."
+    if [ "$WORKING_TREE" -eq 1 ]; then
+        warn "No changed PHP/JS/TS/CSS/SCSS files found in the working tree (vs HEAD)."
+    else
+        warn "No changed PHP/JS/TS/CSS/SCSS files found between '$BASE_REF' and HEAD (incl. working tree)."
+    fi
     exit 0
 fi
 

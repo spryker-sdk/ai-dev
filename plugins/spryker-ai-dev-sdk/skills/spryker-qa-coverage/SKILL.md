@@ -76,12 +76,13 @@ When in doubt, run inline — losing context is a worse failure than a slightly 
 
 ### Step 1 — Build the test checklist and test cases
 
-For each user story / acceptance criterion, derive test cases from these four buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
+For each user story / acceptance criterion, derive test cases from these five buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
 
 - **Happy path** — the documented behavior works for the intended actor.
 - **Negative / validation** — missing or malformed input, wrong values, empty state, "no results".
 - **Authorization** — a *different* actor (or one lacking the ACL role) is correctly denied. Spryker is actor-heavy; test the boundary, e.g. a Customer hitting a Back Office endpoint, or a Merchant user reaching another merchant's data.
 - **Corner / edge** — boundaries and the things that actually break Spryker features: empty collection, single vs. many (bulk of 1 vs 100), very long strings, special characters/HTML in text fields, concurrent/duplicate submit, CSRF token missing/expired, multi-store / multi-locale, multi-currency, pagination limits, stale cache vs. published storage (Redis/Elasticsearch), and idempotency on retry.
+- **Scale / NFR** — when the caller supplies a scale envelope (data volumes + NFR numbers, e.g. from `spryker-customization` Step 0d), verify the feature against it with measurements, not opinions: the **query-count delta** on the primary flow (ES/DB round trips before vs after — a feature once silently doubled ES queries on every one-word search), the **per-document index/KV size delta** multiplied out against the envelope, and a **timing statement for any synchronous work inside imports** at envelope scale. No load-testing infra needed — counts, sizes, and arithmetic. *All functional cases green + NFRs unmeasured is an incomplete verdict, not a pass.* No envelope supplied → note "Scale/NFR: no envelope provided" in the report rather than skipping silently.
 
 Think explicitly about what could break this *specific* feature — don't just template. If the feature publishes data, a corner case is "does the storefront storage actually reflect it after publish?". If it's a bulk action, "what about a partial failure mid-batch?".
 
@@ -124,6 +125,8 @@ Invoke the **`spryker-runtime`** skill to run each case. It handles login per ac
 Execution order: run the cheap CLI/API/storage cases first (fast, no browser), then the Chrome flows. Reuse one login session across cases where possible (hand the harvested cookie from Chrome to curl — Mode 4) instead of logging in repeatedly.
 
 Capture **concrete evidence** for every case as you go: HTTP status + key response fields, the DB row / Redis key / queue message you checked, console output, console errors (`read_console_messages`), the rendered result, and a `gif_creator` recording for notable UI flows. Evidence is what makes a QA report trustworthy — record what you actually observed, never paraphrase or assume.
+
+**Write-path evidence rule:** a write is verified by reading the written state through a **different mechanism than the one that wrote it**. A tool's own success report is not evidence — a data importer once printed *"Successful, 3 imported DataSets"* with zero rows written. For imports, assert the row delta (`SELECT COUNT(*)` before/after vs the expected count); for publish/sync features, read the index/Redis key back rather than trusting "queues drained".
 
 ### Step 4 — Report
 
@@ -183,7 +186,7 @@ ALWAYS structure the final report like this:
 
 - "I'll just run phpstan/spryker-ci to check it" → NO. This skill never runs static analysis.
 - "I'll write a Codeception test for this" → NO. That's `codecept-functional`. Here you execute against the running app.
-- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all four buckets.
+- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all five buckets (Scale/NFR when an envelope is supplied — else note its absence).
 - "It probably works" / "the code looks right" → NO. QA reports *observed* behavior with evidence, not inferences from code.
 - "The endpoint returns 200, so the feature works" → NO. A synthetic/endpoint hit is a layer below the UI. If the AC is a user flow, prove it through the real UI (E2E); otherwise mark it `PASS (server only)` and keep the UI-flow case FAIL/BLOCKED. Reading code is fine to *understand what to test* — it is never a substitute for *observing* the running flow.
 - "The button did nothing once, so it's a blocker" → NO. Reproduce on ≥3 fresh loads (hard reload + navigate-back) and rule out your own driver first. Spryker Zed front-end bootstrap bugs are often intermittent races — works-on-some-loads is a *minor/flaky* finding, not a blocker. One dead load is a hypothesis, not a verdict.

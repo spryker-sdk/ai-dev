@@ -50,6 +50,7 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | `*.schema.xml` changed (project layer) | `propel:install` |
 | A `.php` file is **added, renamed, moved, or deleted** under a project namespace in `src/` | `composer dumpautoload --apcu` |
 | A `.php` file under a project namespace is added or deleted whose **fully-qualified class name matches an existing vendor class** (the file is a project-layer override — same FQCN minus the `Spryker\` vs project root) | `cache:class-resolver:build` |
+| A **new module directory** appears under a project namespace (`src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<NewModule>/`) | `dev:ide-auto-completion:generate` → `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`). The first regenerates the locator stub so `$this->getLocator()-><newModule>()` exists — without it the app runs fine but **phpstan fails with `Call to an undefined method …LocatorLocatorInterface::<newModule>()`**, surfacing two steps later as a phantom code defect (the project's own install recipe runs it — see `config/install/development.yml`). The second is its unconditional companion: phpstan's result cache keeps reporting the stale locator error after the stub is fixed. |
 | `*DependencyProvider.php` changed (plugin chain edit, body or new file) | `cache:empty-all` |
 | `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
 | Yves Twig / JS / SCSS changed | `frontend:yves:build` → `twig:cache:warmer` |
@@ -79,10 +80,12 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
    1. **Cache removes** — `cache:empty-all`, `navigation:cache:remove`, `rest-api:remove-validation-cache`, `search:source-map:remove`. Clear old cached state before new state is written.
    2. **Codegen** — `transfer:generate`, `propel:install`.
    3. **Autoload** — `composer dumpautoload --apcu`.
-   4. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`.
-   5. **Class resolver build** — `cache:class-resolver:build`. Runs after the class layout AND caches are in their final state.
-   6. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely.
-   7. **Frontend builds** — `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
+   4. **IDE/locator stubs** — `dev:ide-auto-completion:generate`. After autoload (the stub generator reads the class map), before the class-resolver build.
+   5. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`.
+   6. **Class resolver build** — `cache:class-resolver:build`. Runs after the class layout AND caches are in their final state.
+   7. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely.
+   8. **Frontend builds** — `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
+   9. **Stale-analysis cache clear** — `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`), whenever step 4 ran. Last, so no later step repopulates a stale entry.
 
    Each step runs only if its commands appeared in your matched set from step 2. Install recipes (`config/install/*.yml`) are authoritative — if a recipe orders commands differently for this project, defer to the recipe.
 
@@ -132,6 +135,7 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 ### Caveats (manual steps the caller should consider)
 - Queue workers may need restart if publisher plugins changed.
 - Storefront cache may need browser hard-refresh.
+- **If the file list touched a DependencyProvider, `ApplicationServices.php`, or other DI/container wiring:** a clean exit code does NOT prove the application still serves — remind the caller to run the wiring smoke check (one Back Office route + one backend-gateway route) before continuing. A stateful-plugin DI mistake exits 0 here and 500s every route at runtime.
 ```
 
 ## What you do NOT do

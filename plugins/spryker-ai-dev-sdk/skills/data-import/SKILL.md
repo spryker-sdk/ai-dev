@@ -42,6 +42,24 @@ Create a new module {MODULE_NAME}DataImport in Zed Layer:
 Use Spryker best practices. Use native PHP types. No extra DocBlocks. Use current branch.
 Do not run propel:install or transfer:generate — write code only.
 
+## Scope boundary: this skill does NOT own propagation (Publish & Synchronize)
+
+This skill builds the import path — CSV → validator/writer steps → database rows. **How those rows
+reach search or key-value storage is a separate, deliberate design decision that belongs to the
+feature's solution design** (the `spryker-customization` skill's §P&S section: is propagation needed
+at all, which single mechanism, what transaction boundary). Never wire a publish into an
+after-import hook as a side effect of building the import — that decision was made outside any
+review once, and it shipped a synchronous publish that bypassed the queue while the declared event
+behavior had no subscriber.
+
+## Verification rule: a success message is not evidence of a write
+
+The importer's console report (*"Successful, N imported DataSets"*) is **not** acceptable evidence —
+a real run printed exactly that with zero rows written. Verify every import by the **row delta**:
+state the expected count, then `SELECT COUNT(*)` on the target table before/after (through the DB,
+not through the importer). A write path is proven by reading the written state through a different
+mechanism than the one that wrote it.
+
 ## Example Usage
 
 I need to create a data import for my new entity 'picker'.

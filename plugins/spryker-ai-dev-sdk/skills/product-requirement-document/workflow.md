@@ -11,18 +11,20 @@ This document provides the detailed phase-by-phase breakdown of the interactive 
 
 ### Phase 0: Research FIRST 🔬 REQUIRED (before any requirement)
 
-Ground everything in real Spryker before drafting. Codebase facts (Step 0.2) are always gathered; docs research (Step 0.1) and running-app validation (Step 0.3) are **opt-in — ask the user with `AskUserQuestion` before running each**.
+Ground everything in real Spryker before drafting — **code first, then docs**: the codebase facts are cheap inline calls that settle most questions and target the expensive docs research. Codebase facts (Step 0.1) are always gathered; docs research (Step 0.2) and running-app validation (Step 0.3) are **opt-in — ask the user with `AskUserQuestion` before running each**.
 
-**Step 0.1 — Public documentation research (ASK FIRST; run as subagent[s])**
-Ask the user whether docs research is needed: *"Should I research the official Spryker docs for this feature first?"* Some features are project-specific or already clear from the codebase and need none. **Only if yes**, dispatch the research to **subagent(s) via the Agent tool** — never inline in the main loop — each subagent's prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only). This keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** launch one subagent per concept/PBC/actor-area in a single message so they run in parallel; use a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs.
-- If a subagent reports a missing MCP tool, tell the user and suggest enabling it before continuing.
-
-**Step 0.2 — Codebase facts (inline, Spryker tooling MCP server)**
-Confirm against the real install and pin exact names — match tools by tool name (server names vary by install):
+**Step 0.1 — Codebase facts (inline, first, Spryker tooling MCP server)**
+Establish against the real install what exists and pin exact names — match tools by tool name (server names vary by install):
 - `getSprykerModules` — exact module name(s).
-- `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.)
+- `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.) **Take vendor paths from the map's output — never guess `Business/...` sub-paths.**
 - `getTransferStructureByName` — real transfer field names/types. Never invent fields.
+- **Project-overlap sweep:** grep the project namespace for the feature's nouns and read the registered plugin stacks in the touched modules' project DependencyProviders — what has *this project* already built that overlaps? Anything found becomes a story input.
 **If the tooling MCP server is not connected / not running** (tool unavailable or `/mcp` reconnect failed): **start the underlying server first** — it backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up — then **ask the user to reload the MCP connection** (run `/mcp` to reconnect) and wait for confirmation before continuing. Don't guess names; if the reconnect keeps failing, fall back to reading the codebase directly (grep/Read) and say so.
+From these facts, **form a hypothesis** about the feature's shape — the docs research below confirms or refutes it instead of sweeping blind.
+
+**Step 0.2 — Public documentation research (one folded question; run as subagent[s] or inline per the user's choice)**
+Ask one research-depth question via `AskUserQuestion`: *(a) docs research via subagents (recommended)*, *(b) docs research inline* (for a harness that forbids unrequested subagents), *(c) skip*. Some features are project-specific or already settled by Step 0.1 and need none. On **(a)**, dispatch **subagent(s) via the Agent tool**, each prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only) and naming the Step 0.1 hypothesis/concepts to confirm — this keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** one subagent per concept/PBC/actor-area in a single message, **each given an explicit non-overlap boundary** ("agent B covers Product Lists — don't"); a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs. On **(b)**, run the skill inline and say so. Docs are **not trusted for identifier spellings** — real field/route names come from Step 0.1.
+- If a subagent reports a missing MCP tool, tell the user and suggest enabling it before continuing.
 
 **Step 0.3 — Validate existing flows (ASK FIRST; only when the behavior already exists)**
 If the feature modifies or extends an existing flow, ask the user: *"This extends an existing flow (<name> → <endpoint>). Should I run the app and validate how it behaves today?"* **Only if yes**, invoke the **`spryker-runtime`** skill to see how it behaves today — run a `docker/sdk cli console` command, call the endpoint over HTTP, or log in and drive the UI in Chrome (start the app with `script -q /dev/null docker/sdk run` if it's down). Use the observed status/response/UI to write accurate acceptance criteria and the correct endpoint path. Skip this (and the question) for greenfield behavior that cannot be run yet.
@@ -30,7 +32,7 @@ If the feature modifies or extends an existing flow, ask the user: *"This extend
 **Step 0.4 — Hold the findings**
 Keep what you gathered: real module/transfer names always; documented behavior (if researched) and observed behavior (if validated) when applicable. They feed Phases 3–5 directly. Do not invent any of these later.
 
-**CHECKPOINT:** Do not draft requirements until codebase facts are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
+**CHECKPOINT:** Do not draft requirements until codebase facts (incl. the project-overlap sweep) are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
 
 ### Phase 1: Initial Requirements Gathering 🔄 INTERACTIVE
 
@@ -148,7 +150,24 @@ If user requests changes:
 
 ### Phase 3: User Stories - Iterative Creation 🔄 INTERACTIVE
 
-**CRITICAL:** Create user stories ONE AT A TIME, not all at once.
+**Step 3.0: Ask the pacing question — once, before the first story**
+
+```json
+{
+  "questions": [{
+    "question": "How do you want to review stories and acceptance criteria?",
+    "header": "Review pacing",
+    "options": [
+      {"label": "Per story (Recommended)", "description": "Each story + its criteria presented as one batch — ~1 checkpoint per story"},
+      {"label": "Per criterion", "description": "Every story AND every criterion approved individually — most checkpoints, finest control"},
+      {"label": "Draft then review", "description": "Full draft of all stories + criteria, then one revision pass"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+Honour the answer through Phases 3–4. The steps below describe the finest granularity (per-criterion); at coarser pacing, run the same drafting steps but **collapse the approval questions to the chosen batch size** — the story checkpoint content (story + actor + endpoint together) is mandatory at every pacing, and corrections stay possible at whichever checkpoints occur.
 
 **Step 3.1: Identify Story Count**
 
@@ -243,15 +262,15 @@ Show the drafted story together with its actor and affected endpoint, then ask t
 
 ### Phase 4: Acceptance Criteria - Per Story Iteration 🔄 INTERACTIVE
 
-**CRITICAL:** For the approved user story from Phase 3, create acceptance criteria ONE SCENARIO AT A TIME.
+For the approved user story from Phase 3, create acceptance criteria and present them **at the pacing chosen in Step 3.0** — individually (per-criterion), as the story's batch (per-story), or collected for the draft review.
 
 **Step 4.1: Draft Initial Scenarios**
 
-Based on the user story, draft 2-3 Gherkin scenarios that test different aspects.
+Based on the user story, draft the Gherkin scenarios that test different aspects — typically 2–4, but the cap is advisory: the story carrying the feature's primary behavior may need more (happy path, isolation, anonymous, no-regression, collision are distinct behaviors). Never merge distinct behaviors to fit the count.
 
-**Step 4.2: Present Each Scenario Individually**
+**Step 4.2: Present the Scenario(s) per the chosen pacing**
 
-For each scenario:
+At per-criterion pacing, for each scenario:
 
 **a) Show the scenario:**
 ```markdown
@@ -345,7 +364,7 @@ Business-level quality attributes only — no tooling, no test-suite commands:
 - Security (data protection, auth, compliance)
 - Scalability (growth/volume projections)
 
-Quantify every attribute (no "fast"/"reliable"). Do NOT add tooling commands, test suites, or "quality gates" — those belong to planning, not the PRD.
+Quantify every attribute (no "fast"/"reliable"). **When the user has no numbers, propose the baseline volumes explicitly** (`spryker-customization`'s `references/baseline-volumes.md`; a filled `architecture/10-quality-requirements.md` volume table overrides them) **and mark each number user-supplied vs baseline-default.** Do NOT add tooling commands, test suites, or "quality gates" — those belong to planning, not the PRD.
 
 **Step 6.2: Present for Review**
 
@@ -387,7 +406,12 @@ For each selected addition: ask the user to describe it, draft the specific requ
 
 **CHECKPOINT:** Do not proceed until NFRs are approved.
 
-### Phase 7: Success Metrics & Scope
+### Phase 7: Constraints, Decisions, Success Metrics & Scope
+
+**Step 7.0: Draft Constraints and Decisions & Accepted Risks**
+
+- `## Constraints` — discovered hard constraints that change what can be promised, business-phrased and mechanism-free, one line per item (they typically surfaced during Phase 0; cross-check `architecture/02-constraints.md` when the project has it).
+- `## Decisions & Accepted Risks` — one line per item: `**[Decision]** — [its cost, plainly] — accepted by [user] on [date]`. Genuinely undecided items that block implementation go **first**, as `**OPEN — blocks implementation:** <question> — <what it blocks>` — never dressed up as decided.
 
 **Step 7.1: Draft Success Metrics**
 
@@ -430,6 +454,10 @@ Present these sections and ask for quick approval or additions.
 
 ### Phase 8: Final Review & Save 🔄 INTERACTIVE
 
+**Step 8.0: Scenario lint pass**
+
+Run the mechanical audit from [gherkin-guide.md](gherkin-guide.md) over every scenario: one `Given`/`When`/`Then` spine (no `When` missing, no two actions or two assertions chained), every `Then` comparison value stated literally upstream (no bare "the same/unchanged/as before"), no dependency-free quantities in the `Given`, no `or` in a `Then`, titles naming exactly what the body asserts. Split compounds rather than merging behaviors.
+
 **Step 8.1: Red Flag Check**
 
 Review the complete PRD and remove anything matching:
@@ -442,6 +470,9 @@ Review the complete PRD and remove anything matching:
 - ❌ **Any code reference in the body** — FQCN, `Class::method()`, controller/action/plugin/facade/transfer/repository class name, or file path (anywhere, including Dependencies). Move it to `{feature-name}.refs.md`; in the body use module/feature names and configuration names; endpoints show the URL path only.
 - ❌ Vague goals or unquantified criteria ("fast", "good", "works well")
 - ❌ Acceptance criteria not in Gherkin, >4 steps, or multiple behaviors per scenario
+- ❌ A `Then` comparing against a value never stated in the `Given`/`When` ("the same", "unchanged", "as before" with no literal)
+- ❌ An assertion that cannot fail (an `or` in a `Then`; "renders as before"; externally unobservable claims)
+- ❌ Paragraph-form entries in Constraints / Decisions / Dependencies / Out of Scope (one line per item)
 - ❌ Missing business justification or success metrics
 
 Quick grep before saving (the body should be clean): `grep -nE '::|\\\\[A-Z][A-Za-z]+\\\\|/src/' {feature-name}.prd.md` — hits other than the linked attachment path mean code leaked into the body.
@@ -474,14 +505,17 @@ Ask the user which location:
 
 **Step 8.5: Save PRD + the code-reference attachment** with the `Write` tool. Write the code-free `{feature-name}.prd.md` **and** its sibling `{feature-name}.refs.md` (same directory) containing the code references discovered during research — see [refs-attachment.md](refs-attachment.md). Ensure the PRD research header links the attachment.
 
-**Step 8.6: Confirm Completion** — mention both files.
+**Step 8.6: Confirm Completion** — mention both files, and **repeat every `OPEN — blocks implementation` item in the hand-off message itself** (the planner must see the blockers without opening the document).
 
 ```
 PRD saved to: [path]/{feature-name}.prd.md (business requirements, code-free)
 Code references saved to: [path]/{feature-name}.refs.md (controller/action FQCNs, transfers, configuration keys, file paths — for the planner)
 
+OPEN decisions blocking implementation (from Decisions & Accepted Risks):
+- [each OPEN item, verbatim — or "none"]
+
 Next steps:
-- Use this PRD (and its .refs.md attachment) as input for implementation planning (e.g. the prd-to-planning skill)
+- Build it with the `spryker-customization` skill (it takes this PRD + .refs.md as input and drives plan → build → verify → commit gate)
 - Share with stakeholders for alignment
 - Update as requirements evolve
 ```

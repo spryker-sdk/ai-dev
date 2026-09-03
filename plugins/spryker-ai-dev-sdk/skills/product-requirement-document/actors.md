@@ -7,7 +7,8 @@ Every user story MUST name its actor from the real Spryker actor set. Do not inv
 | Actor | Who they are | Where they operate | How they authenticate |
 |-------|--------------|--------------------|-----------------------|
 | **Back Office user** | Internal operator running the shop. This is the umbrella actor — name the **specific ACL role** when the story is role-scoped (e.g. *Back Office content manager*, *Back Office catalog manager*, *Back Office customer-service user*), or just *Back Office user (admin)* for full-access operators. Permissions controlled by ACL roles. | Back Office (Zed) — `http://<backoffice-host>` (host from the `backoffice` application in deploy.dev.yml) | `security-gui/login`, e.g. `admin@spryker.com` |
-| **Customer** | Storefront shopper (B2C buyer or B2B company user). | Yves storefront + Glue API | Yves login / Glue access token, e.g. `sonia@acme.com` |
+| **Customer** | Storefront shopper (B2C buyer). For a shopper acting within a company, use **Company user** below. | Yves storefront + Glue API | Yves login / Glue access token, e.g. `sonia@acme.com` |
+| **Company user (Customer)** | B2B shopper acting **within a company and an active business unit** — a first-class Spryker concept (`spy_company_user`): its own OAuth scope and access-token endpoint on Glue, company roles/permissions, and Business-on-Behalf (one customer switching between company/BU contexts mid-session). On any B2B or B2B-marketplace project this is the single most common storefront actor. | Yves storefront + Glue API (company-user token) | Yves login / Glue company-user access token, e.g. `sonia@acme.com` acting for "Acme / BU South" |
 | **Agent** | Customer-service representative who assists customers and can act on their behalf ("agent assist" / customer impersonation). | Yves agent flow | `agent/login` on Yves, e.g. `agent123@spryker.com` |
 | **Merchant user** | Staff of **one** merchant. Scoped to a single seller — bound to exactly one merchant via `spy_merchant_user.fk_merchant`. Sees and acts on only that merchant's data. | Merchant Portal | `security-merchant-portal-gui/login`, e.g. `harald@spryker.com` |
 | **Merchant Agent** | Marketplace-operator support who acts **across multiple merchants** — not locked to one seller. The merchant-side equivalent of an Agent. | Merchant Portal | `security-merchant-portal-gui/login` |
@@ -31,7 +32,8 @@ So a story written for a Merchant user is always *"for my single merchant"*; a s
 
 State the actor explicitly and unambiguously. For a Back Office user, **prefer the specific ACL role** when the story is role-scoped, keeping the canonical actor recognizable:
 
-- ✅ `As a Back Office content manager (Back Office user)` / `As a Back Office user (admin)` / `As a Customer` / `As an Agent assisting a customer` / `As a Merchant user`
+- ✅ `As a Back Office content manager (Back Office user)` / `As a Back Office user (admin)` / `As a Customer` / `As a Company user (Customer)` / `As an Agent assisting a customer` / `As a Merchant user`
 - ❌ `As a user` / `As an administrator` (which one?) / `As the system` / `As a content manager` (which actor?)
+- ❌ `As a Customer belonging to a business unit…` — that actor has a name: `Company user (Customer)`. Don't reconstruct it with a qualifying clause on every story.
 
 Pattern for a specialized role: `As a <specific role> (<canonical actor>)` — e.g. `As a Back Office catalog manager (Back Office user)`. Always keep the canonical actor in parentheses so the role stays mapped. If the install has a custom ACL role, confirm it exists at `/acl` (via `spryker-runtime`) before naming it.
