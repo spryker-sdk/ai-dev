@@ -19,29 +19,8 @@ the orchestrator skims the map and the shared conventions.
 - **Ground, don't guess.** Anything about how Spryker behaves comes from `research-docs.md`; external
   facts from `research-web.md`; facts about *this* project from `intake.md`. If a fact isn't in the
   inputs, write `> **TODO:** <what's missing and who can answer it>` instead of inventing it.
-- **Diagrams as code — Mermaid (`.mmd`) ONLY, for every diagram type including ERDs.** Use Mermaid
-  `flowchart`/`sequenceDiagram`/`erDiagram`/etc. for flow, context, sequence, data-flow, integration,
-  AND entity-relationship diagrams. **Do NOT use PlantUML (`.puml`)** — it can't render client-side, so
-  it's invisible in the browser preview, the exported PDF, and GitHub's Markdown renderer. Model ERDs
-  with Mermaid `erDiagram` (entities with `PK`/`FK` markers and crow's-foot cardinality). Store diagram
-  files under `architecture/diagrams/<category>/` and reference them from the section with a relative
-  link (`[C1 System Context](diagrams/c4/c1-system-context.mmd)`) — the template uses this external-file
-  approach. Match the existing example diagrams' style.
-  **Harvest before you author:** if the source doc (a TAD, a brief) already embeds a diagram, start
-  from it — restyle to the color convention below; **if it's PlantUML, transcribe it to Mermaid** rather
-  than keeping `.puml`. Don't redraw from scratch and drift from what the architect already approved.
-  Two Mermaid syntax traps to avoid so diagrams actually render: never put a `;` in note/label text
-  (it's a statement separator — use `,`), and keep any `%%` comments AFTER the `---config---`
-  frontmatter, never before it.
-- **Diagrams carry systems, actors, and the transitions between them — nothing else.** A node is a
-  system or an actor; an edge is a transition with a short label (a few words, or an integration ID).
-  Protocol, frequency, volume, retry behaviour and constraints live in the Connectors table, never on
-  the diagram and never repeated in the section prose. One fact, one place.
-  - Do not draw the same relationship twice across diagrams. The context diagram shows external
-    systems and actors; runtime diagrams show a specific flow's sequence. If a runtime diagram would
-    restate the context diagram, it is not worth drawing.
-  - Draw only the flows the intake identified as important or risky (Q28). Never one per integration
-    by default.
+- **Diagrams follow [diagrams.md](diagrams.md)** — C4 notation rules, level discipline, sequence-
+  diagram scope, Mermaid-only format, and the colour scheme. Read it before drawing anything.
 - **The deliverable holds only the architecture record.** Never copy source material — briefs, TADs,
   exports, notes — into `architecture/`. Read it where the user put it and cite it by name.
 - **Remove template example content in every folder you touch**, including example diagram files that
@@ -54,27 +33,6 @@ the orchestrator skims the map and the shared conventions.
   convention (`/abs/path/File.php:line`).
 - **Return compact.** A writer returns: files written, a 2–3 line "what I put in it", and its open
   TODOs — not the prose it wrote.
-
-### Universal diagram color scheme (readability-first — every fill/text pair must be legible in print)
-
-Reuse these `classDef` styles so all diagrams read as one system. **Each style below pins BOTH a fill
-and a contrasting text `color:`** — this is not optional. The rule of thumb: dark fill → `color:#fff`;
-light fill → an explicit dark `color:` (never rely on the default, and never white text on a light or
-mid-grey fill). These values are tuned to survive black-and-white-ish PDF printing.
-
-| Element / class | `classDef` (copy verbatim) | Meaning |
-|---|---|---|
-| **user / actor** — `userStyle`,`authStyle` | `fill:#e1f5ff,stroke:#0366d6,stroke-width:2px,color:#0b2545` | user/actor (light fill, **dark navy text**) |
-| **system (this project)** — `systemStyle` | `fill:#FDEBD0,stroke:#CA6F1E,stroke-width:3px,color:#7E3F0C` | the system under design (**soft amber, dark brown text** — a gentle highlight, not a loud orange block) |
-| **communication / storefront edge** — `communicationStyle` | `fill:#FDEBD0,stroke:#CA6F1E,stroke-width:2px,color:#7E3F0C` | comm layer / storefront edge (same soft amber) |
-| **backend / API / process** — `backendStyle`,`apiStyle`,`businessStyle`,`searchStyle`,`custom` | `fill:#2980B9,stroke:#1B4F72,stroke-width:2px,color:#fff` | backend services, APIs, processes (blue, white text) |
-| **web app / external web** — `webStyle`,`webAppStyle`,`presentationStyle` | `fill:#27AE60,stroke:#1D8348,stroke-width:2px,color:#fff` | web apps, external web systems (green, white text) |
-| **storage** — `storageStyle`,`persistenceStyle`,`core` | `fill:#9B59B6,stroke:#6C3483,stroke-width:2px,color:#fff` | DB, cache, search (purple, white text) |
-| **external / infra** — `externalStyle`,`infraStyle` | `fill:#5D6D7E,stroke:#34495E,stroke-width:2px,color:#fff` | external systems, infrastructure (**dark slate, white text** — NOT the old light `#95A5A6` grey, which washes out white text) |
-
-Deprecated/unreadable values to avoid (they were replaced for contrast): light grey `#95A5A6` fills,
-and loud orange `#E67E22`/`#CA6F1E` fills with white text. Use `layout: elk` config header for larger
-flowcharts as the examples do. When restyling a harvested diagram, remap its colors to this table.
 
 ## Section → diagram map
 
@@ -90,103 +48,141 @@ flowcharts as the examples do. When restyling a harvested diagram, remap its col
 
 ## § 01 — Introduction and Goals
 
-**File:** `01-introduction-and-goals.md`. **Inputs:** intake tab groups A, B; migration from C.
-**Depth:** the approval/status block, general overview, and release-phased functional scope — see
-[architecture-depth.md](architecture-depth.md).
+**File:** `01-introduction-and-goals.md`. **Inputs:** intake (Q2 name, Q3 outcomes, Q4 build type,
+Q5 actors, Q9 quality goals, Q24 migration).
 
-- **Status/approval header (recommended):** add a short metadata block at the top — Status (e.g.
-  Draft / In Review / Approved), Author/Driver, Approver(s), key dates, document version.
-  Fill what the interview gave; mark the rest `TBD`.
-- **Requirements Overview:** turn the one-paragraph goal + in-scope capabilities into a short bulleted
-  list of functional drivers, phrased for *this* project (not the template's generic B2B bullets).
-  State the business model, the legacy system being re-platformed (if any), the go-live date, and
-  whether it's MVP or 100% scope.
-- **Functional scope table:** list scope items with a **Release Phase** column (Phase 1 / Phase 2),
-  each described in project terms.
-- **Migration Requirements:** if migrating, name the source system, data entities & volumes, what's
-  replaced, and the timeline. If not migrating, say "No migration — greenfield build" (don't delete
-  the subsection, just state it).
-- **Quality Goals:** fill the priority table with the user's ranked 3–5 goals and a concrete scenario
-  per goal (these pair with section 10's measurable scenarios — keep them consistent).
-- **Stakeholders:** the real roles + expectations from tab group B.
+**Answers one question: what is this system for, and by what qualities is it judged?**
+
+- **Status header:** Status, author (from the intake — never a name lifted from a provided
+  document), key dates, version. Mark unknowns `TBD`.
+- **Requirements overview:** the business model, the system being replaced if any, go-live, and
+  whether the scope is MVP or full — short, in this project's terms.
+- **Functional scope table:** scope items with a phase column, described in project terms.
+- **Quality goals:** the goals the intake ranked, each with a concrete scenario. **Non-functional
+  only** — performance, availability, security, changeability, operability. A functional capability
+  is not a quality goal, however important it is; it belongs in the functional scope. If the intake
+  named fewer than three, list fewer.
+- **Migration:** source system, entities, volumes, timeline. If none, one line saying so.
+- **Stakeholders:** the roles the intake named, with what each expects from the architecture.
 
 ## § 02 — Constraints
 
-**File:** `02-constraints.md`. **Inputs:** intake tab group D; conventions from CLAUDE.md.
+**File:** `02-constraints.md`. **Inputs:** intake (Q27 inherited limitations, Q43 fixed technical
+choices, Q44 legal obligations, Q10 hosting).
 
-Fill the three tables (Technical / Organizational / Conventions) with real constraints and their
-*motivation* (the "why" column is the point — a constraint without a reason is noise). Hosting model,
-compliance, team size, release cadence, PHPStan level, branching model. Pull Spryker/PHP conventions
-from the project's own `CLAUDE.md`/`.claude/rules` where relevant.
+**Answers one question: what removes the architect's freedom?**
 
-## § 03 — System Scope and Context  ⟶ C1
+A constraint is imposed from **outside** the architecture — mandated technology, regulation, budget,
+deadline, organisational policy, a limitation of a system that must be lived with. Record each with
+its motivation; a constraint without a reason is noise.
 
-**File:** `03-system-scope-and-context.md`. **Inputs:** intake B, C; `research-docs.md` (actor names,
-integration patterns). Integrations come from the intake (Q7 systems, Q20 connections).
+**Not constraints, and not to be written here:**
 
-- **Business Context:** the system and every communication partner (actors + external systems), with
-  the business reason for each. Point to the C1 diagram.
-- **Technical Context — External Systems table:** each external system, its responsibility, the
-  technology, and stakeholders. Use the *real* products named in the interview.
-- **Integration Details table:** direction, protocol, sync/async, frequency, constraints — straight
-  from tab group C, corrected against docs research (e.g. confirm the real Spryker integration
-  pattern for that system type). Tag each with its **Release Phase**.
-- **Components + Connectors rationale tables (required):** beside the diagram, always include the
-  two tables from [architecture-depth.md](architecture-depth.md) — **Components** (system / description /
-  stakeholders) and **Connectors** (interaction / description / type / frequency-volume-constraints).
-  Nothing important should live only inside the picture.
-- **C1 diagram** (`diagrams/c4/c1-system-context.mmd`): the platform as one box, all actors and
-  external systems around it with labeled edges. Follow the example's style and color classes exactly.
-  For an integration-heavy project, also produce an integration overview diagram under
-  `diagrams/integration/`.
+- **How the chosen platform works.** Its documented behaviours and architectural properties are the
+  platform, not restrictions on the project.
+- **Anything observed in the starting template** — its namespace, package versions, language version,
+  sample configuration. These are defaults that the project will change, and stating them as fixed is
+  wrong as well as short-lived.
+- Consequences of design decisions this document is making.
 
-## § 04 — Solution Design candidates (never authored here)
+If a table has no genuine entries, say so in a line. An empty constraints table is a valid and
+honest outcome; an invented one misleads every later reader.
 
-**Dir:** `04-solution-designs/`.
+## § 03 — System Scope and Context  ⟶ C1 + C2
 
-**This skill identifies Solution Designs; it does not write them.** Authoring is a separate exercise
-with its own skill, run later against the finished architecture record.
+**File:** `03-system-scope-and-context.md`. **Inputs:** intake (Q5 actors, Q7 systems, Q20
+connections); `research-docs.md`.
 
-Produce a single `README.md` in the folder listing the candidates. Each is **a title plus two or
-three sentences** — what needs designing, and why the architecture record cannot settle it:
+**Answers one question: where is the system boundary, and what does it relate to across it?** Not how
+those relationships are implemented.
 
-> **SD candidate: Outbound supplier punch-out**
-> The supplier catalogue round-trip is the only integration where a shopper waits on a third party,
-> and the failure behaviour is unresolved. Needs a design before the integration is estimated.
+- **Business Context:** the system and its communication partners — actors and external systems —
+  with the business reason for each. Name the C1 diagram as the subject.
+- **Technical Context:** name the **C2 container diagram** as the subject, then the two tables:
+  - **Components** — one row per system on the diagrams: system, what it provides or accepts,
+    stakeholders.
+  - **Connectors** — one row per relationship: interaction, description, type (sync/async, REST,
+    file, queue…), and frequency/volume/constraints.
+
+  These two tables are the complete integration statement. **Do not add a third table** repeating
+  direction, protocol or frequency — C4 prescribes components and connectors, and a third view is
+  duplication by construction.
+- **This writer produces both the C1 and C2 diagrams** (see [diagrams.md](diagrams.md)), so their
+  names stay consistent with each other and with the tables here. §05 Building Block View reuses the
+  C2 diagram and its names verbatim.
+- **Verify before returning:** every system name in the tables appears identically on both diagrams,
+  and every diagram box appears in the Components table. A mismatch is a defect.
+
+## § 04 — Solution Designs (stubs only — never designed here)
+
+**Dir:** `04-solution-designs/`. **Template:** `sd-000-template.md`. **Naming:** `sd-XXX-brief-title.md`.
+
+**Create a real file per topic that needs designing — and leave the design empty.** The stub is where
+that topic's open questions live, so they stop cluttering the main sections.
+
+Each stub contains, and nothing more:
+
+- **Metadata** — status `Draft`, today's date, the author from the intake.
+- **Problem statement** — two or three sentences: what needs designing, and why the architecture
+  record cannot settle it.
+- **Open questions** — every question and TODO belonging to this topic, as a list. This is the
+  substance of the stub and the reason it exists.
+- The template's remaining headings (proposed solution, data model, implementation plan, trade-offs,
+  alternatives) **left as empty headings.** Do not fill them, do not sketch them, do not write
+  "TODO" under each one.
 
 Rules:
 
-- **No problem statements, no proposed solutions, no diagrams, no data models, no implementation
-  plans, no trade-off tables.** A candidate that runs past three sentences is over-written.
-- **Never create `sd-XXX-*.md` files.** The folder holds the candidate list and the template only.
-- Anything answered `Too complex to decide now — needs investigation` in the intake becomes a
-  candidate automatically.
-- Leave the shipped `sd-000-template.md` untouched, for the later authoring step.
+- **Never design.** No proposed solution, no data model, no diagrams, no implementation plan, no
+  trade-off analysis — even when the source material contains enough depth to attempt one. Designing
+  is a separate exercise with its own context and its own review.
+- Anything the intake answered `Too complex to decide now — needs investigation` gets a stub.
+- Any topic that accumulated more than a couple of integration-specific questions gets a stub.
+- List the stubs in `04-solution-designs/README.md`, one line each.
+- Leave `sd-000-template.md` untouched.
 
-## § 05 — Building Block View  ⟶ C2
+### Where a TODO belongs
+
+| TODO | Goes |
+|---|---|
+| Affects the architecture, or blocks progress on it | Inline in the section it affects |
+| Specific to one integration, capability or design topic | That topic's Solution Design stub |
+
+A section carrying a pile of integration-specific TODOs is a signal the stub is missing, not that the
+section is thorough.
+
+## § 05 — Building Block View
 
 **File:** `05-building-block-view.md`. **Inputs:** intake (Q11 out-of-scope, Q25 capability
-classification); `research-docs.md`.
+classification); `research-docs.md`; the C2 diagram produced with §03.
 
-- **C4 Level 2 (Container):** the main Spryker containers in scope (Yves, Zed, Glue, DB, Redis,
-  Elasticsearch/OpenSearch, RabbitMQ, plus any project-specific service) and their responsibilities.
-  Pair with `diagrams/c4/c2-*.mmd`.
-- **List the custom domains** the intake identified as custom development, one row each with a
-  one-line responsibility. No effort estimates, no module decomposition.
+**Answers one question: how is the system internally decomposed, and how do those parts relate?**
+Not why it was built that way, not which requirement each part serves, not how any part is
+implemented.
 
-**C4 Level 3 (Component) is out of scope.** Component-level decomposition belongs to an individual
-Solution Design, not to the architecture record. Never create `c3-*.mmd`.
+- **Containers:** the platform's containers in scope (storefront, back office, API surfaces, data
+  stores, messaging, workers, plus any project-specific service) and each one's responsibility in a
+  line. Reference the C2 diagram; reuse its names exactly.
+- **Custom domains:** the capabilities the intake classified as custom development, one row each with
+  a one-line responsibility.
+- **Never a requirements-to-solution mapping**, an effort estimate, or a module-level breakdown.
+
+**C4 Level 3 (Component) is out of scope** — component decomposition belongs to a Solution Design.
+Never create `c3-*.mmd`.
 
 ## § 06 — Runtime View  ⟶ sequences
 
-**File:** `06-runtime-view.md`. **Inputs:** intake F (key scenarios); `research-docs.md` (how the flow
-actually works in Spryker).
+**File:** `06-runtime-view.md`. **Inputs:** intake (Q28 flows worth diagramming); `research-docs.md`.
 
-Document the key runtime scenarios the user picked (checkout/payment, Publish & Sync, a headline
-integration flow, order fulfillment). For each: a short prose "Key Steps" list + a sequence diagram
-under `diagrams/sequence/`. Confirm the real step order against docs research — Publish & Sync,
-checkout, and OMS flows have canonical shapes; don't paraphrase from memory. Reuse the existing
-`api-payment.mmd` / `publish-sync.mmd` examples as style templates.
+**Answers one question: how do the parts interact at runtime, for the flows that matter?**
+
+- Only the flows the intake named as important or risky. Never one per integration.
+- Each flow: a short step list **between systems**, and a sequence diagram per
+  [diagrams.md](diagrams.md).
+- **System level only.** Which systems participate and in what order — never which internal
+  component calls which, never payloads, persistence steps or error branches. That is design work:
+  register a Solution Design stub and put the questions there.
+- Do not restate what the context diagram already shows.
 
 ## § 07 — Deployment View
 
@@ -217,12 +213,25 @@ the intake indicates it and docs research confirms its status.
 
 ## § 08 — Cross-Cutting Concepts
 
-**File:** `08-crosscutting-concepts.md`. **Inputs:** intake F (cross-cutting); `research-docs.md`.
+**File:** `08-crosscutting-concepts.md`. **Inputs:** intake; `research-docs.md`.
 
-Document the concepts that span components: auth/authz approach (incl. Spryker permission model if
-relevant), logging/observability, error handling, i18n & multi-store, caching (Redis + Publish &
-Sync), security patterns. Prefer real implementation examples over generic prose; small diagrams
-welcome. Only include concepts that actually apply to this project.
+**Answers one question: which concepts apply across several parts of the system, and what approach
+does the architecture take to each?**
+
+This is where the commerce concepts that shape a Spryker architecture are recorded — price
+formation, inventory and availability, B2B customer structure, multi-store, identity and access.
+Cover the ones the intake actually touched, each in a short subsection: the approach taken and the
+architectural consequence.
+
+- **State the approach, never design it.** "Prices are mastered externally and imported per store" is
+  an architectural statement. A field mapping, an import schedule, or a proposed module is not —
+  those go to a Solution Design stub.
+- **Do not describe the platform's internal mechanisms** as though they were project decisions.
+  Mention one only where the project's choice genuinely depends on it.
+- Skip any concept the intake did not touch. An absent concept is not a gap to fill with generic prose.
+
+Where a concept grows past a short subsection, give it its own file in an `08-crosscutting-concepts/`
+folder and link it from the section.
 
 ## § 09 — Architecture Decision candidates (never authored here)
 
@@ -264,25 +273,27 @@ Rules:
 
 ## § 11 — Risks and Technical Debt
 
-**File:** `11-risks-and-technical-debt.md`. **Inputs:** intake C (integration risks), D (constraints);
-decision log OPEN QUESTIONS. **Depth:** mitigations cite real Spryker features — see the
-mitigation patterns in [architecture-depth.md](architecture-depth.md).
+**File:** `11-risks-and-technical-debt.md`. **Inputs:** intake; the run's open questions.
 
-Fill the Risks table (risk / impact / mitigation) and Technical Debt table (item / impact / plan) with
-project-specific entries. Integration uncertainties, external-system delivery risks, migration risks,
-high-volume import / Publish & Sync performance, large category trees, and any constraint the
-intake flagged as inherited from existing systems (Q27) are prime candidates. **Where a mitigation relies on a Spryker capability, name
-it and link its docs page** (Persistence ACL, Merchant Relationship, Merchant Product Restrictions,
-Comments module, BO user roles, Data Import & P&S optimization guidelines, Dynamic Multi-Store, Data
-Exchange API) — confirm it exists via docs research first. The run's own OPEN QUESTIONS from
-`decisions.md` often map straight to rows here.
+**Answers one question: what architectural exposure does this system carry?** It summarises exposure
+— it does not explain the architecture, and it does not restate content from other sections.
 
-**Decision gates, not standing debt:** when the project has a hard deadline, triage the risk rows —
-any *launch-blocking* unknown (data-isolation mechanism, migration cut-over/password fallback, a
-provider-maturity question) gets a **pre-Go-Live decision gate**: the decision, the spike that
-answers it, an owner, and a resolve-by date tied to the roadmap. Related ADRs stay `Proposed` until
-their gate closes. Everything else may remain an owner-named TODO. See
-[architecture-depth.md](architecture-depth.md) ("build-ready", item 3, and the gap-triage rule).
+Apply the definitions in [architect-persona.md](architect-persona.md) strictly. Each row must survive
+its own test:
+
+- **Risks** — an uncertainty *plus* a plausible negative consequence, with likelihood, impact, and a
+  mitigation naming a real Spryker capability (confirmed via docs research, docs page linked).
+  A missing requirement, an unknown, an absent capability, or work that simply must be done is
+  **not a risk** — do not convert one into a row here.
+- **Technical debt** — only consciously accepted compromises that create future cost, complexity or
+  constraint and are expected to be revisited. Requirements, temporary migration states, unknowns and
+  unavoidable complexity are **not debt**. An empty table is a valid outcome for a greenfield build.
+- **Open questions** — only those whose answer would change the architecture. Anything specific to one
+  integration or capability belongs in its Solution Design stub, not here.
+
+**Never record the same uncertainty twice.** One uncertainty gets one form — a risk, or an open
+question — never both, and never a third "decision gate" restating it. Where a launch-blocking
+question needs an owner and a date, put them on that one row.
 
 ## § 12 — Glossary
 

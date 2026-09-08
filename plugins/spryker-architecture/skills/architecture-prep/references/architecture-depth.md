@@ -94,7 +94,7 @@ gaps; that is what makes them trustworthy.
 Two honest forms, and they are not interchangeable:
 
 - **Open unknown** → one line: the question, the owner.
-- **Launch-blocking unknown** → a decision gate: the decision, the owner, a resolve-by date.
+- **Launch-blocking unknown** → the same one line, plus a resolve-by date.
 
 Neither form is an invitation to fill the gap with generated content.
 

@@ -42,6 +42,46 @@ document an architect would sign off is the job.
 > [run-lean.md](run-lean.md)) — the obligation to name the assumption never disappears, only the
 > interruption does.
 
+## Source material is evidence, not content to preserve
+
+**You are extracting an architecture, not relocating information.** The intake and the provided
+documents are evidence. Nothing in them has a right to appear in the document because it was
+mentioned.
+
+Before adding anything to a section, ask: **does this materially help this section answer its own
+architectural question?** If not, it goes to a more appropriate artifact or nowhere.
+
+An architecture document is not the place for project context, delivery information, requirements
+inventories, research findings, or implementation detail — however true and however available.
+Prefer, in every case:
+
+- architectural structure over source completeness
+- abstraction over implementation detail
+- a concise view over an exhaustive inventory
+- responsibilities and relationships over descriptive project knowledge
+- what helps a reader understand the architecture over what merely happens to be known
+
+**Each arc42 section answers only its own question.** Know what that question is before writing, and
+stay inside it — a context section describes the system boundary and its external relationships, not
+a detailed integration specification; a building-block section describes internal decomposition and
+relationships, not a requirements-to-solution mapping. When content is real but belongs elsewhere,
+move it; when it belongs nowhere, omit it.
+
+**The goal is the smallest document that still communicates the architecture clearly and
+sufficiently.**
+
+## Stop at architecture; hand the rest to a Solution Design
+
+This exercise establishes the architecture. It does **not** design solutions.
+
+Go as deep as: actors, systems and their subsystems to container level, the connections between them
+and each connection's type and mode. Then stop. Roles, scopes, object identification, message
+sequences between components, field mappings, error handling — all of it needs design work and more
+context than the intake carries. Register a Solution Design and put the open questions there.
+
+Where a topic is architecturally risky — pricing, order management, stock, customer structure,
+multi-store, identity — probe it enough to expose the risk, then leave the design to the SD.
+
 ## Single source of truth — no duplication
 
 Every concept, decision, or diagram lives in **exactly one place**. Don't restate the same
@@ -68,16 +108,34 @@ paraphrased — unless a specific piece of it *is* a stated requirement, decisio
 These docs double as AI context for building and validating code, and as review material for humans.
 Keep them minimal, or both audiences suffer. **Empty beats padded-with-fluff.**
 
-## Open questions vs risks — they are different
+## Architectural terms — use them strictly
 
-| | Definition | Where it goes |
+These are not loose labels. Most low-quality architecture documents are produced by filing content
+under whichever term is nearest, which is how requirements become risks and unknowns become debt.
+**Before writing an item under any of these headings, check it against the definition. If it does
+not match, it belongs somewhere else or nowhere.**
+
+| Term | Is | Is **not** |
 |---|---|---|
-| **Open Question** | An information gap that *would change the design* if answered | §04 SD Open Questions, or an owned open item |
-| **Risk** | Something that could go wrong *during implementation* | §11, with likelihood + impact |
+| **Quality goal** | A non-functional property the system is judged by — performance, availability, security, changeability, operability | A feature, a user story, or a functional requirement |
+| **Constraint** | A condition imposed from **outside** the architecture that removes freedom: mandated technology, regulation, budget, deadline, an organisational policy | A property of the chosen platform, a consequence of a design decision, or an observation about the starting template |
+| **Risk** | An **uncertainty** plus a **plausible negative consequence** — something that may or may not happen, and hurts if it does | A missing requirement, an unknown, an absent capability, or work that simply has to be done |
+| **Technical debt** | A **consciously accepted** compromise that creates future cost, complexity or constraint, and is expected to be revisited | A requirement, a temporary migration state, an unknown, or unavoidable complexity |
+| **Open question** | An information gap that **would change the architecture** if answered | A requirement clarification, or a detail that belongs to one Solution Design |
+| **Decision** | A choice actually made, with consequences | A choice still open — that is an open question |
+
+Corollaries that follow directly and are worth stating:
+
+- A platform's own documented behaviour is neither a constraint nor a risk. It is how the platform
+  works — state it once where it is relevant, if at all.
+- "We do not yet know X" is an open question. It becomes a risk only when you can name what goes
+  wrong if X turns out badly.
+- Never record the same uncertainty as a risk *and* an open question *and* a gate. Pick the one form
+  that matches, and cross-reference if another section needs it.
 
 **Never write an open/undecided question into the architecture folder unprompted.** Flag it to the
-user; they decide whether it goes into an SD's Open Questions, gets asked to the customer directly,
-or is dropped. If asked to add it: one plain sentence, no client quotes, no restated mechanism.
+user; they decide whether it goes into a Solution Design, gets asked to the customer, or is dropped.
+If asked to add it: one plain sentence, no client quotes, no restated mechanism.
 
 > Exception: an unknown answered *through the questionnaire* is already the user's instruction to
 > record it — no extra confirmation needed. Anything you notice *outside* the questionnaire still

@@ -51,5 +51,5 @@ drift from what the architect already drew. Note in the diagram file header wher
 Know the typical gaps so you mark them as TODOs (with owners) instead of hunting or inventing:
 effort/estimates and team capacity, concurrent-user counts, per-adapter timeout/retry policy,
 PHPStan level / team conventions, environment sizing, historical-migration record counts. These are
-exactly the items the depth bar (architecture-depth.md) says to handle with interim assumptions,
-spikes, or owner-named TODOs.
+exactly the items the depth bar (architecture-depth.md) says to record as owner-named gaps — never to
+derive, estimate, or plan around.

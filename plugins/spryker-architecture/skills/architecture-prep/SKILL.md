@@ -2,10 +2,10 @@
 name: architecture-prep
 description: >
   Establish or fill in a Spryker project's version-controlled architecture record — the
-  `architecture/` folder as arc42 sections + C4/sequence diagrams, ADRs, and Solution Designs.
-  Interviews the user, researches Spryker docs and the web, and writes each section to
-  decision-grade depth (release-phased scope, components/connectors tables, per-phase volume planning,
-  multi-store strategy). Runs in ANY Spryker project/demoshop and scaffolds the
+  `architecture/` folder as arc42 sections + C4/sequence diagrams, with stubs for the Solution Designs
+  and decisions that need designing later. Interviews the user, researches Spryker docs and the web,
+  and writes the smallest document that communicates the architecture clearly — components and
+  connectors, release-phased scope, volumes, and architectural risk. Runs in ANY Spryker project/demoshop and scaffolds the
   mandatory `architecture/` folder if missing — for greenfield, an existing build (onboarding), or
   turning a business brief into an architecture doc that feeds a PRD. Accepts a target architecture
   document or similar structured brief as the complete intake — no interview — and handles batch runs: N TADs/briefs → N architecture docs → N PRs, one git worktree
@@ -81,10 +81,11 @@ the step that needs it, not all up front:
   **logging** discipline (bugfix-style `run.log`), the **decision log**, and the plan task list.
   **Read once at the start of every run, before Step 0.**
 - [references/architect-persona.md](references/architect-persona.md) — **who you are while doing
-  this**: the Senior Enterprise Solution Architect role, the communication rules (challenge by
-  default, never invent, absolute dates), the no-duplication and documentation-hygiene rules, Open
-  Question vs Risk, the quality lens, and SD-vs-ADR. **Read by the orchestrator at the start of
-  every run, and by every section-writer teammate before it writes.**
+  this**: the Senior Enterprise Solution Architect role, the rule that **source material is evidence
+  to extract architecture from, not content to preserve**, **strict definitions** of quality goal /
+  constraint / risk / technical debt / open question / decision, where architecture stops and a
+  Solution Design begins, and the no-duplication and hygiene rules. **Read by the orchestrator at the
+  start of every run, and by every section-writer teammate before it writes.**
 - [references/questionnaire.md](references/questionnaire.md) — the **canonical fillable question list**,
   organised as progressive levels **L1 (9) → L2 (21) → L3 (21) → L4 (2)** = 53 questions. Each is typed
   (`pick`/`table`/`confirm`/`document`/`shorttext`) and most carry a **condition** naming the earlier
@@ -108,6 +109,9 @@ the step that needs it, not all up front:
 - [references/multi-deliverable.md](references/multi-deliverable.md) — batch runs: N inputs → N
   worktrees/branches → N PRs, one isolated writer per deliverable, research shared once, push-ready
   handoff. **Read at Step 0 whenever there is more than one deliverable.**
+- [references/diagrams.md](references/diagrams.md) — **C4 notation rules** (one box per system, level
+  discipline, no protocol boxes, consistent naming), sequence-diagram scope, Mermaid format and the
+  colour scheme. **Read by every writer that draws a diagram.**
 - [references/sections.md](references/sections.md) — per-arc42-section writer guidance (what goes in
   each of the 12 files, which diagrams pair with which section, the diagram color/style convention,
   and the ADR / Solution Design sub-workflow). **Each section-writer teammate reads the § for its
@@ -120,7 +124,7 @@ the step that needs it, not all up front:
   not a thin template fill.**
 - [references/review.md](references/review.md) — the **Spryker-specific self-review checklist**: the
   Step 6 quality gate run by an independent reviewer subagent (grounding & no fabrication, depth-bar
-  met, the build-ready five, arc42 structure & cross-consistency), returning a per-section verdict +
+  met, section-purpose compliance, arc42 structure & cross-consistency), returning a per-section verdict +
   ranked defect list. **Read by the orchestrator before Step 6, and by the reviewer subagent as its
   brief.**
 - [references/preview.md](references/preview.md) — the **two browser previews + PDF export**, both
@@ -138,15 +142,12 @@ the step that needs it, not all up front:
   the whole run: challenge inconsistencies rather than agreeing by default, separate fact from
   assumption, never invent scope, keep every concept in exactly one place, and keep client Q&A out
   of the deliverable. Every section-writer teammate gets this file too.
-- **Aim for decision-grade depth, expressed as code — then make it build-ready.** The bar (see
-  [references/architecture-depth.md](references/architecture-depth.md)) is release-phased scope, a
-  Components + Connectors rationale pair beside every architecture diagram, a rich per-phase volume
-  table, multi-store strategy, and risk mitigations that cite real Spryker features — all delivered as
-  version-controlled arc42 + Mermaid (`.mmd`) diagrams. Beyond that, the review-proven build-ready additions:
-  t-shirt sizing per custom module + first-pass infra sizing, SD data models drafted (never a bare
-  TODO), launch-blocking unknowns promoted to decision gates with owners/dates, and load tests
-  anchored by explicit interim assumptions. Thin template-filling is the thing to avoid; "sequences
-  but doesn't size" is the second thing to avoid.
+- **The smallest document that communicates the architecture clearly.** The bar (see
+  [references/architecture-depth.md](references/architecture-depth.md)): components and connectors
+  beside the context diagram, release-phased scope, the volumes given, and architectural risk —
+  delivered as version-controlled arc42 + Mermaid (`.mmd`). Write what the intake supports and
+  nothing more; a missing answer is a one-line gap, never a derivation. Where real depth is left on
+  the table, return it as a **depth candidate** for the user to request, rather than writing it.
 - **Collect first, write second.** The single biggest failure mode is writing thin, generic sections
   because the interview was shallow. Front-load information gathering — ask for real documents, then a
   broad batched interview, then research — and only start writing once you have substance. A section
@@ -324,12 +325,17 @@ writes all of its project's selected sections in its own worktree, following the
 guidance below, and finishes with its own Step 5 cross-link pass (see
 [references/multi-deliverable.md](references/multi-deliverable.md)).
 
+**§03 System Scope and Context and §05 Building Block View share one writer** when both are
+selected — it produces the C1 and C2 diagrams together plus both sections. Parallel writers cannot
+keep diagram naming consistent, and inconsistent names across levels is the defect users notice first.
+
 Otherwise spawn **one teammate per selected section**, in parallel. Each teammate:
 - reads [references/architect-persona.md](references/architect-persona.md) **first** — it is a peer
   architect writing this section, bound by the never-invent, no-duplication, and
   documentation-hygiene rules, not a template-filler;
 - reads **its own §** in [references/sections.md](references/sections.md), the shared `intake.md`, and
-  the research file(s) relevant to it;
+  the research file(s) relevant to it — plus [references/diagrams.md](references/diagrams.md) if it
+  draws anything;
 - reads the **current template file** it's replacing (to keep the structure/heading style);
 - fills the section with project-specific content, replacing example content, and marks any
   unfillable part with a `> **TODO:** …` note naming what's missing;
@@ -387,9 +393,9 @@ mandatory, not optional, in both modes.** Route each finding to a fix:
   `research-docs.md`. Small mechanical fixes (a broken cross-link, a stray template label) the
   orchestrator may apply inline.
 - A finding is resolved in exactly one of two honest ways: **fixed**, or **converted to a triaged
-  owned gap** (client-owned TODO / decision gate / stated interim assumption per
+  owned gap** (an owner-named TODO, or an open question, per
   [architecture-depth.md](references/architecture-depth.md)) — never silently dropped. "Can't fix from
-  the inputs" means *convert to a decision gate or TODO with an owner*, not leave the defect standing.
+  the inputs" means *convert to an owner-named TODO*, not leave the defect standing.
 - Log each fix as a decision: `FIX | round <n> | <file> | <finding> → <fixed|gated|todo>`.
 
 **6c — Re-verify.** After a fix pass, **spawn a fresh reviewer again** (a new independent context —
@@ -420,22 +426,25 @@ human-judgment artifact, so in Gated mode the user's review remains the final si
 
 ### Step 7 — Handoff
 
-**Never report "all done" without accounting for what was not answered.** Before anything else, state
-coverage explicitly:
+**Never report "all done".** A run that was not interrupted still ran on incomplete information.
+Before anything else, ask the user to review how the content landed, and name the **big gaps** —
+whole topics the intake never covered, in L1-then-L2 priority order:
 
 ```
-Answered: 31 of 53 questions.
-Not answered:
-  L2 Core foundation      4  (Q17 payment methods, Q20 integrations, Q25 volumes, Q26 targets)
-  L3 Design intelligence  2  (Q38 data residency, Q43 fixed technical choices)
+Worth reviewing before this goes further. The document is built from what we had, and
+these areas are essentially blank:
+
+  Pricing        — nothing on structure, sources or update frequency
+  Ordering       — the order process is not described anywhere
+  Volumes        — no figures for catalogue size or load
 ```
+
+Name topics, not question IDs, and do not enumerate counts — a thematic gap tells the user something;
+"22 of 53 unanswered" does not. Skip anything whose gate was legitimately closed.
 
 Then offer, as an `AskUserQuestion`:
-`Answer the outstanding questions now` · `Send the remaining tables as homework files` ·
+`Go through the open areas now` · `Send the remaining tables as homework files` ·
 `Leave them as owned TODOs and finish here`
-
-A question skipped because its gate was closed is **not** outstanding — never list it. Only genuinely
-unanswered ones count.
 
 **Offer the depth candidates.** Each section writer returned its top 1–3 candidates for deeper
 treatment (see [architecture-depth.md](architecture-depth.md)). Present them in tiers, most valuable

@@ -113,14 +113,15 @@ finding ends either *fixed* or *converted to a triaged owned gap*; nothing is si
 | [tad-mapping.md](references/tad-mapping.md) | TAD fast-path: TAD-section → arc42-section | Step 0, if a TAD is the input |
 | [multi-deliverable.md](references/multi-deliverable.md) | N inputs → N worktrees/branches → N PRs | Step 0, if N > 1 |
 | [sections.md](references/sections.md) | Per-arc42-section writer guidance + diagram map | Step 4, each writer its own § |
-| [architecture-depth.md](references/architecture-depth.md) | The decision-grade / build-ready depth bar | Orchestrator once + every writer |
+| [diagrams.md](references/diagrams.md) | C4 notation rules, level discipline, Mermaid format, colours | Step 4, any writer drawing a diagram |
+| [architecture-depth.md](references/architecture-depth.md) | Lean-by-default depth bar + depth candidates | Orchestrator once + every writer |
 | [review.md](references/review.md) | Spryker-specific self-review checklist | Before Step 6 + the reviewer subagent |
 | [preview.md](references/preview.md) | Two project-agnostic (copy-only) files in `architecture/`: `preview.html` (dev — served, auto-discovers docs) + `preview-standalone.html` (handoff — pure-Bash-built, opens over file://) + PDF export | Step 7, to view or export the doc |
 
 ## The arc42 sections
 
 `01` introduction & goals · `02` constraints · `03` system scope & context (+C1) · `04` solution
-design candidates · `05` building block view (+C2) · `06` runtime view (+sequences) · `07` deployment view ·
+design stubs · `05` building block view (+C2) · `06` runtime view (+sequences) · `07` deployment view ·
 `08` crosscutting concepts · `09` architecture decisions (ADRs) · `10` quality requirements (volumes) ·
 `11` risks & technical debt · `12` glossary. Step 0 asks which to produce this run; only those are
 written.

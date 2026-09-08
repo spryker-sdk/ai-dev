@@ -16,7 +16,9 @@ ISLAND=$(
   echo "["
   first=1
   for f in $(ls -1 [0-9]*.md 2>/dev/null | sort) \
+           $(ls -1 04-solution-designs/README.md 2>/dev/null) \
            $(ls -1 04-solution-designs/sd-*.md 2>/dev/null | grep -v '000-template' | sort) \
+           $(ls -1 09-architecture-decisions/README.md 2>/dev/null) \
            $(ls -1 09-architecture-decisions/adr-*.md 2>/dev/null | grep -v '000-template' | sort) \
            $(find diagrams -name '*.mmd' 2>/dev/null | sort); do
     b64=$(base64 < "$f" | tr -d '\n')

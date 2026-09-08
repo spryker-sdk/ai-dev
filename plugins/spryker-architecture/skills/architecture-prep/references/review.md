@@ -62,6 +62,31 @@ what slipped through.
 - [ ] **Surviving template examples.** Example entities (SAP, Akeneo, Auth0, sample volumes) and
       example diagram files unrelated to this project.
 
+### Section-purpose compliance — check this first, per section
+
+For each section in scope, state **the one architectural question arc42 gives it**, then judge the
+content against that question alone:
+
+- Does every part of the section help answer it?
+- Is anything here that belongs to another section's question — or to a Solution Design?
+- Are abstraction levels mixed (a context section carrying integration specifics, a decomposition
+  section carrying requirements mapping or implementation detail)?
+- Is source information present without architectural value — project context, delivery information,
+  requirement inventories, research findings?
+- Could this be said in fewer words without losing architectural meaning?
+
+Content that is true but misplaced is still a defect. Say where it should go.
+
+**Term discipline.** Check every row filed under quality goal, constraint, risk, technical debt, open
+question and decision against the definitions in
+[architect-persona.md](architect-persona.md). A functional requirement filed as a quality goal, a
+platform behaviour filed as a constraint, an unknown filed as a risk, or a requirement filed as debt
+is a defect — name the correct home or cut it.
+
+**Diagram notation.** Check every diagram against [diagrams.md](diagrams.md): one box per system,
+no protocol or state boxes, no integration IDs in labels, correct level discipline, and **identical
+names across all diagrams, tables and prose**. Naming drift between diagrams is a defect.
+
 Report the cut list first, with a line count. If reduction removes more than a third of a section,
 say so plainly — that is a signal the writer misjudged the bar, worth naming.
 
@@ -86,9 +111,8 @@ The failure mode that a generic reviewer misses. Check every platform claim:
 - [ ] **No template leftovers.** Grep the written sections for the template's example entities (SAP,
       Akeneo, Auth0, the sample volume figures, sample diagram labels). Any survivor in an in-scope
       section is a BLOCKER — it means the section was not actually rewritten.
-- [ ] **Gaps are triaged, not defaulted.** Each open item is one of the three honest forms
-      (client-owned `TODO` w/ owner · launch-blocking → decision gate w/ spike/owner/date ·
-      derivable-but-unconfirmed → stated interim assumption). Everything dumped as a bare `TODO` is MAJOR.
+- [ ] **Every gap has an owner.** An open item names what is missing and who can answer it. An
+      ownerless `TODO` is MAJOR. A gap filled with a derived value instead is a BLOCKER.
 
 ## B — Substance (from architecture-depth.md)
 
@@ -153,9 +177,8 @@ orchestrator runs **review → fix → re-verify** until it passes:
 1. **Fix is mandatory** after any round that finds a BLOCKER or MAJOR — in both Gated and Autonomous
    mode. Fixes go back to writer teammates (same per-section / per-deliverable isolation as the
    original write); small mechanical fixes the orchestrator applies inline.
-2. **Every finding resolves in exactly one honest way**: *fixed*, or *converted to a triaged owned gap*
-   (client-owned TODO · launch-blocking decision gate w/ owner+date · derivable interim assumption).
-   Never silently dropped, never left standing as a defect.
+2. **Every finding resolves in exactly one honest way**: *fixed*, or *converted to an owner-named
+   gap*. Never silently dropped, never left standing as a defect.
 3. **Re-verify with a fresh reviewer** (new independent context) after each fix pass — an author, or a
    reviewer re-reading its own pass, can't see what it missed. Loop until **zero open BLOCKER/MAJOR**
    (capped at 3 rounds; an unresolved blocker at round 3 is escalated in the summary, not hidden).
