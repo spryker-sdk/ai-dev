@@ -54,9 +54,35 @@ reuse its names verbatim.
      as they were on C1 — same names, same granularity — unless the intake genuinely requires one to
      be opened up, in which case its subsystems appear **inside a box carrying its C1 name**.
    - **C3 (component) is out of scope.** Component decomposition belongs to a Solution Design.
-6. **Names are identical across every diagram and every section.** A system named on C1 keeps that
+6. **The C2 container diagram always shows the full Spryker application set**, whether or not this
+   project uses every part. A reader must see the platform as it is, not only the slice in scope.
+   Mark anything out of scope for this project — dimmed, or a `(not in scope)` note on the
+   description line — but never omit it.
+
+   | Container | Technology | Responsibility |
+   |---|---|---|
+   | Storefront (Yves) | Twig + PHP | Customer-facing shop |
+   | Back Office | Twig + PHP | Platform administration |
+   | Merchant Portal | Twig + PHP | Merchant product and order management |
+   | Storefront API | PHP | REST API for storefront operations |
+   | Backend API | PHP | System-to-system integration surface |
+   | Backend Gateway | PHP | Routes Storefront and Storefront API requests to backend services |
+   | Scheduler | Jenkins + PHP | Runs jobs: imports, and the publish step that populates cache and search |
+   | Database | MySQL / MariaDB | Persistent data, system of record |
+   | Key-value store | Redis | Sessions and storefront read model |
+   | Search | OpenSearch | Catalogue search index |
+   | Message broker | RabbitMQ | Asynchronous event queues |
+
+   **Data-flow facts that are frequently drawn wrong:** the Scheduler — not the broker — writes the
+   read model into the key-value store and the search index; the Backend Gateway sits between the
+   Storefront / Storefront API and the backend; the broker carries queued events and is consumed by
+   the Scheduler's workers. Never draw the broker writing directly to search or cache.
+
+   The shipped `architecture/diagrams/c4/c2-spryker-container.mmd` template is the reference for this
+   set — read it before drawing, and keep its container names.
+7. **Names are identical across every diagram and every section.** A system named on C1 keeps that
    exact name on C2, in the Components table, and in prose. No synonyms, no re-categorising.
-7. **Icons: emoji only — never Font Awesome.** Prefix the name line with an emoji: 👤 actor,
+8. **Icons: emoji only — never Font Awesome.** Prefix the name line with an emoji: 👤 actor,
    🛒 the system under design, 🏭 ERP, 💳 payment, 🧮 tax, 📦 storage, 🗄️ database, 🔍 search,
    📨 queue, ✉️ mail, 📊 analytics, 🛡️ security/consent. `fa:` icons render in some Mermaid
    viewers and silently fail in others — emoji render everywhere, including IDE previews and PDF.
