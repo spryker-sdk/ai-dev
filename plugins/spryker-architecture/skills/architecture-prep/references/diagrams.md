@@ -17,9 +17,36 @@ reuse its names verbatim.
    improves readability, and only within one diagram.
 2. **A box is a system or a component. Nothing else.** Never a protocol, a mechanism, a state, or the
    absence of one. `SSO`, `No SSO`, `REST API`, `Nightly batch` are edges or labels — never nodes.
-3. **No integration IDs in node labels.** Identifiers belong on edges and in the Connectors table.
-   A node carries a name and, optionally, its technology.
-4. **Level discipline.**
+3. **Every box carries name, type and description — in that order, on three lines.**
+
+   ```
+   Name
+   [Type: Technology]
+   Short description
+   ```
+
+   | Element | Label |
+   |---|---|
+   | Actor | `Business Buyer` · `[Person]` · `Orders supplies for their company` |
+   | System under design | `Acme Marketplace` · `[Software System]` · `B2B marketplace for four brands` |
+   | External system | `Epicor M2K` · `[Software System: ERP]` · `Masters orders, stock and pricing` |
+   | Container | `Storefront` · `[Container: Yves]` · `Customer-facing shop` |
+
+   The type is mandatory on every element, and the qualifier after the colon is what tells a reader
+   *what kind* of system it is — ERP, PIM, Payment Provider, Tax Provider, CRM. The product name
+   stays in the name slot; never fold the category into it.
+
+   Technology is mandatory on containers, optional on systems. Descriptions are one short line —
+   responsibilities at a glance, never a specification.
+
+   **No integration IDs in labels.** Identifiers belong on edges and in the Connectors table.
+
+   In Mermaid, use `<br/>` between the three lines.
+4. **Every relationship is labelled**, consistent with the direction and intent of the
+   relationship — what flows, or what one element does to the other (`Places order`, `Imports stock`).
+   Relationships between containers also carry the technology or protocol: `[CSV over SFTP, daily]`,
+   `[REST/JSON]`. Never leave an edge unlabelled.
+5. **Level discipline.**
    - **C1 (context):** the system under design is **exactly one box**. Every external system is
      **exactly one box**, named as the business names it — even when it internally comprises several
      subsystems. Actors are boxes. Nothing internal appears.
@@ -27,20 +54,21 @@ reuse its names verbatim.
      as they were on C1 — same names, same granularity — unless the intake genuinely requires one to
      be opened up, in which case its subsystems appear **inside a box carrying its C1 name**.
    - **C3 (component) is out of scope.** Component decomposition belongs to a Solution Design.
-5. **Names are identical across every diagram and every section.** A system named on C1 keeps that
+6. **Names are identical across every diagram and every section.** A system named on C1 keeps that
    exact name on C2, in the Components table, and in prose. No synonyms, no re-categorising.
-6. **Icons on every actor and system box** — Mermaid renders Font Awesome, e.g.
-   `fa:fa-user` for actors, `fa:fa-server` / `fa:fa-database` for systems. They make the actor/system
-   distinction readable at a glance.
+7. **Icons: emoji only — never Font Awesome.** Prefix the name line with an emoji: 👤 actor,
+   🛒 the system under design, 🏭 ERP, 💳 payment, 🧮 tax, 📦 storage, 🗄️ database, 🔍 search,
+   📨 queue, ✉️ mail, 📊 analytics, 🛡️ security/consent. `fa:` icons render in some Mermaid
+   viewers and silently fail in others — emoji render everywhere, including IDE previews and PDF.
 
 ## What a diagram carries
 
-Nodes are systems, components and actors. Edges are relationships with a short label — a few words
-saying what flows, or the integration ID.
+Nodes are systems, components and actors, labelled per rule 3. Edges are labelled relationships per
+rule 4.
 
-Protocol, frequency, volume, retry behaviour, field mappings and constraints live in the
-**Connectors table**, never on the diagram and never repeated in the section prose. One fact, one
-place.
+Frequency, volume, retry behaviour, field mappings and error handling live in the **Connectors
+table**, never on the diagram and never repeated in the section prose. One fact, one place. The
+exception is rule 4's protocol on container-level edges, which C4 requires on the diagram itself.
 
 Do not draw the same relationship twice across diagrams. If a diagram would restate what another
 already shows, it is not worth drawing.
@@ -73,7 +101,10 @@ not redraw from scratch and drift from what the architect already approved.
 Two syntax traps that silently break rendering: never put `;` in note or label text (it is a
 statement separator — use `,`), and keep `%%` comments **after** the `---config---` frontmatter.
 
-## Universal colour scheme
+## Colour scheme — flowchart-type diagrams only
+
+**`classDef` is invalid inside `sequenceDiagram` and breaks rendering silently.** Apply the palette
+below to `flowchart` and `graph` diagrams only; leave sequence diagrams unstyled.
 
 Reuse these `classDef` styles so all diagrams read as one system. Each pins **both** a fill and a
 contrasting text colour: dark fill → `color:#fff`; light fill → an explicit dark `color:`. These

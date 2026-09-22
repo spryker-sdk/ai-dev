@@ -325,9 +325,16 @@ writes all of its project's selected sections in its own worktree, following the
 guidance below, and finishes with its own Step 5 cross-link pass (see
 [references/multi-deliverable.md](references/multi-deliverable.md)).
 
-**§03 System Scope and Context and §05 Building Block View share one writer** when both are
-selected — it produces the C1 and C2 diagrams together plus both sections. Parallel writers cannot
-keep diagram naming consistent, and inconsistent names across levels is the defect users notice first.
+**One writer owns every system name in the document.** When they are selected, **§03 System Scope
+and Context, §05 Building Block View and §08 Cross-Cutting Concepts go to a single writer**, which
+also produces the C1 and C2 diagrams. These are the sections that name systems and their subsystems;
+split across parallel writers they drift, and a system named in prose but absent from the diagrams is
+the defect readers notice first. Accept the lost parallelism — naming consistency is worth more than
+the minutes.
+
+Every other writer **reuses those names verbatim** and introduces no system the diagrams do not
+show. If a writer needs a system that is not on a diagram, that is a finding to report, not a name to
+invent.
 
 Otherwise spawn **one teammate per selected section**, in parallel. Each teammate:
 - reads [references/architect-persona.md](references/architect-persona.md) **first** — it is a peer

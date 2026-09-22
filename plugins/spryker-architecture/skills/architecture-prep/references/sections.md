@@ -283,8 +283,19 @@ its own test:
 
 - **Risks** — an uncertainty *plus* a plausible negative consequence, with likelihood, impact, and a
   mitigation naming a real Spryker capability (confirmed via docs research, docs page linked).
-  A missing requirement, an unknown, an absent capability, or work that simply must be done is
-  **not a risk** — do not convert one into a row here.
+
+  Two tests every candidate row must pass:
+
+  1. **Could it not happen?** If it is certain, it is not a risk. Functionality that must be built,
+     a capability the platform does not ship, an integration with no first-party connector — these
+     are **work to be estimated**, not risks. Build effort belongs to planning; absence of an
+     out-of-the-box connector belongs to the functional scope.
+  2. **Name the consequence.** "X is unknown" is an open question. It becomes a risk only when you
+     can state what goes wrong if X resolves badly.
+
+  Infrastructure and environment gaps behind a **committed requirement** do qualify — a region that
+  must exist for a committed market and has no provisioning plan is a genuine uncertainty with a
+  clear consequence.
 - **Technical debt** — only consciously accepted compromises that create future cost, complexity or
   constraint and are expected to be revisited. Requirements, temporary migration states, unknowns and
   unavoidable complexity are **not debt**. An empty table is a valid outcome for a greenfield build.
