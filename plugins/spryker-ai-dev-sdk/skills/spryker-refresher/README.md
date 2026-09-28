@@ -67,10 +67,11 @@ the change set. Claude runs on the host, so commands are invoked as `docker/sdk 
 | Project-layer `.php` whose FQCN matches an existing vendor class (an override) | `cache:class-resolver:build` |
 | `*DependencyProvider.php` changed | `cache:empty-all` |
 | `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
-| Yves / Zed / Merchant Portal Twig, JS, SCSS changed | `frontend:yves:build` \| `frontend:zed:build` \| `frontend:mp:build` → `twig:cache:warmer` |
+| Yves / Zed / Merchant Portal JS, TS, SCSS, LESS changed | `frontend:yves:build` \| `frontend:zed:build` \| `frontend:mp:build` |
+| Twig file added / moved / deleted (new override) | `twig:cache:warmer` — edits to an existing Twig file need nothing |
 | `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
 | Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
-| `RouteProvider` plugin or route config added/changed/deleted | `router:cache:warm-up` and/or `:backoffice` / `:backend-gateway` / `:merchant-portal` |
+| `RouteProvider` plugin or route config added/changed/deleted, or a new Zed controller/action | `router:cache:warm-up` and/or `:backoffice` / `:backend-gateway` / `:merchant-portal` |
 | OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
 | Glossary CSV changed | `data:import:glossary` (Yves translations only — not Zed BO labels) |
 | Zed translator CSV (`src/<Ns>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` |

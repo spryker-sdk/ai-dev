@@ -125,7 +125,8 @@ linters crash, which is why the config is passed explicitly.
 | **Back Office** `src/*/Zed/*/Presentation/**/*.twig`, `src/*/Zed/*/assets/Zed/**` | none in the builder layout — prettier only | none in the builder layout — prettier only | `formatter` | `npm run zed` for assets |
 
 Run npm scripts wherever `node_modules` lives — `docker/sdk cli npm run <script>` or `npm run <script>`
-on the host. Changed **Twig** on any surface: `docker/sdk cli console twig:cache:warmer`. After a
+on the host. **New or moved Twig** file on any surface: `docker/sdk cli console twig:cache:warmer` (the
+template path cache is on by default); run it too if an edited template still renders stale. After a
 lint-clean change, run the surface's rebuild — it is how the change becomes visible, and a build
 error is not something a linter catches. The Merchant Portal Angular build type-checks; the Yves
 webpack build transpiles TS **without** type-checking and there is no `tsc` gate, so Yves type errors
@@ -196,7 +197,7 @@ project's frontend rules (`.claude/rules/yves-frontend.md`, `zed-backoffice-fron
    run covered the working tree only.
 
 5. **Frontend changed? Rebuild the surface** once the linters are clean — `yves`, `zed`, `mp:build`,
-   and `twig:cache:warmer` for Twig (see [Frontend surfaces](#frontend-surfaces)). Report a build
+   and `twig:cache:warmer` for new or moved Twig files (see [Frontend surfaces](#frontend-surfaces)). Report a build
    failure as a finding; the linters cannot see it.
 
 ## Notes & caveats

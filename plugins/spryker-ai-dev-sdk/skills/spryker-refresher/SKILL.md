@@ -53,12 +53,13 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | A **new module directory** appears under a project namespace (`src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<NewModule>/`) | `dev:ide-auto-completion:generate` → `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`). The first regenerates the locator stub so `$this->getLocator()-><newModule>()` exists — without it the app runs fine but **phpstan fails with `Call to an undefined method …LocatorLocatorInterface::<newModule>()`**, surfacing two steps later as a phantom code defect (the project's own install recipe runs it — see `config/install/development.yml`). The second is its unconditional companion: phpstan's result cache keeps reporting the stale locator error after the stub is fixed. |
 | `*DependencyProvider.php` changed (plugin chain edit, body or new file) | `cache:empty-all` |
 | `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
-| Yves Twig / JS / SCSS changed | `frontend:yves:build` → `twig:cache:warmer` |
-| Zed Twig / JS / SCSS changed | `frontend:zed:build` → `twig:cache:warmer` |
-| Merchant Portal Twig / JS / SCSS changed | `frontend:mp:build` → `twig:cache:warmer` |
+| Yves JS / SCSS / `index.ts` changed | `frontend:yves:build` (runs `npm run yves`) |
+| Back Office (Zed) `assets/Zed/**` JS / SCSS changed | `frontend:zed:build` (runs `npm run zed`) |
+| Merchant Portal `Presentation/Components/**` changed | `frontend:mp:build` (runs `npm run mp:build`) |
+| Twig file **added, moved, or deleted** (Yves, Zed, or MP — a new override) | `twig:cache:warmer` (the template path cache otherwise keeps resolving the old file). Edits to an existing Twig file need nothing. |
 | `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
 | Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
-| `RouteProvider` plugin or route configuration file added / changed / deleted (NOT controller body edits) | `router:cache:warm-up` (Zed) and/or the per-application variant — `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` — for the applications the route belongs to |
+| `RouteProvider` plugin or route configuration file added / changed / deleted, or a **new Zed controller / action** (a 404 on the new URL) — NOT controller body edits | `router:cache:warm-up` (Zed) and/or the per-application variant — `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` — for the applications the route belongs to |
 | OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
 | Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` (Yves storefront translations only — does NOT cover Zed BO labels) |
 | Zed translator CSV changed (`src/<Namespace>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` (Zed BO labels — separate pipeline from glossary; verify the command via `docker/sdk console list`) |
