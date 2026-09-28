@@ -1,219 +1,202 @@
 # TypeScript Component Patterns
 
-## Component Lifecycle
+Yves storefront JS is **native Web Components** — every interactive component is a custom element
+extending the ShopUi `Component` base class. No framework (Angular is the Merchant Portal, not Yves).
+Base class: `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/models/component.ts`.
+
+## Lifecycle
 
 ```
-register() called in index.ts
+index.ts calls register('{name}', lazy import)
     ↓
-Webpack lazy-loads the module when component tag appears in DOM
+the tag appears in the DOM → webpack lazy-loads the class → custom element defined
     ↓
-Component class is registered as a Custom Element
-    ↓
-readyCallback() — called when ALL components on page are initialized
-    ↓
-init() — called right after readyCallback (preferred entry point)
+app mounts every component → mountCallback() → init()
 ```
 
-Use `init()` for standard setup. Use `readyCallback()` only when you need other components to already be available.
+- **Override `init()`** for setup — it runs once the DOM is loaded and every other component is
+  defined, so querying other components is safe. Never do setup in the constructor.
+- Use the native `connectedCallback()` only when you do not depend on other components (faster).
+- Older ShopUi versions declare an abstract, deprecated `readyCallback()`. If the installed
+  `models/component.ts` still has it, every subclass must declare `protected readyCallback(): void {}`
+  — the build does not type-check, so nothing will tell you.
+- House pattern inside `init()`: resolve element references first, then call `mapEvents()`.
 
-## Base Class: Component
+## Base class API
 
 ```typescript
 import Component from 'ShopUi/models/component';
 
 export default class MyComponent extends Component {
-    // Component is a Custom Element — `this` is the DOM element
-    // Available properties:
-    //   this.jsName  → 'js-{config.name}' from Twig config
-    //   this.name    → '{config.name}' from Twig config (the CSS class)
-
-    protected init(): void {
-        // Setup code here — called once, after DOM is ready
-    }
-
-    protected readyCallback(): void {
-        // Called after ALL components on page are ready
-        // Usually not needed — prefer init()
-    }
+    // this.name   → tag name lowercased ('my-component') == config.name in Twig
+    // this.jsName → 'js-my-component' == config.jsName in Twig
+    // this.dispatchCustomEvent(name, detail?, options?)
+    // this.isMounted
+    protected init(): void {}
 }
 ```
 
-## Querying Child Elements
+- `export default` the class — the registry uses the default export.
+- Class name is PascalCase of the tag (`toggler-checkbox` → `TogglerCheckbox`).
+- Prefer `protected` over `private` so projects can extend the class.
 
-Always use `jsName` classes for JS queries — never use the visual CSS class:
+## Querying child elements
+
+Query by the `js-` BEM class the Twig emits via `config.jsName`, built from `this.jsName`:
 
 ```typescript
 protected init(): void {
-    // Correct: query by jsName-based class
-    const trigger = this.querySelector(`.${this.jsName}__trigger`) as HTMLElement;
-    const items = Array.from(this.getElementsByClassName(`${this.jsName}__item`)) as HTMLElement[];
-
-    // Wrong: never query by visual class
-    // const trigger = this.querySelector('.my-component__trigger');  // BAD
+    this.trigger = this.querySelector<HTMLElement>(`.${this.jsName}__trigger`);
+    this.items = Array.from(this.querySelectorAll<HTMLElement>(`.${this.jsName}__item`));
+    // Wrong: this.querySelector('.my-component__trigger') — styling class, breaks on restyle
 }
 ```
 
-## Reading HTML Attributes from Twig
+Prefer `querySelector`/`querySelectorAll`; use `getElementsByClassName` only when you need a live
+collection. Never hardcode the class string.
 
-Attributes declared in `{% define attributes %}` are rendered on the component's root element. Read them in TS:
+## Reading attributes from Twig
+
+Values declared in `{% define attributes %}` render on the root element. Read them inline where used:
+
+```typescript
+element.classList.add(this.getAttribute('class-to-toggle'));
+```
+
+Add a getter only when the value is read in several places or needs parsing/a default:
+
+```typescript
+protected get animationSpeed(): number {
+    return Number(this.getAttribute('animation-speed'));
+}
+```
+
+Structured data: serialize to JSON in an attribute and parse it into a typed interface:
 
 ```twig
-{# In Twig #}
 {% define attributes = {
-    'target-selector': required,
-    'animation-speed': '300',
+    'json': data.config | json_encode,
 } %}
 ```
 
 ```typescript
-// In TypeScript
-protected get targetSelector(): string {
-    return this.getAttribute('target-selector');
+interface MyComponentConfig {
+    maxItems: number;
+    labels: string[];
 }
 
-protected get animationSpeed(): number {
-    return parseInt(this.getAttribute('animation-speed'), 10);
-}
+const config = <MyComponentConfig>JSON.parse(this.getAttribute('json'));
 ```
 
-## Communicating with Other Components
+## Events
 
-Query sibling components that share a container:
+Keep event names in constants and use the base helper. It does **not** bubble unless you ask:
 
 ```typescript
-protected init(): void {
-    // Get a reference to another component on the page by its tag name
-    const slider = document.querySelector('product-slider') as HTMLElement & { goToSlide(n: number): void };
+const EVENT_SELECTED = 'my-component:selected';
 
-    // Or find a child component
-    const dropdown = this.querySelector('custom-select') as HTMLElement;
-
-    // Dispatch custom events for loose coupling
-    this.dispatchCustomEvent('my-component:selected', { value: 'something' });
-}
-
-protected dispatchCustomEvent(name: string, detail: object): void {
-    this.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
-}
+this.dispatchCustomEvent(EVENT_SELECTED, { value }, { bubbles: true });
 ```
 
-## Event Patterns
+Other components listen on the element (or an ancestor when bubbling). Prefer events over calling
+methods on another component's element directly.
 
 ```typescript
 export default class MyComponent extends Component {
+    protected readonly activeClassName = 'is-active';
     protected triggers: HTMLElement[] = [];
 
     protected init(): void {
-        this.triggers = Array.from(
-            this.getElementsByClassName(`${this.jsName}__trigger`)
-        ) as HTMLElement[];
-
+        this.triggers = Array.from(this.querySelectorAll<HTMLElement>(`.${this.jsName}__trigger`));
         this.mapEvents();
     }
 
     protected mapEvents(): void {
-        this.triggers.forEach((el: HTMLElement) => {
-            el.addEventListener('click', (event: Event) => this.onTriggerClick(event));
+        this.triggers.forEach((trigger: HTMLElement) => {
+            trigger.addEventListener('click', (event: Event) => this.onTriggerClick(event));
         });
-
-        // For one-time setup
-        this.addEventListener('change', (event: Event) => this.onChange(event as InputEvent));
     }
 
     protected onTriggerClick(event: Event): void {
         event.preventDefault();
-        const target = event.currentTarget as HTMLElement;
-        this.activate(target);
-    }
-
-    protected onChange(event: InputEvent): void {
-        const input = event.target as HTMLInputElement;
-        // handle change
+        this.activate(<HTMLElement>event.currentTarget);
     }
 
     protected activate(element: HTMLElement): void {
-        this.triggers.forEach((el) => el.classList.remove(this.activeClass));
-        element.classList.add(this.activeClass);
-    }
-
-    protected get activeClass(): string {
-        return `${this.jsName}__trigger--active`;
+        this.triggers.forEach((trigger: HTMLElement) => trigger.classList.remove(this.activeClassName));
+        element.classList.add(this.activeClassName);
     }
 }
 ```
 
-## Extending a TypeScript Component in Pyz
+## Extending a core TS component in the project
+
+Real project pattern — extend the core class through its module alias and call `super`:
 
 ```typescript
-// src/Pyz/{Module}/src/Pyz/Yves/{Module}/Theme/default/components/molecules/{component}/index.ts
-import './style.scss';
+// src/Pyz/Yves/CatalogPage/Theme/default/components/molecules/window-location-applicator/window-location-applicator.ts
+import WindowLocationApplicatorCore from 'CatalogPage/components/molecules/window-location-applicator/window-location-applicator';
+
+export default class WindowLocationApplicator extends WindowLocationApplicatorCore {
+    protected sortTriggers: HTMLSelectElement[];
+
+    protected init(): void {
+        this.sortTriggers = <HTMLSelectElement[]>Array.from(document.getElementsByClassName(this.sortTriggerClassName));
+
+        super.init();
+    }
+
+    protected get sortTriggerClassName(): string {
+        return this.getAttribute('sort-trigger-class-name');
+    }
+}
+```
+
+```typescript
+// index.ts next to it — registers the project class under the same tag
 import register from 'ShopUi/app/registry';
 
 export default register(
-    'my-component',
+    'window-location-applicator',
     () =>
         import(
             /* webpackMode: "lazy" */
-            /* webpackChunkName: "my-component" */
-            './my-component'
+            /* webpackChunkName: "window-location-applicator" */
+            './window-location-applicator'
         ),
 );
 ```
 
-```typescript
-// src/Pyz/{Module}/src/Pyz/Yves/{Module}/Theme/default/components/molecules/{component}/{component}.ts
-import MyComponent from 'SprykerShop/ModuleName/components/molecules/my-component/my-component';
+- The alias (`CatalogPage/*`) must exist in `tsconfig.yves.json` `paths`; add it if missing.
+- Your `index.ts` replaces the core entry point — mirror everything the core `index.ts` imports
+  (styles included), or those styles stop loading.
+- Override only the methods you change; never copy the core class body.
 
-export default class MyComponentExtended extends MyComponent {
-    // Override a method
-    protected onTriggerClick(event: Event): void {
-        super.onTriggerClick(event); // call parent
-        // Add extra behavior
-        this.trackAnalyticsEvent();
-    }
+## Enforced ESLint rules
 
-    protected trackAnalyticsEvent(): void {
-        // custom code
-    }
-}
-```
+From `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/FrontendBuilder/libs/lint/spryker-base-eslint.mjs`
+plus the TS block in `eslint.config.mjs` next to it (a project-root `eslint.config.yves.mjs` replaces
+the packaged config). Confirm the config actually covers your file first — see `validation.md`.
 
-## Component Lazy-Loading Pattern (Standard)
+| Rule | Constraint | Fix |
+|---|---|---|
+| `max-lines` | 200 per file (blank lines and comments skipped) | Split into child components or helpers. Disabling is a last resort for a component that truly cannot be decomposed. |
+| `@typescript-eslint/no-magic-numbers` | only `-1, 0, 1` inline | Hoist to `protected readonly` class fields — readonly initial values, enums, default values and array indexes are exempt. |
+| `no-console` | error | Remove debug output. |
+| `camelcase` | error, properties included | camelCase everywhere; snake_case JSON payload keys may need a justified disable. |
+| `eqeqeq` | `===` (null ignored) | Never `==`. |
+| `@typescript-eslint/no-unused-vars` | error, arguments ignored | Remove dead locals. |
+| `no-eval` / `no-new-func` / `no-implied-eval` | error | No dynamic code execution. |
 
-```typescript
-// index.ts
-import './style.scss';
-import register from 'ShopUi/app/registry';
+None of these are autofixable — they need a structural change. No rule enforces return types, but
+the codebase annotates them (`: void`, `: string`); match the surrounding files.
 
-export default register(
-    'component-name',   // Must match config.name in Twig AND the HTML tag
-    () =>
-        import(
-            /* webpackMode: "lazy" */
-            /* webpackChunkName: "component-name" */
-            './component-name'
-        ),
-);
-```
+## TypeScript config facts
 
-The `webpackChunkName` comment tells webpack what to name the chunk file. Keep it the same as the component name.
-
-## Accessing Transferred Data via Data Attributes
-
-For passing complex data from Twig to TS, use `data-json` attributes:
-
-```twig
-{% block body %}
-    <div
-        class="{{ config.name }}__data {{ config.jsName }}__data"
-        data-json="{{ data.config | json_encode | e('html_attr') }}">
-    </div>
-{% endblock %}
-```
-
-```typescript
-protected init(): void {
-    const dataElement = this.querySelector(`.${this.jsName}__data`) as HTMLElement;
-    const config = JSON.parse(dataElement.dataset.json ?? '{}');
-}
-```
+- `tsconfig.base.json`: `target es2020`, `module esnext`, `moduleResolution: "bundler"`,
+  **`strict: false`**, `noImplicitAny: false` — little is caught, so write explicit types.
+- `tsconfig.yves.json` `paths` define both the TS and the webpack aliases (`ShopUi/*`, `{Module}/*`,
+  `src/ShopUi/*` for the project ShopUi).
+- Webpack (Babel) transpiles **without type-checking**; there is no `tsc` script or CI job.
+  `tsc` is advisory — see `validation.md`.
+- Import styles with the explicit extension: `import './my-component.scss';`.

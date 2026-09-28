@@ -1,74 +1,65 @@
 # SCSS Patterns & Conventions
 
-## Two-File Pattern (Required)
+## The mixin pattern
 
-Every component uses exactly two SCSS files:
-
-| File | Purpose |
-|---|---|
-| `{component-name}.scss` | Defines a mixin — no actual CSS output |
-| `style.scss` | Calls `helper-import` + invokes the mixin — outputs CSS |
-
-This separation allows downstream customizations to call the same mixin with different selectors.
-
-## Mixin Naming Convention
+A component's `{component-name}.scss` defines **one mixin**; the CSS is emitted where that mixin is
+included. This lets other components and project overrides reuse the styles with a different selector
+or extra rules.
 
 ```
 @mixin {module-name-kebab}-{component-name-kebab}($name: '.{component-name}')
 ```
 
-Examples:
-- `@mixin shop-ui-box(...)` — for ShopUi/atoms/box
-- `@mixin product-group-widget-color-selector(...)` — for ProductGroupWidget/molecules/color-selector
-- `@mixin catalog-page-filter-section(...)` — for CatalogPage/organisms/filter-section
+Examples from core: `shop-ui-toggler-checkbox` (ShopUi/molecules/toggler-checkbox),
+`catalog-page-filter-category` (CatalogPage/molecules/filter-category). The first parameter is the
+**dot-prefixed** default selector; use `#{$name}` for the root and for self-references that `&` cannot
+express.
 
-## The `@content` Directive
+Where the mixin is included differs:
 
-Always include `@content` inside the root element block. This lets customizers inject extra rules:
+| Style | Files | Used by |
+|---|---|---|
+| Project convention | `{name}.scss` defines the mixin and ends with `@include {mixin};` — `index.ts` imports `./{name}.scss` | nearly all components in `src/Pyz/Yves` |
+| Core convention | `{name}.scss` only defines; `style.scss` does `@include helper-import({tier}, {name}) { @include {mixin}; }` — `index.ts` imports `./style.scss` | `vendor/spryker-shop/**` |
+
+Follow the neighbouring components of the module you are working in. `helper-import` skips its block
+when a keyword is listed in `$setting-import-blacklist`, which lets a project switch off a core
+component's CSS without touching the mixin.
+
+## `@content` — always last
+
+Place `@content;` as the last statement inside the root `#{$name}` block so callers can inject rules
+scoped to the component:
 
 ```scss
 @mixin my-module-my-component($name: '.my-component') {
     #{$name} {
         display: flex;
 
-        // ... other rules ...
-
-        @content;  // ALWAYS include this
+        @content;
     }
 }
 ```
 
-## style.scss Template
-
-```scss
-@include helper-import({type}, {component-name}) {
-    @include {module-name}-{component-name};
-}
-```
-
-Where `{type}` is `atom`, `molecule`, or `organism`.
-
-## BEM Methodology
+## BEM
 
 ```scss
 @mixin my-module-my-component($name: '.my-component') {
     #{$name} {
-        // Block styles
-
         &__element {
-            // Element styles
-
             &:hover {
-                // Pseudo-class on element
+                // element state
             }
         }
 
         &__element--modifier {
-            // Element modifier
+            // element modifier
         }
 
         &--modifier {
-            // Block modifier
+            #{$name}__element {
+                // root modifier affecting an element
+            }
         }
 
         @content;
@@ -76,85 +67,97 @@ Where `{type}` is `atom`, `molecule`, or `organism`.
 }
 ```
 
-**Rules:**
-- Never nest BEM deeper than 2 levels (block → element is fine; block → element → sub-element is not)
-- Modifiers go on the block or element, never both
-- Never reference a parent component's class — components are self-contained
+- Keep nesting shallow — the Stylelint selector budget (below) rejects deep chains.
+- Never style `js-` classes — they are TypeScript hooks.
+- Never reference a parent component's classes — components are self-contained. Parents pass
+  `modifiers` or `class` instead.
 
-## Global Variables (from ShopUi)
+## Tokens and helpers — no import needed
 
-Common variables available across all components:
+The builder injects ShopUi's `styles/shared.scss` (the project copy in
+`src/Pyz/Yves/ShopUi/Theme/default/styles/` when present, which forwards the core one) into every
+component file, so `$setting-*`, `helper-*` and `map.get` work
+without `@use`/`@import`.
 
-```scss
-// Colors
-$setting-color-main           // Primary brand color
-$setting-color-white
-$setting-color-dark
-$setting-color-darker
-$setting-color-lighter
-$setting-color-lightest
-$setting-color-transparent
-$setting-color-success
-$setting-color-error
-$setting-color-actions        // Map of action colors
+Look up what exists before using it — tokens are project-specific:
+- Core defaults: `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/styles/{settings,helpers}/`
+- Project overrides and additions: `src/Pyz/Yves/ShopUi/Theme/default/styles/{settings,helpers}/` and `shared.scss`
 
-// Spacing
-$setting-spacing              // Map: 'default', 'big', 'small', etc.
-map-get($setting-spacing, 'default')
-map-get($setting-spacing, 'big')
-map-get($setting-spacing, 'small')
+Core tokens (always present unless the project removed them):
 
-// Typography
-$setting-font-size-default
-$setting-font-weight-bold
+```text
+$setting-color-main, $setting-color-alt, $setting-color-white, $setting-color-black
+$setting-color-light, $setting-color-lighter, $setting-color-lightest
+$setting-color-dark, $setting-color-darker, $setting-color-darkest
+$setting-color-text, $setting-color-bg, $setting-color-shadow, $setting-color-overlay
+$setting-color-actions          // map
+
+map.get($setting-spacing, 'big' | 'default' | 'small' | 'reset')   // projects often add keys
+$setting-font-size, $setting-font-weight, $setting-font-line-height // maps
+$setting-breakpoints, $setting-zi-*                                  // breakpoints map, z-index scale
+// projects often add more, e.g. breakpoint variables ($lg) or grey scales — check the project settings
 ```
 
-## Useful Mixins
+Core helpers:
 
 ```scss
-// Smooth transitions
-@include helper-effect-transition(border-color opacity);
-@include helper-effect-transition(all);
-
-// Clearfix
+@include helper-font-size(big);                // keys of $setting-font-size
+@include helper-font-weight(bold);              // keys of $setting-font-weight
+@include helper-effect-transition(color border-color);
 @include helper-ui-clearfix;
-
-// Visually hidden (accessible)
-@include helper-ui-visually-hidden;
+@include helper-breakpoint(md) { ... }                  // key of $setting-breakpoints; (md, lg) = range
+@include helper-breakpoint-media-min(768px) { ... }     // also -media-max, -media-between
+color: helper-color-dark($setting-color-main);          // function, also helper-color-light
 ```
 
-## Responsive Breakpoints
+If the project ships a design-token source (`frontend/assets/global/{theme}/design-tokens/design-tokens.json`),
+the builder generates `src/Pyz/Yves/ShopUi/Theme/{theme}/styles/design-tokens.css` from it. Edit the
+JSON, never the generated CSS; consume tokens as the project already does (CSS custom properties,
+project helpers such as a `typography()` mixin).
+
+**Never hardcode a colour** that a token covers. Named colours are forbidden by Stylelint.
+
+## Overriding core SCSS in the project
+
+Call the core mixin and put your rules in its `@content` slot (pattern taken from a real project override):
 
 ```scss
-@include helper-breakpoint('sm') {
-    // Styles for small and up
-}
-
-@include helper-breakpoint('md') {
-    // Styles for medium and up
-}
-
-@include helper-breakpoint('lg') {
-    // Styles for large and up
-}
-```
-
-## Overriding Component SCSS in Pyz
-
-To override styles, create `style.scss` in the Pyz component folder and customize via `@content`:
-
-```scss
-// src/Pyz/{Module}/src/Pyz/Yves/{Module}/Theme/default/components/molecules/{component-name}/style.scss
-
-@include helper-import(molecule, {component-name}) {
-    // Call original mixin with custom overrides via @content
-    @include {original-module}-{component-name} {
-        // These rules inject into the @content slot
-        background: $setting-color-lightest;
-
-        &__title {
-            font-size: 1.25rem;
+// src/Pyz/Yves/ShopUi/Theme/default/components/molecules/toggler-checkbox/toggler-checkbox.scss
+@mixin shop-ui-toggler-checkbox($name: '.toggler-checkbox') {
+    @include shop-ui-checkbox($name) {
+        &__input:checked ~ &__label {
+            @include helper-font-weight(regular);
         }
+
+        @content;
     }
 }
+
+@include shop-ui-toggler-checkbox;
 ```
+
+Core mixins are callable without imports. Mixin names resolve **project-last**: a project file that
+defines a mixin with a core mixin's name replaces it everywhere it is included. Pair the file with an
+`index.ts` that imports it and re-registers the core TS class (see SKILL.md, "What to ship next to the
+Twig").
+
+## Enforced Stylelint rules
+
+`npm run yves:stylelint` extends `stylelint-config-standard-scss` with
+`vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/FrontendBuilder/libs/lint/spryker-base-stylelint.mjs`
+(a project-root `.stylelintrc.js` replaces it). Read that file for authoritative values.
+
+| Rule | Constraint |
+|---|---|
+| `color-named` | never — no `red`, `white`; use tokens |
+| `color-hex-length` | off — match the surrounding file |
+| `number-max-precision` | 4 |
+| `unit-disallowed-list` | `pt` forbidden |
+| `selector-pseudo-element-colon-notation` | double — `::before` |
+| `*-no-vendor-prefix` | no vendor prefixes — autoprefixer adds them |
+| `selector-max-class` / `-compound-selectors` / `-id` / `-attribute` / `-universal` | 2 / 3 / 1 / 1 / 1 |
+| `length-zero-no-unit` | `0`, not `0px` |
+| `declaration-empty-line-before` | never |
+
+`-- --fix` handles whitespace, casing and units. Selector-budget and `color-named` violations are not
+autofixable — restructure the selector or use a token.

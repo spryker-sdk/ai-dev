@@ -24,8 +24,10 @@ They are only allowed to:
 - Return view responses or redirects
 - Handle forms within the controller
 - Use castId() for ID parameters
+- Add translatable flash messages with placeholders passed as parameters (`addSuccessMessage('Saved %count% items', ['%count%' => $count])`)
 
 They are NOT allowed to:
+- Build flash messages with `sprintf()` or string concatenation — the result has no glossary key and cannot be translated
 - Call Repository or EntityManager directly
 - Access Query Objects or Entities
 - Contain complex data transformations

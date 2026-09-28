@@ -13,7 +13,10 @@
 #                              (src/{Org}/{Layer}/{Module}) and validates each whole module,
 #                              not only the individually-touched files.
 #   * Frontend, changed-only — eslint/stylelint/prettier run on just the changed FE files,
-#                              not the all-files globs in package.json.
+#                              not the all-files globs in package.json, each with the config
+#                              the matching npm script uses (Yves storefront / Merchant Portal,
+#                              legacy root configs or the ShopUi/ZedUi packaged builder configs).
+#                              *.twig has no linter: changed templates are listed, not analysed.
 #
 # Usage:
 #   static-check-diff.sh [options]
@@ -352,13 +355,15 @@ _raw_changes="$(
 
 # Partition changed files by kind:
 #   changed_php   — *.php                     (phpcbf/phpcs/phpmd/phpstan)
-#   changed_jsts  — *.js *.ts                 (eslint + prettier)
+#   changed_jsts  — *.js *.ts, plus Merchant Portal component *.html (eslint + prettier)
 #   changed_style — *.scss *.css *.less       (stylelint + prettier)
 #   changed_fmt   — *.json *.html + js/ts/style (prettier)
+#   changed_twig  — *.twig                    (no linter exists — reported, not analysed)
 changed_php=()
 changed_jsts=()
 changed_style=()
 changed_fmt=()
+changed_twig=()
 _seen_files=""
 while IFS= read -r f; do
     [ -z "$f" ] && continue
@@ -369,7 +374,10 @@ while IFS= read -r f; do
         *.php)                      changed_php+=("$f") ;;
         *.js|*.ts)                  changed_jsts+=("$f"); changed_fmt+=("$f") ;;
         *.scss|*.css|*.less)        changed_style+=("$f"); changed_fmt+=("$f") ;;
+        # Merchant Portal Angular templates are linted by the MP eslint config (angular-eslint).
+        */Zed/*/Presentation/Components/*.html) changed_jsts+=("$f"); changed_fmt+=("$f") ;;
         *.json|*.html)              changed_fmt+=("$f") ;;
+        *.twig)                     changed_twig+=("$f") ;;
     esac
 done <<EOF
 $_raw_changes
@@ -377,6 +385,10 @@ EOF
 
 if [ "${#changed_php[@]}" -eq 0 ] && [ "${#changed_jsts[@]}" -eq 0 ] \
    && [ "${#changed_style[@]}" -eq 0 ] && [ "${#changed_fmt[@]}" -eq 0 ]; then
+    if [ "${#changed_twig[@]}" -gt 0 ]; then
+        warn "Only Twig changed (${#changed_twig[@]} file(s)) — no linter or formatter covers *.twig,"
+        warn "  so NOTHING was analysed. Review the templates against the frontend rules instead."
+    fi
     if [ "$WORKING_TREE" -eq 1 ]; then
         warn "No changed PHP/JS/TS/CSS/SCSS files found in the working tree (vs HEAD)."
     else
@@ -455,6 +467,9 @@ _report_fe() {
 [ "${#changed_jsts[@]}"  -gt 0 ] && _report_fe "JS/TS (eslint)"       "${changed_jsts[@]}"
 [ "${#changed_style[@]}" -gt 0 ] && _report_fe "CSS/SCSS (stylelint)" "${changed_style[@]}"
 [ "${#changed_fmt[@]}"   -gt 0 ] && _report_fe "Formatting (prettier)" "${changed_fmt[@]}"
+if [ "${#changed_twig[@]}" -gt 0 ]; then
+    _report_fe "Twig (NOT analysed — no linter exists; review by hand)" "${changed_twig[@]}"
+fi
 :  # keep exit status clean for `set -e`-free flow
 
 # Path sets:
@@ -543,14 +558,105 @@ if [ "$_fe_skipped" -gt 0 ]; then
     info "  (they have their own linter configs; the root config does not describe them)."
 fi
 
+# ----------------------------------------------------------------------------
+# Frontend lint config resolution, per surface.
+#
+# Two project layouts exist:
+#   * Legacy — a root eslint flat config (eslint.config.{js,mjs,cjs}) and root
+#     .stylelintrc.js that cover every frontend file; config lookup just works.
+#   * Builder — no root eslint config; `npm run yves:lint|yves:stylelint|mp:lint|
+#     mp:stylelint` delegate to the lint wrappers packaged with ShopUi (Yves) and
+#     ZedUi (Merchant Portal), which take a project-root override when present.
+#     Plain config lookup finds nothing here and eslint/stylelint crash, so the
+#     same config the npm script would use is resolved and passed explicitly.
+#
+# Surfaces: Yves storefront (*/Yves/*/Theme/*), Merchant Portal Angular
+# (*/Zed/*/Presentation/Components/*), and everything else (e.g. Back Office
+# assets/Zed/*) — which in the builder layout has no eslint/stylelint gate at all,
+# only prettier.
+# ----------------------------------------------------------------------------
+YVES_LINT_DIR="vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/FrontendBuilder/libs/lint"
+MP_LINT_DIR="vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/libs/lint"
+
+_first_existing() {   # echoes the first argument that exists under MAIN_ROOT
+    local c; for c in "$@"; do [ -f "$MAIN_ROOT/$c" ] && { printf '%s' "$c"; return 0; }; done
+    return 1
+}
+
+eslint_root_cfg="$(_first_existing eslint.config.js eslint.config.mjs eslint.config.cjs)"
+eslint_yves_cfg="$(_first_existing eslint.config.yves.mjs "$YVES_LINT_DIR/eslint.config.mjs")"
+eslint_mp_cfg="$(_first_existing eslint.config.mp.mjs "$MP_LINT_DIR/eslint.config.mjs")"
+stylelint_root_cfg="$(_first_existing .stylelintrc .stylelintrc.js .stylelintrc.cjs .stylelintrc.mjs \
+    .stylelintrc.json .stylelintrc.yml .stylelintrc.yaml stylelint.config.js stylelint.config.cjs stylelint.config.mjs)"
+stylelint_yves_cfg="$(_first_existing .stylelintrc.js "$YVES_LINT_DIR/stylelint.config.mjs")"
+stylelint_mp_cfg="$(_first_existing .stylelintrc.mp.js "$MP_LINT_DIR/stylelint.config.mjs")"
+
+fe_surface_of() {
+    case "$1" in
+        */Zed/*/Presentation/Components/*) printf 'mp' ;;
+        */Yves/*/Theme/*)                  printf 'yves' ;;
+        *)                                 printf 'other' ;;
+    esac
+}
+
+# Buckets: *_lookup = run with config lookup (legacy root config); *_yves / *_mp =
+# run with that surface's config; *_none = no config covers the file (not linted).
+eslint_lookup=(); eslint_yves=(); eslint_mp=(); eslint_none=()
+for f in "${changed_jsts[@]:-}"; do
+    [ -z "$f" ] && continue
+    if [ -n "$eslint_root_cfg" ]; then eslint_lookup+=("$f"); continue; fi
+    case "$(fe_surface_of "$f")" in
+        yves) if [ -n "$eslint_yves_cfg" ]; then eslint_yves+=("$f"); else eslint_none+=("$f"); fi ;;
+        mp)   if [ -n "$eslint_mp_cfg" ];   then eslint_mp+=("$f");   else eslint_none+=("$f"); fi ;;
+        *)    eslint_none+=("$f") ;;
+    esac
+done
+
+stylelint_lookup=(); stylelint_yves=(); stylelint_mp=(); stylelint_none=()
+for f in "${changed_style[@]:-}"; do
+    [ -z "$f" ] && continue
+    case "$(fe_surface_of "$f")" in
+        yves) if [ -n "$stylelint_yves_cfg" ]; then stylelint_yves+=("$f")
+              elif [ -n "$stylelint_root_cfg" ]; then stylelint_lookup+=("$f")
+              else stylelint_none+=("$f"); fi ;;
+        mp)   if [ -n "$stylelint_mp_cfg" ]; then stylelint_mp+=("$f")
+              elif [ -n "$stylelint_root_cfg" ]; then stylelint_lookup+=("$f")
+              else stylelint_none+=("$f"); fi ;;
+        *)    if [ -n "$stylelint_root_cfg" ]; then stylelint_lookup+=("$f")
+              else stylelint_none+=("$f"); fi ;;
+    esac
+done
+
+has_tool() { case ",$TOOLS," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
+if has_tool eslint && [ "${#eslint_none[@]}" -gt 0 ]; then
+    warn "eslint: no project eslint config covers ${#eslint_none[@]} changed file(s) — NOT linted (prettier still runs):"
+    for f in "${eslint_none[@]}"; do warn "  - $f"; done
+fi
+if has_tool stylelint && [ "${#stylelint_none[@]}" -gt 0 ]; then
+    warn "stylelint: no project stylelint config covers ${#stylelint_none[@]} changed file(s) — NOT linted (prettier still runs):"
+    for f in "${stylelint_none[@]}"; do warn "  - $f"; done
+fi
+
 if [ "$DRY_RUN" -eq 1 ]; then
     info ""
     info "[dry-run] Tools: $TOOLS"
     info "[dry-run] phpcs/phpcbf paths:  ${cs_paths[*]:-<none>}"
     info "[dry-run] phpmd/phpstan paths: ${strict_paths[*]:-<none>}"
-    info "[dry-run] eslint paths:        ${changed_jsts[*]:-<none>}"
-    info "[dry-run] stylelint paths:     ${changed_style[*]:-<none>}"
+    if [ "${#eslint_lookup[@]}" -gt 0 ]; then
+        info "[dry-run] eslint ($eslint_root_cfg): ${eslint_lookup[*]}"
+    fi
+    [ "${#eslint_yves[@]}" -gt 0 ] && info "[dry-run] eslint Yves ($eslint_yves_cfg): ${eslint_yves[*]}"
+    [ "${#eslint_mp[@]}" -gt 0 ]   && info "[dry-run] eslint MP ($eslint_mp_cfg): ${eslint_mp[*]}"
+    [ "${#eslint_none[@]}" -gt 0 ] && info "[dry-run] eslint NOT covered:  ${eslint_none[*]}"
+    if [ "${#stylelint_lookup[@]}" -gt 0 ]; then
+        info "[dry-run] stylelint ($stylelint_root_cfg): ${stylelint_lookup[*]}"
+    fi
+    [ "${#stylelint_yves[@]}" -gt 0 ] && info "[dry-run] stylelint Yves ($stylelint_yves_cfg): ${stylelint_yves[*]}"
+    [ "${#stylelint_mp[@]}" -gt 0 ]   && info "[dry-run] stylelint MP ($stylelint_mp_cfg): ${stylelint_mp[*]}"
+    [ "${#stylelint_none[@]}" -gt 0 ] && info "[dry-run] stylelint NOT covered: ${stylelint_none[*]}"
     info "[dry-run] prettier paths:      ${changed_fmt[*]:-<none>}"
+    [ "${#changed_twig[@]}" -gt 0 ] && info "[dry-run] twig (no tool):      ${changed_twig[*]}"
     exit 0
 fi
 
@@ -560,8 +666,6 @@ fi
 # what the container mounts as /data); the repo-relative file paths we pass are
 # the same strings in either tree.
 # ----------------------------------------------------------------------------
-has_tool() { case ",$TOOLS," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
-
 run() {
     info ""
     info "\$ docker/sdk cli $*"
@@ -664,12 +768,15 @@ if has_tool phpstan; then
     fi
 fi
 
-# --- Frontend (JS/TS/CSS/SCSS) --------------------------------------------
-# Runs the same linters as package.json, but scoped to changed files only.
-# eslint auto-loads eslint.config.mjs; stylelint auto-loads .stylelintrc.js;
+# --- Frontend (JS/TS/CSS/SCSS/LESS) ----------------------------------------
+# Runs the same linters as package.json, but scoped to changed files only, with
+# the per-surface configs resolved above (eslint --no-config-lookup --config …,
+# stylelint --config …), or config lookup in the legacy root-config layout.
 # prettier auto-loads .prettierrc.json and honours .prettierignore.
 # FIX=1 (via --fix or STATIC_CHECK_FIX=1) turns on autofix (eslint --fix,
 # stylelint --fix, prettier --write); otherwise all three run in check mode.
+# Calling eslint directly is also the only way to autofix: `npm run yves:lint`
+# and `npm run mp:lint` build a fixed argv and silently drop `-- --fix`.
 #
 # WHERE they run is decided at runtime, not assumed. eslint/stylelint must resolve
 # the plugins their config `extends`, so they need a real node_modules. Depending on
@@ -677,10 +784,13 @@ fi
 # `npx` in a tree without it silently downloads a DIFFERENT major from the registry
 # and crashes on plugin resolution, which then reads as "violations".
 
+_eslint_n=$(( ${#eslint_lookup[@]} + ${#eslint_yves[@]} + ${#eslint_mp[@]} ))
+_stylelint_n=$(( ${#stylelint_lookup[@]} + ${#stylelint_yves[@]} + ${#stylelint_mp[@]} ))
+
 _fe_wanted=0
-{ has_tool eslint    && [ "${#changed_jsts[@]}"  -gt 0 ]; } && _fe_wanted=1
-{ has_tool stylelint && [ "${#changed_style[@]}" -gt 0 ]; } && _fe_wanted=1
-{ has_tool prettier  && [ "${#changed_fmt[@]}"   -gt 0 ]; } && _fe_wanted=1
+{ has_tool eslint    && [ "$_eslint_n" -gt 0 ]; } && _fe_wanted=1
+{ has_tool stylelint && [ "$_stylelint_n" -gt 0 ]; } && _fe_wanted=1
+{ has_tool prettier  && [ "${#changed_fmt[@]}" -gt 0 ]; } && _fe_wanted=1
 
 if [ "$_fe_wanted" -eq 1 ]; then
     fe_mode=""
@@ -701,7 +811,7 @@ if [ "$_fe_wanted" -eq 1 ]; then
     # an arbitrary latest version when the local install is missing.
     run_fe() {
         local tool="$1"; shift
-        local out rc
+        local out rc n
         if [ "$fe_mode" = "container" ]; then
             out="$(run "node_modules/.bin/$tool" "$@" 2>&1)"; rc=$?
         else
@@ -713,31 +823,40 @@ if [ "$_fe_wanted" -eq 1 ]; then
         # An "ignored because no matching configuration" finding means eslint did NOT
         # analyse that file — it matched no `files:` block in the config. Silent empty
         # coverage reads as a pass, so say so loudly; it usually means the config's globs
-        # are shaped for a different repo layout (e.g. vendor/monorepo paths like
-        # src/*/*/src/*/Yves/** vs a demoshop's src/Pyz/Yves/**).
-        if [ "$tool" = "eslint" ] && \
-           printf '%s' "$out" | grep -q 'File ignored because no matching configuration'; then
-            warn "eslint: some files matched NO config block and were therefore NOT analysed."
-            warn "  Check the \`files:\` globs in the project's eslint config cover this layout."
+        # are shaped for a different repo layout (e.g. the packaged builder configs'
+        # src/*/*/src/*/Yves/** globs vs a project's src/Pyz/Yves/**). This is also why
+        # eslint does not get --no-warn-ignored: that flag suppresses this very warning.
+        if [ "$tool" = "eslint" ]; then
+            n="$(printf '%s\n' "$out" | grep -c 'File ignored because no matching configuration')"
+            if [ "${n:-0}" -gt 0 ]; then
+                warn "eslint: $n file(s) matched NO config block and were therefore NOT analysed."
+                warn "  Report them as not linted — never as clean. The config's \`files:\` globs"
+                warn "  do not cover this layout; fixing that is a project/vendor config change."
+            fi
         fi
         classify "$tool" "$rc" "$out"
     }
 
+    _fe_fix_flag=""
+    [ "$FIX" -eq 1 ] && _fe_fix_flag="--fix"
+
     if [ -n "$fe_mode" ]; then
-        if has_tool eslint && [ "${#changed_jsts[@]}" -gt 0 ]; then
-            if [ "$FIX" -eq 1 ]; then
-                run_fe eslint --no-warn-ignored --fix "${changed_jsts[@]}"
-            else
-                run_fe eslint --no-warn-ignored "${changed_jsts[@]}"
-            fi
+        if has_tool eslint; then
+            [ "${#eslint_lookup[@]}" -gt 0 ] && \
+                run_fe eslint $_fe_fix_flag "${eslint_lookup[@]}"
+            [ "${#eslint_yves[@]}" -gt 0 ] && \
+                run_fe eslint --no-config-lookup --config "$eslint_yves_cfg" $_fe_fix_flag "${eslint_yves[@]}"
+            [ "${#eslint_mp[@]}" -gt 0 ] && \
+                run_fe eslint --no-config-lookup --config "$eslint_mp_cfg" $_fe_fix_flag "${eslint_mp[@]}"
         fi
 
-        if has_tool stylelint && [ "${#changed_style[@]}" -gt 0 ]; then
-            if [ "$FIX" -eq 1 ]; then
-                run_fe stylelint --allow-empty-input --fix "${changed_style[@]}"
-            else
-                run_fe stylelint --allow-empty-input "${changed_style[@]}"
-            fi
+        if has_tool stylelint; then
+            [ "${#stylelint_lookup[@]}" -gt 0 ] && \
+                run_fe stylelint --allow-empty-input $_fe_fix_flag "${stylelint_lookup[@]}"
+            [ "${#stylelint_yves[@]}" -gt 0 ] && \
+                run_fe stylelint --allow-empty-input --config "$stylelint_yves_cfg" $_fe_fix_flag "${stylelint_yves[@]}"
+            [ "${#stylelint_mp[@]}" -gt 0 ] && \
+                run_fe stylelint --allow-empty-input --config "$stylelint_mp_cfg" $_fe_fix_flag "${stylelint_mp[@]}"
         fi
 
         if has_tool prettier && [ "${#changed_fmt[@]}" -gt 0 ]; then
