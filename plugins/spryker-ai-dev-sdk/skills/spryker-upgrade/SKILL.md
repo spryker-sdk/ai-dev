@@ -584,14 +584,21 @@ useful than a bad merge — generate one rather than forcing it.
 1. VENDOR_FILE_CHANGED: run the report's three-way merge command
    (`git merge-file -p <project> <baseline> <vendor-new>`). Clean merge → review and apply;
    conflict markers → resolve semantically (vendor structural changes win, project business
-   content wins).
+   content wins). **Exception — a Twig override that extends the core file explicitly**
+   (`{% extends molecule('<name>', '@SprykerShop:<Module>') %}`, `'@Spryker:<Module>/…'`) is not a full
+   shadow: vendor changes outside its blocks already reach the page. Do not text-merge it; check that
+   every block it overrides still exists in the new vendor template and that `parent()` calls still fit.
 2. Components are triplets — if a `.twig` changed, check sibling `.scss`/`.ts` entries.
-3. Small customizations: convert the full override to a block-level extension
-   (`{% extends organism/molecule(...) %}` + `{% block %}`) — permanently shrinks the surface.
+3. Small customizations: convert the full override to a block-level extension that names the core
+   file explicitly (`{% extends molecule('<name>', '@SprykerShop:<Module>') %}` + `{% block %}`; Zed:
+   `{% extends '@Spryker:<Module>/<path>.twig' %}`) — permanently shrinks the surface. A plain
+   `molecule('<name>', '<Module>')` resolves to the override itself. See `yves-atomic-frontend` /
+   `backoffice-frontend`.
 4. VENDOR_FILE_REMOVED → changelog/guide for the rename; re-point or drop the override.
 5. NEW_VENDOR_FILE (info) → check whether the overridden parent template must now include it.
 6. Zed Presentation entries (Backoffice twig, OMS mail templates) follow the same merge flow.
-7. Rebuild: `script -q /dev/null docker/sdk cli npm run yves` — zero tsc/webpack errors.
+7. Rebuild: `script -q /dev/null docker/sdk cli npm run yves` (and `npm run zed` / `npm run mp:build` for
+   Zed/MP entries) — zero webpack errors, then render the merged pages: the Yves build does no type-checking.
 
 ### Lane 3 — Plugin stacks (`plugin-usage-report.json`)
 

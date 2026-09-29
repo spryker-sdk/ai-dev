@@ -1,4 +1,6 @@
 ---
+name: table
+description: Use when writing, reviewing, or modifying a Back Office Communication Table class. Enforces the two allowed table patterns (Propel-backed query table or facade-provided data) and keeps data loading, row formatting, and action links in their dedicated methods.
 paths: "src/**/Communication/Table/*.php"
 ---
 
