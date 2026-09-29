@@ -18,7 +18,7 @@ a11y) live in `.claude/rules/merchant-portal-angular.md`; this skill is the proc
 
 | Where | Path | You may |
 |---|---|---|
-| Project | `src/Pyz/Zed/{Module}/Presentation/Components/` | create, extend, replace |
+| Project | `src/Pyz/Zed/{Module}/Presentation/Components/` (always `Pyz`, even in a custom-namespace project) | create, extend, replace |
 | App shell | `src/Pyz/Zed/ZedUi/Presentation/Components/` (`main.ts`, `app/app.module.ts`, `styles.less`) | root config, global theme overrides |
 | Core (read-only) | `vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Components/` | read, import via `@mp/{module}` |
 | UI library (read-only) | `node_modules/@spryker/*`, `node_modules/ng-zorro-antd` | read typings, import |
@@ -40,7 +40,7 @@ with the same name as a core module replaces the core entry entirely**.
 | Goal | Where the entry lives | Consequence |
 |---|---|---|
 | New MP component for a new page | `src/Pyz/Zed/{NewModule}/Presentation/Components/entry.ts` (new name) | Added next to core; nothing replaced |
-| Add or replace a component on a core module's pages | `src/Pyz/Zed/{CoreModule}/Presentation/Components/entry.ts` (same name) | Core entry no longer loads — re-register **every** core element that module's Twig still uses |
+| Add or replace a component on a core module's pages | `src/Pyz/Zed/{CoreModule}/Presentation/Components/entry.ts` (same name) | Core entry no longer loads — re-register **every** element and module in the core `components.module.ts`, not just the ones its Twig uses: tags are global, and other modules' pages rely on them |
 | Only change markup around existing elements | Override the Twig template, no Angular code | See step 5 |
 
 A second registration of an already-defined tag is skipped silently (`customElements.get()` guard in
@@ -52,7 +52,7 @@ A second registration of an already-defined tag is skipped silently (`customElem
 
 ```
 src/Pyz/Zed/{Module}/Presentation/Components/
-├── entry.ts                       # registerNgModule(ComponentsModule)
+├── entry.ts                       # single-entry marker + registerNgModule(ComponentsModule)
 └── app/
     ├── components.module.ts       # WebComponentsModule.withComponents([...])
     └── {name}/
@@ -73,7 +73,9 @@ and project code relatively; no alias exists for `src/Pyz` modules.
 1. Leaf module declares **and** exports the component.
 2. `app/components.module.ts`: add the component to `WebComponentsModule.withComponents([...])` **and**
    import its module. Do the same for any `@spryker/*` component used directly as `<web-spy-*>` in Twig.
-3. `entry.ts`: `registerNgModule(ComponentsModule)` from `@mp/zed-ui`.
+3. `entry.ts`: first line `// spy/merchant-portal:single-entry-marker`, then `registerNgModule(ComponentsModule)`
+   from `@mp/zed-ui`. Without the marker the entry becomes its own `spy/{module}.js` chunk, which the
+   Merchant Portal layout never loads (it loads only `spy/merchant-portal.js`).
 
 `app/app.module.ts` is the root shell — do not register components there.
 
@@ -91,8 +93,10 @@ Page templates live in `Presentation/{Controller}/{action}.twig`, extend
 </web-mp-product-list>
 ```
 
-- `@Input() tableId` ↔ `table-id="..."`. Values are strings or JSON serialised by Twig. Wrap JSON
-  attributes in single quotes. Translate with `| trans` in Twig and pass the result in.
+- `@Input() tableId` ↔ `table-id="..."`. Every attribute arrives as a **string**. For JSON (objects,
+  arrays, booleans) declare `@Input({ transform: jsonAttribute })` (`jsonAttribute` from `@spryker/utils`),
+  or the input stays a string. Serialise with `| json_encode`; wrap raw (`guiTableConfiguration`) JSON in
+  single quotes. Translate with `| trans` in Twig and pass the result in.
 - `<h1 title>` lands in `<ng-content select="[title]">`.
 - To change a core page, create the same path under `src/Pyz/Zed/{Module}/Presentation/...` and
   `{% extends '@Spryker:{Module}/{Controller}/{action}.twig' %}`, overriding only the blocks you change.
@@ -117,8 +121,9 @@ docker/sdk cli npm run mp:test           # -- --test-path-patterns=<name>
 docker/sdk cli console twig:cache:warmer # when a new Twig override is not picked up
 ```
 
-- If `mp:lint` prints `File ignored because no matching configuration was supplied`, your files were not
-  linted. Add the root `eslint.config.mp.mjs` from `references/testing.md` § Lint and re-run.
+- `mp:lint` prints nothing and exits 0 for project files when they are not covered, even with errors in
+  them. Run the `--print-config` check from `references/testing.md` § Lint; if it prints `undefined`, add
+  the root `eslint.config.mp.mjs` from there and re-run.
 - Verify in the browser. Log in to the Merchant Portal (`mp.<region>.<project>.local` in
   `deploy.dev.yml`; see the `spryker-runtime` skill for users), open the page, confirm the element
   rendered (not an empty `<web-mp-*>`), and check the browser console.
@@ -127,10 +132,10 @@ docker/sdk cli console twig:cache:warmer # when a new Twig override is not picke
 
 | Symptom | Cause |
 |---|---|
-| `<web-mp-x>` in DOM but empty | Not in `withComponents`, module not imported, entry not registered, or build not re-run |
-| Core elements vanished from a page | Project `entry.ts` with a core module's name replaced the core entry; re-register them |
+| `<web-mp-x>` in DOM but empty | Tag is not `web-` + the selector, not in `withComponents`, module not imported, entry not registered or missing the single-entry marker, or build not re-run |
+| Core elements vanished from a page | A project `entry.ts` with a core module's name replaced that core entry; re-register its whole list (the page may belong to another module) |
 | Project replacement of a core tag ignored | Registered from a differently named module; core defined the tag first |
-| Input never arrives | Attribute not kebab-case, JSON not quoted/serialised, or wrong input name — read the `.d.ts` |
+| Input never arrives, or arrives as a string | Attribute not kebab-case, wrong input name (read the `.d.ts`), or a JSON input without `transform: jsonAttribute` |
 | `Cannot find module '@mp/...'` | Alias missing: run `mp:update:config`; project modules have no alias, import relatively |
 | New component not picked up in watch mode | Restart `mp:build:watch` after adding an `entry.ts` |
 

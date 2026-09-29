@@ -19,8 +19,10 @@ Run the checks on a clean checkout first to know the baseline.
 npm run yves:stylelint -- --fix -p <absolute/path.scss>   # drop --fix to check only
 ```
 
-Config: `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/FrontendBuilder/libs/lint/spryker-base-stylelint.mjs`
-(a project-root `.stylelintrc.js` replaces it). The ones that need structural fixes, not `--fix`:
+Config: `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/FrontendBuilder/libs/lint/stylelint.config.mjs`
+(`stylelint-config-standard-scss` + rules from `spryker-base-stylelint.mjs`; a project-root
+`.stylelintrc.js` replaces it). Direct run on a too-old host Node:
+`npx stylelint --config <that file> <path.scss>`. The ones that need structural fixes, not `--fix`:
 `selector-max-class` 2, `selector-max-compound-selectors` 3, `selector-max-id` 1, `color-named` never.
 Also: no `pt`, no vendor prefixes, `::` pseudo-elements.
 
@@ -65,8 +67,11 @@ unreachable. Check only your file and ignore `TS2307` on aliases you didn't touc
 `TS2882` (extensionless style imports):
 
 ```bash
-npx tsc --noEmit -p tsconfig.yves.json 2>&1 | grep '<your-file-name>'
+npx tsc --noEmit -p tsconfig.yves.json 2>&1 | grep '^src/.*<your-file-name>'
 ```
+
+Anchor the grep to `src/`: extending a core class means the core file has the same name, and its
+pre-existing errors (e.g. core `cart-items-list.ts` `TS2554`) are not yours.
 
 `tsconfig.base.json` has `strict: false`, `noImplicitAny: false` — write explicit types.
 

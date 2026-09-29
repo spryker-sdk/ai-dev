@@ -41,7 +41,7 @@ flowchart TD
     D --> E["3 · Twig<br/>extends @Gui/Layout/layout.twig<br/>action buttons · widget.twig · BS5 markup"]
     E --> F["4 · Navigation + ACL<br/>navigation.xml · role rule"]
     F --> G{"Needs JS/SCSS?"}
-    G -- "yes" --> H["5 · src/Pyz/Zed/{Module}/assets/Zed/js/*.entry.js<br/>assetsPath() in footer_js/head_css<br/>tables via requestTable()"]
+    G -- "yes" --> H["5 · src/Pyz/Zed/{Module}/assets/Zed/js/*.entry.js<br/>assetsPath() in footer_js/head_css<br/>tables via requestTable() if gui ships it, else draw.dt"]
     G -- "no" --> T
     H --> T["6 · Translations<br/>Translator/data/{Module}/{locale}.csv"]
 
@@ -77,7 +77,7 @@ flowchart TD
   - The build scans `src/Pyz/Zed` for `**/Zed/**/*.entry.js`.
   - A project entry replaces a core entry with the same name.
   - Include bundles with `assetsPath()`.
-  - Reach Gui tables through `requestTable()`, never `.DataTable()`.
+  - Reach Gui tables through `requestTable()` where the installed `spryker/gui` ships it, never `.DataTable()`.
 - **Translations**: keys go in `src/Pyz/Zed/Translator/data/{Module}/{locale}.csv`, then run
   `translator:generate-cache`.
 - **Verification**:

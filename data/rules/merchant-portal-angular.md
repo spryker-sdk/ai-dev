@@ -9,9 +9,9 @@ Merchant Portal Angular code MUST reuse the installed `@spryker/*` UI components
 
 ## Architecture (non-negotiable)
 
-- Only `src/Pyz/Zed/*/Presentation/Components/` is built, linted and tested. Code under another namespace is ignored by the ZedUi FrontendBuilder.
-- Components are custom elements rendered from Twig as `<web-mp-*>` (`@spryker/*`: `<web-spy-*>`). A component renders only after it is registered through `entry.ts` → `components.module.ts` (`WebComponentsModule.withComponents`) → leaf module. `app/app.module.ts` is the root shell, not a registry.
-- A project `entry.ts` in a module named like a core module **replaces** the core entry. That override MUST re-register every core element the module's Twig still uses.
+- Only `src/Pyz/Zed/*/Presentation/Components/` is built, linted and tested. Code under another namespace is ignored by the ZedUi FrontendBuilder, so Merchant Portal Angular code stays in `src/Pyz` even when the project writes everything else to a custom namespace.
+- Components are custom elements rendered from Twig as `<web-mp-*>` (`@spryker/*`: `<web-spy-*>`). A component renders only after it is registered through `entry.ts` (first line `// spy/merchant-portal:single-entry-marker`) → `components.module.ts` (`WebComponentsModule.withComponents`) → leaf module. `app/app.module.ts` is the root shell, not a registry.
+- A project `entry.ts` in a module named like a core module **replaces** the core entry. That override MUST re-register every element and module of the core `components.module.ts`: tags are global, and other modules' pages rely on them.
 - Never hand-roll a table, modal, drawer, notification, spinner, pagination, select, date picker, tabs, chips or form control. Read the installed package's typings for its real API; never guess input names or trust the public README.
 
 ## Component conventions
@@ -20,7 +20,7 @@ Merchant Portal Angular code MUST reuse the installed `@spryker/*` UI components
 - `@Input()` / `@Output()` decorators. No signal inputs, `signal()` or `computed()` (core: 0 usages). The codebase is RxJS-based.
 - New components set `changeDetection: ChangeDetectionStrategy.OnPush`, `encapsulation: ViewEncapsulation.None` (deliberate, never "fix" it to `Emulated`), and `host: { class: 'mp-<name>' }`.
 - Selector `mp-<kebab-name>` (element). Directives use `mp<CamelName>` (attribute).
-- Inputs cross the Twig boundary as kebab-case HTML attributes: strings or Twig-serialised JSON. Type them honestly, parse explicitly, and give safe defaults.
+- Inputs cross the Twig boundary as kebab-case HTML attributes, always as strings. Parse Twig-serialised JSON with `@Input({ transform: jsonAttribute })` (`@spryker/utils`), type inputs honestly, and give safe defaults.
 - **Translate in Twig (`| trans`), never in Angular.** No hardcoded user-facing strings. Accept them as inputs; the house pattern is a `translations` object.
 - Async state as observables rendered with the `async` pipe. No nested subscriptions; unsubscribe (`takeUntilDestroyed`/`takeUntil`) when you must subscribe, because a leaked subscription outlives the Twig page.
 - No `any` (use `unknown` + narrowing), no non-null assertions, no `rxjs/Rx` imports. Member order: instance fields → instance methods → static fields → static methods.
@@ -35,7 +35,7 @@ Merchant Portal Angular code MUST reuse the installed `@spryker/*` UI components
 ## Validation honesty
 
 - Gate: `npm run formatter`, `mp:stylelint`, `mp:lint`, `mp:test` (via `docker/sdk cli`), then `mp:build` and render the page. A green build is not verification.
-- A green `mp:lint` is NOT evidence for project files while ESLint prints `File ignored because no matching configuration was supplied`. The packaged config targets the monorepo layout.
+- A green `mp:lint` is NOT evidence for project files. The packaged config targets the monorepo layout, and ESLint skips uncovered files silently (exit 0, no output). Prove coverage with `--print-config` on a file, or use a root `eslint.config.mp.mjs`.
 - `mp:test` passes with no tests; confirm your spec ran. Never `xit`/`skip` or weaken an assertion to reach green.
 - `max-lines` is off for Merchant Portal. `eslint-disable`, `stylelint-disable`, `@ts-ignore` and `@ts-expect-error` each need a comment explaining why the rule cannot apply.
 - Merchant Portal has no Nx, no Storybook (`.stories.ts`) and no Atomic Design level tagging. Do not invent workflows around them.

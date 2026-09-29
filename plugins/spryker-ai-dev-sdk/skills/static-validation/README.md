@@ -142,10 +142,11 @@ bash "$SCD" --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
 |---|---|---|
 | `-r, --repo <path>` | cwd's git repo | Project root to validate — run from anywhere. |
 | `-b, --base <ref>` | auto-detect | Base branch/ref to diff against. |
+| `-w, --working-tree` | off | Validate only uncommitted + untracked changes against `HEAD` (no base ref). |
 | `-s, --scope <mode>` | `files` | `files` or `module` — PHP grouping only (FE always individual). |
-| `--tools <list>` | all | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
+| `--tools <list>` | all except `phpcbf` | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
 | `--fix` | off | Autofix: phpcbf (always), eslint/stylelint `--fix`, prettier `--write`. |
-| `--include-tests` | off | Include `/tests/` files in phpcs/phpcbf. |
+| `--include-tests` | off | Include test files in phpcs/phpcbf and the frontend linters. |
 | `--dry-run` | off | Print plan + per-tool paths only, run nothing. |
 | `-h, --help` | — | Show usage. |
 
@@ -174,7 +175,7 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
 
 | Code | Meaning |
 |---|---|
-| `0` | Clean, or dry-run, or nothing changed. |
+| `0` | Clean, or dry-run, or nothing changed. If changed files went unanalysed (Twig, eslint "no matching configuration", no config for the surface) they are listed and the verdict reads *"passed for the files it analysed ONLY"* — report those files as unlinted. |
 | `1` | **Code violations** reported by at least one tool. |
 | `2` | Usage error (bad option, unknown `--tools` name, unresolvable base, base == HEAD, not a git repo, skill's own dir as cwd), **or a tool that failed to RUN** (missing `src/Generated`, missing `node_modules`, unresolvable tool config), **or no tool was invoked at all**. |
 

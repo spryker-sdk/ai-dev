@@ -10,8 +10,7 @@ description: >
 
 # Spryker Yves Atomic Frontend
 
-The always-loaded rule `.claude/rules/yves-frontend.md` holds the non-negotiables (override policy,
-review-only Twig conventions, validation commands). This skill is the create/override workflow.
+Non-negotiables live in the always-loaded rule `.claude/rules/yves-frontend.md`; this is the workflow.
 
 ## Where code lives
 
@@ -44,17 +43,9 @@ Folder `src/Pyz/Yves/{Module}/Theme/default/components/{tier}/{name}/`; folder =
 ```twig
 {% extends model('component') %}
 
-{% define config = {
-    name: 'my-component',
-    tag: 'my-component',   {# must equal name when a TS class exists; defaults to div #}
-} %}
-
-{% define data = {
-    title: required,       {# mandatory; new keys on existing components must be optional #}
-    items: [],
-} %}
-
-{% define attributes = { 'target-selector': '' } %}   {# root attrs; true = bare, false/null = omitted #}
+{% define config = { name: 'my-component', tag: 'my-component' } %}  {# tag == name with a TS class; default div #}
+{% define data = { title: required, items: [] } %}  {# new keys on existing components must be optional #}
+{% define attributes = { 'target-selector': '' } %}  {# root attrs; true = bare, false/null = omitted #}
 
 {% block body %}
     <button type="button" class="{{ config.name }}__trigger {{ config.jsName }}__trigger" {{ qa('my-component-trigger') }}>
@@ -96,18 +87,16 @@ export default class MyComponent extends Component {
 import './my-component.scss';
 import register from 'ShopUi/app/registry';
 
-export default register(
-    'my-component',
-    () => import(/* webpackMode: "lazy" */ /* webpackChunkName: "my-component" */ './my-component'),
-);
+export default register('my-component', () => import(/* webpackMode: "lazy" */ './my-component'));
 ```
-
-Include from another module by name: `{% include molecule('my-component', '{Module}') with { data: {...} } only %}`.
 
 ## Override or extend a core component
 
-Mirror the core path under `src/Pyz/Yves/{Module}/Theme/default/...` and extend the core file explicitly —
-a plain `'{Module}'` resolves to your own file and extends itself:
+**First `ls` the mirrored project folder.** If the project already overrides the component (demo shops
+override most ShopUi ones, e.g. `product-item`), edit those files — never replace them with a fresh
+override, which silently drops the project's markup, styles and TS. Otherwise mirror the core path under
+`src/Pyz/Yves/{Module}/Theme/default/...` and extend the core file explicitly — a plain `'{Module}'`
+resolves to your own file and extends itself:
 
 ```twig
 {# src/Pyz/Yves/ShopUi/Theme/default/components/molecules/product-item/product-item.twig #}
@@ -124,25 +113,36 @@ a plain `'{Module}'` resolves to your own file and extends itself:
 | You change | Ship |
 |---|---|
 | Markup only | `.twig` only — **no `index.ts`**, the core entry keeps loading core TS and styles |
-| Styles | `{name}.scss` (call the core mixin, rules in its `@content`) + `index.ts` importing it **and** re-registering the core class |
+| Styles | `{name}.scss` that `@include`s the core mixin with project rules in its `@content` + `index.ts` importing it **and** re-registering the core class. Redefine a mixin under the core name only with a copy of its body — it replaces the core one and cannot call it (Sass `Stack Overflow`) |
 | Behaviour | `{name}.ts` extending the core class via its alias + `index.ts` registering `./{name}` |
 
-To restyle without changing behaviour, use the `index.ts` above with `./{name}.scss` as the style import
-and the core class alias as the lazy target:
-`register('toggler-checkbox', () => import('ShopUi/components/molecules/toggler-checkbox/toggler-checkbox'))`.
-A replacing `index.ts` must mirror every import of the core `index.ts`, or those styles stop loading.
+Write a replacing `index.ts` from the core one: keep every import, the tag and `webpackMode`, change only
+the style import and the lazy target (core alias to restyle, `./{name}` to extend). The tag must equal
+the Twig `config.tag` — core can disagree (`cart-items-list` renders `<cart-items-list>` but registers
+`product-cart-items-list`, so its TS never binds); compare both before copying.
 
 ## Widgets
 
-PHP `src/Pyz/Yves/{Module}/Widget/{Name}Widget.php` + `Theme/default/views/{view}/{view}.twig`. Register
-in `src/Pyz/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()` — unregistered
+PHP `src/Pyz/Yves/{Module}/Widget/{Name}Widget.php` + `Theme/default/views/{view}/{view}.twig`, plus
+`{Module}Factory` / `{Module}DependencyProvider` when it calls `getFactory()`. Register in
+`src/Pyz/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()` — unregistered
 widgets render nothing. The tag needs `{% endwidget %}`. Details: `references/components.md`.
 
 ## Build and verify
 
-`docker/sdk cli npm run yves` (or `yves:watch`); `docker/sdk cli console twig:cache:warmer` when a
-new or moved Twig override is not picked up. Then lint per `references/validation.md` (mind the ESLint coverage trap) and render the page in the
-running shop. A green webpack build proves nothing: no type-checking, no Twig checks.
+`docker/sdk cli npm run yves` (or `yves:watch`); `docker/sdk cli console twig:cache:warmer` when a new
+or moved Twig override is not picked up (`cache:class-resolver:build` for a new PHP class). Lint per
+`references/validation.md` (mind the ESLint coverage trap) and render the page in the running shop — a
+green build or lint proves nothing about the two failures below.
+
+## Troubleshooting
+
+- **Style not applied:** the `.scss` defines a mixin but never `@include`s it (single-file convention);
+  no `index.ts` imports it; a project `index.ts` replaced the core entry and dropped its style import;
+  the selector targets a `js-` class; stale build or browser cache — rebuild, hard-reload.
+- **Component not initializing:** the Twig lacks `config.tag` (renders a `div`) or it differs from the
+  `register()` tag; `index.ts` is missing or nested deeper than `{tier}/{name}/`; setup is in the
+  constructor instead of `init()`; markup injected by AJAX needs `await mount()` from `ShopUi/app`.
 
 ## References
 

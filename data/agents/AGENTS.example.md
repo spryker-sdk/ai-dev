@@ -14,7 +14,7 @@ docker/sdk cli console twig:cache:warmer              # Warm Twig template cache
 docker/sdk cli console transfer:generate              # Generate transfers
 docker/sdk cli console propel:install                 # Apply DB schema
 docker/sdk cli npm install                            # Install npm deps
-docker/sdk cli run yves:watch                         # Watch Yves assets
+docker/sdk cli npm run yves:watch                     # Watch Yves assets
 docker/sdk cli "mariadb -h database -u spryker -psecret -D eu-docker -e 'SELECT 1;'"
 docker/sdk cli redis-cli -h key_value_store -n 1      # EU store (db1 = AT/DE)
 docker/sdk cli "redis-cli -h key_value_store -n 1 --scan --count 1000 | grep 'product_abstract:de:de_de'"
@@ -48,6 +48,7 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 | `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer — write here**: overrides of Pyz or core, and all new project code |
 
 **CRITICAL**: If a custom namespace is defined, **always write there** — overrides and new code alike. It is registered ahead of `Pyz` in `PROJECT_NAMESPACES` (`config/Shared/config_default.php`), so its class always wins; editing the `Pyz` copy instead changes nothing and raises no error. A near-empty `src/CustomNamespace/` is normal on a new project.
+Exception — frontend builders: Merchant Portal Angular code stays in `src/Pyz` (the ZedUi builder only builds `src/Pyz/Zed/*/Presentation/Components`), and Yves / Back Office assets in a custom namespace are built only after the namespace is registered in the frontend build config (see the `configure-codebase` skill).
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
 

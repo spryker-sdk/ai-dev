@@ -53,10 +53,12 @@ Include it in the page:
 ## Gui tables from JS: go through the orchestrator
 
 Every table rendered by `AbstractTable` (`.gui-table-data[id]`, `.gui-table-data-no-search[id]`) is
-created and configured by `vendor/spryker/gui/assets/Zed/js/modules/libs/table/table.js`. Its
-`README.md` in that directory is the authoritative contract.
+created and configured by `vendor/spryker/gui/assets/Zed/js/modules/libs/table/table.js`. **What exists
+depends on the installed `spryker/gui`** — read `Table.FEATURES` in that file first. Older releases (e.g.
+gui 5.5) ship only `data-selectable`, `data-filterable`, `data-uploader` and have **no** `table-access.js`,
+`README.md` or `TABLE_INIT_EVENT`; requiring them fails the build with "Module not found".
 
-1. **Prefer PHP.** Declare the feature on the table config and ship no JS. Features:
+1. **Prefer PHP.** Declare the feature on the table config and ship no JS. Features (newer gui):
    `data-selectable`, `data-assignable`, `data-master-detail`, `data-filterable`, `data-uploader`. Address
    columns by header id (the key in `setHeader()`), not by index.
 
@@ -64,7 +66,8 @@ created and configured by `vendor/spryker/gui/assets/Zed/js/modules/libs/table/t
    $config->setTableAttributes(['data-selectable' => ['moveToSelector' => '#toBeAssigned', 'colId' => 'spy_product.id_product']]);
    ```
 
-2. **Otherwise request a handle.** Never call `$(el).DataTable()` (not even with `retrieve: true`, which
+2. **Otherwise request a handle** (only if `libs/table/table-access.js` exists; without it, subscribe to the
+   instance's jQuery events, e.g. `$('#foo-table').on('draw.dt', cb)`, the one allowed jQuery use). Never call `$(el).DataTable()` (not even with `retrieve: true`, which
    creates a bare table), and never `import { Table }`, which inlines a second orchestrator:
 
    ```js
@@ -80,7 +83,7 @@ created and configured by `vendor/spryker/gui/assets/Zed/js/modules/libs/table/t
    so call them inside a subscription or an event handler. `requestTable` throws on a missing element or
    on a non-Gui table.
 
-3. **Tables injected after load** (dialogs, AJAX fragments) must announce themselves:
+3. **Tables injected after load** (dialogs, AJAX fragments; newer gui only) must announce themselves:
    `container.dispatchEvent(new CustomEvent(require('ZedGuiModules/libs/table/table').TABLE_INIT_EVENT, { bubbles: true }))`.
 
 ## Checks

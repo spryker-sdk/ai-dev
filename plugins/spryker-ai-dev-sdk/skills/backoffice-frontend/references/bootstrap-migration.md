@@ -7,7 +7,8 @@ neighbouring templates are a bad source to copy.
 
 ## Legacy → Bootstrap 5
 
-Use this when writing new markup or when converting the region you are editing:
+Use this when writing new markup or when converting the region you are editing (existing markup: check
+the `KEEP (JS)` caveat below first):
 
 | Legacy (do not write) | Bootstrap 5 |
 |---|---|
@@ -26,10 +27,14 @@ Use this when writing new markup or when converting the region you are editing:
 
 Do not mass-migrate untouched templates, and do not copy from the public Inspinia demo site, which is
 Bootstrap 3-era. Before converting a class in *existing* markup, check vendor JS does not select it:
-`hidden`, `form-group`, `has-error` and `control-label` are toggled or queried by core
-Zed JS, so renaming them breaks behaviour. The `spryker-upgrade` skill's `check-legacy-css-classes.php`
-reports these as `KEEP (JS)`. Bootstrap JS is available as `window.bootstrap` (set in `ZedGui` commons), so prefer
-`data-bs-*` attributes.
+`hidden`, `form-group`, `has-error`, `control-label`, `btn-default`, `input-group-addon` and
+`ibox`/`ibox-content`/`panel-body` are toggled or queried by core Zed JS (e.g. the filterable table's
+default wrapper is `.panel-body, .ibox-content`), so renaming them breaks behaviour. Check with
+`grep -rlE "['\".]{class}\b" vendor/spryker*/*/assets/Zed/js`, or the `spryker-upgrade` skill's
+`check-legacy-css-classes.php --classes=ibox-content,panel-body,…` (`KEEP (JS)` = keep it). That script
+only scans `src/Pyz/Zed/` and only classes already used there; its default list omits `ibox`/`panel`.
+
+Bootstrap JS is available as `window.bootstrap` (set in `ZedGui` commons), so prefer `data-bs-*` attributes.
 
 ## Styling layers: stop at the first one that fits
 

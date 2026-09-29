@@ -87,9 +87,10 @@ root `eslint.config.mp.mjs` if it exists and the packaged
 `vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/libs/lint/eslint.config.mjs` otherwise. It
 ignores extra arguments, so `-- --fix` does nothing.
 
-In zed-ui 4.3.0, the packaged config's `files` patterns only match the monorepo layout. For every project
-file ESLint prints `File ignored because no matching configuration was supplied`, and it still exits 0.
-Check a file:
+In zed-ui 4.3.0, the packaged config's `files` patterns only match the monorepo layout, so no project file
+is linted. Because `mp:lint` passes glob patterns, ESLint skips those files **silently**: no output, exit 0,
+even with errors in them. The `File ignored because no matching configuration was supplied` warning appears
+only when you pass a file path explicitly. Check a file:
 
 ```bash
 npx eslint --no-config-lookup --config vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/libs/lint/eslint.config.mjs \

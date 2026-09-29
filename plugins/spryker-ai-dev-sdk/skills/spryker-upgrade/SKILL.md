@@ -598,7 +598,7 @@ useful than a bad merge — generate one rather than forcing it.
 5. NEW_VENDOR_FILE (info) → check whether the overridden parent template must now include it.
 6. Zed Presentation entries (Backoffice twig, OMS mail templates) follow the same merge flow.
 7. Rebuild: `script -q /dev/null docker/sdk cli npm run yves` (and `npm run zed` / `npm run mp:build` for
-   Zed/MP entries) — zero webpack errors, then render the merged pages: the build does no type-checking.
+   Zed/MP entries) — zero webpack errors, then render the merged pages: the Yves build does no type-checking.
 
 ### Lane 3 — Plugin stacks (`plugin-usage-report.json`)
 

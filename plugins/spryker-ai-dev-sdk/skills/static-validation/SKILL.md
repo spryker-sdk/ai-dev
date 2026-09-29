@@ -79,6 +79,10 @@ bash "$SCD" --repo /path/to/project [options]
 Exit code: `0` = clean (or dry-run / nothing changed), `1` = **code violations** found, `2` = usage
 error, environment error, **or a tool that failed to run**.
 
+Exit `0` is not full coverage: changed files no tool analysed (Twig, eslint *"no matching configuration"*,
+a surface with no config) are listed under *"Changed files NOT analysed"*, and the verdict then reads
+*"passed for the files it analysed ONLY"*. Report those files as unlinted, never as clean.
+
 **Exit 2 is not a code finding.** If a tool crashes before analysing anything (missing `src/Generated`,
 missing `node_modules`, unresolvable config), the script says so explicitly and names the tool. Do **not**
 report those as violations and do **not** try to "fix" code for them — resolve the environment and re-run:

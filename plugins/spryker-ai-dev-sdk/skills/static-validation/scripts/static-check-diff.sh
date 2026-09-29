@@ -677,6 +677,22 @@ env_rc=0       # 1 = a tool failed to RUN (nothing was analysed)
 ran_any=0      # 1 = at least one tool was actually invoked
 env_failures=""
 
+# Changed files no tool analysed. Listed in the verdict so a green exit never reads as
+# coverage the run did not have.
+not_analysed=""
+if has_tool eslint && [ "${#eslint_none[@]}" -gt 0 ]; then
+    for f in "${eslint_none[@]}"; do not_analysed="${not_analysed}  - $f (eslint: no config covers it)
+"; done
+fi
+if has_tool stylelint && [ "${#stylelint_none[@]}" -gt 0 ]; then
+    for f in "${stylelint_none[@]}"; do not_analysed="${not_analysed}  - $f (stylelint: no config covers it)
+"; done
+fi
+if [ "${#changed_twig[@]}" -gt 0 ]; then
+    for f in "${changed_twig[@]}"; do not_analysed="${not_analysed}  - $f (twig: no linter exists)
+"; done
+fi
+
 # Classify a tool result. Static-analysis tools distinguish "found problems" from
 # "could not run"; collapsing both into "violations" sends agents chasing phantom
 # code findings that no edit can ever clear. $1=tool $2=exit code $3=captured output
@@ -690,8 +706,16 @@ classify() {
         eslint:2|stylelint:78|prettier:2|phpcs:3|phpcbf:3)
             env_failures="${env_failures}${tool} "; env_rc=1; return 0 ;;
     esac
+    # A findings summary means the tool DID analyse — real violations, even when a
+    # message happens to contain a crash marker below (phpstan's "Offset 'x' does not
+    # exist on array", "Class Foo could not be found" …).
+    case "$out" in
+        *"[ERROR] Found "*|*"FOUND "*" ERROR"*|*"FOUND "*" WARNING"*|*" problem"*)
+            overall_rc=1; return 0 ;;
+    esac
     # Output markers that mean the tool crashed before analysing anything.
     case "$out" in
+        *"Docker is not running"*|\
         *ERR_MODULE_NOT_FOUND*|*"Cannot find package"*|*ConfigurationError*|\
         *"while loading bootstrap file"*|*"Failed opening required"*|\
         *"could not be found"*|*"does not exist"*)
@@ -829,6 +853,13 @@ if [ "$_fe_wanted" -eq 1 ]; then
         if [ "$tool" = "eslint" ]; then
             n="$(printf '%s\n' "$out" | grep -c 'File ignored because no matching configuration')"
             if [ "${n:-0}" -gt 0 ]; then
+                # stylish format: the file path line precedes its "0:0 warning File ignored" line.
+                not_analysed="${not_analysed}$(printf '%s\n' "$out" | awk -v a="$MAIN_ROOT/" '
+                    /^[^ \t]/ { f = $0
+                                if (index(f, a) == 1) f = substr(f, length(a) + 1)
+                                else if (index(f, "/data/") == 1) f = substr(f, 7) }
+                    /File ignored because no matching configuration/ { print "  - " f " (eslint: no matching config block)" }')
+"
                 warn "eslint: $n file(s) matched NO config block and were therefore NOT analysed."
                 warn "  Report them as not linted — never as clean. The config's \`files:\` globs"
                 warn "  do not cover this layout; fixing that is a project/vendor config change."
@@ -870,6 +901,11 @@ if [ "$_fe_wanted" -eq 1 ]; then
 fi
 
 info ""
+if [ -n "$not_analysed" ]; then
+    warn "Changed files NOT analysed by any linter (report them as unlinted, never as clean):"
+    printf '%s' "$not_analysed" >&2
+fi
+
 if [ "$env_rc" -ne 0 ]; then
     err "✗ Tool(s) failed to RUN (environment/config error): ${env_failures}"
     err "  No code was analysed by those tools — these are NOT code findings."
@@ -890,7 +926,9 @@ if [ "$ran_any" -eq 0 ]; then
     exit 2
 fi
 
-if [ "$overall_rc" -eq 0 ]; then
+if [ "$overall_rc" -eq 0 ] && [ -n "$not_analysed" ]; then
+    warn "✓ Static analysis passed for the files it analysed ONLY — coverage is incomplete (see the list above)."
+elif [ "$overall_rc" -eq 0 ]; then
     info "✓ Static analysis passed."
 else
     err "✗ Static analysis reported violations (see output above)."

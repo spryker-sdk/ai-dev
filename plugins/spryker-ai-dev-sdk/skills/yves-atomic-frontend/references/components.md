@@ -58,12 +58,17 @@ registers `./window-location-applicator` under the same tag.
   generates `src/Pyz/Yves/ShopUi/Theme/{theme}/styles/design-tokens.css` (gitignored). Edit the JSON,
   never the CSS. Brand colours are Back Office Configuration settings (`theme:storefront:colors`),
   emitted at runtime as `:root` custom properties over the tokens — change the palette with the
-  `brand-project` skill.
+  `brand-project` skill. So style with the custom properties the neighbouring project components use
+  (`var(--text-brand)`, `var(--scale-8)`, …): `$setting-color-*` are build-time literals and do **not**
+  follow a Back Office palette change.
 
 ### Overriding core SCSS
 
-Call the core mixin and put project rules in its `@content` slot; import the file from a project
-`index.ts` that also re-registers the core TS class:
+Simplest: `@include shop-ui-toggler-checkbox { /* project rules */ }` — the builder injects the core
+mixin, and the rules land in its `@content`. To change the core rules themselves, redefine the mixin
+under its core name with a copy of its body, as below (it replaces the core one everywhere, so it must
+not call itself). Many core mixins also expose an optional `{mixin}-base-hook` mixin you can define.
+Either way, import the file from a project `index.ts` that also re-registers the core TS class:
 
 ```scss
 // src/Pyz/Yves/ShopUi/Theme/default/components/molecules/toggler-checkbox/toggler-checkbox.scss

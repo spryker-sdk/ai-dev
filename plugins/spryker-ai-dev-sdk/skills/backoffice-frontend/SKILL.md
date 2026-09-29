@@ -13,9 +13,8 @@ description: >
 The always-on conventions (Bootstrap 5 only, no new jQuery, `| raw` safety, `| trans`, ACL server-side,
 `data-qa`) live in `.claude/rules/zed-backoffice-frontend.md`. This skill is the procedure.
 
-Project code goes in `src/Pyz/Zed/{Module}/`; core (`vendor/spryker*/{module}/src/*/Zed/{Module}/`) is
-read-only and extended from Pyz. Find the nearest existing screen first (grep the core `Presentation/` dirs)
-and copy its structure.
+Project code goes in `src/Pyz/Zed/{Module}/`; core (`vendor/spryker*/`) is read-only. Find the nearest
+existing screen first (grep the core `Presentation/` dirs) and copy its structure.
 
 ## Decide: override or new page?
 
@@ -25,8 +24,8 @@ and copy its structure.
 
 ## 1. Controller — `src/Pyz/Zed/{Module}/Communication/Controller/{Name}Controller.php`
 
-URL is `/{module-kebab}/{controller-kebab}/{action-kebab}`, e.g. `IndexController::listAction()` in module
-`FooGui` → `/foo-gui/index/list`. Thin controller per `.claude/rules/controller.md`.
+URL is `/{module-kebab}/{controller-kebab}/{action-kebab}` (`FooGui` `IndexController::listAction()` →
+`/foo-gui/index/list`). Thin controller per `.claude/rules/controller.md`.
 
 - List page = `indexAction()` (`viewResponse(['fooTable' => $table->render()])`) **and** `tableAction()`
   (`jsonResponse($table->fetchData())`) — DataTables calls the second one; one controller per table
@@ -40,8 +39,8 @@ URL is `/{module-kebab}/{controller-kebab}/{action-kebab}`, e.g. `IndexControlle
 - Table extends `Spryker\Zed\Gui\Communication\Table\AbstractTable` (rules: `.claude/rules/table.md`).
   Row buttons: `generateEditButton()` / `generateViewButton()` / `generateRemoveButton()` /
   `generateButtonGroup()`; register those columns in `setRawColumns()`.
-- Table JS features (selectable, filterable, master-detail, …) are declared in PHP with
-  `$config->setTableAttributes(['data-selectable' => [...]])` — no JS needed. See `references/assets-and-build.md`.
+- Table JS features (`data-selectable`, `data-filterable`, …; the set depends on the installed `spryker/gui`)
+  are declared in PHP via `$config->setTableAttributes([...])` — no JS. See `references/assets-and-build.md`.
 - Forms: Symfony types in `Communication/Form/` (choice data per `.claude/rules/form-data-loading-performance.md`).
 - Tabbed pages: a class extending `Spryker\Zed\Gui\Communication\Tabs\AbstractTabs`, `->createView()` passed
   to Twig, rendered with `{{ tabs(fooTabs, {...context}) }}`.
@@ -73,8 +72,9 @@ Available blocks/helpers/partials: `references/twig-layout-and-helpers.md`; lega
 ## 3b. Override a core template
 
 Mirror the core path (`vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Edit/index.twig` →
-`src/Pyz/Zed/{Module}/Presentation/Edit/index.twig`), extend the core file **explicitly**, override only
-the blocks you change — never copy the template:
+`src/Pyz/Zed/{Module}/Presentation/Edit/index.twig`); first check every `src/*/Zed/{Module}/Presentation/`
+for an existing override — the first of `KernelConstants::PROJECT_NAMESPACES` wins, so extend that one.
+Extend the core file **explicitly**, override only the blocks you change — never copy the template:
 
 ```twig
 {% extends '@Spryker:ProductManagement/Edit/index.twig' %}
@@ -90,21 +90,20 @@ the project file first, so extending it from the override recurses on itself.
 
 ## 4. Navigation and ACL
 
-- Add the entry to `config/Zed/navigation.xml` (project order and top-level sections; top-level `<icon>`
-  takes a Material Symbols name such as `settings`) or to `src/Pyz/Zed/{Module}/Communication/navigation.xml`
-  (also scanned). Keyed by `<bundle>` / `<controller>` / `<action>` in kebab-case:
+- Add the entry to `config/Zed/navigation.xml` (top-level `<icon>` = a Material Symbols name such as
+  `settings`). With the project's `BREADCRUMB_MERGE_STRATEGY` (`ZedNavigationConfig::getMergeStrategy()`)
+  that file is the menu: a module `Communication/navigation.xml` only adds `<pages>` to an entry already there
+  (same key and `<bundle>`), so an entry only in the module file never shows. Hidden sub-pages
+  (create/edit) go in `<pages>` with `<visible>0</visible>`. Keyed by `<bundle>`/`<controller>`/`<action>` in kebab-case:
 
 ```xml
 <foo-gui>
-    <label>Foo</label>
-    <title>Foo</title>
-    <bundle>foo-gui</bundle>
-    <controller>index</controller>
-    <action>index</action>
+    <label>Foo</label><title>Foo</title><icon>settings</icon>
+    <bundle>foo-gui</bundle><controller>index</controller><action>index</action>
 </foo-gui>
 ```
 
-- Navigation is cached (`ZED_NAVIGATION_CACHE_ENABLED` defaults to `true`) — run `console navigation:build-cache`.
+- Navigation is cached (`ZED_NAVIGATION_CACHE_ENABLED` defaults to `true`) — run `navigation:build-cache`.
 - ACL checks the same bundle/controller/action triple. The root role has `*/*/*`; any restricted role
   needs a rule: installer rules in `src/Pyz/Zed/Acl/AclConfig.php::getInstallerRules()` (fresh installs;
   see `addDiscountManagerInstallerRules()`), or Back Office → Users → Roles (rules are attached to a role) for an existing DB.
@@ -129,7 +128,7 @@ core entry **replaces** that core bundle. Details, table handle API and aliases:
 |---|---|
 | New or moved Twig file (override not picked up) | `twig:cache:warmer` — the Zed template path cache is on by default |
 | New project PHP class overriding core (controller, factory, config) | `cache:class-resolver:build` |
-| New controller/action → 404 | `router:cache:warm-up:backoffice` |
+| New controller/action → 404 | `router:cache:warm-up:backoffice` (only if the Zed routing cache is enabled; off by default) |
 | `navigation.xml` | `navigation:build-cache` |
 | Translation CSV | `translator:generate-cache` |
 | JS/SCSS | `docker/sdk cli npm run zed` (`zed:watch` while iterating) |
@@ -139,8 +138,8 @@ Verification — a green build is not proof:
 1. Log in to the Back Office and open the page (`spryker-runtime` skill); check the browser console for
    JS errors and the table's AJAX request (`/{module}/{controller}/table`) returning JSON.
 2. Exercise the happy path, a validation error, and a user role without the ACL rule (expect the `/acl/index/denied` "Access denied" page).
-3. `npm run formatter` (`formatter:fix`) is the only automated check for Zed JS/SCSS; PHP via `static-validation`.
-4. E2E coverage when the page matters: `cypress-tests` skill; select on `data-qa` attributes.
+3. `npm run formatter` is the only automated Zed JS/SCSS check; PHP via `static-validation`. E2E when the
+   page matters: `cypress-tests` skill, selecting on `data-qa`.
 
 ## Checklist
 

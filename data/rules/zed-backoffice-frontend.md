@@ -1,7 +1,7 @@
 ---
 name: zed-backoffice-frontend
 description: Use when writing, reviewing, or overriding Back Office (Zed) Twig templates, Back Office JavaScript/SCSS, or Back Office navigation. Enforces project-level overrides that extend core blocks, Bootstrap 5 markup on the Gui/Inspinia2 layers, no new jQuery, translated text, safe escaping, server-side ACL, and verifying changes in the running Back Office.
-paths: "src/*/Zed/*/Presentation/**/*.twig,src/*/Zed/*/assets/Zed/**/*.{js,scss},config/Zed/navigation.xml"
+paths: "src/*/Zed/*/Presentation/**/*.twig,src/*/Zed/*/assets/Zed/**/*.js,src/*/Zed/*/assets/Zed/**/*.scss,config/Zed/navigation.xml,src/*/Zed/*/Communication/navigation.xml"
 ---
 
 **Frontend rule**
@@ -53,7 +53,8 @@ Scope: Back Office pages only. These are out of scope:
 - jQuery is global and load-bearing. Do not rewrite working jQuery, but write new code with native DOM
   APIs, `fetch()` with explicit `response.ok` handling, and ES modules/classes.
 - Never call `.DataTable()` on a Gui table. Declare the feature with `setTableAttributes()` in PHP, or
-  take a handle via `requestTable()` (`ZedGuiModules/libs/table/table-access`).
+  take a handle via `requestTable()` (`ZedGuiModules/libs/table/table-access`, only in newer `spryker/gui`;
+  check the file exists, else listen to the table's `draw.dt` event).
 - Use `js-` prefixed hook classes. Pass UI text and state classes from Twig via `data-*` or `<template>`.
 - Never build `innerHTML` from user input.
 - No React/Vue/Angular on Back Office pages.

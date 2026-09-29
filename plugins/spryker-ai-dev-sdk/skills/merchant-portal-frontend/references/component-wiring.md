@@ -12,10 +12,10 @@ uses. Source of truth: `vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuil
   `src/Pyz/Zed/ProductMerchantPortalGui` both become `spy/product-merchant-portal-gui`.
 - Project entries are merged after core entries, so a same-named project entry **replaces** the core one.
 - An entry that contains the comment `// spy/merchant-portal:single-entry-marker` is bundled into the
-  shared `spy/merchant-portal` chunk. All 17 core entries carry it, and so should yours.
-- `libs/index-transform.mts` injects one `<script>` per chunk into the built `index.html`, and the Merchant
-  Portal layout loads that. Entries are discovered when webpack starts, so restart `mp:build:watch` after
-  adding an `entry.ts`.
+  shared `spy/merchant-portal` chunk. All 17 core entries carry it, and yours **must**: the Merchant Portal
+  layout (`@ZedUi/Layout/layout.twig`, block `layoutJs`) loads only `js/spy/merchant-portal.js`. An entry
+  without the marker is emitted as its own `spy/{module}.js`, which no page loads, so its tags stay empty.
+- Entries are discovered when webpack starts, so restart `mp:build:watch` after adding an `entry.ts`.
 - `@spryker/web-components` defines a tag only `if (!customElements.get(name))`. The first definition
   wins, and duplicates are dropped without a warning.
 
@@ -63,14 +63,23 @@ export class MerchantNoteModule {}
 ```
 
 Twig: `<web-mp-merchant-note ...></web-mp-merchant-note>`. The page itself (controller, template extending
-`@ZedUi/Layout/merchant-layout-main.twig`, navigation) is ordinary Zed work.
+`@ZedUi/Layout/merchant-layout-main.twig`, navigation) is ordinary Zed work. A new MP module also needs an
+ACL rule for its dasherized bundle name: extend `getMerchantAclRoleRules()` in
+`src/Pyz/Zed/AclMerchantPortal/AclMerchantPortalConfig.php` (core list: `vendor/spryker/acl-merchant-portal`),
+or merchant users are denied the page.
 
 ## Recipe B: add or replace a component on a core module's pages
 
 Create `src/Pyz/Zed/{CoreModule}/Presentation/Components/entry.ts` with the **same module name**. Because
-it replaces the core entry, your `ComponentsModule` must define every element the module's Twig still
-renders. Open the core `app/components.module.ts` and carry its `withComponents([...])` list and module
-imports over, importing core classes from `@mp/{module}`:
+it replaces the core entry, your `ComponentsModule` must define **every** element and import **every**
+module the core `app/components.module.ts` does, including icon modules. Tags are global, so another
+module's page may depend on them: `<web-spy-icon>` on the DataImportMerchantPortalGui page is defined only by
+ProductMerchantPortalGui and MerchantAppMerchantPortalGui. Carry the whole list over. Import core classes
+from `@mp/{module}` where its `public-api.ts` exports them; import the rest (for example
+ProductMerchantPortalGui's `../icons` and `create-abstract-product-concretes-list`, or three
+SalesMerchantPortalGui `manage-order-*` components) by a relative path into
+`vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Components/`. Never drop one because it is not
+exported:
 
 ```ts
 // src/Pyz/Zed/ProductMerchantPortalGui/Presentation/Components/app/components.module.ts
@@ -81,6 +90,12 @@ import {
     EditAbstractProductComponent,
     // ...every other element from the core components.module.ts
 } from '@mp/product-merchant-portal-gui';
+import {
+    IconDeleteModule,
+    IconGermanyModule,
+    IconNoDataModule,
+    IconUnitedStatesModule,
+} from '../../../../../../../vendor/spryker/product-merchant-portal-gui/src/Spryker/Zed/ProductMerchantPortalGui/Presentation/Components/icons'; // not in public-api.ts
 
 import { ProductListComponent } from './product-list/product-list.component';
 import { ProductListModule } from './product-list/product-list.module';
@@ -102,8 +117,9 @@ export class ComponentsModule {}
 
 - To change behaviour, extend the core class (`export class ProductListComponent extends CoreProductListComponent`,
   imported from `@mp/product-merchant-portal-gui`). Declare it with the same `selector` so the existing
-  `<web-mp-product-list>` in Twig picks it up. Carry over the `templateUrl` and `styleUrls`, or point them
-  at your own copies.
+  `<web-mp-product-list>` in Twig picks it up. Carry over the `templateUrl` and `styleUrls` as relative
+  paths into `vendor/`, or point them at your own copies. Declare it in your own leaf module that repeats the
+  core leaf module's `imports` (core-internal ones such as `ProductListTableModule` come from `@mp/{module}`).
 - Do **not** import the core `ComponentsModule`. It would define the core `mp-product-list` element, and
   whichever definition runs first would win.
 - Diff your list against the core `components.module.ts` after every `composer update` of that module.
