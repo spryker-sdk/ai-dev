@@ -1,31 +1,35 @@
 ---
 name: merchant-portal-frontend
 description: >
-  Use when creating, extending, or replacing Spryker Merchant Portal (MP) frontend code in a project —
-  Angular components and entry.ts registration (always src/Pyz/Zed/*/Presentation/Components), the Twig
-  pages that render them (any project namespace), and their Jest specs. Invoke for "create a Merchant Portal
-  component", "extend an MP page", "add a web-mp component", "replace a core MP component", "use a
-  @spryker/* table/drawer/select in the Merchant Portal", "pass data from Twig to Angular", "write an MP
-  Jest spec", "mp:test is failing", "mp:build fails", or "my MP component does not render".
+  Use when creating, extending, or replacing Merchant Portal (MP) frontend code in a project: Angular components,
+  entry.ts registration, the Twig pages that render them, and Jest specs. MP Angular code is always built from
+  src/Pyz/Zed (a custom namespace cannot hold it). Triggers: "create a Merchant Portal component", "extend an MP
+  page", "replace a core MP component", "use a @spryker/* table in the MP", "pass data from Twig to Angular",
+  "MP Jest spec", "mp:build fails", "my MP component does not render".
 ---
 
 # Spryker Merchant Portal Frontend
 
-The Merchant Portal is **Angular Elements embedded in Zed Twig pages**, not a routed SPA. A component
-reaches the page only through a registration chain, and every break in that chain fails silently — the
-`<web-mp-*>` tag just stays empty. Always-on conventions (decorator metadata, inputs, RxJS, LESS, i18n,
-a11y) live in `.claude/rules/merchant-portal-angular.md`; this skill is the procedure.
+The Merchant Portal is **Angular Elements embedded in Zed Twig pages**, not a routed SPA: a component reaches
+the page only through a registration chain, and any break leaves the `<web-mp-*>` tag silently empty.
+Always-on conventions live in `.claude/rules/merchant-portal-angular.md`; this skill is the procedure.
 
-`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed
-first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
+## Namespace limitation — read first
 
-| Where | Path | You may |
+**A custom project namespace cannot be used fully for the Merchant Portal** (zed-ui 4.3.0): only the PHP/Twig
+half of a page can move; Angular is built from `src/Pyz/Zed` only, and no project setting changes that.
+`{ProjectNamespace}` = the custom namespace listed first in `KernelConstants::PROJECT_NAMESPACES`, else `Pyz`.
+
+| Part | Custom namespace? | Path |
 |---|---|---|
-| MP page (PHP + Twig) | `src/{ProjectNamespace}/Zed/{Module}/` — controller, factory, `Presentation/{Controller}/{action}.twig` rendering `<web-mp-*>` | create, override |
-| MP Angular code | `src/Pyz/Zed/{Module}/Presentation/Components/` — **always `Pyz`**: zed-ui 4.3.0 hardcodes it (`FrontendBuilder/settings.mts:79-80`), no override; see `references/component-wiring.md` | create, extend, replace |
-| App shell | `src/Pyz/Zed/ZedUi/Presentation/Components/` (`main.ts`, `app/app.module.ts`, `styles.less`) | root config, global theme overrides |
-| Core (read-only) | `vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Components/` | read, import via `@mp/{module}` |
-| UI library (read-only) | `node_modules/@spryker/*`, `node_modules/ng-zorro-antd` | read typings, import |
+| MP page: controller, factory, config, ACL, Twig rendering `<web-mp-*>` | **yes**, no wiring | `src/{ProjectNamespace}/Zed/{Module}/` |
+| MP Angular: `Presentation/Components/**` (`entry.ts`, components, specs, LESS) | **no — always `Pyz`** | `src/Pyz/Zed/{Module}/Presentation/Components/` |
+| App shell (`main.ts`, `app/app.module.ts`, `styles.less`) | **no** | `src/Pyz/Zed/ZedUi/Presentation/Components/` |
+| Core, UI library (read-only) | — | `vendor/spryker/{module}/.../Presentation/Components/`, `node_modules/@spryker/*` |
+
+Angular files outside `src/Pyz/Zed` are silently never built, linted or tested. Don't work around it (symlinks,
+an `angular.json` wrapper, patching vendor) — tell the user and keep the Angular code in `Pyz`. Why, the exact
+vendor file references, and the rejected workarounds: `references/component-wiring.md` § Namespace limitation.
 
 ## 1 · Find something to reuse first
 
@@ -78,8 +82,6 @@ and project code relatively; no alias exists for project modules.
 3. `entry.ts`: first line `// spy/merchant-portal:single-entry-marker`, then `registerNgModule(ComponentsModule)`
    from `@mp/zed-ui`. Without the marker the entry becomes its own `spy/{module}.js` chunk, which the
    Merchant Portal layout never loads (it loads only `spy/merchant-portal.js`).
-
-`app/app.module.ts` is the root shell — do not register components there.
 
 ## 5 · Use it from Twig
 
@@ -141,10 +143,8 @@ docker/sdk cli console twig:cache:warmer # when a new Twig override is not picke
 | Input never arrives, or arrives as a string | Attribute not kebab-case, wrong input name (read the `.d.ts`), or a JSON input without `transform: jsonAttribute` |
 | `Cannot find module '@mp/...'` | Alias missing: run `mp:update:config`; project modules have no alias, import relatively |
 | New component not picked up in watch mode | Restart `mp:build:watch` after adding an `entry.ts` |
-| Angular files never built, linted or tested | They are outside `src/Pyz/Zed/*/Presentation/Components/`; move them (the page may stay in `{ProjectNamespace}`) |
+| Angular files never built, linted or tested | Outside `src/Pyz/Zed/*/Presentation/Components/` — see § Namespace limitation |
 
 ## Reference files
 
-- `references/component-wiring.md` — entry discovery and naming, new-module vs same-name-override recipes with code, re-registering core elements, `@mp/*` aliases, assets
-- `references/ui-components-lookup.md` — finding installed `@spryker/*` packages and core MP components, reading typings, package naming, `web-spy-*` usage
-- `references/testing.md` — TestHost spec template, running one spec, `/testing` mocks, the ESLint coverage check and override config
+`references/component-wiring.md` (entry discovery, recipes, namespace limitation, aliases, assets) · `references/ui-components-lookup.md` (installed components, typings) · `references/testing.md` (spec template, one spec, ESLint coverage).

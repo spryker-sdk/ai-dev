@@ -4,27 +4,49 @@ How the ZedUi FrontendBuilder turns project files into custom elements, and the 
 uses. Source of truth: `vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/settings.mts` and
 `libs/entry-points.mts`.
 
-## Namespaces: page anywhere, Angular in `Pyz`
+## Namespace limitation
 
 `{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed
 first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
 
-- **MP page** (controller, factory, config, `Presentation/{Controller}/{action}.twig`): any project
+**A custom namespace cannot be used fully for the Merchant Portal.** The split:
+
+- **MP page** (controller, factory, config, ACL, `Presentation/{Controller}/{action}.twig`): any project
   namespace. Twig and PHP resolve across all `PROJECT_NAMESPACES` (first listed wins), so
   `src/{ProjectNamespace}/Zed/{Module}/` works with no extra wiring.
-- **MP Angular code** (`Presentation/Components/**`, `entry.ts`, the ZedUi app shell): `src/Pyz/Zed` only.
-  This is a builder limitation in zed-ui 4.3.0, not a convention:
-  - `FrontendBuilder/settings.mts:79-80` hardcodes `projectModulesDirectory: './src/Pyz/Zed'` and
-    `projectApplicationDirectory: './src/Pyz/Zed/ZedUi/Presentation/Components'`.
-  - `resolveBuilderSettings()` takes only the project root. It reads no project settings file and no env
-    var, and webpack, Jest, ESLint, Stylelint and `mp:update:config` all call it.
-  - `jest.config.mjs:15` hardcodes the `src/Pyz` root.
-  - Pointing `angular.json` `customWebpackConfig.path` at a project wrapper is not durable:
-    `mp:update:config` rewrites it to the vendor file (`libs/angular-configuration.mts:211`).
-    Hand-added `tsconfig.mp.json` includes survive but do not create webpack entries.
-- So a page in `src/{ProjectNamespace}/Zed/{Module}/` renders `<web-mp-*>` elements whose Angular code is
-  in `src/Pyz/Zed/{Module}/Presentation/Components/`. Re-check `settings.mts` after every `spryker/zed-ui`
-  upgrade.
+- **MP Angular code** (`Presentation/Components/**`, `entry.ts`, specs, LESS, the ZedUi app shell):
+  `src/Pyz/Zed` only. A page in `src/{ProjectNamespace}/Zed/{Module}/` renders `<web-mp-*>` elements whose
+  Angular code is in `src/Pyz/Zed/{Module}/Presentation/Components/`.
+
+### Why: `src/Pyz` is hardcoded in the builder, with no project setting
+
+All in `vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/` (zed-ui 4.3.0):
+
+| File | Hardcodes |
+|---|---|
+| `settings.mts:79-80` | `projectModulesDirectory: './src/Pyz/Zed'`, `projectApplicationDirectory: './src/Pyz/Zed/ZedUi/Presentation/Components'` |
+| `settings.mts:130` `resolveBuilderSettings()` | takes only the project root — reads no project settings file and no env var; webpack, Jest, ESLint, Stylelint and `mp:update:config` all call it |
+| `tsconfig.mp.json:63-67`, `tsconfig.mp.spec.json:17`, `tsconfig.mp.lint.json:5` | `src/Pyz/Zed/*/Presentation/Components/...` includes |
+| `jest.config.mjs:15` | Jest `roots: [.../src/Pyz, ...]` |
+
+There is no project file to configure: unlike Yves (`frontend/yves.settings.mts` → `paths.sources`) and Back
+Office JS (`frontend/zed/build.js` → `entry.dirs`), the Merchant Portal has no project-level builder settings.
+
+### Rejected workarounds
+
+- **Symlink** `src/Pyz/Zed/{Module}/Presentation/Components` → the custom namespace: breaks with git on some
+  platforms, Docker mounts and watch mode; two paths for one file confuse lint, tests and reviews.
+- **Project webpack wrapper** in `angular.json` `customWebpackConfig.path`: `mp:update:config` rewrites it back
+  to the vendor file (`libs/angular-configuration.mts:211`), and `postinstall` runs that on every `npm install`.
+  Hand-added `tsconfig.mp.json` includes survive but create no webpack entries.
+- **Patching `vendor/`** (composer-patches, patch-package): the project then owns the patch across every
+  zed-ui update — against the upgradability rule.
+
+### When this changes
+
+Only an upstream `spryker/zed-ui` change can lift it — e.g. an optional `frontend/mp.settings.mts` read through
+`defineConfig({ paths: { sources: { ... } } })`, as ShopUi does for Yves (that file does not exist today).
+After every `spryker/zed-ui` upgrade, re-check `settings.mts` before assuming the limitation still holds.
 
 ## How entries are discovered
 
