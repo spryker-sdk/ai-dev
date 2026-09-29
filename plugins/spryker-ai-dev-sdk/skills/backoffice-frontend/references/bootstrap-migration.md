@@ -32,7 +32,8 @@ Bootstrap 3-era. Before converting a class in *existing* markup, check vendor JS
 default wrapper is `.panel-body, .ibox-content`), so renaming them breaks behaviour. Check with
 `grep -rlE "['\".]{class}\b" vendor/spryker*/*/assets/Zed/js`, or the `spryker-upgrade` skill's
 `check-legacy-css-classes.php --classes=ibox-content,panel-body,…` (`KEEP (JS)` = keep it). That script
-only scans `src/Pyz/Zed/` and only classes already used there; its default list omits `ibox`/`panel`.
+only scans `src/Pyz/Zed/` (grep templates in any other project namespace yourself) and only classes already
+used there; its default list omits `ibox`/`panel`.
 
 Bootstrap JS is available as `window.bootstrap` (set in `ZedGui` commons), so prefer `data-bs-*` attributes.
 

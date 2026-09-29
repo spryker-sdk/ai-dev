@@ -5,13 +5,16 @@ paths: "src/**/Yves/**/Theme/**/*.{ts,js,scss,twig}"
 ---
 
 **Frontend rule**
-Yves storefront code MUST be customized on project level (`src/Pyz/Yves/{Module}/Theme/...`) by extending core from `vendor/spryker-shop` / `vendor/spryker-feature` — never by editing `vendor/`. It MUST pass the project's npm lint scripts, and the parts no tool checks — Twig conventions and accessibility — MUST be reviewed by hand.
+Yves storefront code MUST be customized on project level (`src/{ProjectNamespace}/Yves/{Module}/Theme/...`) by extending core from `vendor/spryker-shop` / `vendor/spryker-feature` — never by editing `vendor/`. It MUST pass the project's npm lint scripts, and the parts no tool checks — Twig conventions and accessibility — MUST be reviewed by hand.
+
+`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
 
 ## Overriding core
 
-- Mirror the core relative path: `vendor/spryker-shop/{module}/src/SprykerShop/Yves/{Module}/Theme/default/components/{tier}/{name}/` → `src/Pyz/Yves/{Module}/Theme/default/components/{tier}/{name}/`. The project file wins. If that folder already exists, edit its files — never replace an existing project override.
+- Mirror the core relative path: `vendor/spryker-shop/{module}/src/SprykerShop/Yves/{Module}/Theme/default/components/{tier}/{name}/` → `src/{ProjectNamespace}/Yves/{Module}/Theme/default/components/{tier}/{name}/`. The project file wins. First check `src/*/Yves/{Module}/Theme/...` for an existing override in ANY project namespace and edit it — never replace or duplicate one. Twig/PHP resolve by `PROJECT_NAMESPACES` order (first wins); Yves assets by `paths.sources` order (later wins).
 - Extend the core template and override only the blocks you change: `{% extends molecule('{name}', '@SprykerShop:{Module}') %}` (`@SprykerFeature:{Module}` for feature modules). A plain `'{Module}'` resolves to the project override and extends itself.
 - The builder keys entry points by `{tier}/{name}`, and the project entry replaces the core one. A Twig-only override ships no `index.ts`. A project `index.ts` MUST keep every import of the core `index.ts` and re-register the TS class (core class via its alias, e.g. `ShopUi/components/...`) under the Twig `config.tag`. New component names MUST be unique per tier across all modules.
+- The builder only scans `paths.sources` (default `./src/Pyz/Yves`). Assets in another namespace are built and linted only after it is registered in `frontend/yves.settings.mts` `paths.sources` and `tsconfig.yves.json` `include` (`configure-codebase` skill) — confirm the build picked your file up.
 - Import core TS through the module aliases in `tsconfig.yves.json` `paths` (`{Module}/components/...`); add a missing alias there — never a relative path into `vendor/`.
 
 ## Review-only conventions (no linter covers Twig)
@@ -31,8 +34,8 @@ Yves storefront code MUST be customized on project level (`src/Pyz/Yves/{Module}
 
 - Checks (the CI `js-validation` job runs them on the host with the Node version from `package.json` `engines`; `docker/sdk cli npm run ...` also works): `npm run yves:stylelint`, `npm run yves:lint`, `npm run formatter`.
 - Autofix: `npm run formatter:fix`; `npm run yves:stylelint -- --fix`, single file `-- -p <absolute-path.scss>`. `npm run yves:lint -- --fix` is silently ignored — the runner does not forward arguments.
-- `npm run yves:lint` exiting 0 is NOT evidence for project TS. The packaged ESLint config may not match the project layout and then ignores `src/Pyz/Yves/**/*.ts` (`File ignored because no matching configuration was supplied`). Check coverage of your file with `--print-config` before citing ESLint.
+- `npm run yves:lint` exiting 0 is NOT evidence for project TS. The packaged ESLint config may not match the project layout and then ignores `src/{ProjectNamespace}/Yves/**/*.ts` (`File ignored because no matching configuration was supplied`). Check coverage of your file with `--print-config` before citing ESLint.
 - `tsc` is advisory, never a gate — no script, no CI job, pre-existing errors on a clean checkout. Run `npx tsc --noEmit -p tsconfig.yves.json 2>&1 | grep '^src/.*{your-file}'` and fix only what points at code you touched.
 - A successful `npm run yves` build is NOT verification — webpack transpiles without type-checking. Render the page in the running shop.
-- `yves:*` covers only the builder's project source (`src/Pyz/Yves/**/Theme/**`). Do not "fix" Zed or Merchant Portal assets as part of a storefront task.
+- `yves:*` covers only the builder's registered `./src/...` sources (`src/{ProjectNamespace}/Yves/**/Theme/**`). Do not "fix" Zed or Merchant Portal assets as part of a storefront task.
 - For changed-files-only checks use the `static-validation` skill; for component scaffolding, SCSS, TypeScript and Widget depth use the `yves-atomic-frontend` skill.

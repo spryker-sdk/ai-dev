@@ -9,7 +9,9 @@ Merchant Portal Angular code MUST reuse the installed `@spryker/*` UI components
 
 ## Architecture (non-negotiable)
 
-- Only `src/Pyz/Zed/*/Presentation/Components/` is built, linted and tested. Code under another namespace is ignored by the ZedUi FrontendBuilder, so Merchant Portal Angular code stays in `src/Pyz` even when the project writes everything else to a custom namespace.
+- `{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
+- The MP **page** (Zed controller, factory, Twig rendering `<web-mp-*>`) may live in `src/{ProjectNamespace}/Zed/{Module}/`; Twig and PHP resolve across all project namespaces.
+- MP **Angular code** (`Presentation/Components/**`, `entry.ts`) MUST live in `src/Pyz/Zed/{Module}/Presentation/Components/`. This is a builder limitation, not a convention: zed-ui 4.3.0 hardcodes `projectModulesDirectory: './src/Pyz/Zed'` (`FrontendBuilder/settings.mts:79-80`) with no project override, so files elsewhere are silently not built, linted or tested. If this rule loaded for a file outside `src/Pyz`, move the file. Re-check after upgrading `spryker/zed-ui`.
 - Components are custom elements rendered from Twig as `<web-mp-*>` (`@spryker/*`: `<web-spy-*>`). A component renders only after it is registered through `entry.ts` (first line `// spy/merchant-portal:single-entry-marker`) → `components.module.ts` (`WebComponentsModule.withComponents`) → leaf module. `app/app.module.ts` is the root shell, not a registry.
 - A project `entry.ts` in a module named like a core module **replaces** the core entry. That override MUST re-register every element and module of the core `components.module.ts`: tags are global, and other modules' pages rely on them.
 - Never hand-roll a table, modal, drawer, notification, spinner, pagination, select, date picker, tabs, chips or form control. Read the installed package's typings for its real API; never guess input names or trust the public README.

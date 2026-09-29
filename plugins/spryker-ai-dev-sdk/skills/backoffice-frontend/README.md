@@ -15,7 +15,8 @@ but most of what goes wrong is Spryker-specific rather than a Bootstrap or Twig 
 - Several Gui Twig functions exist in vendor but are not registered in the project.
 
 This skill carries those mechanics and uses project paths only. Core is read from `vendor/` and extended
-into `src/Pyz/Zed`, never edited.
+into `src/{ProjectNamespace}/Zed` (the project's custom namespace if one is defined, listed first in
+`KernelConstants::PROJECT_NAMESPACES`, otherwise `Pyz`), never edited.
 
 ## When it triggers
 
@@ -34,14 +35,14 @@ flowchart TD
 
     B -- "change core page" --> O["Extension point exists?<br/>(expander plugin, config)"]
     O -- "yes" --> O1["Use it — no template override"]
-    O -- "no" --> O2["Mirror path in src/Pyz/Zed/{Module}/Presentation/<br/>extends '@Spryker:{Module}/...'<br/>override blocks · parent()"]
+    O -- "no" --> O2["Mirror path in src/{ProjectNamespace}/Zed/{Module}/Presentation/<br/>extends '@Spryker:{Module}/...'<br/>override blocks · parent()"]
 
     B -- "new page" --> C["1 · Controller<br/>indexAction + tableAction<br/>form: handleRequest → facade → flash → redirect"]
     C --> D["2 · Factory<br/>AbstractTable · form type · AbstractTabs"]
     D --> E["3 · Twig<br/>extends @Gui/Layout/layout.twig<br/>action buttons · widget.twig · BS5 markup"]
     E --> F["4 · Navigation + ACL<br/>navigation.xml · role rule"]
     F --> G{"Needs JS/SCSS?"}
-    G -- "yes" --> H["5 · src/Pyz/Zed/{Module}/assets/Zed/js/*.entry.js<br/>assetsPath() in footer_js/head_css<br/>tables via requestTable() if gui ships it, else draw.dt"]
+    G -- "yes" --> H["5 · src/{ProjectNamespace}/Zed/{Module}/assets/Zed/js/*.entry.js<br/>non-Pyz: add to build.js entry.dirs<br/>assetsPath() in footer_js/head_css<br/>tables via requestTable() if gui ships it, else draw.dt"]
     G -- "no" --> T
     H --> T["6 · Translations<br/>Translator/data/{Module}/{locale}.csv"]
 
@@ -61,7 +62,8 @@ flowchart TD
 ## Key rules
 
 - **Overrides**:
-  - Mirror the core path under `src/Pyz/Zed/{Module}/Presentation/` and extend
+  - Check `src/*/Zed/{Module}/Presentation/` for an existing override (first in `PROJECT_NAMESPACES` wins).
+  - Mirror the core path under `src/{ProjectNamespace}/Zed/{Module}/Presentation/` and extend
     `@Spryker:`/`@SprykerFeature:`/`@SprykerEco:` explicitly.
   - Override blocks only, and call `parent()` to keep core content.
   - Never copy a whole template, never edit vendor.
@@ -70,15 +72,16 @@ flowchart TD
   - Put page buttons in the `action` block, using `createActionButton` and the other action-button helpers.
   - Wrap content in `@Gui/Partials/widget.twig`.
   - Tables need an `index` and a `table` action.
-  - Use only the Twig functions registered in `src/Pyz/Zed/Twig/TwigDependencyProvider.php`.
+  - Use only the Twig functions registered in the project's `Zed/Twig/TwigDependencyProvider.php`.
 - **Navigation/ACL**: navigation entries and ACL rules both use kebab-case bundle/controller/action.
   Navigation is cached. Restricted roles need an ACL rule, and hiding a menu entry does not protect the page.
 - **Assets**:
-  - The build scans `src/Pyz/Zed` for `**/Zed/**/*.entry.js`.
+  - The build scans `entry.dirs` in `frontend/zed/build.js` (default only `./src/Pyz/Zed/`) for
+    `**/Zed/**/*.entry.js`; register any other project namespace there.
   - A project entry replaces a core entry with the same name.
   - Include bundles with `assetsPath()`.
   - Reach Gui tables through `requestTable()` where the installed `spryker/gui` ships it, never `.DataTable()`.
-- **Translations**: keys go in `src/Pyz/Zed/Translator/data/{Module}/{locale}.csv`, then run
+- **Translations**: keys go in `src/{ProjectNamespace}/Zed/Translator/data/{Module}/{locale}.csv`, then run
   `translator:generate-cache`.
 - **Verification**:
   - Prettier is the only automated check for Zed JS/SCSS, and a successful build is not verification.

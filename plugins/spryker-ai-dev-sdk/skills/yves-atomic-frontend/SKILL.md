@@ -11,33 +11,34 @@ description: >
 # Spryker Yves Atomic Frontend
 
 Non-negotiables live in the always-loaded rule `.claude/rules/yves-frontend.md`; this is the workflow.
+`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed
+first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
 
 ## Where code lives
 
 | | Path |
 |---|---|
-| Project (write here) | `src/Pyz/Yves/{Module}/Theme/default/{components/{atoms,molecules,organisms},templates,views}/{name}/` |
+| Project (write here) | `src/{ProjectNamespace}/Yves/{Module}/Theme/default/{components/{atoms,molecules,organisms},templates,views}/{name}/` |
 | Core (read-only) | `vendor/spryker-shop/{module}/src/SprykerShop/Yves/{Module}/Theme/default/...`, same under `vendor/spryker-feature/` |
-| ShopUi base, settings, helpers | `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/{models,app,styles/settings,styles/helpers}/`; project overrides in `src/Pyz/Yves/ShopUi/Theme/default/styles/` |
+| ShopUi base, settings, helpers | `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/{models,app,styles/settings,styles/helpers}/`; project overrides in the `project` source's `ShopUi/Theme/default/styles/` (`src/Pyz/Yves/...` by default) |
 
-Copy the nearest existing component (project first, then core ShopUi). The builder scans `src/Pyz/Yves` only; a custom
-namespace needs `frontend/yves.settings.mts` `paths.sources` (see `configure-codebase`).
+Copy the nearest existing component (`src/*/Yves` first, then core ShopUi). The builder scans only `paths.sources`
+(default `./src/Pyz/Yves`): assets in a custom namespace build only once it is added to `frontend/yves.settings.mts`
+`paths.sources` (after `project` — later wins) and `tsconfig.yves.json` `include` (`configure-codebase` skill).
 
 ## How the builder resolves components
 
 - Entry points are `{tier}/{name}/index.ts`, **one level deep** under `atoms|molecules|organisms|templates|views`.
 - They are keyed by `{tier}/{name}` **across all modules**, and the project wins. So:
   - a project `index.ts` **replaces** the core entry — it must re-import styles and re-register the TS class;
-  - a new component whose name exists in another module's same tier **silently shadows** it — check
-    `vendor/spryker-shop` and `vendor/spryker-feature` before naming.
+  - a new component whose name exists in another module's same tier **silently shadows** it — check vendor first.
 - Mixin names resolve project-last too: redefining a core mixin name replaces it everywhere.
-- Webpack aliases come from `tsconfig.yves.json` `paths`: `ShopUi/...` (core ShopUi), `src/ShopUi/...`
-  (project ShopUi), `{Module}/components/...` for other modules. Add a missing one as
+- Webpack aliases = `tsconfig.yves.json` `paths`: `ShopUi/...` (core), `{Module}/components/...`; add a missing one as
   `"{Module}/*": ["./vendor/spryker-shop/{module}/src/SprykerShop/Yves/{Module}/Theme/default/*"]`.
 
 ## Create a new component
 
-Folder `src/Pyz/Yves/{Module}/Theme/default/components/{tier}/{name}/`; folder == `register()` tag == `config.name` (== `config.tag` with a TS class) == mixin suffix.
+Folder `src/{ProjectNamespace}/Yves/{Module}/Theme/default/components/{tier}/{name}/`; folder == `register()` tag == `config.name` (== `config.tag` with a TS class) == mixin suffix.
 
 **`{name}.twig`**
 ```twig
@@ -54,9 +55,8 @@ Folder `src/Pyz/Yves/{Module}/Theme/default/components/{tier}/{name}/`; folder =
 {% endblock %}
 ```
 
-**`{name}.scss`** — project convention is a single file: mixin + trailing include (core uses a separate
-`style.scss` with `helper-import`; match the neighbouring components). `$setting-*`, `helper-*` and
-`map.get` are injected — no import.
+**`{name}.scss`** — project convention: one file, mixin + trailing include (core splits it into `style.scss` +
+`helper-import`; match the neighbours). `$setting-*`, `helper-*` and `map.get` are injected — no import.
 ```scss
 @mixin my-module-my-component($name: '.my-component') {
     #{$name} {
@@ -92,14 +92,14 @@ export default register('my-component', () => import(/* webpackMode: "lazy" */ '
 
 ## Override or extend a core component
 
-**First `ls` the mirrored project folder.** If the project already overrides the component (demo shops
+**First `ls src/*/Yves/{Module}/Theme/default/...`** (every project namespace). If the project already overrides the component (demo shops
 override most ShopUi ones, e.g. `product-item`), edit those files — never replace them with a fresh
 override, which silently drops the project's markup, styles and TS. Otherwise mirror the core path under
-`src/Pyz/Yves/{Module}/Theme/default/...` and extend the core file explicitly — a plain `'{Module}'`
+`src/{ProjectNamespace}/Yves/{Module}/Theme/default/...` and extend the core file explicitly — a plain `'{Module}'`
 resolves to your own file and extends itself:
 
 ```twig
-{# src/Pyz/Yves/ShopUi/Theme/default/components/molecules/product-item/product-item.twig #}
+{# src/{ProjectNamespace}/Yves/ShopUi/Theme/default/components/molecules/product-item/product-item.twig #}
 {% extends molecule('product-item', '@SprykerShop:ShopUi') %}   {# @SprykerFeature:{Module} for features #}
 
 {% block price %}
@@ -123,17 +123,17 @@ the Twig `config.tag` — core can disagree (`cart-items-list` renders `<cart-it
 
 ## Widgets
 
-PHP `src/Pyz/Yves/{Module}/Widget/{Name}Widget.php` + `Theme/default/views/{view}/{view}.twig`, plus
+PHP `src/{ProjectNamespace}/Yves/{Module}/Widget/{Name}Widget.php` + `Theme/default/views/{view}/{view}.twig`, plus
 `{Module}Factory` / `{Module}DependencyProvider` when it calls `getFactory()`. Register in
-`src/Pyz/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()` — unregistered
+`src/{ProjectNamespace}/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()` — unregistered
 widgets render nothing. The tag needs `{% endwidget %}`. Details: `references/components.md`.
 
 ## Build and verify
 
-`docker/sdk cli npm run yves` (or `yves:watch`); `docker/sdk cli console twig:cache:warmer` when a new
-or moved Twig override is not picked up (`cache:class-resolver:build` for a new PHP class). Lint per
-`references/validation.md` (mind the ESLint coverage trap) and render the page in the running shop — a
-green build or lint proves nothing about the two failures below.
+`docker/sdk cli npm run yves` (or `yves:watch`); `console twig:cache:warmer` for a new/moved Twig override,
+`console cache:class-resolver:build` for a new PHP class. Confirm the builder picked your component up
+(`grep -l '{name}' public/Yves/assets/current/*/js/*.js`), lint per `references/validation.md` (mind the
+ESLint coverage trap) and render the page — a green build or lint proves nothing about the failures below.
 
 ## Troubleshooting
 

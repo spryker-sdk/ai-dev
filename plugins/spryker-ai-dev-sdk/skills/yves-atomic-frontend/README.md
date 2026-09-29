@@ -2,7 +2,9 @@
 
 Create, extend, and override **Spryker Yves storefront frontend code in a project** — atomic components,
 templates, views, and Widgets — across Twig, SCSS, and TypeScript. Core is read from `vendor/` and
-extended into `src/Pyz/Yves`, never edited.
+extended into the project namespace (`src/{ProjectNamespace}/Yves` — the custom namespace listed first in
+`KernelConstants::PROJECT_NAMESPACES`, otherwise `Pyz`), never edited. Assets in a custom namespace are built
+only once it is registered in `frontend/yves.settings.mts` `paths.sources` and `tsconfig.yves.json` `include`.
 
 It carries the mechanics a strong model won't guess: the builder keys entry points by `{tier}/{name}`
 across all modules (a project `index.ts` replaces the core entry; same-name components shadow each

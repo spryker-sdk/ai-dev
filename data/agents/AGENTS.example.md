@@ -48,7 +48,7 @@ docker exec spryker_broker_1 rabbitmqctl list_queues
 | `CustomNamespace` | `src/CustomNamespace/{Layer}/{Module}/` | **The project layer — write here**: overrides of Pyz or core, and all new project code |
 
 **CRITICAL**: If a custom namespace is defined, **always write there** — overrides and new code alike. It is registered ahead of `Pyz` in `PROJECT_NAMESPACES` (`config/Shared/config_default.php`), so its class always wins; editing the `Pyz` copy instead changes nothing and raises no error. A near-empty `src/CustomNamespace/` is normal on a new project.
-Exception — frontend builders: Merchant Portal Angular code stays in `src/Pyz` (the ZedUi builder only builds `src/Pyz/Zed/*/Presentation/Components`), and Yves / Back Office assets in a custom namespace are built only after the namespace is registered in the frontend build config (see the `configure-codebase` skill).
+Exception — frontend builders (Twig templates and PHP classes need no extra wiring): Merchant Portal Angular code (`Presentation/Components/**`) must stay in `src/Pyz` — a ZedUi builder limitation (`projectModulesDirectory: './src/Pyz/Zed'`, no project override); the MP page's controller and Twig may live in the custom namespace. Yves TS/SCSS is built only after the namespace is added to `frontend/yves.settings.mts` `paths.sources` and the `tsconfig.yves.json` `include`; Back Office `*.entry.js` only after `./src/CustomNamespace/Zed/` is appended to `entry.dirs` in `frontend/zed/build.js`. One-time setup: the `configure-codebase` skill.
 
 > Note: `[Org]` can also be other custom namespaces under `src/`.
 

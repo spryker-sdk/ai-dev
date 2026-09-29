@@ -1,7 +1,8 @@
 # Back Office Twig: layout, helpers, partials
 
 Only what is Spryker-specific and verified against `vendor/spryker/gui` and the project's
-`src/Pyz/Zed/Twig/TwigDependencyProvider.php`. Generic Twig is assumed.
+project `Zed/Twig/TwigDependencyProvider.php` (`src/Pyz/Zed/Twig/` in b2b-demo-marketplace). Generic Twig is assumed.
+`{ProjectNamespace}` is defined in `SKILL.md`.
 
 ## Layouts
 
@@ -24,7 +25,7 @@ Blocks of `@Gui/Layout/layout.twig`:
 
 ## Twig functions registered in the project
 
-These come from `src/Pyz/Zed/Twig/TwigDependencyProvider.php`. A Gui function that is not listed is not
+These come from the project's `Zed/Twig/TwigDependencyProvider.php` (e.g. `src/Pyz/Zed/Twig/` in b2b-demo-marketplace). A Gui function that is not listed is not
 available. Examples are `modal()`, `panel()` and `listGroup()`: their plugins exist in vendor but are not
 registered. Use the partial instead, or register the plugin there first.
 
@@ -59,12 +60,12 @@ Avoid these legacy partials in new markup: `@Gui/Panel/panel.twig` (`panel panel
 
 | Reference | Resolves to |
 |---|---|
-| `@ProductManagement/Edit/index.twig` | The project file first (`src/Pyz/Zed/ProductManagement/Presentation/...`), then core. |
+| `@ProductManagement/Edit/index.twig` | The project file first (`src/{ProjectNamespace}/Zed/ProductManagement/Presentation/...`, in `PROJECT_NAMESPACES` order), then core. |
 | `@Spryker:ProductManagement/Edit/index.twig` | Always `vendor/spryker/product-management/...`. Use it in `extends` inside an override. |
 | `@SprykerFeature:AiCommerce/...`, `@SprykerEco:{Module}/...` | Feature and eco packages. |
 
 `include ... ignore missing` keeps an override working when an optional feature package is not installed.
-`src/Pyz/Zed/ProductManagement/Presentation/Edit/index.twig` does exactly that.
+In b2b-demo-marketplace, `src/Pyz/Zed/ProductManagement/Presentation/Edit/index.twig` does exactly that.
 
 The Zed template path cache is on by default (`TwigConfig::isPathCacheEnabled()`). A newly added override
 keeps rendering the core file until you run `console twig:cache:warmer`.

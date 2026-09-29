@@ -20,7 +20,10 @@ Scope: Back Office pages only. These are out of scope:
 
 ## Overrides
 
-- Mirror the core path under `src/Pyz/Zed/{Module}/Presentation/`.
+`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
+Zed Twig and PHP overrides work in any project namespace; Back Office JS in a namespace other than `Pyz` is built only after it is added to `entry.dirs` in `frontend/zed/build.js` (see the skill).
+
+- Mirror the core path under `src/{ProjectNamespace}/Zed/{Module}/Presentation/`. First check `src/*/Zed/{Module}/Presentation/` for an existing override in any project namespace — the first one in `PROJECT_NAMESPACES` wins, so extend that one instead of adding a second.
 - In an override, extend the core file explicitly: `{% extends '@Spryker:{Module}/...' %}` (or
   `@SprykerFeature:` / `@SprykerEco:`). Plain `@{Module}/...` resolves to the override itself.
 - Override only the blocks you change, and call `{{ parent() }}` unless you are replacing the block on purpose.
@@ -32,7 +35,7 @@ Scope: Back Office pages only. These are out of scope:
 ## Twig
 
 - New pages extend `@Gui/Layout/layout.twig` and reuse Gui helpers and partials instead of hand-written
-  markup. Use only Twig functions registered in `src/Pyz/Zed/Twig/TwigDependencyProvider.php`.
+  markup. Use only Twig functions registered in the project's `Zed/Twig/TwigDependencyProvider.php` (e.g. `src/Pyz/Zed/Twig/` in b2b-demo-marketplace).
 - No business logic in templates. Prepare data in the controller/facade (see [performance.md](performance.md)).
 - Use `| raw` only on application-generated markup (a rendered table or form, sanitized HTML). **Never**
   use it on customer-, merchant-, import- or request-supplied values.

@@ -9,7 +9,8 @@ CI runs `npm ci` then the scripts on the host with the Node version from `packag
 Locally, use a matching host Node or `docker/sdk cli npm run <script>`. A too-old host Node fails with
 errors that look like builder bugs (e.g. `Named export 'program' not found`) — environment, not code.
 
-Linters take their files from the builder's project source root (`src/Pyz/Yves/**/Theme/**`); vendor, Zed
+Linters take their files from the builder's `./src/...` entries in `paths.sources` (default `./src/Pyz/Yves`,
+plus any custom namespace registered in `frontend/yves.settings.mts`) — `**/Theme/**` only; vendor, Zed
 and Merchant Portal are out of scope. For changed-files-only checks use the `static-validation` skill.
 Run the checks on a clean checkout first to know the baseline.
 
@@ -31,7 +32,7 @@ Also: no `pt`, no vendor prefixes, `::` pseudo-elements.
 1. `npm run yves:lint -- --fix` is silently ignored — the runner does not forward arguments.
 2. `npm run yves:lint` may not lint project TS at all: the packaged config
    (`.../FrontendBuilder/libs/lint/eslint.config.mjs`) scopes its TS block to a pattern that may not
-   match `src/Pyz/Yves/...`, and unmatched files are skipped with exit 0. Check:
+   match `src/{ProjectNamespace}/Yves/...` (`{ProjectNamespace}`: see `SKILL.md`), and unmatched files are skipped with exit 0. Check:
 
 ```bash
 npx eslint --no-config-lookup \
@@ -54,6 +55,10 @@ export default [...packaged, { ...yvesTsBlock, basePath: '<project>', files: ['s
 ```bash
 npx eslint --no-config-lookup --config /tmp/eslint.config.yves.mjs [--fix] <path.ts>
 ```
+
+`src/*/Yves` covers every project namespace. A custom namespace must also be in `tsconfig.yves.json`
+`include` — otherwise ESLint fails with `"parserOptions.project" has been provided` and `tsc` below
+silently reports nothing for the file.
 
 Expect pre-existing violations in untouched files; fix only yours. Committing a covering config turns
 them into CI failures — a separate project decision. Rules that bite and aren't autofixable:

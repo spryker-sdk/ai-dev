@@ -15,7 +15,7 @@ find vendor/spryker/*/src/Spryker/Zed/*/Presentation/Components -name '*.compone
 cat vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Components/public-api.ts   # what is importable
 
 # 3. How elements are actually used today (the best usage documentation there is)
-grep -rhoE '<web-(spy|mp)-[a-z-]+' --include='*.twig' vendor/spryker src/Pyz | sort | uniq -c | sort -rn
+grep -rhoE '<web-(spy|mp)-[a-z-]+' --include='*.twig' vendor/spryker src | sort | uniq -c | sort -rn
 grep -rn 'spy-table\|TableModule' --include='*.ts' --include='*.html' vendor/spryker/*/src/Spryker/Zed/*/Presentation/Components
 ```
 

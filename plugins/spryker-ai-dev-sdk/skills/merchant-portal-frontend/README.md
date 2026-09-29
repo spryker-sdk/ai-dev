@@ -8,14 +8,16 @@ The Merchant Portal is Angular Elements inside Twig, not an SPA. A component rea
 `entry.ts` → `components.module.ts` (`WebComponentsModule.withComponents`) → leaf module, and it renders
 as `<web-mp-*>`. Break any link and the tag stays empty without an error. The builder also has project
 traps:
-- It scans only `src/Pyz/Zed`.
+- zed-ui 4.3.0 scans only `src/Pyz/Zed` for Angular code, even in a custom-namespace project. The
+  MP page (controller, Twig) can live in any project namespace.
 - A project `entry.ts` with a core module's name replaces the core entry, so core elements must be
   re-registered.
 - `@mp/*` aliases exist only for core modules.
 - The packaged ESLint config silently skips every project file.
 
-This skill carries all of that with project paths only. Core is read from `vendor/` and extended into
-`src/Pyz/Zed`, never edited.
+This skill carries all of that with project paths only. Core is read from `vendor/` and extended from the
+project — Angular code in `src/Pyz/Zed`, pages in `src/{ProjectNamespace}/Zed` (the project's custom
+namespace if one is defined in `KernelConstants::PROJECT_NAMESPACES`, otherwise `Pyz`) — never edited.
 
 ## When it triggers
 

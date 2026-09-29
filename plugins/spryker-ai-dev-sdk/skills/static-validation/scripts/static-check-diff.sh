@@ -848,7 +848,7 @@ if [ "$_fe_wanted" -eq 1 ]; then
         # analyse that file — it matched no `files:` block in the config. Silent empty
         # coverage reads as a pass, so say so loudly; it usually means the config's globs
         # are shaped for a different repo layout (e.g. the packaged builder configs'
-        # src/*/*/src/*/Yves/** globs vs a project's src/Pyz/Yves/**). This is also why
+        # monorepo globs src/{Pyz,SprykerShop,…}/*/src/…/Yves/** vs a project's src/<Namespace>/Yves/**). This is also why
         # eslint does not get --no-warn-ignored: that flag suppresses this very warning.
         if [ "$tool" = "eslint" ]; then
             n="$(printf '%s\n' "$out" | grep -c 'File ignored because no matching configuration')"

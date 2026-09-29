@@ -1,9 +1,9 @@
 ---
 name: merchant-portal-frontend
 description: >
-  Use when creating, extending, or replacing Spryker Merchant Portal (MP) Angular frontend code in a project
-  — components, modules, entry.ts registration, the Twig pages that render them, and their Jest specs —
-  under src/Pyz/Zed/*/Presentation/Components. Invoke whenever the user asks to "create a Merchant Portal
+  Use when creating, extending, or replacing Spryker Merchant Portal (MP) frontend code in a project —
+  Angular components and entry.ts registration (always src/Pyz/Zed/*/Presentation/Components), the Twig
+  pages that render them (any project namespace), and their Jest specs. Invoke for "create a Merchant Portal
   component", "extend an MP page", "add a web-mp component", "replace a core MP component", "use a
   @spryker/* table/drawer/select in the Merchant Portal", "pass data from Twig to Angular", "write an MP
   Jest spec", "mp:test is failing", "mp:build fails", or "my MP component does not render".
@@ -16,14 +16,16 @@ reaches the page only through a registration chain, and every break in that chai
 `<web-mp-*>` tag just stays empty. Always-on conventions (decorator metadata, inputs, RxJS, LESS, i18n,
 a11y) live in `.claude/rules/merchant-portal-angular.md`; this skill is the procedure.
 
+`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed
+first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
+
 | Where | Path | You may |
 |---|---|---|
-| Project | `src/Pyz/Zed/{Module}/Presentation/Components/` (always `Pyz`, even in a custom-namespace project) | create, extend, replace |
+| MP page (PHP + Twig) | `src/{ProjectNamespace}/Zed/{Module}/` — controller, factory, `Presentation/{Controller}/{action}.twig` rendering `<web-mp-*>` | create, override |
+| MP Angular code | `src/Pyz/Zed/{Module}/Presentation/Components/` — **always `Pyz`**: zed-ui 4.3.0 hardcodes it (`FrontendBuilder/settings.mts:79-80`), no override; see `references/component-wiring.md` | create, extend, replace |
 | App shell | `src/Pyz/Zed/ZedUi/Presentation/Components/` (`main.ts`, `app/app.module.ts`, `styles.less`) | root config, global theme overrides |
 | Core (read-only) | `vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Components/` | read, import via `@mp/{module}` |
 | UI library (read-only) | `node_modules/@spryker/*`, `node_modules/ng-zorro-antd` | read typings, import |
-
-Builder source, for when behaviour surprises you: `vendor/spryker/zed-ui/src/Spryker/Zed/ZedUi/FrontendBuilder/`.
 
 ## 1 · Find something to reuse first
 
@@ -66,7 +68,7 @@ src/Pyz/Zed/{Module}/Presentation/Components/
 Copy the shape of the nearest core component, e.g.
 `vendor/spryker/agent-dashboard-merchant-portal-gui/src/Spryker/Zed/AgentDashboardMerchantPortalGui/Presentation/Components/app/agent-bar/`.
 Import core code through `@mp/{module}` aliases (generated from each core module's `mp.public-api.ts`)
-and project code relatively; no alias exists for `src/Pyz` modules.
+and project code relatively; no alias exists for project modules.
 
 ## 4 · Register it
 
@@ -98,7 +100,8 @@ Page templates live in `Presentation/{Controller}/{action}.twig`, extend
   or the input stays a string. Serialise with `| json_encode`; wrap raw (`guiTableConfiguration`) JSON in
   single quotes. Translate with `| trans` in Twig and pass the result in.
 - `<h1 title>` lands in `<ng-content select="[title]">`.
-- To change a core page, create the same path under `src/Pyz/Zed/{Module}/Presentation/...` and
+- To change a core page, first check `src/*/Zed/{Module}/Presentation/...` for an existing override (the
+  first namespace in `PROJECT_NAMESPACES` wins), else create it under `src/{ProjectNamespace}/Zed/...` and
   `{% extends '@Spryker:{Module}/{Controller}/{action}.twig' %}`, overriding only the blocks you change.
   A plain `@{Module}/...` resolves to your own override and extends itself.
 - Example page: `vendor/spryker/product-merchant-portal-gui/src/Spryker/Zed/ProductMerchantPortalGui/Presentation/Products/index.twig`.
@@ -138,6 +141,7 @@ docker/sdk cli console twig:cache:warmer # when a new Twig override is not picke
 | Input never arrives, or arrives as a string | Attribute not kebab-case, wrong input name (read the `.d.ts`), or a JSON input without `transform: jsonAttribute` |
 | `Cannot find module '@mp/...'` | Alias missing: run `mp:update:config`; project modules have no alias, import relatively |
 | New component not picked up in watch mode | Restart `mp:build:watch` after adding an `entry.ts` |
+| Angular files never built, linted or tested | They are outside `src/Pyz/Zed/*/Presentation/Components/`; move them (the page may stay in `{ProjectNamespace}`) |
 
 ## Reference files
 

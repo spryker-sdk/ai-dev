@@ -1,7 +1,8 @@
 # Yves Component Internals
 
 Project-specific mechanics only. Verified against `vendor/spryker-shop/shop-ui` in a project; re-check
-the installed version when behaviour differs.
+the installed version when behaviour differs. `{ProjectNamespace}` is defined in `SKILL.md`; paths marked
+"e.g." are real files in b2b-demo-marketplace.
 
 ## TypeScript — the `Component` base class
 
@@ -24,7 +25,7 @@ the installed version when behaviour differs.
 ### Extending a core class
 
 ```typescript
-// src/Pyz/Yves/CatalogPage/Theme/default/components/molecules/window-location-applicator/window-location-applicator.ts
+// e.g. src/Pyz/Yves/CatalogPage/Theme/default/components/molecules/window-location-applicator/window-location-applicator.ts
 import WindowLocationApplicatorCore from 'CatalogPage/components/molecules/window-location-applicator/window-location-applicator';
 
 export default class WindowLocationApplicator extends WindowLocationApplicatorCore {
@@ -40,12 +41,13 @@ registers `./window-location-applicator` under the same tag.
 
 ## SCSS — tokens, helpers, overrides
 
-- The builder injects ShopUi `styles/shared.scss` (the project copy in
-  `src/Pyz/Yves/ShopUi/Theme/default/styles/` when present, which forwards core) into every component
+- The builder injects ShopUi `styles/shared.scss` (the copy in the `project` source — `./src/Pyz/Yves` by
+  default — under `ShopUi/Theme/default/styles/` when present, which forwards core) into every component
   file: `$setting-*`, `helper-*`, `map.get` and all core component mixins work without imports.
 - Look up tokens before using them — projects add and override many:
   - core: `vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/styles/{settings,helpers}/`
-  - project: `src/Pyz/Yves/ShopUi/Theme/default/styles/{settings,helpers}/`
+  - project: `ShopUi/Theme/default/styles/{settings,helpers}/` in the `project` source (`src/Pyz/Yves` by default).
+    ShopUi `app.ts`, `vendor.ts` and `styles/` are read from that one source only, not from extra `paths.sources`.
 - Core token families: `$setting-color-*` (main, alt, white, black, light/lighter/lightest,
   dark/darker/darkest, text, bg, shadow, overlay, `actions` map), maps `$setting-spacing`
   (`big|default|small|reset`), `$setting-font-size`, `$setting-font-weight`, `$setting-breakpoints`,
@@ -55,7 +57,7 @@ registers `./window-location-applicator` under the same tag.
   functions `helper-color-dark|light(...)`, and `helper-import(tier, name) { ... }` (skipped when the
   keyword is in `$setting-import-blacklist` — the way to switch off a core component's CSS).
 - Design tokens: if `frontend/assets/global/{theme}/design-tokens/design-tokens.json` exists, the builder
-  generates `src/Pyz/Yves/ShopUi/Theme/{theme}/styles/design-tokens.css` (gitignored). Edit the JSON,
+  generates `design-tokens.css` in the `project` source's `ShopUi/Theme/{theme}/styles/` (gitignored). Edit the JSON,
   never the CSS. Brand colours are Back Office Configuration settings (`theme:storefront:colors`),
   emitted at runtime as `:root` custom properties over the tokens — change the palette with the
   `brand-project` skill. So style with the custom properties the neighbouring project components use
@@ -71,7 +73,7 @@ not call itself). Many core mixins also expose an optional `{mixin}-base-hook` m
 Either way, import the file from a project `index.ts` that also re-registers the core TS class:
 
 ```scss
-// src/Pyz/Yves/ShopUi/Theme/default/components/molecules/toggler-checkbox/toggler-checkbox.scss
+// e.g. src/Pyz/Yves/ShopUi/Theme/default/components/molecules/toggler-checkbox/toggler-checkbox.scss
 @mixin shop-ui-toggler-checkbox($name: '.toggler-checkbox') {
     @include shop-ui-checkbox($name) {
         &__input:checked ~ &__label {
@@ -98,7 +100,7 @@ Either way, import the file from a project `index.ts` that also re-registers the
 ## Widgets
 
 ```php
-// src/Pyz/Yves/CustomerFullNameWidget/Widget/CustomerFullNameWidget.php
+// e.g. src/Pyz/Yves/CustomerFullNameWidget/Widget/CustomerFullNameWidget.php
 class CustomerFullNameWidget extends AbstractWidget   // Spryker\Yves\Kernel\Widget\AbstractWidget
 {
     public function __construct()
@@ -119,7 +121,8 @@ class CustomerFullNameWidget extends AbstractWidget   // Spryker\Yves\Kernel\Wid
 }
 ```
 
-- Register in `src/Pyz/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()`.
+- Register in `src/{ProjectNamespace}/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()`.
+  In a custom namespace, extend the existing project provider and `array_merge(parent::getGlobalWidgets(), [...])`.
   Unregistered widgets silently render nothing (or the `{% nowidget %}` branch).
 - The view extends `template('widget')` and reads `_widget.customerFullName` (⇔ `addParameter` key).
 - The tag always closes; `args` map positionally to the constructor; blocks of the widget view can be
@@ -134,6 +137,6 @@ class CustomerFullNameWidget extends AbstractWidget   // Spryker\Yves\Kernel\Wid
 {% endwidget %}
 ```
 
-- Change a core widget's markup by overriding its view at the same path in `src/Pyz/Yves` with
+- Change a core widget's markup by overriding its view at the same path in `src/{ProjectNamespace}/Yves` with
   `{% extends view('{view}', '@SprykerShop:{Module}') %}` — no PHP change. Change the PHP only when the
-  data changes: extend the core widget in Pyz and register the project class instead.
+  data changes: extend the core widget in `src/{ProjectNamespace}/Yves` and register the project class instead.

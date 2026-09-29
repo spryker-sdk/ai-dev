@@ -13,8 +13,9 @@ description: >
 The always-on conventions (Bootstrap 5 only, no new jQuery, `| raw` safety, `| trans`, ACL server-side,
 `data-qa`) live in `.claude/rules/zed-backoffice-frontend.md`. This skill is the procedure.
 
-Project code goes in `src/Pyz/Zed/{Module}/`; core (`vendor/spryker*/`) is read-only. Find the nearest
-existing screen first (grep the core `Presentation/` dirs) and copy its structure.
+Project code goes in `src/{ProjectNamespace}/Zed/{Module}/`; core (`vendor/spryker*/`) is read-only.
+`{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`. Twig, PHP, navigation and translations work in any project namespace; JS needs step 5's
+build registration. Copy the structure of the nearest existing screen.
 
 ## Decide: override or new page?
 
@@ -22,7 +23,7 @@ existing screen first (grep the core `Presentation/` dirs) and copy its structur
   (form/table expander plugin, configuration) over a template override when one exists.
 - **New page** → steps 1–7.
 
-## 1. Controller — `src/Pyz/Zed/{Module}/Communication/Controller/{Name}Controller.php`
+## 1. Controller — `src/{ProjectNamespace}/Zed/{Module}/Communication/Controller/{Name}Controller.php`
 
 URL is `/{module-kebab}/{controller-kebab}/{action-kebab}` (`FooGui` `IndexController::listAction()` →
 `/foo-gui/index/list`). Thin controller per `.claude/rules/controller.md`.
@@ -45,7 +46,7 @@ URL is `/{module-kebab}/{controller-kebab}/{action-kebab}` (`FooGui` `IndexContr
 - Tabbed pages: a class extending `Spryker\Zed\Gui\Communication\Tabs\AbstractTabs`, `->createView()` passed
   to Twig, rendered with `{{ tabs(fooTabs, {...context}) }}`.
 
-## 3a. New template — `src/Pyz/Zed/{Module}/Presentation/{Controller}/{action}.twig`
+## 3a. New template — `src/{ProjectNamespace}/Zed/{Module}/Presentation/{Controller}/{action}.twig`
 
 ```twig
 {% extends '@Gui/Layout/layout.twig' %}
@@ -72,8 +73,8 @@ Available blocks/helpers/partials: `references/twig-layout-and-helpers.md`; lega
 ## 3b. Override a core template
 
 Mirror the core path (`vendor/spryker/{module}/src/Spryker/Zed/{Module}/Presentation/Edit/index.twig` →
-`src/Pyz/Zed/{Module}/Presentation/Edit/index.twig`); first check every `src/*/Zed/{Module}/Presentation/`
-for an existing override — the first of `KernelConstants::PROJECT_NAMESPACES` wins, so extend that one.
+`src/{ProjectNamespace}/Zed/{Module}/Presentation/Edit/index.twig`). First check `src/*/Zed/{Module}/Presentation/`
+for an existing override in any project namespace — the first in `PROJECT_NAMESPACES` wins; change that one.
 Extend the core file **explicitly**, override only the blocks you change — never copy the template:
 
 ```twig
@@ -103,22 +104,23 @@ the project file first, so extending it from the override recurses on itself.
 </foo-gui>
 ```
 
-- Navigation is cached (`ZED_NAVIGATION_CACHE_ENABLED` defaults to `true`) — run `navigation:build-cache`.
 - ACL checks the same bundle/controller/action triple. The root role has `*/*/*`; any restricted role
-  needs a rule: installer rules in `src/Pyz/Zed/Acl/AclConfig.php::getInstallerRules()` (fresh installs;
-  see `addDiscountManagerInstallerRules()`), or Back Office → Users → Roles (rules are attached to a role) for an existing DB.
+  needs a rule: installer rules in the project `Zed/Acl/AclConfig.php::getInstallerRules()` (fresh installs; e.g.
+  `src/Pyz/Zed/Acl/` in b2b-demo-marketplace, see `addDiscountManagerInstallerRules()`), or Back Office → Users → Roles (rules are attached to a role) for an existing DB.
   Always-allowed / whitelisted bundles: `AclConstants::ACL_DEFAULT_RULES` / `ACL_USER_RULE_WHITELIST` in
   `config/Shared/config_default.php` — do not add business pages there.
 
 ## 5. Assets (only if the page needs JS/SCSS)
 
-Entry point `src/Pyz/Zed/{Module}/assets/Zed/js/{bundle-name}.entry.js`, built by `npm run zed`, included
-with `{{ assetsPath('js/{bundle-name}.js') }}` in `footer_js` (after `{{ parent() }}`). Same file name as a
-core entry **replaces** that core bundle. Details, table handle API and aliases: `references/assets-and-build.md`.
+Entry point `src/{ProjectNamespace}/Zed/{Module}/assets/Zed/js/{bundle-name}.entry.js`, built by `npm run zed`,
+included with `{{ assetsPath('js/{bundle-name}.js') }}` in `footer_js` (after `{{ parent() }}`). The build
+scans only `./src/Pyz/Zed/` by default — for another namespace append `path.resolve('./src/{ProjectNamespace}/Zed/')`
+to `entry.dirs` in `frontend/zed/build.js` (one-time setup: `configure-codebase` skill), then confirm
+`public/Backoffice/assets/js/{bundle-name}.js` exists after the build. Same file name as a core entry **replaces** it. Details, table handle API and aliases: `references/assets-and-build.md`.
 
 ## 6. Translations
 
-`src/Pyz/Zed/Translator/data/{Module}/en_US.csv` + `de_DE.csv` (one per Back Office locale), two columns
+`src/{ProjectNamespace}/Zed/Translator/data/{Module}/en_US.csv` + `de_DE.csv` (one per Back Office locale), two columns
 `"source","translation"`, no header, `en_US` repeats the source. Reuse core keys from
 `vendor/*/{module}/data/translation/Zed/*.csv` first. Rebuild: `translator:generate-cache`.
 
@@ -129,7 +131,7 @@ core entry **replaces** that core bundle. Details, table handle API and aliases:
 | New or moved Twig file (override not picked up) | `twig:cache:warmer` — the Zed template path cache is on by default |
 | New project PHP class overriding core (controller, factory, config) | `cache:class-resolver:build` |
 | New controller/action → 404 | `router:cache:warm-up:backoffice` (only if the Zed routing cache is enabled; off by default) |
-| `navigation.xml` | `navigation:build-cache` |
+| `navigation.xml` | `navigation:build-cache` (nav cache is on by default) |
 | Translation CSV | `translator:generate-cache` |
 | JS/SCSS | `docker/sdk cli npm run zed` (`zed:watch` while iterating) |
 
@@ -138,8 +140,7 @@ Verification — a green build is not proof:
 1. Log in to the Back Office and open the page (`spryker-runtime` skill); check the browser console for
    JS errors and the table's AJAX request (`/{module}/{controller}/table`) returning JSON.
 2. Exercise the happy path, a validation error, and a user role without the ACL rule (expect the `/acl/index/denied` "Access denied" page).
-3. `npm run formatter` is the only automated Zed JS/SCSS check; PHP via `static-validation`. E2E when the
-   page matters: `cypress-tests` skill, selecting on `data-qa`.
+3. `npm run formatter` is the only automated Zed JS/SCSS check; PHP via `static-validation`; E2E: `cypress-tests`.
 
 ## Checklist
 

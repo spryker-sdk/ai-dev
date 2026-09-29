@@ -5,17 +5,22 @@
 `npm run zed` runs `node ./frontend/zed/build` (`@spryker/oryx-for-zed`):
 
 - It scans these entry dirs in order: `vendor/spryker`, `vendor/spryker-eco`, `vendor/spryker-sdk`,
-  `vendor/spryker-feature`, and then **`src/Pyz/Zed`**, which `frontend/zed/build.js` adds.
+  `vendor/spryker-feature`, and then the project dirs listed in `entry.dirs` of `frontend/zed/build.js`
+  (default: only `./src/Pyz/Zed/`).
 - The pattern is `**/Zed/**/*.entry.js`, so a project entry needs a `Zed` directory below the module:
-  `src/Pyz/Zed/{Module}/assets/Zed/js/{bundle-name}.entry.js`.
+  `src/{ProjectNamespace}/Zed/{Module}/assets/Zed/js/{bundle-name}.entry.js` (`{ProjectNamespace}`: see `SKILL.md`).
 - The bundle name is the file name minus `.entry.js`. Output goes to
   `public/Backoffice/assets/js/{bundle-name}.js`, and to `css/{bundle-name}.css` when the entry imports
   SCSS.
 - **Same name wins last.** A project entry with the file name of a core entry (for example
   `spryker-zed-acl-role.entry.js`) replaces the core bundle. Every page that includes it gets your code,
   so re-import whatever the core entry did.
-- A custom namespace (for example `src/Demo/Zed`) is **not** scanned. Add it to `entry.dirs` in
-  `frontend/zed/build.js`.
+- Any namespace other than `Pyz` is **not** scanned until you append it (project-owned file; one-time
+  setup via the `configure-codebase` skill):
+  `entry: { dirs: [path.resolve('./src/Pyz/Zed/'), path.resolve('./src/{ProjectNamespace}/Zed/')] }`.
+  Verify: after `npm run zed`, `public/Backoffice/assets/js/{bundle-name}.js` exists.
+- Twig, PHP, navigation and translations need no such registration — they resolve across all
+  `KernelConstants::PROJECT_NAMESPACES`.
 
 Commands (on the host or with `docker/sdk cli`): `npm run zed`, `npm run zed:watch`, `npm run zed:production`.
 
@@ -88,7 +93,7 @@ gui 5.5) ship only `data-selectable`, `data-filterable`, `data-uploader` and hav
 
 ## Checks
 
-- `npm run formatter` / `formatter:fix` (Prettier) covers `src/Pyz/**/*.{js,scss}`. The project has **no**
+- `npm run formatter` / `formatter:fix` (Prettier) covers all project `*.js`/`*.scss` (glob `**/*`, minus `.prettierignore`). The project has **no**
   ESLint or Stylelint config for Zed assets and no JS unit tests.
 - A successful `npm run zed` proves only that the bundle compiled. Load the page, check the browser
   console, and confirm the table request returns JSON.

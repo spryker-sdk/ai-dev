@@ -229,6 +229,14 @@ project's frontend rules (`.claude/rules/yves-frontend.md`, `zed-backoffice-fron
   layout project changed Yves/Merchant Portal `.ts`/`.html` can come back this way — and
   `npm run yves:lint` / `mp:lint` then pass without linting them. Report those files as unlinted;
   fixing the globs is a project (`eslint.config.{yves,mp}.mjs`) or vendor change, not a code fix.
+- **Custom project namespace (`{ProjectNamespace}` = listed first in `KernelConstants::PROJECT_NAMESPACES`,
+  otherwise `Pyz`).** Routing is by path shape (`src/*/…`), so a file in any
+  project namespace lands on the same surface and config as its `Pyz` twin. One extra trap: with an
+  override config that does match it, a Yves `.ts` can fail `Parsing error: … was not found in any of
+  the provided project(s)` — `tsconfig.yves.json` `include` lacks `./src/{ProjectNamespace}/Yves/**/*`
+  (the same entry the build needs; one-time setup in the `configure-codebase` skill). That is a wiring
+  gap, not a violation. Merchant Portal Angular code outside `src/Pyz` is linted but never built — the
+  ZedUi builder only builds `src/Pyz/Zed` (`merchant-portal-frontend`).
 - **To autofix eslint, use this script's `--fix`** (it calls eslint directly). `npm run yves:lint -- --fix`
   and `npm run mp:lint -- --fix` are silently ignored — the wrappers build a fixed argv — and still
   exit 0. `yves:stylelint` / `mp:stylelint` do accept `-- --fix` and `-- -p <file>`.
