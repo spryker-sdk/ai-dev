@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 /**
- * csv.php — RFC-4180 CSV primitives for the project-starter plugin.
+ * csv.php — RFC-4180 CSV primitives for the spryker-import-tools skill.
  *
  * Zero dependencies. Two ways to use it:
  *   1. require it and call the csv_* functions (sibling PHP scripts).
  *   2. run it as a CLI for universal read/filter/delete/columns operations.
  *
  * Why this exists: Spryker import CSVs contain multi-line quoted fields
- * (e.g. cms_page.csv), so shell tools (cut/awk/sed) MUST NOT touch them.
+ * (e.g. cms_page.csv), so shell tools (cut/awk/sed) must not touch them.
  * PHP's fgetcsv with escape disabled ('') is RFC-4180 compliant and handles
- * multi-line quoted fields correctly. All access is by HEADER NAME, never by
- * column index (the index approach caused a real mis-read).
+ * multi-line quoted fields correctly. All access is by header name, never by
+ * column index (column positions differ between files of the same entity).
  */
 
 /**
@@ -410,13 +410,6 @@ function csv_scale_json_numbers(string $cell, array $keys, float $factor, bool $
 }
 
 /**
- * GENERAL MECHANIC — project a subset of columns (in the given order).
- *
- * @param array{header: list<string>, rows: list<array<string,string>>} $data
- * @param list<string> $columns
- * @return array{header: list<string>, rows: list<array<string,string>>}
- */
-/**
  * Cross-column arithmetic scale can't do: write a target column as source ×
  * factor (e.g. value_gross = value_net × 1.19). Creates the target column if
  * absent. A row whose source is empty or non-numeric is skipped. `--only-empty`
@@ -459,6 +452,60 @@ function csv_derive(array $data, string $target, string $source, float $factor, 
     return ['header' => $header, 'rows' => $data['rows'], 'changed' => $changed, 'skipped' => $skipped];
 }
 
+/**
+ * Append rows to an existing file.
+ *
+ * @param array{header: list<string>, rows: list<array<string,string>>} $data
+ * @param array{header: list<string>, rows: list<array<string,string>>} $incoming
+ * @return array{header: list<string>, rows: list<array<string,string>>, appended: int, skipped: int}
+ */
+function csv_append(array $data, array $incoming, ?string $dedupeOn): array
+{
+    $known = array_fill_keys($data['header'], true);
+    foreach ($incoming['header'] as $col) {
+        if (!isset($known[$col])) {
+            throw new RuntimeException("append: column '{$col}' does not exist in the target header (" . implode(',', $data['header']) . ') — the incoming header must be a subset');
+        }
+    }
+    if ($dedupeOn !== null && !isset($known[$dedupeOn])) {
+        throw new RuntimeException("append: --dedupe-on column '{$dedupeOn}' does not exist in the target header");
+    }
+    $seen = [];
+    if ($dedupeOn !== null) {
+        foreach ($data['rows'] as $row) {
+            $seen[(string) ($row[$dedupeOn] ?? '')] = true;
+        }
+    }
+    $rows = $data['rows'];
+    $appended = 0;
+    $skipped = 0;
+    foreach ($incoming['rows'] as $in) {
+        if ($dedupeOn !== null) {
+            $key = (string) ($in[$dedupeOn] ?? '');
+            if (isset($seen[$key])) {
+                $skipped++;
+                continue;
+            }
+            $seen[$key] = true;
+        }
+        $row = [];
+        foreach ($data['header'] as $col) {
+            $row[$col] = (string) ($in[$col] ?? '');
+        }
+        $rows[] = $row;
+        $appended++;
+    }
+
+    return ['header' => $data['header'], 'rows' => $rows, 'appended' => $appended, 'skipped' => $skipped];
+}
+
+/**
+ * GENERAL MECHANIC — project a subset of columns (in the given order).
+ *
+ * @param array{header: list<string>, rows: list<array<string,string>>} $data
+ * @param list<string> $columns
+ * @return array{header: list<string>, rows: list<array<string,string>>}
+ */
 function csv_select(array $data, array $columns): array
 {
     $rows = [];
@@ -824,8 +871,13 @@ function csv_cli(array $argv): int
     $opts = csv_parse_opts(array_slice($rest, $k));
     $where = $opts['where'] ?? [];
 
-    if ($command === '' || $files === []) {
+    if ($command === '') {
         return csv_usage();
+    }
+    if ($files === []) {
+        $hint = $rest === [] ? 'no input file given' : "no input file given — did you put a --flag before the file? ('{$rest[0]}' was read as a flag; list every file BEFORE the first --flag)";
+
+        return csv_report(2, [], ["{$command}: {$hint}"]);
     }
     if (isset($opts['_errors'])) { // e.g. a malformed --where — fail loudly, never silently narrow/broaden
         return csv_report(2, [], $opts['_errors']);
@@ -840,7 +892,7 @@ function csv_cli(array $argv): int
     }
     if ($command === 'read') {
         if (count($files) > 1) {
-            return csv_report(2, [], ['read takes ONE file (' . count($files) . ' given). Silent truncation is worse than an error — read files one at a time, or use `columns`/`count` for many-file inspection.']);
+            return csv_report(2, [], ['read takes one file (' . count($files) . ' given); it errors instead of silently using only the first — read files one at a time, or use `columns`/`count` for many-file inspection.']);
         }
         return csv_cli_read($files[0], $opts);
     }
@@ -903,6 +955,8 @@ function csv_usage(): int
         '  select <file> --columns a,b,c --out f',
         '  drop-columns <file>... (--column name [--column name2 ...] | --suffix .de_DE [--suffix ...]) (--out f | --in-place)   (removes named/suffix-matched columns; inverse of select)',
         '  rename-columns <file>... --rename old:new [--rename old2:new2 ...] (--out f | --in-place)   (renames header + row keys; missing/colliding pairs skipped, not fatal)',
+        '  append <file>... --from <rows.csv> [--dedupe-on <col>] (--out f | --in-place)   (adds rows from a CSV whose header ⊆ target; unknown column = error; the way to ADD rows — never a second source file or a script)',
+        '  add-row <file>... --set col=value [--set col2=value ...] (--out f | --in-place)   (adds one row; unset columns empty; unknown column = error)',
         '  apply-translations <file>... --target-column name.uk_UA [--source-column name.en_US] --map map.csv (--out f | --in-place)   (map has source,target cols; only target-column changes)',
         '  replace <file>... --column url.fr_CA --search /en/ --with /fr/ [--regex] [--where col=val] (--out f | --in-place)',
         '  scale <file>... --column value_gross (--by 1.08 | --rates PLN=4.3,UAH=45 [--currency-column currency]) [--no-round] [--json-keys a,b] [--where col=val] (--out f | --in-place)',
@@ -1020,7 +1074,7 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
             $mode = $opts['match'] ?? 'exact';
             // A row "matches" when it satisfies BOTH the --where conditions and the
             // set-membership (--in) conditions (AND). Set-membership expresses
-            // "col ∈ {…}" — e.g. keep only the 44 kept SKUs across every catalog file.
+            // "col ∈ {…}" — e.g. keep only the kept SKUs across every catalog file.
             $pred = static fn (array $r): bool => csv_row_matches($r, $where, $mode) && csv_row_in($r, $inSets);
             $matched = array_values(array_filter($data['rows'], $pred));
             $kept = $command === 'filter'
@@ -1033,8 +1087,8 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
             }
 
             // Preview (no --out/--in-place) is the destructive-op gate's evidence:
-            // the COUNTS are the verdict, so cap the echoed rows (a full glossary
-            // preview once printed 626 KB). --limit raises the cap when needed.
+            // the counts are the verdict, so cap the echoed rows (a full glossary
+            // preview runs to hundreds of KB). --limit raises the cap when needed.
             $previewLimit = max(0, (int) ($opts['limit'] ?? 20));
             $previewRows = $target === null ? array_slice($kept, 0, $previewLimit) : null;
 
@@ -1209,6 +1263,35 @@ function csv_apply(string $command, array $data, array $opts, array $where, ?str
 
             return ['exit' => 0, 'summary' => ['written' => [$target], 'changed' => $r['changed'], 'skipped' => $r['skipped']]];
 
+        case 'append':
+            $from = $opts['from'] ?? '';
+            if ($from === '' || is_array($from) || $target === null) {
+                return ['exit' => 2, 'summary' => ['error' => 'append: --from <rows.csv> and (--out|--in-place) are required ([--dedupe-on <col>] skips rows whose key already exists)']];
+            }
+            $r = csv_append($data, csv_read($from), isset($opts['dedupe-on']) && !is_array($opts['dedupe-on']) ? (string) $opts['dedupe-on'] : null);
+            csv_write($target, $r['header'], $r['rows']);
+
+            return ['exit' => 0, 'summary' => ['written' => [$target], 'appendedRows' => $r['appended'], 'skippedRows' => $r['skipped'], 'rowCount' => count($r['rows'])]];
+
+        case 'add-row':
+            $sets = $opts['set'] ?? [];
+            $sets = is_array($sets) ? $sets : [$sets];
+            if ($sets === [] || $target === null) {
+                return ['exit' => 2, 'summary' => ['error' => 'add-row: at least one --set col=value and (--out|--in-place) are required (unset columns stay empty; an unknown column is an error)']];
+            }
+            $row = [];
+            foreach ($sets as $pair) {
+                $eq = strpos((string) $pair, '=');
+                if ($eq === false) {
+                    return ['exit' => 2, 'summary' => ['error' => "add-row: malformed --set '{$pair}' (expected col=value)"]];
+                }
+                $row[substr((string) $pair, 0, $eq)] = substr((string) $pair, $eq + 1);
+            }
+            $r = csv_append($data, ['header' => array_keys($row), 'rows' => [$row]], null);
+            csv_write($target, $r['header'], $r['rows']);
+
+            return ['exit' => 0, 'summary' => ['written' => [$target], 'appendedRows' => 1, 'rowCount' => count($r['rows'])]];
+
         case 'apply-translations':
             $targetCol = $opts['target-column'] ?? '';
             $sourceCol = $opts['source-column'] ?? $targetCol;
@@ -1242,8 +1325,8 @@ function csv_parse_opts(array $args): array
         $arg = $args[$i];
         if (!str_starts_with($arg, '--')) {
             // A bare token here is a positional that landed AFTER the first flag — almost
-            // always a file listed after the flags (`set a.csv --column x b.csv`). Silently
-            // skipping it made a batch cover fewer files than it looked. Fail loudly.
+            // always a file listed after the flags (`set a.csv --column x b.csv`). Skipping it
+            // silently would make a batch cover fewer files than it appears to. Fail loudly.
             $opts['_errors'][] = "unexpected argument '{$arg}' — list all input files BEFORE the first --flag";
             continue;
         }

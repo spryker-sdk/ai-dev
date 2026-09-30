@@ -1,28 +1,29 @@
 <?php
 
 /**
- * Platform-alignment detector: is the machine you are resolving on the machine the project runs on?
+ * Platform-alignment detector: does the host composer resolves on match the platform the project
+ * runs on?
  *
- * A Spryker project declares `require.php: ">=8.3"` and runs `image.tag: spryker/php:8.3`. A
- * developer laptop on PHP 8.5 satisfies `">=8.3"`, so composer raises no objection — and then
- * resolves dependencies (usually dev tooling: doctrine/instantiator, symfony/*, phpunit) to versions
- * that require PHP 8.4+. The resulting `composer.lock` installs perfectly on that laptop and fails in
- * every container:
+ * For example, a Spryker project declares `require.php: ">=8.3"` and runs
+ * `image.tag: spryker/php:8.3`. A host on PHP 8.5 satisfies `">=8.3"`, so composer raises no
+ * objection and resolves dependencies (usually dev tooling: doctrine/instantiator, symfony/*,
+ * phpunit) to versions that require PHP 8.4+. The resulting `composer.lock` installs on that host and
+ * fails in every container:
  *
  *     Your lock file does not contain a compatible set of packages.
  *     doctrine/instantiator 2.1.0 requires php ^8.4 -> your php version (8.3.32) does not satisfy that
  *
- * On the validation run this was discovered only when `docker/sdk up` died at `composer install`,
- * many phases after the damage, and it also meant an entire characterization suite had been running
- * on the wrong PHP minor — so "the tests pass" had not meant what it appeared to mean.
+ * Without this check the damage surfaces only when `docker/sdk up` fails at `composer install`,
+ * several phases later, and any test suite run on the host in the meantime ran on the wrong PHP
+ * minor, so a passing host run does not cover the deployed runtime.
  *
  * The fix is two-part, because a host can be wrong in two independent ways:
- *   1. wrong PHP VERSION      -> `config.platform.php` in composer.json, set to the deployment PHP;
- *   2. wrong EXTENSION SET    -> resolve inside the container; a host without ext-redis cannot
+ *   1. wrong PHP version      -> `config.platform.php` in composer.json, set to the deployment PHP;
+ *   2. wrong extension set    -> resolve inside the container; a host without ext-redis cannot
  *                                resolve spryker/redis at all, and `--ignore-platform-req` only
  *                                re-creates problem 1 by pretending the requirement is met.
  *
- * Run this in Phase 0, BEFORE the first composer update. It is static: it reads composer.json,
+ * Run this in Phase 0, before the first composer update. It is static: it reads composer.json,
  * composer.lock and the deploy files, and compares against the running PHP. No container needed.
  *
  * Usage:
@@ -77,7 +78,7 @@ foreach (glob($root . '/deploy*.yml') ?: [] as $deployFile) {
 $distinctTags = array_values(array_unique($imageTags));
 
 /**
- * Target precedence matters. `config.platform.php` is what composer ACTUALLY resolves against, so it
+ * Target precedence matters. `config.platform.php` is what composer resolves against, so it
  * wins whenever it is declared — inferring `.0` from an `8.3` image tag instead produces false
  * positives against any package with a patch-level constraint (`~8.3.2`) and can recommend a *lower*
  * pin than the project already has. Only fall back to the image tag when nothing is declared.
@@ -91,7 +92,7 @@ if ($targetPhp === null && $declaredPlatform !== null) {
 }
 
 if ($targetPhp === null && count($distinctTags) === 1) {
-    // "8.3" from a tag is a LINE, not a version. Assume .0 — the conservative floor for that line.
+    // "8.3" from a tag is a release line, not a version. Assume .0 — the conservative floor for that line.
     $targetPhp = substr_count($distinctTags[0], '.') === 1 ? $distinctTags[0] . '.0' : $distinctTags[0];
     $targetSource = 'deploy image tag (assumed floor)';
 }
@@ -127,7 +128,7 @@ if ($imageTags === []) {
         . 'derived. Pass --target=<version> to check against the real one.';
 }
 
-// The host/deployment minor gap is the actual hazard — a patch difference is harmless.
+// The host/deployment minor gap is what breaks the lock; a patch difference is harmless.
 if ($targetPhp !== null) {
     $hostMinor = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
     $targetMinor = implode('.', array_slice(explode('.', $targetPhp), 0, 2));
@@ -135,9 +136,9 @@ if ($targetPhp !== null) {
     if ($hostMinor !== $targetMinor) {
         if ($declaredPlatform === null) {
             $problems[] = "host PHP is {$hostMinor} but the project deploys on {$targetMinor}, and "
-                . 'config.platform.php is ABSENT. Any composer update run here can produce a lock that '
+                . 'config.platform.php is absent. Any composer update run here can produce a lock that '
                 . 'does not install in the container. require.php (' . ($requirePhp ?? 'absent')
-                . ") does NOT prevent this — the host satisfies it.";
+                . ") does not prevent this — the host satisfies it.";
         } else {
             $notes[] = "host PHP ({$hostMinor}) differs from the deployment PHP ({$targetMinor}), but "
                 . "config.platform.php is set to {$declaredPlatform}, so composer resolves for the "
@@ -156,8 +157,8 @@ if ($declaredPlatform !== null && $targetPhp !== null) {
 }
 
 /**
- * The decisive check: does the CURRENT lock actually install on the target PHP? This is what
- * `docker/sdk up` will discover the hard way.
+ * The decisive check: does the current lock install on the target PHP? Without it, `docker/sdk up`
+ * discovers this at install time.
  */
 $lockPath = $root . '/composer.lock';
 $incompatible = [];
@@ -181,7 +182,7 @@ if (is_file($lockPath) && $targetPhp !== null) {
                             $incompatible[] = [$section, $package['name'], $package['version'], $constraint];
                         }
                     } catch (Throwable) {
-                        // an unparseable constraint is not our finding to make
+                        // an unparseable constraint is skipped, not reported
                     }
                 }
                 if (str_starts_with($dependency, 'ext-')) {
@@ -205,7 +206,7 @@ if ($incompatible !== []) {
     );
 }
 
-// Extensions the lock needs that this host lacks: proof the host cannot resolve here at all.
+// Extensions the lock needs that this host lacks: the host cannot resolve these packages at all.
 $missingExtensions = [];
 foreach (array_keys($extensionsRequired) as $extension) {
     $name = substr($extension, 4);
@@ -233,8 +234,8 @@ if ($problems !== []) {
 if ($missingExtensions !== []) {
     fwrite(STDOUT, sprintf(
         "  \033[33mNOTE\033[0m     this host is missing %d required extension(s): %s\n"
-        . "             Composer cannot resolve the packages needing them here at ALL. Run composer in\n"
-        . "             the container (`docker/sdk cli composer …`). Do NOT use --ignore-platform-req:\n"
+        . "             Composer cannot resolve the packages needing them here at all. Run composer in\n"
+        . "             the container (`docker/sdk cli composer …`). Do not use --ignore-platform-req:\n"
         . "             it fakes the requirement and re-creates the uninstallable lock.\n\n",
         count($missingExtensions),
         implode(', ', array_slice($missingExtensions, 0, 8)) . (count($missingExtensions) > 8 ? ', …' : ''),
@@ -248,7 +249,7 @@ foreach ($notes as $note) {
 if ($problems === []) {
     fwrite(STDOUT, "\n  Aligned: a composer update run here resolves for the deployment platform.\n");
     if ($missingExtensions !== []) {
-        fwrite(STDOUT, "  (Still prefer the container — the extension gap above is real.)\n");
+        fwrite(STDOUT, "  (Still prefer the container — the extension gap above still applies.)\n");
     }
     exit(0);
 }
@@ -260,8 +261,8 @@ fwrite(STDOUT, <<<TEXT
 
     "config": { "platform": { "php": "{$suggested}" } }
 
-  Prefer the LOWEST patch that satisfies the lock over the image's current patch — spryker/php:8.x is
-  a floating tag, so environments pull different patches. Then re-resolve INSIDE the container and
+  Prefer the lowest patch that satisfies the lock over the image's current patch — spryker/php:8.x is
+  a floating tag, so environments pull different patches. Then re-resolve inside the container and
   confirm with `docker/sdk cli composer check-platform-reqs` (must report 0 failures).
 
   Anything already resolved on a mismatched host must be re-resolved: the existing lock is suspect,

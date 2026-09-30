@@ -4,7 +4,7 @@ Build, extend, and override **Spryker Yves atomic-design components** — atoms,
 across all five files a component is made of: `index.ts`, `style.scss`, the mixin SCSS, the TypeScript
 class, and the Twig template.
 
-A Yves component is not a template; it's a small, strict convention. The Twig extends
+A Yves component follows a small, strict convention. The Twig extends
 `model('component')` and declares `config` / `data` / `attributes` / `modifiers`; the SCSS splits into a
 mixin file and a `style.scss` entry point; the TS extends `ShopUi/models/component` and is registered
 lazily from `index.ts`. Break one of those and the component silently doesn't render, doesn't get styled,

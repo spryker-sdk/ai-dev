@@ -21,58 +21,7 @@ You do **not** generate prompts. The `ai-dev:generate-prompts` command exists in
 
 ## Run logging — what, when, how, where
 
-Every run keeps a plain-text trail so a completed onboarding can be audited afterwards: what the mode
-decision was, which steps ran, what each one changed, and what was skipped because it was already in
-place. This does **not** change any step's behavior — it records what the steps already do.
-
-**Where.** One per-run folder, anchored to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`,
-with a `$(pwd)` fallback) so it is stable regardless of the current working directory:
-
-```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/ai-dev-setup/<run-id>/
-```
-
-`<run-id>` is the UTC start timestamp (`YYYYMMDD-HHMMSS`). Keep **all** run files inside `$SETUP_DIR` —
-never scatter them elsewhere.
-
-**When.** Create the folder and the log as the **first action after the mode decision is made** (that
-decision is the first thing worth recording), before Requirements / Preflight in onboarding flow or
-before Step 5 in update flow.
-
-```bash
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SETUP_DIR="$PROJECT_DIR/.ai-dev/ai-dev-setup/$(date -u '+%Y%m%d-%H%M%S')"
-mkdir -p "$SETUP_DIR"
-SETUP_LOG="$SETUP_DIR/run.log"
-printf '[%s] MODE — flow=%s (signalA=%s signalB=%s) | START\n' \
-  "$(date '+%Y-%m-%d %H:%M:%S')" "$FLOW" "$SIGNAL_A" "$SIGNAL_B" >> "$SETUP_LOG"
-```
-
-**What.** Append one line per step boundary, plus a line for every outcome that a later reader would
-need. Use `| START` and `| END <one-line outcome>`, and log skips as explicitly as actions — an
-idempotent skip is a result, not an absence:
-
-```bash
-printf '[%s] STEP 1 — install package | START\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$SETUP_LOG"
-printf '[%s] STEP 1 — install package | END already installed: spryker-sdk/ai-dev 0.5.0 (skipped)\n' \
-  "$(date '+%Y-%m-%d %H:%M:%S')" >> "$SETUP_LOG"
-```
-
-Log, at minimum: the mode decision and the two signals behind it; each Requirements / Preflight check
-and its result; each step's START/END with what changed or why it was skipped; the actual
-`ConsoleDependencyProvider` path edited; the MCP server name registered; each Step 5 artifact decision
-(`added` / `overwritten` / `merged` / `skipped` / `failed`) with the user's answer; and every hard stop
-(missing Composer, `docker/sdk` down, a failed copy) with the verbatim error.
-
-**How.** Two rules carry over from the rest of this skill:
-
-- **Bulk output goes to a file, not the log line.** When a command produces more than a couple of lines
-  (`composer require` output, `claude mcp list`, a failed copy's stderr), redirect it to
-  `$SETUP_DIR/<step>.log` and keep the `run.log` line to the one-line outcome plus that file's name.
-- **Never log a step green that wasn't.** A skipped, blocked, or partially-completed step is recorded
-  as exactly that. The log is evidence; an optimistic log is worse than no log.
-
-The Final report's last line is the absolute path to `$SETUP_DIR`.
+Every run keeps a plain-text trail — the mode decision, which steps ran, what each changed, and what was skipped because it was already in place — in one per-run folder, `$SETUP_DIR = ${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/ai-dev-setup/<UTC timestamp>/`, with `run.log` inside it. It records what the steps do and changes none of them. The folder layout, line format and per-step log files: **[references/run-logging.md](references/run-logging.md)** — read it before creating `$SETUP_DIR`.
 
 ---
 
@@ -86,7 +35,7 @@ When the user invokes this skill, scan the message they sent (the prompt that tr
 
 - Words like *"update"*, *"refresh"*, *"sync"*, *"pull latest"*, *"get newer"*, *"upgrade rules"*, *"refresh CLAUDE.md"* → user wants **update**.
 - Words like *"install"*, *"set up"*, *"onboard"*, *"add"*, *"configure"*, *"first time"*, *"new project"* → user wants **onboarding**.
-- Bare invocation with no context (just `/spryker-ai-dev-setup` and nothing else) → ambiguous, use Signal B.
+- Bare invocation with no context (just `/spryker-ai-dev-sdk:ai-dev-setup` and nothing else) → ambiguous, use Signal B.
 
 ### Signal B — read the project state
 
@@ -127,7 +76,8 @@ When in update flow, **skip Requirements / Preflight / Step 1 / Step 2 / Step 3 
 - If the user wants the *latest from `master`* rather than what Composer has installed, instruct them to run `composer update spryker-sdk/ai-dev` first; the bundled content under `vendor/spryker-sdk/ai-dev/data/` will then reflect the new version. The skill itself only copies what's on disk — it does not fetch from GitHub.
 - If `CLAUDE.md` does **not** exist when update flow runs, tell the user this looks like a first-time install and ask whether to switch to onboarding. Do not silently install.
 - If `.claude/rules/` does not exist or is empty when update flow runs, same handling.
-- The Final report in update flow only mentions which of the two artifacts were refreshed (or skipped) and the bundled version copied from (e.g. `from vendor/spryker-sdk/ai-dev 0.5.0`). Skip the "what was installed (package + version)" and "MCP server registered" lines — those steps did not run.
+- **Artifact 3 is refreshed in update flow too, when `.claude/hooks/spryker-ai-dev-sdk/` exists.** The hooks gain rules between releases, so an install that refreshes only `CLAUDE.md` keeps enforcing an older rule set. A hook file whose matcher (for example `guard-agent.php` on `Agent|Task`) is not copied by update flow, or is missing from the project's settings, never executes. Re-copy `hooks/*.php`, re-write `.claude/hooks/spryker-ai-dev-sdk/plugin-skills.txt`, and **diff the `hooks` block of `hooks/settings.example.json` against the project's `.claude/settings.json`** — report any matcher present in the example and missing in the project, and offer to add it.
+- The Final report in update flow only mentions which of the three artifacts were refreshed (or skipped) and the bundled version copied from (e.g. `from vendor/spryker-sdk/ai-dev 0.5.0`). Skip the "what was installed (package + version)" and "MCP server registered" lines — those steps did not run.
 
 After Step 5 completes in update flow, **stop**. Do not run anything else in this file.
 
@@ -182,7 +132,7 @@ Only proceed past this section once both Composer and `docker/sdk` checks pass (
 Run these checks before changing anything. If any fail, stop and tell the user what's missing.
 
 1. The current working directory must contain `composer.json` with a `spryker/*` dependency.
-2. At least one `ConsoleDependencyProvider` must exist under `src/`. Find candidates with `find src -maxdepth 6 -path "*/Zed/Console/ConsoleDependencyProvider.php" -not -path "*/vendor/*"`. Typical: just `src/Pyz/...`; some projects also have a higher-precedence override (e.g. `src/GrowerMarketplace/Zed/Console/ConsoleDependencyProvider.php`). Step 2 handles the override case explicitly. If none is found at all, the project layout is non-standard — ask the user where console commands are wired before continuing.
+2. At least one `ConsoleDependencyProvider` must exist under `src/`. Find candidates with `find src -maxdepth 6 -path "*/Zed/Console/ConsoleDependencyProvider.php" -not -path "*/vendor/*"`. Typical: just `src/Pyz/...`; some projects also have a higher-precedence override (e.g. `src/Acme/Zed/Console/ConsoleDependencyProvider.php`). Step 2 handles the override case explicitly. If none is found at all, the project layout is non-standard — ask the user where console commands are wired before continuing.
 
 (The Composer and `docker/sdk` checks live in the **Requirements** section above and must already have passed before reaching this point.)
 
@@ -210,7 +160,7 @@ Interpret the result. Note that `composer outdated` only prints a row when the p
 If installing or upgrading, run:
 
 ```bash
-composer require spryker-sdk/ai-dev --dev --ignore-platform-reqs
+composer require spryker-sdk/ai-dev --dev
 ```
 
 If the project uses `docker/sdk` for Composer (common in Spryker dev environments), prefer:
@@ -239,7 +189,7 @@ Region: EU | Code bucket: EU | Environment: docker.dev
 
 ## Step 2 — Wire console commands: McpServerConsole, AiToolSetupConsole only
 
-**Override detection (do this BEFORE the per-console pre-check).** Spryker projects frequently put a project-namespace `ConsoleDependencyProvider` above `Pyz` (e.g. `src/GrowerMarketplace/Zed/Console/ConsoleDependencyProvider.php` extending `Pyz\Zed\Console\ConsoleDependencyProvider`). The class that actually runs is the *leaf* — the one no other ConsoleDependencyProvider extends. Wiring into `Pyz` only works if every override in the chain calls `parent::getConsoleCommands($container)`. Find all candidates and identify the leaf:
+**Override detection (do this BEFORE the per-console pre-check).** Spryker projects frequently put a project-namespace `ConsoleDependencyProvider` above `Pyz` (e.g. `src/Acme/Zed/Console/ConsoleDependencyProvider.php` extending `Pyz\Zed\Console\ConsoleDependencyProvider`). The class that actually runs is the *leaf* — the one no other ConsoleDependencyProvider extends. Wiring into `Pyz` only works if every override in the chain calls `parent::getConsoleCommands($container)`. Find all candidates and identify the leaf:
 
 ```bash
 find src -maxdepth 6 -path "*/Zed/Console/ConsoleDependencyProvider.php" -not -path "*/vendor/*"
@@ -250,7 +200,7 @@ find src -maxdepth 6 -path "*/Zed/Console/ConsoleDependencyProvider.php" -not -p
   - **Every non-leaf in the chain calls `parent::getConsoleCommands($container)`** → safe to wire into `src/Pyz/Zed/Console/ConsoleDependencyProvider.php`. The leaf's `parent::` chain will surface the added consoles.
   - **Any non-leaf does NOT call `parent::getConsoleCommands`** → wiring into Pyz will be silently invisible. Either wire directly into the leaf, or tell the user the override needs a `parent::` call before continuing. Ask the user which approach they prefer.
 
-State explicitly in one line which file you decided to edit and why (e.g. *"Editing src/Pyz/...; project also has src/GrowerMarketplace/... which calls parent::getConsoleCommands, so the wiring flows through"*).
+State explicitly in one line which file you decided to edit and why (e.g. *"Editing src/Pyz/...; project also has src/Acme/... which calls parent::getConsoleCommands, so the wiring flows through"*).
 
 **Pre-check (do this second).** Read the file you decided to edit and inspect what is already wired. For each of the consoles below, determine independently:
 
@@ -307,11 +257,11 @@ Parse the output and look for an entry whose name matches `$(basename "$(pwd)")`
 - **Entry exists but shows as failed / unreachable / error** → **do not re-register yet.** Failing entries are almost always a downstream symptom of Step 1 (package not installed) or Step 2 (console not wired) not having run yet — both of which the onboarding flow has already addressed by the time you reach Step 3. The fix is usually that `claude mcp list` will report the same entry as `✓ Connected` the next time it's run, with no `mcp remove` / `mcp add` cycle needed. Note the failing entry but defer the decision: report `MCP server <name> exists but failing — will re-verify after Step 4`, skip the `claude mcp add` below, and let Step 4's `claude mcp list` re-check decide. If after Step 4 the entry is *still* failing, surface the error and ask the user about `claude mcp remove <name>` + re-registration. The root cause at that point is usually `docker/sdk` not being runnable or the wiring in Step 2 not having taken effect.
 - **No entry exists for this project** → proceed with the `claude mcp add` instructions below.
 
-Also check whether *any* entry in `claude mcp list` already points at this project's `docker/sdk console ai-dev:mcp-server` under a different name (e.g. a stale `spryker-project` from an older onboarder run). If found, flag it to the user — a stale duplicate may shadow the new entry — and ask whether to remove it.
+Also check whether *any* entry in `claude mcp list` already points at this project's `docker/sdk console ai-dev:mcp-server` under a different name (e.g. a stale entry named `spryker-project`). If found, flag it to the user — a stale duplicate may shadow the new entry — and ask whether to remove it.
 
 **The MCP server name MUST be unique per project** so that developers with multiple Spryker checkouts on the same machine do not collide on a single shared entry in `~/.claude.json`. Use the project's root folder name (the `basename` of the current working directory) as the MCP server name. Do not hardcode a generic name like `spryker-project`.
 
-Run from the project root, substituting `<project-name>` with the basename of the project root directory (e.g. for `/Users/alice/work/b2b-demo-marketplace`, use `b2b-demo-marketplace`):
+Run from the project root, substituting `<project-name>` with the basename of the project root directory (e.g. for `<path>/b2b-demo-marketplace`, use `b2b-demo-marketplace`):
 
 ```bash
 claude mcp add <project-name> -- "$(pwd)/docker/sdk" console ai-dev:mcp-server -q
@@ -362,18 +312,18 @@ A listed-but-failing entry is not a pass — surface the error and stop until th
 
 ## Step 5 — Install artifacts one by one (with user consent per artifact)
 
-The onboarder installs two project-level artifacts: `CLAUDE.md` at the project root, and bundled rules under `.claude/rules/`.
+The onboarder installs three project-level artifacts: `CLAUDE.md` at the project root, bundled rules under `.claude/rules/`, and the permission rules from the SDK's `hooks/settings.example.json` plus — for a project that does not use the Claude Code plugin — its enforcement hooks (Artifact 3).
 
 **Auto mode does NOT bypass Step 5 prompts.** Each artifact decision is a separate consent. Overwriting an existing custom `CLAUDE.md` or replacing files in `.claude/rules/` is a destructive action; ask even when the harness is otherwise configured for autonomous execution. (Adding a missing `CLAUDE.md` or populating an empty `.claude/rules/` is not destructive — those can proceed on a clear yes/no.)
 
 ### How the bundled content is delivered
 
-Source-of-truth content for both artifacts lives in the package install at `vendor/spryker-sdk/ai-dev/data/`:
+Source-of-truth content for artifacts 1 and 2 lives in the package install at `vendor/spryker-sdk/ai-dev/data/`:
 
 - `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md` — bundled agents/CLAUDE file
 - `vendor/spryker-sdk/ai-dev/data/rules/*.md` — bundled rule files
 
-The package also ships an interactive console command — `docker/sdk cli console ai-dev:setup` — that walks through copying these into the project. **Prefer `ai-dev:setup` when it exists** so the package owns the placement logic. Some package versions do not yet ship a setup command, or ship one that prompts in a way that doesn't fit the agent's per-artifact consent flow. In that case, fall back to a direct `cp` from `vendor/spryker-sdk/ai-dev/data/`.
+The package also ships an interactive console command — `docker/sdk cli console ai-dev:setup` — that walks through copying these into the project. **Prefer `ai-dev:setup` when it exists** so the package owns the placement logic. Some package versions do not ship a setup command, or ship one that prompts in a way that doesn't fit the agent's per-artifact consent flow. In that case, fall back to a direct `cp` from `vendor/spryker-sdk/ai-dev/data/`.
 
 ### Resolve the bundled-content source
 
@@ -461,13 +411,30 @@ done
 echo "rules: $(ls .claude/rules/ | wc -l | tr -d ' ') files total"
 ```
 
-### Rules for running this step as a whole
+### Artifact 3 — Enforcement hooks + permission rules (permissions only on a plugin install)
 
-- Ask in the order above (agents file → rules). Do not batch the two questions into one combined prompt — each artifact is a separate decision.
+**On a plugin install, skip copying the hooks but still offer the `permissions` block.** When the `spryker-ai-dev-sdk` Claude Code plugin is installed (`claude plugin list` names it, or `~/.claude/plugins/cache/*/spryker-ai-dev-sdk` exists), the plugin ships `hooks/hooks.json` and the hooks are active without any project file; offer to merge only the `permissions` block of `hooks/settings.example.json` into `.claude/settings.json` (it has no `ask` rules, so the hooks decide, and it denies `sudo`/`docker volume rm`/`docker system prune`/`git push`). On a setup install, offer the whole artifact, and explain what it does in one line each. The rebuild gate, the rebuild counter and the step-`done` check act only during a wizard run — while a `.ai-dev/project-setup.md` or `.ai-dev/demo-prep.md` exists; outside a run, run `validate.php gate` yourself before a rebuild or import.
+
+- **`PreToolUse` on Bash** — during a wizard run, before `docker/sdk reset|clean-data|up|console data:import`, runs the static data gate (`validate.php gate`); a known-broken data set is denied, and with no gate baseline a rebuild (`reset|clean-data|up`) is denied on any finding while `data:import` passes; trusted rebuilds (a demo clone, first setup, or the developer's recorded `standing_approval: { scope: rebuilds }`) run without a prompt, a project with real data gets one question, and from the third rebuild the hook denies until the decision log has `rebuild #N: <why rung 1 cannot show it>`; `data:import` stays unprompted. A blanket `Bash(docker/sdk:*)` allowlist lets an agent consume hours of rebuild time unprompted.
+- **`PreToolUse` on Edit/Write** — during a wizard run, a step cannot be marked `done` while the gate fails; at all times, installed skill copies under `.claude/skills/` are read-only (the feedback channel is `.ai-dev/skill-improvement-log.md`).
+- **`PostToolUse` on Bash** — during a wizard run, counts rebuilds into `.ai-dev/rebuild-count`.
+- **`permissions`** — `deny` for `sudo`/`docker volume rm`/`docker system prune`/`git push`. `rm`, `python3`/`python`, `magick` and the browser JavaScript tools are allowed, with no `ask` rules: `guard-bash.php` denies a deletion git cannot restore (unless it is ignored build output or a file this session created under `data/import`, `config`, `src`, `frontend`, `public` or `tests` (never under `.ai-dev/`)), `guard-browser.php` allows JavaScript on local pages and makes no decision on other pages (the settings `allow` applies), and the built-in browser is denied for local hosts (use Claude in Chrome). The rebuild verbs (`docker/sdk reset|clean-data|up`) sit under `allow` because `gate-docker-sdk.php` decides them (above), so a permission prompt on top would only double it.
+
+**Write `plugin-skills.txt` as part of the copy.** `hook_plugin_skills()` reads
+`.claude/hooks/spryker-ai-dev-sdk/plugin-skills.txt` to know which `.claude/skills/<name>/` folders
+are installed copies of plugin skills and therefore read-only. Nothing else in the repository writes
+that file, so without this step it returns an empty list and the read-only-skill-copy rule matches
+nothing — a rule that cannot fire on a setup install. Write one skill name per line:
+list the skill directory names (`ls -1 <sdk>/plugins/spryker-ai-dev-sdk/skills`) and Write them, one per line, to `.claude/hooks/spryker-ai-dev-sdk/plugin-skills.txt`. Use the Write tool, not a `>` redirect — `guard-bash.php` denies shell writes into the project.
+
+Install = copy the SDK's `hooks/*.php` to `.claude/hooks/spryker-ai-dev-sdk/` (source: the plugin checkout, or `vendor/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/hooks/` when vendored) and **merge** the `hooks` and `permissions` blocks of `hooks/settings.example.json` into `.claude/settings.json` — never overwrite an existing settings file (show the diff, append the blocks with the Edit tool). Requires host `php` (the hooks exit silently without it). Verify with `php .claude/hooks/spryker-ai-dev-sdk/hooks.test.php` when the test file was copied too.
+### Rules for running this step as a whole
+- Ask in the order above (agents file → rules → hooks). Do not batch the questions into one combined prompt — each artifact is a separate decision.
+
 - Only act on the artifacts the user approved.
 - Each operation must complete cleanly before moving to the next.
 - If a copy fails (permission denied, source missing), surface the actual error verbatim and stop — do not retry, do not auto-recover, do not proceed to the next artifact silently.
-- If the user said no to both, skip the rest of Step 5 and report that in the Final report.
+- If the user said no to all three, skip the rest of Step 5 and report that in the Final report.
 
 
 ## Final report
@@ -477,14 +444,14 @@ In **3–5 lines** tell the user:
 - What was installed (package + version).
 - Which file was edited and how many consoles were added (state the *actual* file edited — Pyz or the project-namespace override).
 - That the MCP server is registered under the project root folder name (state the actual name used).
-- The outcome of Step 5 — list each of the two artifacts (`CLAUDE.md`, rules) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`.
+- The outcome of Step 5 — list each of the three artifacts (`CLAUDE.md`, rules, hooks) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`.
 - ALWAYS highlight that the user must **restart Claude Code /exit** (or open a new session in this project directory) for the Spryker MCP tools to become available in-session — the running session will not pick them up automatically.
 - Name what **this run** changed, and say it needs nothing from the user: tracked `composer.json`, `composer.lock`, the `ConsoleDependencyProvider.php` actually edited; untracked `CLAUDE.md`, `.claude/rules/`, `.ai-dev/`. **These are expected install artifacts and every skill tolerates them uncommitted — `project-starter-wizard` included, which recognises this exact shape and proceeds.** Committing them is optional housekeeping, not a step: mention it only in passing, and only alongside `.ai-dev/` in `.gitignore` (it is per-run log state). Never imply anything is blocked until they commit.
 - Recommend where to go next, so the entry points are known — name them, never start them. Do **not** invoke, launch, or auto-continue into any of these skills; the user chooses if and when to run one.
   - New project from a demoshop clone → `/spryker-ai-dev-sdk:project-starter-wizard` is the recommended next skill.
   - Feature work on an existing project → `/spryker-ai-dev-sdk:spryker-customization` (from a PRD or acceptance criteria), or `/spryker-ai-dev-sdk:product-requirement-document` first when there is no spec yet.
   - Mention that the Spryker MCP tools only exist after the **session restart** above.
-- Suggest setup improvents:
+- Suggest setup improvements:
   - Setup plugin with Language Server php-lsp@claude-plugins-official https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md
   - Setup MCP server for Context7 to work with Spryker documentation https://docs.spryker.com/docs/dg/dev/ai/ai-assistants/context7-mcp-server
 - As the **last line**, the absolute path to the run log (`$SETUP_DIR/run.log`), so the user can audit

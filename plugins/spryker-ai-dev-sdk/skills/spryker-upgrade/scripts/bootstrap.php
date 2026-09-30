@@ -60,7 +60,7 @@ function spryker_upgrade_project_root(): string
 /**
  * Where baselines and reports live. Inside the project (they describe the project and must survive
  * across phases), and self-gitignoring so no snapshot, vendor baseline or merge artifact can ever
- * be picked up by a stray `git add -A`.
+ * be staged by `git add -A`.
  */
 function spryker_upgrade_state_dir(string $projectRoot): string
 {
@@ -86,4 +86,74 @@ function spryker_upgrade_state_dir(string $projectRoot): string
 function spryker_upgrade_rel(string $path, string $projectRoot): string
 {
     return str_replace($projectRoot . '/', '', $path);
+}
+
+/**
+ * Run git in the project root without a shell.
+ *
+ * @param list<string> $args
+ *
+ * @return array{0: int, 1: string, 2: string} exit code, stdout, stderr
+ */
+function spryker_upgrade_git(string $projectRoot, array $args): array
+{
+    $process = proc_open(
+        array_merge(['git', '-C', $projectRoot, '-c', 'core.quotePath=false'], $args),
+        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes
+    );
+    if (!is_resource($process)) {
+        return [127, '', 'could not start git'];
+    }
+    $stdout = (string)stream_get_contents($pipes[1]);
+    $stderr = (string)stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return [proc_close($process), $stdout, $stderr];
+}
+
+/**
+ * The file holding the commit the upgrade started from (written once in Phase 0).
+ */
+function spryker_upgrade_base_ref_file(string $stateDir): string
+{
+    return $stateDir . '/base-ref';
+}
+
+/**
+ * The recorded base commit, or null when Phase 0 has not recorded one.
+ */
+function spryker_upgrade_read_base_ref(string $stateDir): ?string
+{
+    $file = spryker_upgrade_base_ref_file($stateDir);
+    if (!is_file($file)) {
+        return null;
+    }
+    $ref = trim((string)file_get_contents($file));
+
+    return $ref === '' ? null : $ref;
+}
+
+/**
+ * Write `git rev-parse HEAD` to the base-ref file. An existing base ref is kept unless $force,
+ * so re-running Phase 0 cannot move the base past the upgrade's own commits.
+ *
+ * @return array{ref: string, written: bool}
+ */
+function spryker_upgrade_record_base_ref(string $projectRoot, string $stateDir, bool $force = false): array
+{
+    $existing = spryker_upgrade_read_base_ref($stateDir);
+    if ($existing !== null && !$force) {
+        return ['ref' => $existing, 'written' => false];
+    }
+    [$code, $stdout, $stderr] = spryker_upgrade_git($projectRoot, ['rev-parse', 'HEAD']);
+    if ($code !== 0) {
+        fwrite(STDERR, "git rev-parse HEAD failed: " . trim($stderr) . "\n");
+        exit(2);
+    }
+    $ref = trim($stdout);
+    file_put_contents(spryker_upgrade_base_ref_file($stateDir), $ref . "\n");
+
+    return ['ref' => $ref, 'written' => true];
 }
