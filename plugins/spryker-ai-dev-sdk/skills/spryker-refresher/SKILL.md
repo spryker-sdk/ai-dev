@@ -9,14 +9,16 @@ description: >
   these changes take effect", "post-change orchestration". Owns the
   file-pattern to Spryker console command mapping drawn from the project's
   install recipes. Runs the commands in dependency order and reports
-  results. Never edits source code.
+  results. Never edits source code. Boundary: a change to data/import/**
+  rows takes effect through project-data's reset ladder (boot-and-verify
+  §3b), not here — this skill only re-runs an importer for added rows.
 ---
 
 # Spryker Refresher
 
 When invoked, this skill walks through the post-change command chain for a list of touched files. The main session executes the commands directly — no sub-agent spawn.
 
-This skill doesn't edit code. It doesn't decide whether changes are *correct*. It makes them *active*: codegen runs, caches clear, frontends rebuild, autoloaders refresh, the right warmups run. That's it.
+This skill doesn't edit code. It doesn't decide whether changes are *correct*. It makes them *active*: codegen runs, caches clear, frontends rebuild, autoloaders refresh, the right warmups run.
 
 **Examples of jobs this skill handles:**
 
@@ -53,7 +55,8 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | A **new module directory** appears under a project namespace (`src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<NewModule>/`) | `dev:ide-auto-completion:generate` → `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`). The first regenerates the locator stub so `$this->getLocator()-><newModule>()` exists — without it the app runs fine but **phpstan fails with `Call to an undefined method …LocatorLocatorInterface::<newModule>()`**, surfacing two steps later as a phantom code defect (the project's own install recipe runs it — see `config/install/development.yml`). The second is its unconditional companion: phpstan's result cache keeps reporting the stale locator error after the stub is fixed. |
 | `*DependencyProvider.php` changed (plugin chain edit, body or new file) | `cache:empty-all` |
 | `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
-| Yves Twig / JS / SCSS changed | `frontend:yves:build` → `twig:cache:warmer` |
+| Yves **Twig** changed | Edited template: `docker/sdk cli "rm -rf src/Generated/Yves/Twig/codeBucket"` (the compiled templates and their `.pathCache`), then reload. **New** override template (a file that did not exist): also `twig:cache:warmer`, which rebuilds the template path map — until then the old path is served. **Never delete `data/cache/Yves/<env>`** — that is the Symfony DI container, not the Twig cache; removing it mid-request gives transient 500s ("Failed opening required …/Container…"); the one case for clearing it is a stale container after generated-code changes (`../boot-and-verify/references/verify-gates.md`, "Class not found" triage). `cache:empty-all` also empties the `codeBucket` directories. |
+| Yves **JS / SCSS** changed | `docker/sdk cli "ls -d /data/node_modules"` decides: **present** → `frontend:yves:build` (seconds; expect `webpack compiled successfully`); **absent** → `docker/sdk up --assets` (minutes; re-runs the whole `build-static*` section). Clones typically ship `/data/node_modules` in the `cli` container — run the `ls`, don't assume. |
 | Zed Twig / JS / SCSS changed | `frontend:zed:build` → `twig:cache:warmer` |
 | Merchant Portal Twig / JS / SCSS changed | `frontend:mp:build` → `twig:cache:warmer` |
 | `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
@@ -63,9 +66,11 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` (Yves storefront translations only — does NOT cover Zed BO labels) |
 | Zed translator CSV changed (`src/<Namespace>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` (Zed BO labels — separate pipeline from glossary; verify the command via `docker/sdk console list`) |
 | Search schema / index-map file changed (project-layer JSON under `src/<Namespace>/Shared/Search/Schema/*.json`) | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` |
-| Data import CSV changed (entity-specific) | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`) |
+| Data import CSV changed (entity-specific) — **rows ADDED only** | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`). **Not for a changed VALUE on `product-price`, `product-price-schedule`, `discount-amount` or `cms-block`, and not for a removed row:** those importers look rows up by value, so a re-import duplicates the row or fails on a unique key, and no importer deletes. They follow `project-data`'s reset ladder (`boot-and-verify` §3b) — out of scope here, since this skill runs no `reset`; report the file and hand it over. |
 | Publisher plugin / queue config changed | Queue workers need a manual restart — project-specific. Document in the report; don't auto-run. |
+| A data import or `publish:trigger-events` ran and the KV/search read model must catch up, in a **DMS (dynamic multi-store)** project | `docker/sdk cli "APPLICATION_STORE=<STORE> vendor/bin/console queue:worker:start --stop-when-empty"` — **once per store** (same `APPLICATION_STORE=<STORE>` prefix on `queue:task:start` and `publish:trigger-events`). In DMS these commands resolve the store from `APPLICATION_STORE`; the bare `docker/sdk console queue:worker:start --stop-when-empty` prints the env banner, exits 0 and processes **nothing**. Assert the drain, don't infer it: discover the broker container via `docker ps --format '{{.Names}}'` (filter for `broker`; it is `<namespace>_broker_1` — never hardcode `spryker_broker_1`) and confirm `docker exec <broker> rabbitmqctl list_queues -p /<project vhost> name messages` fell to 0. **Signature:** worker exits immediately with only the env banner while the queues stay full → missing `APPLICATION_STORE`, not a broken publisher. |
 | BO showing stale template after a clean refresh (rare) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
+| **Stale Yves Twig cache** — a template fix "does nothing": the `.twig` is correct on disk AND in the container (`docker/sdk cli "cat /data/<path>"` shows the new markup), yet the rendered page is the old one | `docker/sdk cli "rm -rf src/Generated/Yves/Twig/codeBucket"` (+ `twig:cache:warmer` for a new override file). Clear it BEFORE concluding "the change had no effect" and writing a second fix — `up --assets` does not clear it. Never `data/cache/Yves/<env>` (the DI container). |
 
 If a command not in the table seems needed, verify it exists in `docker/sdk console list` first.
 
@@ -77,13 +82,13 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 
 3. **Order the resulting commands** (this matches the pattern in `config/install/development.yml` and similar recipes — clear-then-codegen-then-build-then-resolve-then-import-then-frontend):
 
-   1. **Cache removes** — `cache:empty-all`, `navigation:cache:remove`, `rest-api:remove-validation-cache`, `search:source-map:remove`. Clear old cached state before new state is written.
+   1. **Cache removes** — `cache:empty-all`, `navigation:cache:remove`, `rest-api:remove-validation-cache`, `search:source-map:remove`, `docker/sdk cli "rm -rf src/Generated/Yves/Twig/codeBucket"` (Twig — never `data/cache/Yves/<env>`, which is the DI container). Clear old cached state before new state is written.
    2. **Codegen** — `transfer:generate`, `propel:install`.
    3. **Autoload** — `composer dumpautoload --apcu`.
    4. **IDE/locator stubs** — `dev:ide-auto-completion:generate`. After autoload (the stub generator reads the class map), before the class-resolver build.
    5. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`.
    6. **Class resolver build** — `cache:class-resolver:build`. Runs after the class layout AND caches are in their final state.
-   7. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely.
+   7. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely. In a DMS project, follow an entity import with the **per-store** drain from the table (`APPLICATION_STORE=<STORE> … queue:worker:start --stop-when-empty`) and the broker depth check — the bare worker is a silent no-op there.
    8. **Frontend builds** — `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
    9. **Stale-analysis cache clear** — `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`), whenever step 4 ran. Last, so no later step repopulates a stale entry.
 
@@ -101,7 +106,7 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 - Destructive commands (anything from `destructive*.yml`, anything that drops/truncates/wipes data or storage, `docker/sdk reset`) are out of scope.
 - Run only the commands needed for the actual file list — never the full install chain.
 - Use relative paths from the project root for any Bash invocation.
-- If the caller hasn't specified a store / region for a multi-region command, ask.
+- If the caller hasn't specified a store / region for a multi-region command, ask. In DMS, queue and publish commands take the store as `APPLICATION_STORE=<STORE>` (via `docker/sdk cli "APPLICATION_STORE=<STORE> vendor/bin/console …"`) and run once per store — a store-less run is a silent no-op (banner, exit 0, nothing processed), not a default.
 
 ## Output Format
 
@@ -148,4 +153,4 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 - Do not run commands across multiple stores / regions without the caller specifying which one.
 - Do not skip the install-recipe read. The mapping in this prompt is a starting point; the recipes are the source of truth for this project's command ordering and flags.
 - Do not prepend `cd /absolute/path && ...` to any `Bash` command. The harness already runs every `Bash` invocation in the project root — `cd` shifts the command to a different allowlist pattern and causes permission prompts.
-- **Do not omit `cache:class-resolver:build` after any `.php` change under a project namespace directory in `src/`.** This is the most common refresh defect: the override file lands in the project layer, but Spryker keeps resolving to the vendor class because the resolver map wasn't rebuilt. Self-correction signal: if your file list contains any `src/<Namespace>/**/*.php` (new or edited) and your command plan doesn't include `docker/sdk console cache:class-resolver:build`, stop and add it before reporting.
+- **Do not omit `cache:class-resolver:build` after any `.php` change under a project namespace directory in `src/`.** Without it, the override file lands in the project layer, but Spryker keeps resolving to the vendor class because the resolver map wasn't rebuilt. Self-correction signal: if your file list contains any `src/<Namespace>/**/*.php` (new or edited) and your command plan doesn't include `docker/sdk console cache:class-resolver:build`, stop and add it before reporting.

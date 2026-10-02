@@ -3,32 +3,27 @@
 /**
  * Legacy-CSS-class detector for frontend framework majors (Bootstrap 3 -> 5, and the like).
  *
- * When a release bumps the CSS framework, the tempting move is to take the framework's changelog,
- * grep the project for every removed class, and rewrite them. That is wrong twice over, and this
- * detector exists because both mistakes were made on a real upgrade:
+ * When a release bumps the CSS framework, rewriting every class the framework's changelog lists as
+ * removed is unsafe, for two reasons:
  *
- *   1. Most "removed" classes are NOT removed from the product. Spryker's Back Office emits
+ *   1. Most "removed" classes are still used by the product. Spryker's Back Office emits
  *      `form-group`, `has-error`, `control-label`, `btn-default`, `label label-*` and `hidden` from
- *      its OWN templates at releases that ship Bootstrap 5 — in some cases from the form theme, so
- *      every single form row gets them. The compiled `spryker-zed-gui-commons.css` styles them
- *      deliberately. Rewriting the project's copies is pure churn.
+ *      its own templates at releases that ship Bootstrap 5 — in some cases from the form theme, so
+ *      every form row gets them. The compiled `spryker-zed-gui-commons.css` styles them
+ *      deliberately, so the project's copies need no rewrite.
  *
- *   2. Some of them are load-bearing for VENDOR JAVASCRIPT. `gui`'s `tabs.js` selects
+ *   2. Some of them are required by vendor JavaScript. `gui`'s `tabs.js` selects
  *      `.has-error, .alert-danger` to mark a tab invalid, and `init.js` / `tabs.js` call
  *      `toggleClass('hidden')`. Rewriting `has-error` -> `is-invalid` or `hidden` -> `d-none` in
- *      project markup detaches it from that JS and causes exactly the breakage the migration was
- *      supposed to prevent.
+ *      project markup detaches it from that JS and breaks the behaviour.
  *
- * So the question this asks is never "did the framework remove this class". It is:
- *
- *     does the vendor tree, AT THE TARGET RELEASE, still emit or select this class itself?
- *
- * That is answerable from source with no browser, no compiled CSS and no built assets — which also
- * means it must not be deferred to "verify visually".
+ * The script therefore checks whether the vendor tree, at the target release, still emits or selects
+ * each class itself. That is answerable from source with no browser, no compiled CSS and no built
+ * assets, so it runs before any visual verification.
  *
  * Verdicts:
  *   KEEP           vendor still emits the class in its own templates -> core styles it; leave alone.
- *   KEEP (JS)      vendor JavaScript selects/toggles the class -> rewriting it BREAKS behaviour.
+ *   KEEP (JS)      vendor JavaScript selects/toggles the class -> rewriting it breaks behaviour.
  *   PAIR           vendor emits the legacy class AND its modern equivalent on the same element
  *                  (e.g. `pull-left float-start`) -> mirror the pair, do not replace.
  *   MIGRATE        absent from vendor templates and vendor JS -> a genuine leftover, safe to convert.
@@ -202,7 +197,7 @@ foreach ($classes as $class => $modern) {
 
     [$projectCount] = spryker_upgrade_scan($projectTemplates, $pattern, 0);
     if ($projectCount === 0) {
-        continue; // the project does not use it — not our problem
+        continue; // the project does not use it — nothing to check
     }
 
     [$vendorCount, $vendorHits] = spryker_upgrade_scan($vendorTemplates, $pattern);
@@ -286,7 +281,7 @@ foreach ($rows as $row) {
 if ($migrateCount === 0) {
     fwrite(STDOUT,
         "No migration work: every legacy class the project uses is still emitted or selected by\n"
-        . "vendor at this release. Do NOT rewrite them from the framework's changelog — for the\n"
+        . "vendor at this release. Do not rewrite them from the framework's changelog — for the\n"
         . "KEEP (JS) rows in particular, rewriting detaches project markup from vendor JavaScript.\n");
     exit(0);
 }

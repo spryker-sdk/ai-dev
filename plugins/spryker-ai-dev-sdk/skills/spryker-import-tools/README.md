@@ -13,11 +13,16 @@ currencies. You decide what to do; they do it correctly and print JSON.
 
 Whenever a Spryker data-import CSV or import manifest is being manipulated or validated:
 
-- `csv.php` — read / inspect / filter / delete / duplicate / set / replace / scale / derive /
-  rename / apply-translations.
-- `validate.php` — `preflight`, `refs` (including composite tuples), `required`, `unique`, `absent`,
-  `paths`, `product-refs`, `manifest-refs`, `orphan-files`, `threshold-glossary`, `manifest-diff`,
-  `known-set`.
+- `csv.php` — `filter`, `delete`, `duplicate-columns`, `duplicate-rows`, `set`, `select`,
+  `drop-columns`, `rename-columns`, `replace`, `scale`, `derive`, **`append`**, **`add-row`**,
+  `apply-translations`. (`append` and `add-row` are the sanctioned way to add rows — never a
+  hand-rolled shell writer.)
+- `validate.php` — **`gate`** first: the close-out driver that runs the whole set in one call. Then
+  `preflight`, `refs` (including composite tuples), `required`, `unique`, `absent`, `paths`,
+  `product-refs`, `manifest-refs`, `orphan-files`, `threshold-glossary`, `duplicate-keys`,
+  `cms-block-store`, `sku-coverage`, `store-coverage`, `locale-coverage`, `translation-coverage`,
+  `attribute-glossary`, `bundle-stock`, `tree-scope`, `import-order`, `inventory`, `demo-needs`,
+  `manifest-diff`, `known-set`.
 
 It is the engine behind `project-data`, `define-stores`, `curate-golive-data` and
 `translate-content` — those skills supply the judgment and point here for the mechanics.
@@ -31,13 +36,16 @@ flowchart TD
     I --> M{Mutating or removing?}
 
     M -- "removing / in-place" --> P["PREVIEW<br/>filter/delete with no --out/--in-place<br/>→ matchedRows, nothing written"]
-    P --> G{"Destructive-op gate<br/>explained in ONE line<br/>+ explicit go-ahead?"}
-    G -- "no" --> STOP([Stop — do not run it])
-    G -- "yes" --> W
+    P --> A1["Announce it in ONE plain line"]
+    A1 --> G{"Real data git cannot restore<br/>and not decided by the<br/>confirmed answer set?"}
+    G -- "yes" --> Q{"Explicit go-ahead?"}
+    Q -- "no" --> STOP([Stop — do not run it])
+    Q -- "yes" --> W
+    G -- "no" --> W
 
     M -- "adding / reshaping" --> W["Mutate — ONE command, many files<br/>list files then --in-place<br/>never a shell loop"]
 
-    W --> V["validate preflight &lt;manifest&gt;<br/>the sweep that replaces<br/>remembering each check"]
+    W --> V["validate gate &lt;manifest&gt;<br/>the one call that replaces<br/>remembering each check"]
     V --> VD{"Findings?<br/>exit 2"}
     VD -- "yes" --> DRILL["Drill in per file<br/>unique · required · refs --composite<br/>paths · product-refs · manifest-refs"]
     DRILL --> W
@@ -79,7 +87,7 @@ php scripts/csv.php <command> <file> [<file2>...] [options]
 Inspection — own their output, never write; `--plain` gives line output:
 
 ```bash
-php scripts/csv.php read product_abstract.csv --limit 5          # ONE file only
+php scripts/csv.php read product_abstract.csv --limit 5          # one file only
 php scripts/csv.php columns product_abstract.csv category.csv --plain
 php scripts/csv.php count product_price.csv product_stock.csv --plain
 php scripts/csv.php distinct cms_block.csv --column block_key --plain
@@ -114,7 +122,11 @@ php scripts/validate.php <check> [options]     # --quiet to branch on the exit c
 ```
 
 ```bash
-# Run this FIRST — one driver, every boot-critical invariant across the whole manifest:
+# Run this first — one command, one verdict over every check:
+php scripts/validate.php gate data/import/local/full_EE.yml --base . --locales en_US,pl_PL,uk_UA
+php scripts/validate.php gate --save .ai-dev/gate-baseline.json   # baseline, on the untouched clone — no other arguments
+
+# preflight is the manifest-wide invariant sweep `gate` runs for you — call it alone to narrow down:
 php scripts/validate.php preflight data/import/local/full_EE.yml --base . --locales en_US,pl_PL,uk_UA
 php scripts/validate.php preflight data/import/local/full_EE.yml --baseline .ai-dev/preflight-baseline.json
 
@@ -133,7 +145,7 @@ php scripts/validate.php orphan-files data/import/local/full_EE.yml data/import 
 php scripts/validate.php threshold-glossary data/import/local/full_EE.yml --locales en_US,pl_PL --base .
 php scripts/validate.php manifest-diff data/import/local/full_EU.yml data/import/local/full_EE.yml --base .
 php scripts/validate.php known-set --base <repo-root>
-php scripts/validate.php known-set --emit-map --base <repo-root>
+php scripts/validate.php known-set --emit-map --base <repo-root> --out <scratchpad>/skeleton.yml
 ```
 
 `known-set` resolves its defaults relative to the script, so it runs from any cwd (default manifest
@@ -150,22 +162,24 @@ php scripts/validate.php known-set --emit-map --base <repo-root>
 
 ## Invocation & command discipline (the authoritative copy)
 
-These rules keep an unattended run quiet — no needless permission prompts — and safe. `SKILL.md`
+These rules keep unattended work quiet — no needless permission prompts — and safe. `SKILL.md`
 holds the full text; the short form:
 
 - **Invoke by the literal path from the project cwd** — never `cd`, never a shell variable. A `cd`
   prefix, an assignment prefix (`CSV=… php …`), or a multi-line assign-then-use all miss the
-  allowlist and prompt on **every** call.
+  allowlist and prompt on every call.
 - **One simple command per Bash call, no shell operators.** `;`, `|`, `&&`, `$(…)`, `for`/`while`,
   redirects and env-prefixes can never be allowlisted.
-- **One op over many files = ONE command** — list the files before the flags, add `--in-place`.
+- **One op over many files = one command** — list the files before the flags, add `--in-place`.
 - **Count with the tool** — `rowCount` / `matchedRows` / `count --plain`, never `| grep -c`.
 - **Explore with the built-in Read / Grep / Glob**, edit YAML with the built-in Edit tool — never
   `python`/`ruby`/`sed` regenerating a config file.
-- **`rm` prompts by design** — surface every deletion as an explicit step.
-- **Destructive-operation gate** — preview, explain in one plain line, get an explicit go-ahead
-  before any in-place removal/truncation or any DB/volume drop, even when the allowlist would let it
-  through silently.
+- **Delete only what git can restore or this run created** — leave anything else in place and list it
+  for the person; surface every deletion as an explicit step.
+- **Destructive-operation policy** — preview and announce every in-place removal/truncation or
+  DB/volume drop in one plain line; ask for a go-ahead only when real data git cannot restore is at
+  stake and the confirmed answer set did not decide it (first setup, demo clones and trusted rebuilds
+  proceed after the announcement).
 
 ## Design decisions baked in
 
@@ -177,8 +191,8 @@ holds the full text; the short form:
 - **Counts have no maintainable home.** `demo-facts.md` records only identifiers you can look up,
   each with its re-derive command; `known-set` gates on any bare record count that creeps into a
   skill's prose.
-- **`unclassified` blocks the boot.** A new upstream entity arrives loud in `entity-map.yml` instead
-  of being silently dropped from a keep-list.
+- **`unclassified` blocks the boot.** A new upstream entity shows up as a blocking `entity-map.yml`
+  row instead of being silently dropped from a keep-list.
 - **A green boot is still the correctness authority.** These checks are the cheap early net, not a
   replacement for it.
 

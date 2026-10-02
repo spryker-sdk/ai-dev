@@ -62,8 +62,8 @@ flowchart TD
   references (deploy files and the `pipeline:` recipes they name), never from filenames.
 - **Recoverable by construction.** Before the first deletion the run verifies a clean tree,
   records the HEAD sha, and takes a backup (a `ci-pre-cleanup-<sha>` git tag, or an
-  `.ai-dev/ci-backup/` copy when the CI is uncommitted); removals go through `git rm` so they
-  land as reviewable staged changes, and the final report names the exact restore command.
+  `.ai-dev/ci-backup/` copy when the CI is uncommitted); removals are plain `rm` of tracked
+  files, left unstaged for review, and the final report names the exact restore command.
 
 ## Packaging note
 

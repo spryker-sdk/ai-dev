@@ -42,14 +42,14 @@ shape of a `run.log` line:
 **What.** Log one line per step boundary (`| START`, `| END <one-line outcome>`), plus every result a
 later reader would need:
 
-- The Step 0 answers: quality bar, and which phases are ON/OFF (an OFF phase explains a missing step later).
+- The Step 0 answers: quality bar, and which phases are on/off (an off phase explains a missing step later).
 - **When a solution design with a Short implementation plan exists: one boundary line per task** (`STEP 4 — T3 | START` / `| END <verify result>`), not just per step — the task list is what the build executes from, so the log mirrors it.
 - The resolved PRD source from Step 0c, the Step 0d scale envelope, and the AC checklist count from Step 1.
 - The branch cut in Step 2.
 - Each subagent invocation: which agent, for what, and its compact verdict — plus the file holding its raw output.
 - **Every self-correct iteration** in Step 7: the AC, the iteration number, what was changed, and the
-  outcome. This is the highest-value part of the log — it is what makes a stuck loop visible as a
-  pattern instead of a surprise, and it feeds the "stuck signals" judgement the step already makes.
+  outcome. This part of the log makes a stuck loop visible as a
+  pattern, and it feeds the "stuck signals" judgement the step already makes.
 - Each gate verdict: refresh, verification, Cypress E2E (or its logged skip reason), static validation, code review — `pass|fail` and the output file.
 - The final AC tally and the user's commit-gate answer.
 
@@ -68,7 +68,7 @@ until the end to write it.
   `$BUILD_DIR/<stage>-<n>.log`. Keep the `run.log` line to the outcome plus that filename, and `Read`
   the file later only if you need specific lines.
 - **Never log a step green that wasn't.** A skipped phase, a blocked verification, or an AC that is
-  still red after retries is logged as exactly that. The Step 8 report is built from this log, and
-  the honesty rule the report already carries starts here.
+  still red after retries is logged as exactly that. The Step 8 report is built from this log, so its
+  accuracy depends on it.
 - **Log the loop, not just the exit.** Step 7 can revisit an AC repeatedly; each iteration gets its own
-  line. A log that shows only the final state hides the two attempts that failed first.
+  line. A log that shows only the final state hides the attempts that failed before it.

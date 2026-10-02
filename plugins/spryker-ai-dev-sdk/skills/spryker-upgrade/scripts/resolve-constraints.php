@@ -127,8 +127,8 @@ function parseRootConflicts(string $output): array
     $conflicts = [];
     // Composer writes "<package> <version> requires <dep> <constraint> -> found ... but it
     // conflicts with your root composer.json require (X)". Match "requires" as well as "require":
-    // anchoring on the singular silently parsed ZERO conflicts and reported them as an unparsed
-    // failure, which looks like a composer problem rather than a parser bug.
+    // a pattern anchored on the singular parses no conflicts from this output and reports an
+    // unparsed failure instead.
     $pattern = '#requires?\s+((?:spryker|spryker-shop|spryker-eco|spryker-feature|spryker-sdk)/[a-z0-9-]+)'
         . '\s+([^\s]+(?:\s*\|\|\s*[^\s]+)*)\s+-> found .*? but it conflicts with your root '
         . 'composer\.json require \(([^)]+)\)#';
@@ -141,10 +141,9 @@ function parseRootConflicts(string $output): array
                 continue;
             }
             // A demand can be a DISJUNCTION ("^4.0.0 || ^5.0.0"): the package accepts either major.
-            // Taking its highest alternative overshoots the release group — one module allowing
-            // "gui ^4.0.0 || ^5.0.0" pushed gui to ^5.0.0 while the release group's own feature
-            // package hard-required ^4.5.0, so the next round wanted to LOWER it and the run
-            // deadlocked. A HARD (single-branch) demand therefore always wins over a disjunction.
+            // Taking its highest alternative overshoots the release group when a feature package
+            // hard-requires the lower major: the next round then wants to LOWER it and the resolver
+            // oscillates. A HARD (single-branch) demand therefore always wins over a disjunction.
             $isFlexible = str_contains($m[2], '||');
             $known = $conflicts[$package] ?? null;
             if ($known === null) {
