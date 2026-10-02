@@ -5,7 +5,7 @@ description: "Use when applying or changing a Spryker project's brand identity �
 
 # brand-project
 
-Goal: the shop presents as the customer's brand, not Spryker's. Judgment edits on a few files. Read `.ai-dev/project-setup.md` → `project` (name, dev_domain, brand_colors, logo, reference_sites). (Theming/logo failure-signature triage lives in the Known-traps catalog: `../project-starter-wizard/references/pitfalls.md`.)
+Goal: the shop presents as the customer's brand, not Spryker's. Judgment edits on a few files. Read `.ai-dev/project-setup.md` → `project` (name, dev_domain, brand_colors, logo, reference_sites); when that file (or `.ai-dev/demo-prep.md`) exists without `answers_confirmed_at`, do not start — its answers were never confirmed, and the wizard's Resume confirms them first. (Theming/logo failure-signature triage lives in the Known-traps catalog: `../project-starter-wizard/references/pitfalls.md`.)
 
 **Three inputs, asked together, first-class:** palette (P3), logo (P4), and **"which site(s) should this shop look like?"** (P5, `project.reference_sites`) — the reference. Palette and logo are identity *tokens* and belong here; the reference carries the shop's visual *grammar* (layout, spacing, grids), which `match-reference-design` captures and applies. This skill uses the reference only for what it owns — the measured brand colour and the logo. Usually the customer's live site; blank = no reference, never pick one yourself.
 
@@ -69,7 +69,7 @@ How it works: `default_value` in these ymls is the load-bearing mechanism — bu
 
 ## Verify & close
 
-YAML still valid; hex values match the constraint; the source of every file placed under `frontend/static/images/brand/` recorded in `.ai-dev/composition.md`. Update the `brand-project` step. (Runtime colour check is boot-and-verify.) **The theming edits count as design work:** `guard-files.php` treats `data/configuration/shop_ui|gui|zed_ui.configuration.yml` (and Yves theme templates/styles) as frontend files, so once this session edited one, marking `brand-project` — or later `boot-and-verify` — `done` is denied until `.ai-dev/design-acceptance.md` carries one evidenced line per surface (header, dropdown, hero, homepage, plp, pdp, cart, checkout, search, footer, mobile, tablet — a measurement, a rendered token, a fetched URL or a template path, never the word "checked"), written after the last rebuild and the last frontend change.
+YAML still valid; hex values match the constraint; the source of every file placed under `frontend/static/images/brand/` recorded in `.ai-dev/composition.md`. Update the `brand-project` step. (Runtime colour check is boot-and-verify.) **The theming edits count as design work:** `data/configuration/shop_ui|gui|zed_ui.configuration.yml` (and Yves theme templates/styles) are frontend files, so once this session edited one, mark `brand-project` — or later `boot-and-verify` — `done` only when `.ai-dev/design-acceptance.md` carries one evidenced line per surface (header, dropdown, hero, homepage, plp, pdp, cart, checkout, search, footer, mobile, tablet — a measurement, a rendered token, a fetched URL or a template path, never the word "checked"), written after the last rebuild and the last frontend change.
 
 ## Standalone rebrand (colours only — repeatable, pre- or post-boot)
 

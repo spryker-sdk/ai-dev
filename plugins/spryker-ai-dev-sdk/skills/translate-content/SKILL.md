@@ -7,7 +7,7 @@ description: "Use when actually translating a Spryker project's storefront conte
 
 Adapt-mode leaves every project locale as an **English copy** (fast boot, translation debt flagged). This skill is the opt-in that actually localizes a chosen locale. It is **never forced** — the default is English copies; the developer asks for it ("localize `uk_UA`").
 
-You drive `spryker-import-tools`; you (and translator sub-agents) supply the translations. Invocation + command discipline: follow **`spryker-import-tools` → "Invocation & command discipline"** (the authoritative copy) — literal-path invocation from the project cwd (`$CSV`/`$VALIDATE` below = that path, substituted inline; never a shell variable, never `cd`), one op over many files in one command, no shell operators. Work from real files.
+You drive `spryker-import-tools`; you (and translator sub-agents) supply the translations. Invocation + command discipline: follow **`spryker-import-tools` → "Invocation & command discipline"** (the authoritative copy) — literal-path invocation from the project cwd (`$CSV`/`$VALIDATE` below = that path, substituted inline; never a shell variable, never `cd`), one op over many files in one command, no shell operators. Work from real files. When `.ai-dev/project-setup.md` or `.ai-dev/demo-prep.md` exists without `answers_confirmed_at`, do not start: its answers were never confirmed, and the wizard's Resume confirms them first.
 
 ## Scope (developer chooses, per locale)
 
@@ -76,7 +76,7 @@ if you wrote it into the prompt.
 > the Write tool" hand-rolls quoting, reaches for python to verify it, and produces both malformed
 > data and a stream of permission prompts.
 
-During a wizard run (a `.ai-dev/project-setup.md` or `.ai-dev/demo-prep.md` exists), `guard-agent.php` denies a dispatch that misses the first two; outside a run nothing checks it. Paste this block into every one:
+The first two parts — `TOOLING` (the CSV tooling) and `SKILL` (the owning skill, named as "per `translate-content`") — are the ones a worker cannot reconstruct. Paste this block into every dispatch:
 
 ```
 TOOLING — do not hand-write CSV, and do not use python, awk or a heredoc to build or check it:

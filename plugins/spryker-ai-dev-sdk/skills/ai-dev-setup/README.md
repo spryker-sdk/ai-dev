@@ -89,7 +89,7 @@ flowchart TD
     A1B --> A2
     A1C --> A2
     A2{"Artifact 2 — .claude/rules/<br/>overwrite · merge · cancel"}
-    A2 --> A3{"Artifact 3 — hooks + permissions<br/>plugin install: permissions only"}
+    A2 --> A3{"Artifact 3 — Stop hook + permissions<br/>plugin install: permissions only"}
     A3 --> FIN(["Final report, 3-5 lines<br/>+ ALWAYS: restart Claude Code /exit<br/>for the MCP tools to load"])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
@@ -108,10 +108,10 @@ flowchart TD
 3. The AI Dev MCP server registered with Claude Code, so other sessions in this project get
    Spryker-aware tools (transfers, OMS, module map, CSV/ODS).
 4. Optionally `CLAUDE.md` at the project root and `.claude/rules/` populated from the bundled content.
-5. On a **setup** install (skills copied in, no plugin): the enforcement hooks in
-   `.claude/hooks/spryker-ai-dev-sdk/` plus the `hooks` and `permissions` blocks merged into
-   `.claude/settings.json`. A plugin install gets the hooks from the plugin; the skill still offers
-   to merge the `permissions` block.
+5. On a **setup** install (skills copied in, no plugin): the Stop hook (`guard-stop.php` +
+   `lib.php`) in `.claude/hooks/spryker-ai-dev-sdk/`, plus the `Stop` hook and the `permissions`
+   block merged into `.claude/settings.json`. A plugin install gets the Stop hook from the plugin's
+   `hooks/hooks.json`; the skill still offers to merge the `permissions` block.
 
 `ai-dev:generate-prompts` exists in the package but is **outdated** — the skill never wires it, and
 flags an existing wiring for removal rather than deleting it silently.

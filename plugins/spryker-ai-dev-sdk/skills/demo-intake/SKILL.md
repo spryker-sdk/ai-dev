@@ -163,8 +163,8 @@ any other open question — in its one sitting. Everything else on the list is d
 as `?` questions the preparer is expected to answer.
 
 - **Never manufacture a questionnaire from a brief.** The wizard carries the mirror rule (`interview.md`
-  Rule 0): a prose brief is *input to the interview*, not a substitute for it, and the plugin hook denies the
-  first state-file write unless real questionnaire IDs or a real interview are in the transcript. So the
+  Rule 0): a prose brief is *input to the interview*, not a substitute for it, and the wizard writes its
+  state file only from real questionnaire IDs or a real interview. So the
   handoff carries **no** `P1:` / `T1:` / `D1:` lines — ID-tagged answers are the person's to write.
 - A value nobody stated is a question. For example, a YAML block with a brand hex, a dev domain, a
   region and a locale nobody stated holds four invented answers; autonomous mode starts only after
@@ -258,7 +258,7 @@ Format: **signature → cause → fix.**
   items do not reach the handoff.
 - **A questionnaire YAML with a brand hex, a domain, a region and a locale nobody stated** → a
   brief was read as a questionnaire → no IDs in the handoff, every unstated value a `?` (§7); the wizard's
-  Rule 0 and the state-file hook both refuse this from the other side.
+  Rule 0 refuses this from the other side.
 - **A remembered hex (`#123457` where the site measures `#123456`)** → the colour was recalled instead of
   read → measure it in the browser and record URL + element + property + date (§5).
 - **The wizard spends question rounds reconstructing master / colour / size semantics from the CSVs** → the

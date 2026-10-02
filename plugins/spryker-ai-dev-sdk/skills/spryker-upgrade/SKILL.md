@@ -58,10 +58,9 @@ work, and stop at the gates that belong to the developer.
 
 **No explanatory comments and no suppressions in code.** Use method and variable names that say what
 the code does. Allowed: the license header, docblock tags, `{@inheritDoc}`, Spryker `Specification:`
-blocks, and an `upgrade-debt:` docblock on a temporary shim. While `.spryker-upgrade/state/` exists, a
-plugin hook denies edits that add explanatory comments or suppressions (see the plugin's
-`hooks/README.md`), and `check-added-comments.php` — which also reports added `phpcs:ignore`,
-`@phpstan-ignore` and similar as `suppression` — must exit 0 at the end of every lane and in Phase 7.
+blocks, and an `upgrade-debt:` docblock on a temporary shim. `check-added-comments.php` — which also
+reports added `phpcs:ignore`, `@phpstan-ignore` and similar as `suppression` — must exit 0 at the end
+of every lane and in Phase 7.
 Comments copied verbatim from a vendor file into a project override count as added (Lane 2).
 
 ## Scope: an upgrade updates only what the project already has

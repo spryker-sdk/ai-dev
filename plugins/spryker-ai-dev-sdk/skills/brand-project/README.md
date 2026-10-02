@@ -63,7 +63,7 @@ flowchart TD
     V -- "empty :root — sync ran too early" --> T5
     V -- "still fallback logo" --> UPLOAD["boot-and-verify gate:<br/>Back Office media upload<br/>Configuration → Theme → Logos"]
     UPLOAD --> Z
-    V -- "ok" --> Z(["Verify &amp; close —<br/>YAML valid, hex matches constraint,<br/>brand asset sources in composition.md,<br/>design-acceptance.md evidenced (hook-gated),<br/>update the brand-project step"])
+    V -- "ok" --> Z(["Verify &amp; close —<br/>YAML valid, hex matches constraint,<br/>brand asset sources in composition.md,<br/>design-acceptance.md evidenced before done,<br/>update the brand-project step"])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;

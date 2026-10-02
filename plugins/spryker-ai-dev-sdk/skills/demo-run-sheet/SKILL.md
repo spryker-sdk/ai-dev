@@ -42,7 +42,7 @@ In a demo run, "the person" below is usually a demo preparer, not an engineer (`
 
 **Whatever the format, a local copy is always written:** `html` → `.ai-dev/demo-run-sheet.html` +
 `.txt`; `doc` → `.html` plus the connector document (extra, never instead); `chat` → `.txt`;
-`markdown` → `.md`. The wizard's hook checks that one of these exists before the step is `done`.
+`markdown` → `.md`. The wizard marks the step `done` only once one of these exists.
 
 **Default when the question is not answered, or is answered vaguely ("just give it to me"):**
 

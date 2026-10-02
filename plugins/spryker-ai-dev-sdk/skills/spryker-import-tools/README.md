@@ -15,8 +15,8 @@ Whenever a Spryker data-import CSV or import manifest is being manipulated or va
 
 - `csv.php` — `filter`, `delete`, `duplicate-columns`, `duplicate-rows`, `set`, `select`,
   `drop-columns`, `rename-columns`, `replace`, `scale`, `derive`, **`append`**, **`add-row`**,
-  `apply-translations`. (`append` and `add-row` are the sanctioned way to add rows — the hooks name
-  them by command when they deny a hand-rolled writer.)
+  `apply-translations`. (`append` and `add-row` are the sanctioned way to add rows — never a
+  hand-rolled shell writer.)
 - `validate.php` — **`gate`** first: the close-out driver that runs the whole set in one call. Then
   `preflight`, `refs` (including composite tuples), `required`, `unique`, `absent`, `paths`,
   `product-refs`, `manifest-refs`, `orphan-files`, `threshold-glossary`, `duplicate-keys`,
@@ -174,7 +174,8 @@ holds the full text; the short form:
 - **Count with the tool** — `rowCount` / `matchedRows` / `count --plain`, never `| grep -c`.
 - **Explore with the built-in Read / Grep / Glob**, edit YAML with the built-in Edit tool — never
   `python`/`ruby`/`sed` regenerating a config file.
-- **`rm` is guarded, not prompted** — `guard-bash.php` denies a deletion git cannot restore; surface every deletion as an explicit step.
+- **Delete only what git can restore or this run created** — leave anything else in place and list it
+  for the person; surface every deletion as an explicit step.
 - **Destructive-operation policy** — preview and announce every in-place removal/truncation or
   DB/volume drop in one plain line; ask for a go-ahead only when real data git cannot restore is at
   stake and the confirmed answer set did not decide it (first setup, demo clones and trusted rebuilds

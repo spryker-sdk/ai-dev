@@ -44,7 +44,7 @@ Then wait ~500ms for the stylesheet to re-fetch, then assert. Same applies to bu
 
 ## Running in the browser
 
-**Drive the local shop through Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host, and the `guard-browser.php` hook denies it there.
+**Drive the local shop through Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host.
 
 - **Seeded credentials are test fixtures, and logging in with them is part of your task.** They
   live in the repository (the customer rows and the installer user config); read the account you need and

@@ -8,9 +8,8 @@ with Write/Edit.
 version: 1
 run_mode: collaborative                 # or autonomous — asked last (SKILL.md, Run modes); governs cadence between phases only
 answers_source: brief                   # where the demo came from — brief | script | paste. Never `proposed`:
-                                        # this skill does not invent a demo. `guard-files.php` denies the first
-                                        # write of this file unless the transcript shows the routing table was
-                                        # really shown and confirmed.
+                                        # this skill does not invent a demo. The first write of this file
+                                        # waits until the preparer has seen and confirmed the routing table.
 answers_confirmed_at: 2026-09-22T11:04:00Z   # required — the moment the preparer confirmed the routing table (phase 2).
                                         # Written only by that confirmation, never pre-filled. Its absence means the
                                         # routing was never agreed: resume re-shows the table instead of adopting the file.
@@ -55,18 +54,22 @@ up_front:                               # the one sitting (SKILL.md, Run modes) 
 <!-- Durable cross-phase handoffs, written by the phase that finds one and read by the phase that needs it. -->
 ```
 
-## How the hooks police it
+## Rules the file follows
 
-**The plugin's hooks police this run, and both halves apply here.** The mechanism is in
-[`hooks/README.md`](../../../hooks/README.md):
-
-- **The state-file evidence rule.** `guard-files.php` denies the first write of `.ai-dev/demo-prep.md`
-  (the write that carries its `answers_source:` line) until the transcript shows the preparer confirmed
-  the routing table with one AskUserQuestion whose question or header contains the word "confirm". It
-  also accepts the demo fast path's `.ai-dev/project-setup.md` with `answers_source: demo-prep` only when
-  `.ai-dev/demo-prep.md` carries `up_front_confirmed_at`. `.ai-dev/rehearsal.md` is gated separately, at
-  the step that claims it, so the absence of a denial on the first write does not cover it.
-- **The `answers_confirmed_at` skill guard.** `guard-skill.php` **denies** the phase-5 step skills
-  (`project-data`, `define-stores`, `translate-content`, `brand-project`, `boot-and-verify`, …) while
-  the state file carries no confirmation stamp — a denial means phase 2 is not closed; close it rather than
-  working around the hook.
+- **The first write waits for the routing confirmation.** Write `.ai-dev/demo-prep.md` only after the
+  preparer has confirmed the routing table with one AskUserQuestion (phase 2). The demo fast path writes
+  `.ai-dev/project-setup.md` with `answers_source: demo-prep` only when `.ai-dev/demo-prep.md` carries
+  `up_front_confirmed_at`.
+- **The phase-5 step skills wait for `answers_confirmed_at`.** Do not start `project-data`,
+  `define-stores`, `translate-content`, `brand-project`, `boot-and-verify`, … while the state file
+  carries no confirmation stamp: phase 2 is not closed, so close it first. Never write the stamp without
+  the confirmation.
+- **A step is `done` only with its evidence.** `build` → `.ai-dev/verifier-report.md`, and a
+  `.ai-dev/design-acceptance.md` newer than the newest template or style edit and the last rebuild;
+  `rehearsal` → `.ai-dev/rehearsal.md` with pass/gap lines written after the last rebuild (and the same
+  design-acceptance rule after a template or style fix); `demo-run-sheet` → `.ai-dev/demo-run-sheet.html`,
+  `.md` or `.txt`.
+- **An autonomous run does not end its turn early.** While `run_mode: autonomous` and the Steps table
+  has a row that is not `done` or `skipped`, the Stop guard (`hooks/guard-stop.php`,
+  [`hooks/README.md`](../../../hooks/README.md)) keeps the turn going; it lets the turn end on a question
+  only the preparer can answer, a `NEEDS YOU:` line, or an AskUserQuestion.

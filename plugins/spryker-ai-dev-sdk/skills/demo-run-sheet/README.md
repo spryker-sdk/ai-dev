@@ -93,8 +93,8 @@ flowchart TD
 `.ai-dev/demo-run-sheet.txt` for chat. **Whatever the format, a local copy is always written** —
 `.html`, `.md` or `.txt`; a document created through a connector is extra, never instead. A one-line
 pointer to the file, and a short defect list handed over separately (in a demo run, to the wizard's final
-review). `guard-files.php` denies `demo-run-sheet` → `done` in the wizard's state file until one of those
-local files exists ([hooks/README.md](../../hooks/README.md)).
+review). The wizard marks `demo-run-sheet` → `done` in its state file only once one of those local
+files exists.
 
 ## Packaging note
 

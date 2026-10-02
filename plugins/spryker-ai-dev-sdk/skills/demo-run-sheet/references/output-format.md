@@ -141,7 +141,7 @@ variants. The skeleton in `SKILL.md` § 6 is exactly this file's shape.
 ## Other targets
 
 Every target also leaves a **local copy on disk** — `.ai-dev/demo-run-sheet.html`, `.md` or `.txt`
-(the wizard's hook checks one exists before the step is `done`).
+(the wizard marks the step `done` only once one exists).
 
 - **Wiki page** (`markdown`) — the only case where markdown is the right answer. Write
   `.ai-dev/demo-run-sheet.md` in the flavour the preparer named; if none was named, plain CommonMark —

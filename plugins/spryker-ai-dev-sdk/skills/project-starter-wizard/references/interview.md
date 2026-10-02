@@ -41,19 +41,18 @@ replace the catalogue with …" is *input to the interview*, not a substitute fo
 the candidates you offer (mark them "from your brief" and put them first), and every section is still
 asked and the whole resolved set still confirmed — **except on the demo fast path** (`purpose: demo`, below), where the technical sections are derived rather than asked and appear in the confirmation instead. Failure signature: a brief read as a
 questionnaire, `answers_source: questionnaire+interview`, one `AskUserQuestion` for the run mode, a
-dozen values recorded as agreed, over answers that were never requested. The plugin hook
-denies the first state-file write unless the transcript shows either a questionnaire (ID-tagged
-answers from the developer) or the interview (several questions plus a confirmation question) — or,
-on the `demo-prep` path, a `demo-prep.md` carrying `up_front_confirmed_at` —
-so the brief-as-questionnaire shortcut fails at write time, not at review time.
+dozen values recorded as agreed, over answers that were never requested. Write the state file for
+the first time only when the transcript shows either a questionnaire (ID-tagged answers from the
+developer) or the interview (the questions plus a confirmation question) — or, on the `demo-prep`
+path, a `demo-prep.md` carrying `up_front_confirmed_at`.
 
 **"A blank is a default" applies ONLY to a questionnaire the developer filled.** On an interview run
 there are no blanks — there are **unasked questions** — and `run_mode: autonomous` says nothing about
 them: autonomy begins once the catalog is covered and the whole set is confirmed, never before.
 `answers_source: interview` therefore writes `answers_defaulted: []`. **Check before the state write:**
 every `[REQUIRED]` ID (`P1`, `R1`, `R2`) appears in a question you actually asked, and
-`answers_defaulted` is not longer than the questions asked (the hook counts calls rather than coverage —
-rounds that never asked `P1` still pass it). Otherwise unasked values — `P1` and `R2` among
+`answers_defaulted` is not longer than the questions asked (count coverage, not calls — rounds that
+never asked `P1` are not an interview of `P1`). Otherwise unasked values — `P1` and `R2` among
 them — are recorded as agreed. Autonomous begins only after every question is answered.
 
 Before asking anything, check whether the developer already supplied questionnaire answers — a filled
@@ -160,7 +159,7 @@ table, not these answers), the wizard's one sitting already asked these question
 whole set, derived values included: take the answers from `up_front`, write the state file with
 `answers_source: demo-prep`, copy `up_front_confirmed_at` into `answers_confirmed_at`, copy `run_mode`
 as-is, `up_front.reference_sites` into `project.reference_sites` and `audience` into
-`project.audience`. `guard-files.php` accepts that first write on the strength of the stamp. Without
+`project.audience`. The stamp is what makes that first write valid. Without
 `up_front_confirmed_at`, ask the questions above as usual.
 
 **Derived, never asked.** Write each into the state file and log it as one decision-log line. These are

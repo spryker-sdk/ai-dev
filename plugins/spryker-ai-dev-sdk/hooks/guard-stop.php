@@ -116,14 +116,6 @@ function stop_is_blocked(string $cwd, string $lastMessage, string $transcriptPat
     if (preg_match('~NEEDS YOU:|ACTION NEEDED|awaiting your|waiting for you|your call on~i', $lastMessage) === 1) {
         return 'the turn is explicitly waiting on the person';
     }
-    $log = $cwd . '/.ai-dev/hooks.log';
-    if (is_file($log) && time() - (int) filemtime($log) < 180) {
-        $lines = preg_split('/\R/', trim((string) file_get_contents($log))) ?: [];
-        $last = (string) end($lines);
-        if (preg_match('~\bask\b~', $last) === 1 && !str_contains($last, 'guard-stop.php')) {
-            return 'a guard asked within the last few minutes, so the person has a prompt in front of them';
-        }
-    }
     if ($transcriptPath !== '' && is_file($transcriptPath)) {
         $size = filesize($transcriptPath) ?: 0;
         $fh = fopen($transcriptPath, 'rb');

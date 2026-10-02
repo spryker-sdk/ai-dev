@@ -199,7 +199,7 @@ no further *configuration* questions.
 ## Run artifacts
 
 The run writes four files into the clone's own tree — it is self-contained, and "Return to fresh"
-lists them for the developer to delete (the hook denies `rm` under `.ai-dev/`):
+lists them for the developer to delete:
 
 | File | Role |
 |------|------|

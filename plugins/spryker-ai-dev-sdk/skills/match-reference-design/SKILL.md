@@ -50,7 +50,7 @@ Plus the reference itself: read `up_front.reference_sites` in `.ai-dev/demo-prep
 → "Who runs this"): they judge **what they see** — layout, size, colour, order, whether it looks like
 the reference. Everything about **how** — which rung, which file, which importer — is yours to decide.
 
-**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host, and `guard-browser.php` denies it there. The reference site itself may use either browser.
+**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host. The reference site itself may use either browser.
 
 ---
 
@@ -175,11 +175,13 @@ wanted slot/position, and set the old row's `active` to `0`. That is an insert a
 column the importer does accept — rung 2 cost for a rung 4 intent. Same for a cross-slot move: a new
 relation plus a deactivated old block avoids a teardown.
 
-**Rung 4 is announced and priced:** say what it buys and how long it takes. Trusted rebuilds (a demo
-clone, first setup, or the person's explicit "rebuilds" approval) run without a prompt; on a project
-with real data the `gate-docker-sdk.php` hook asks once. From the third rebuild on a project (per
-project, not per step) the hook denies until the decision log has `rebuild #N: <why rung 1 cannot show
-it>` — write it and continue; it never interrupts the preparer. Quote `.ai-dev/rebuild-count`.
+**Rung 4 is announced and priced:** say what it buys and how long it takes. Before it, run
+`php <VALIDATE> gate` (`boot-and-verify`) and stop on a gating finding. Trusted rebuilds (a demo clone,
+first setup, or a standing "rebuilds" approval in the person's own words) run without a prompt; on a
+project with real data, ask the person once before the rebuild. Count the rebuilds yourself (per
+project, not per step) and quote the count in the report. Before the third rebuild on a project, write
+`rebuild #N: <why rung 1 cannot show it>` to the decision log and continue; it never interrupts the
+preparer.
 
 **Sizing and spacing complaints are rung 1 until proven otherwise.** Find the element in the browser,
 read its box, change the rule that sets it, build, look.
@@ -289,8 +291,8 @@ Generated, gitignored, and overwritten by the next build:
 
 Served static assets (Yves only) belong in `frontend/static/**`, which the build copies into
 `public/`. **Check before writing:** `git check-ignore -v <path>` — a hit means the edit is invisible
-to git and gone at the next build, even though the write reports success. `guard-files.php` denies
-exactly this; treat the denial as the finding and write the source under `frontend/static/**` instead.
+to git and gone at the next build, even though the write reports success. Treat a hit as the finding
+and write the source under `frontend/static/**` instead.
 
 ---
 
@@ -328,7 +330,7 @@ A visual task is done when **all** of these exist, and not before:
 2. **The spec checklist from §1**, line by line: `ok` or `deviates — <measured value> vs <spec value>`.
    A deviation left in place is stated, not omitted.
 3. The rung used per change, the file touched, and the build command's own success line.
-4. `cat .ai-dev/rebuild-count` — quoted, with the reason for each rebuild this step consumed.
+4. The rebuild count on the project so far, with the reason for each rebuild this step consumed.
 5. What was **not** touched: the components you decided against restyling, the data you did not
    change, the deviations you chose to leave.
 6. The `references/visual-defects.md` checklist, per surface and width, each result quoted.
@@ -369,15 +371,13 @@ ends in a checkout, so an unstyled cart shows in the demo's final beat.
 Four rules about the evidence column:
 
 - **A measurement, a rendered value, a URL fetched or a file path — never the word "checked".**
-  `guard-files.php` enforces this: it denies the step flipping to `done` while any surface row
-  carries no evidence token.
+  The step is not `done` while any surface row carries no evidence token.
 - **"Every dropdown" means every dropdown opened, "footer" means scrolled to, "mobile" means at
   phone width.** A general look at the page does not include any of those three.
-- **Each row carries its own evidence** — the hook rejects a file whose surfaces all carry
-  identical evidence, such as `` `ok` `` on every row.
-- **Write it after the last change; the hook checks this.** It denies a sweep older than the
-  newest template/style edit, and one older than the last entry in `.ai-dev/rebuild-log`. A sweep
-  older than the fixes does not cover them.
+- **Each row carries its own evidence** — a file whose surfaces all carry identical evidence, such
+  as `` `ok` `` on every row, does not count as a sweep.
+- **Write it after the last change.** A sweep older than the newest template/style edit, or older
+  than the last rebuild, does not cover them: write it again before marking the step `done`.
 
 ### 11b. Three layout rules
 

@@ -82,9 +82,9 @@ decision; record them in a worklist instead of forcing a textual merge.
 6. Zed Presentation entries (Backoffice twig, OMS mail templates) follow the same merge flow.
 7. CSS framework majors: run `check-legacy-css-classes.php` before rewriting any class (matrix #55).
 8. Comments carried in by a merge: a Twig, TS or JS comment copied verbatim from the vendor
-   counterpart into the override counts as an added comment for `check-added-comments.php` and the
-   comment hook. Drop it from the override; the vendor file keeps it. An `upgrade-debt:` marker on a
-   temporary shim stays allowed.
+   counterpart into the override counts as an added comment for `check-added-comments.php`. Drop it
+   from the override; the vendor file keeps it. An `upgrade-debt:` marker on a temporary shim stays
+   allowed.
 9. Rebuild: `script -q /dev/null docker/sdk cli npm run yves` — zero tsc/webpack errors.
 
 ## Lane 3 — Plugin stacks and deprecations

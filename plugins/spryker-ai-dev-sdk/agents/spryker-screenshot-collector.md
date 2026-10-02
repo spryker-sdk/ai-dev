@@ -40,7 +40,7 @@ You must **never guess URLs**. Discover them from the project's deploy file:
 
 ### Browser drive — Claude-in-Chrome
 
-Use Claude in Chrome (`mcp__claude-in-chrome__*`), never the built-in browser (`mcp__Claude_Browser__*`) — the built-in browser asks the person on every action for a local host, and the `guard-browser.php` hook denies it there. Friendly names:
+Use Claude in Chrome (`mcp__claude-in-chrome__*`), never the built-in browser (`mcp__Claude_Browser__*`) — the built-in browser asks the person on every action for a local host. Friendly names:
 
 - `tabs_create_mcp` — open a fresh tab if needed
 - `navigate` — go to a URL

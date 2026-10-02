@@ -95,7 +95,7 @@ and the run sheet's source of beats, and its `key: value` shape is what `validat
 | file | holds |
 |---|---|
 | `SKILL.md` | the phases and their owners, the needs list, run modes, the final review, skip-ahead and resume, delegation discipline, the closing checklist, pitfalls |
-| `references/state-file.md` | the `.ai-dev/demo-prep.md` template (frontmatter, Steps table, decision log) and how the hooks police it |
+| `references/state-file.md` | the `.ai-dev/demo-prep.md` template (frontmatter, Steps table, decision log) and the rules the file follows |
 
 It reads, without restating: [work-classes.md](../demo-intake/references/work-classes.md) for
 classification; `../project-starter-wizard/references/` — `preflight.md`, `interview.md` (the demo fast
@@ -112,10 +112,11 @@ path and the plain-language table) and `autonomous-runs.md`.
   instead of asking again; a checkpoint on material not seen yet takes the recommended option, logs it,
   and shows it at the final review. Only a hard-stop (starting Docker, the one `/etc/hosts` command)
   interrupts an autonomous run before the final review.
-- **Rebuilds never interrupt the preparer.** Trusted rebuilds (demo clone, first setup, or an explicit
-  "rebuilds" approval) run without a prompt; on a project with real data the hook asks once; from the
-  third rebuild on a project the hook denies until the decision log has `rebuild #N: <why rung 1 cannot
-  show it>` — the agent writes it and continues.
+- **Rebuilds never interrupt the preparer.** The agent runs `php <VALIDATE> gate` before every rebuild
+  or `data:import` and stops on a gating finding. Trusted rebuilds (demo clone, first setup, or a standing
+  "rebuilds" approval in the preparer's own words) run without a prompt; on a project with real data the
+  agent asks once. The agent counts rebuilds in its step reports and, before the third rebuild on a
+  project, writes `rebuild #N: <why rung 1 cannot show it>` to the decision log and continues.
 - **Content, look and story questions only.** A question that cannot be phrased without a technical
   term is not the preparer's — it is decided, logged in the decision log, and not asked.
 - **Quoted UI strings are fixed wording from the moment the brief is read** — copied character for
@@ -130,20 +131,18 @@ path and the plain-language table) and `autonomous-runs.md`.
 - **What crosses a phase boundary is an artifact** — the intake block, the needs list, `spec.md`, the
   coverage record, `rehearsal.md` — so a resume hours later has the file, not the chat.
 
-## Enforced by hooks
+## Rules the run follows
 
-The plugin's hooks police this run ([hooks/README.md](../../hooks/README.md)):
-
-- `guard-files.php` denies the first write of `.ai-dev/demo-prep.md` unless the routing table was really
-  shown and confirmed, and denies `rehearsal` → `done` without pass/gap lines written after the last rebuild.
-- `guard-skill.php` denies the phase-5 step skills while the state file carries no `answers_confirmed_at`.
-- `gate-docker-sdk.php` lets trusted rebuilds through without a prompt, asks once on a project with real
-  data, and from the third rebuild on a project denies until the decision log carries
-  `rebuild #N: <why rung 1 cannot show it>` — not a hard stop; the agent writes the line and continues.
-- `guard-files.php` accepts the demo fast path's `answers_source: demo-prep` only when
-  `.ai-dev/demo-prep.md` carries `up_front_confirmed_at`, and denies the run-sheet step `done` until
-  `.ai-dev/demo-run-sheet.html`, `.md` or `.txt` exists.
-- `guard-browser.php` denies the built-in browser for the local shop.
+- `.ai-dev/demo-prep.md` is first written only after the routing table is shown and confirmed; the
+  phase-5 step skills start only once it carries `answers_confirmed_at`.
+- The demo fast path's `answers_source: demo-prep` is written only when `.ai-dev/demo-prep.md` carries
+  `up_front_confirmed_at`.
+- A step is `done` only with its evidence: `.ai-dev/verifier-report.md` for the build,
+  `.ai-dev/design-acceptance.md` after template or style edits, `.ai-dev/rehearsal.md` pass/gap lines
+  written after the last rebuild, and `.ai-dev/demo-run-sheet.html`, `.md` or `.txt` for the run sheet.
+- In an autonomous run the Stop guard (`hooks/guard-stop.php`, [hooks/README.md](../../hooks/README.md))
+  keeps the turn going while a step is neither `done` nor `skipped`, unless the turn ends on a question
+  only the preparer can answer, a `NEEDS YOU:` line, or an AskUserQuestion.
 
 ## Output
 

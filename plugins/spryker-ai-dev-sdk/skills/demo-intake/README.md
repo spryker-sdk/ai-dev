@@ -94,7 +94,7 @@ is the wizard's routing table, and an item that cannot be placed is resolved by 
 - **A colour is measured, not remembered.** A recalled hex ships the wrong colour into the questionnaire;
   the measurement carries URL, element, property and date.
 - **A value nobody stated is a `?`.** The block carries no questionnaire IDs; the wizard's own
-  rule and the state-file hook refuse a manufactured answer set from the other side.
+  Rule 0 refuses a manufactured answer set from the other side.
 - **Intake asks nothing.** In a demo run its open questions are asked once, in `demo-prep-wizard`'s one
   sitting — the block is not confirmed separately.
 - **`purpose: demo` switches off what a demo does not need.** CI, the e2e suite migration and go-live

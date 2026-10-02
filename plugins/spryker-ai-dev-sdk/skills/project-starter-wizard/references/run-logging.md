@@ -12,8 +12,7 @@ of `SKILL.md` §3; it changes nothing about what any step does, which gate fires
 **Where.** Alongside the other run artifacts, in the clone's own tree — `.ai-dev/run.log`, a
 project-relative path like every other `.ai-dev/` file. The run is self-contained: never write run
 files outside this clone. It is created by the run and removed in the "Return to fresh" recipe, which
-hands the developer the `rm` command for `.ai-dev/project-setup.md` **(+ run logs)**; the hook denies
-`rm` under `.ai-dev/`.
+hands the developer the `rm` command for `.ai-dev/project-setup.md` **(+ run logs)** to run.
 
 The run's four files sit flat at `.ai-dev/` because the state file's path is load-bearing: pre-flight
 detects a prior run by it, Resume reads it, and "Return to fresh" lists it for the developer to delete.
@@ -24,10 +23,9 @@ from §3 onward appends to it. On **Resume**, do not start a new file: append a 
 going, so one run reads as one continuous timeline across interruptions.
 
 **How.** Write it with the built-in **Write / Edit / Read** tools, not the shell. This is a direct
-application of `SKILL.md` → Tooling discipline: `guard-bash.php` allows a `printf … >>` append to a
-non-state `.ai-dev/` file such as `run.log`, but denies shell writes into project files and guarded
-state files, and a redirect bypasses the `Edit|Write|MultiEdit` guard and (like pipes, `&&`, and
-subshells) can prompt regardless of the allowlist. Appending a line with
+application of `SKILL.md` → Tooling discipline: a `printf … >>` append to a non-state `.ai-dev/` file
+such as `run.log` is permitted, but a redirect (like pipes, `&&`, and subshells) can prompt regardless
+of the allowlist. Appending a line with
 `Edit` costs no prompt and keeps the run hands-off. Keep entries terse — one line per event:
 
 ```

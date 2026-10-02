@@ -1,16 +1,9 @@
 # Autonomous runs — stopping, delegating, and what "done" requires
 
-Every rule below is also enforced by a hook in `hooks/`. This file is the readable version of the
-same rules, so a run can follow them *before* tripping one.
-
-| rule | enforced by |
-|---|---|
-| a progress report does not end the turn | `guard-stop.php` |
-| a denied sub-agent call does not cancel the task | `guard-stop.php` |
-| a blocked command is recorded in the report and the turn continues | `guard-stop.php` |
-| a sub-agent prompt carries the tooling, the skill and the work class | `guard-agent.php` |
-| a design step is done against an evidenced sweep of every surface | `guard-files.php` |
-| a theme template/stylesheet is design work and has a skill | `guard-files.php` |
+These rules apply while `run_mode: autonomous`. Follow each of them as written. The plugin's Stop hook
+(`hooks/guard-stop.php`) backs the first one: while the state file's Steps table has a row that is not
+`done` or `skipped`, the turn cannot end, except on a question only the developer can answer — a
+`⚠ NEEDS YOU:` line or an `AskUserQuestion`.
 
 ---
 
@@ -71,7 +64,8 @@ tried).
 Sweep **every** surface after the **last** change, not incrementally, and write the evidence down: a
 measurement, a rendered value, a URL fetched, or a file path. The word "checked" on its own is not
 evidence. For design work the artifact is `.ai-dev/design-acceptance.md` — see
-`match-reference-design` §11a for the table and the surface list.
+`match-reference-design` §11a for the table and the surface list. A step that edited a theme
+template, stylesheet or theming yml is marked `done` only once that file is current.
 
 ## 4. Load the skill that owns the work
 

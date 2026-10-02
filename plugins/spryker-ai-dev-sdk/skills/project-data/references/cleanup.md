@@ -30,7 +30,7 @@ Present the domains actually present in `data/import/**` (scan; don't assume), i
 
 For a domain with a dedicated strategy, follow it: **subset of the catalog → reduce (`reduce.md`)**; **strip-everything → clean (`clean.md`)**. Otherwise apply the cascade here:
 1. **Identify the domain's files** by scanning headers/paths (don't trust a fixed list — the demoshop evolves).
-2. **Remove the rows/files** (`csv filter`/`delete`, or drop the file + its `source:` from the import config; a deletion git cannot restore is denied by the hook — leave it and list it in the report).
+2. **Remove the rows/files** (`csv filter`/`delete`, or drop the file + its `source:` from the import config; delete only files git can restore or that this run created — leave anything else in place and list it in the report).
 3. **Reconcile dependents — nothing may reference a removed key.** For a catalog removal, `php "$VALIDATE" product-refs data/import/common --keep-from <product_abstract>:abstract_sku --keep-from <product_concrete>:concrete_sku` to zero orphans. For other domains, scan for files referencing the removed entity's key (e.g. remove customers → their carts/wishlists/orders/reviews; remove merchants → their offers/commissions/relationships/stock). Every removal is a cascade; a dangling reference aborts the import.
 
 ## 3. Never remove operational config (the shop must still boot)

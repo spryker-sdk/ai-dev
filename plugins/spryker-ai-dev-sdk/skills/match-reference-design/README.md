@@ -39,7 +39,7 @@ flowchart TD
     LAD -- "1 · style / template" --> R1["frontend build · seconds"]
     LAD -- "2 · value on an existing row" --> R2["scoped data:import · under a minute"]
     LAD -- "3 · template change / cross-slot move" --> R3["New block key + old one active=0<br/>rung 2 cost for a rung 4 intent"]
-    LAD -- "4 · deletions / value changes on imported rows" --> R4["reset — announced, priced,<br/>rebuild-count quoted · 3rd rebuild:<br/>decision-log reason, then continue"]
+    LAD -- "4 · deletions / value changes on imported rows" --> R4["reset — announced, priced,<br/>gate first, rebuild count quoted ·<br/>3rd rebuild: decision-log reason, then continue"]
     R1 --> CYC
     R2 --> CYC
     R3 --> CYC
@@ -100,16 +100,17 @@ re-derived.
   defect is gone. Anything behind a login goes to the
   [spryker-verifier](../../agents/spryker-verifier.md) agent; this skill never logs in.
 
-## Enforced by hooks
+## Rules the agent follows
 
-From [hooks/README.md](../../hooks/README.md): `guard-browser.php` denies the built-in browser for the local
-shop; `guard-files.php` stops edits to gitignored build output and denies a design-closing step → `done`
-without an evidenced `.ai-dev/design-acceptance.md` — no row without evidence, not the same token on every
-row, and not older than the newest template edit or the last rebuild; `gate-docker-sdk.php` lets trusted
-rebuilds (demo clone, first setup, explicit "rebuilds" approval) through without a prompt, asks once on a
-project with real data, and from the third rebuild on a project denies until the decision log has
-`rebuild #N: <why rung 1 cannot show it>` — not a hard stop, the agent writes it and continues;
-`count-rebuild.php` keeps `.ai-dev/rebuild-count` (per project), quoted in every report.
+The local shop is driven in Claude in Chrome, never the built-in browser, which asks the person on every
+action for a local host. Gitignored build output is never edited; the source goes under
+`frontend/static/**` or the theme. A design-closing step is `done` only with an evidenced
+`.ai-dev/design-acceptance.md` — no row without evidence, not the same token on every row, and not older
+than the newest template edit or the last rebuild. Before a rebuild the agent runs `php <VALIDATE> gate`
+and stops on a gating finding; trusted rebuilds (demo clone, first setup, a standing "rebuilds" approval
+in the person's own words) run without a prompt, and on a project with real data the agent asks once. The
+agent counts rebuilds per project, quotes the count in every report, and before the third rebuild writes
+`rebuild #N: <why rung 1 cannot show it>` to the decision log and continues.
 
 ## Output
 

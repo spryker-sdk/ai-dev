@@ -33,7 +33,7 @@ and feel; the engineering is yours.
 - The plain-language table in `../project-starter-wizard/references/interview.md` applies to every line
   shown to them.
 
-**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host, and `guard-browser.php` denies it there.
+**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host.
 
 **You own the conversation and the flow; you own no mechanics.** Every phase below names the skill that
 does the work. Read that skill, hand it its input, take its output — never restate its rules and never
@@ -70,8 +70,8 @@ or points at; failing both, the brief's own prose. Read them where they are — 
 into a spec of our own. **If nothing supplied says what will be shown, say so in one line and ask for
 the script** — treat it as a missing input and do not design the demo yourself. Record which of the
 three it was in `.ai-dev/demo-prep.md`'s `answers_source:` line (`brief` | `script` | `paste`) and where
-it lives in its `brief:` line, so a resume hours later does not have to ask again. The hook identifies
-the state file's first write by its `answers_source:` line ([references/state-file.md](references/state-file.md)).
+it lives in its `brief:` line, so a resume hours later does not have to ask again
+([references/state-file.md](references/state-file.md)).
 
 ---
 
@@ -123,9 +123,9 @@ then decide how the row reaches the demo:
   the story, and offer it as a talking point on the run sheet instead.
 
 Show the preparer the table in **their** terms — what they asked for, how it will appear, your
-recommendation — and confirm the routing table with one AskUserQuestion whose question text contains the word
-"confirm" (`guard-files.php` looks for it in the question or header before the state file's first write). It is
-the run's routing confirmation, which stamps `answers_confirmed_at`; the one sitting's confirmation is the only other:
+recommendation — and confirm the routing table with one AskUserQuestion. The state file's first write
+waits for that answer. It is the run's routing confirmation, which stamps `answers_confirmed_at`; the one
+sitting's confirmation is the only other:
 
 | # | what you asked for | how it appears in the demo | recommended |
 |---|---|---|---|
@@ -227,11 +227,13 @@ and currencies, what happens to the sample products and the reference sites from
 asks nothing again**, and the one-sitting confirmation (`up_front_confirmed_at`) is its confirmation.
 Everything technical is derived. Let it own its own state file.
 
-**Trusted rebuilds** (a demo clone, first setup, or the preparer's explicit "rebuilds" approval) **run
-without a prompt**; on a project with real data the `gate-docker-sdk.php` hook asks once. Announce each
-in one line with its expected duration. From the **third rebuild on a project** (the count is per
-project, not per step) the hook denies until the decision log has a line `rebuild #N: <why rung 1
-cannot show it>` — write it and continue. It is not a hard stop and never interrupts the preparer.
+**Before every rebuild or `data:import`, run `php <VALIDATE> gate`** (the `validate.php` path in §6) and
+stop on a gating finding. **Trusted rebuilds** (a demo clone, first setup, or a standing "rebuilds"
+approval in the preparer's own words) **run without a prompt**; on a project with real data, ask the
+preparer once before the rebuild. Announce each in one line with its expected duration. **Count the
+rebuilds yourself** and quote the count in every step report (the count is per project, not per step).
+Before the **third rebuild on a project**, write a decision-log line `rebuild #N: <why rung 1 cannot
+show it>`, then continue. It is not a hard stop and never interrupts the preparer.
 
 ### 6 · Rehearsal
 
@@ -265,13 +267,13 @@ It proves the data exists, not that the story reads well, so the walk follows:
 
 **Gate:** every beat either passes or is a **named, accepted gap** — named to the preparer, accepted
 by the preparer (in an autonomous run, at the final review; the step is `done` once the walk is
-recorded). `guard-files.php` denies this step `done` without `.ai-dev/rehearsal.md` carrying
-pass/gap lines written after the last rebuild. A gap stays recorded as a gap; it is never reworded
+recorded). Mark this step `done` only when `.ai-dev/rehearsal.md` carries pass/gap lines written
+after the last rebuild. A gap stays recorded as a gap; it is never reworded
 into something the demo happens to do well.
 
 **A rehearsal fix that edits a template or style re-runs `match-reference-design` §11a** before `build` or
-`rehearsal` is marked `done`: `guard-files.php` requires a `.ai-dev/design-acceptance.md` newer than both
-the newest template or style edit and the last rebuild.
+`rehearsal` is marked `done`: either step is `done` only with a `.ai-dev/design-acceptance.md` newer
+than both the newest template or style edit and the last rebuild.
 
 ### 7 · Run sheet
 
@@ -285,9 +287,9 @@ in `.ai-dev/demo-run-sheet.html`, `.md` or `.txt`; a connector document is extra
 
 Same shape and same role as the wizard's `.ai-dev/project-setup.md`: the run **is** this file, written
 with Write/Edit. **Read [references/state-file.md](references/state-file.md) before its first write** —
-the frontmatter template, the Steps table, and how the plugin's hooks police the file: the first write
-waits for the confirmed routing table, and the phase-5 step skills wait for `answers_confirmed_at`. A
-denial from either hook means phase 2 is not closed: close it rather than working around the hook.
+the frontmatter template, the Steps table, and the rules the file follows: the first write waits for
+the confirmed routing table, and the phase-5 step skills wait for `answers_confirmed_at`. A missing
+confirmation means phase 2 is not closed: close it before going on.
 
 ---
 
@@ -441,9 +443,9 @@ Format: **signature → cause → fix.**
   between "it booted" and "it is ready" → phase 6: every beat is walked, in the browser, as its
   persona, before the run sheet is written.
 
-- **A phase 5 delegation is denied by `guard-skill.php`** → `.ai-dev/demo-prep.md` carries no
-  `answers_confirmed_at`, which means the routing table was never confirmed → do not work around the
-  hook and do not stamp the file to clear it: show the table, get the confirmation, then stamp.
+- **A phase 5 delegation is about to start while `.ai-dev/demo-prep.md` carries no
+  `answers_confirmed_at`** → the routing table was never confirmed → do not stamp the file to get past
+  it: show the table, get the confirmation, then stamp.
 
 - **The wizard's interview is run on the demo clone to collect demo scope** → the two tracks were
   conflated; `project-starter-wizard` collects *project setup* decisions and knows nothing about the

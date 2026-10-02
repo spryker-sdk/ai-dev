@@ -1,5 +1,5 @@
 {
-    "//": "Setup install (skills copied into .claude/skills, no plugin): merge this file into the project's .claude/settings.json. A plugin install gets the hooks from hooks/hooks.json and needs only the permissions block. The allow list is broad on command names, including `rm` and the browser JavaScript tools, because the hooks check the arguments: they deny a deletion git cannot restore and allow JavaScript on local pages. There are no ask rules, because a settings ask outranks a hook allow. `git -C` is intentionally not in the allow list.",
+    "//": "Setup install (skills copied into .claude/skills, no plugin): merge this file into the project's .claude/settings.json. A plugin install gets the Stop hook from hooks/hooks.json and needs only the permissions block. There are no ask rules. `git -C` is intentionally not in the allow list.",
     "permissions": {
         "allow": [
             "Bash(php:*)",
@@ -114,75 +114,6 @@
         ]
     },
     "hooks": {
-        "PreToolUse": [
-            {
-                "matcher": "Bash",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/gate-docker-sdk.php\" || exit 0",
-                        "timeout": 120
-                    },
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/guard-bash.php\" || exit 0",
-                        "timeout": 30
-                    }
-                ]
-            },
-            {
-                "matcher": "Edit|Write|MultiEdit",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/guard-files.php\" || exit 0",
-                        "timeout": 120
-                    }
-                ]
-            },
-            {
-                "matcher": "Agent|Task",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/guard-agent.php\" || exit 0",
-                        "timeout": 15
-                    }
-                ]
-            },
-            {
-                "matcher": "Skill",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/guard-skill.php\" || exit 0",
-                        "timeout": 15
-                    }
-                ]
-            },
-            {
-                "matcher": "mcp__Claude_Browser__.*|mcp__claude-in-chrome__javascript_tool",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/guard-browser.php\" || exit 0",
-                        "timeout": 15
-                    }
-                ]
-            }
-        ],
-        "PostToolUse": [
-            {
-                "matcher": "Bash",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "command -v php >/dev/null 2>&1 && exec php \"$CLAUDE_PROJECT_DIR/.claude/hooks/spryker-ai-dev-sdk/count-rebuild.php\" || exit 0",
-                        "timeout": 15
-                    }
-                ]
-            }
-        ],
         "Stop": [
             {
                 "hooks": [

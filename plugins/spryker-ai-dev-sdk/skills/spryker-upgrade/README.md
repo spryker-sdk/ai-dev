@@ -130,9 +130,6 @@ containing `upgrade-debt`. Suppressions (`phpcs:ignore`, `@phpstan-ignore`, `@ps
 `eslint-disable`, `@ts-ignore`, …) are reported with kind `suppression`: an upgrade fixes each finding
 instead of silencing it. Exit 0 clean, 1 findings, 2 no base ref.
 
-The plugin's `guard-files.php` hook enforces the same rule at edit time while
-`.spryker-upgrade/state/` exists (see the plugin's `hooks/README.md`, "guard-files.php (comments)").
-
 ## check-baselines.php — the Phase 1 gate
 
 ```bash
