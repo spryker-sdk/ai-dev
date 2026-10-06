@@ -11,6 +11,14 @@ fan-out, never a skipped review — it applies the same criteria and gates the s
 The skill itself is deliberately thin — it is the dispatcher. The actual Spryker review criteria
 live in the `spryker-code-reviewer` subagent it delegates to.
 
+**Frontend changes** (Twig, TS/JS, SCSS/LESS, MP HTML) are routed by surface to the project's
+frontend rules — `.claude/rules/yves-frontend.md` (Yves `Theme/**`),
+`.claude/rules/zed-backoffice-frontend.md` (Back Office Twig and `assets/Zed/**`),
+`.claude/rules/merchant-portal-angular.md` (`Presentation/Components/**`; MP page Twig gets both
+Zed and MP rules). Lint output from `static-validation`, when present, is reported first as tool
+findings and not re-derived; files no tool analysed (all Twig, eslint "no matching configuration")
+get full manual review. The only extra check beyond the rules: Yves XSS sinks (`|raw`, `innerHTML`).
+
 ## When it triggers
 
 Whenever a code review is requested.
@@ -43,7 +51,7 @@ flowchart TD
 ## Output
 
 Issues are always reported as `<path_from_git_root>:<line_number>` — e.g.
-`src/Spryker/Session/src/Spryker/Yves/Session/SessionConfig.php:10` — the format most IDEs and
+`src/Pyz/Yves/CartPage/CartPageConfig.php:10` — the format most IDEs and
 terminals turn into a clickable jump to the exact line.
 
 The final selection step lists issues **individually, not grouped**, so the user chooses precisely

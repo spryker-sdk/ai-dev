@@ -9,9 +9,10 @@ host fallback — many Spryker projects install it on the host only):
 
 - **PHP** — `phpcbf`, `phpcs`, `phpmd` (project architecture ruleset `phpmd.xml`, priority 4),
   `phpstan` (level 6).
-- **Frontend** — `eslint` (js/ts), `stylelint` (scss/css/less), `prettier` (all of the above +
-  json/html) — the same linters as `package.json`, but on **changed files only** instead of the
-  all-files globs (`eslint … './src/Pyz/Yves/**/*.{js,ts}'`, `prettier --check '**/*.…'`).
+- **Frontend** — `eslint` (js/ts, Merchant Portal html), `stylelint` (scss/css/less), `prettier`
+  (all of the above + json/html) — the same linters and configs as the `yves:*` / `mp:*` /
+  `formatter` npm scripts, but on **changed files only** instead of their all-files globs. Twig has
+  no linter; changed templates are listed as not analysed.
 
 It is the flexible successor to fixed, single-base validation scripts.
 
@@ -38,7 +39,7 @@ flowchart TD
 
     COLLECT --> ANY{"anything changed?"}
     ANY -- "no" --> OK0([exit 0 — nothing to validate])
-    ANY -- "yes" --> PART["Partition by extension<br/>.php &rarr; PHP<br/>.js/.ts &rarr; eslint + prettier<br/>.scss/.css/.less &rarr; stylelint + prettier<br/>.json/.html &rarr; prettier"]
+    ANY -- "yes" --> PART["Partition by extension<br/>.php &rarr; PHP<br/>.js/.ts, MP .html &rarr; eslint + prettier<br/>.scss/.css/.less &rarr; stylelint + prettier<br/>.json/.html &rarr; prettier<br/>.twig &rarr; listed, not analysed<br/>eslint/stylelint config per surface:<br/>Yves · Merchant Portal · other"]
 
     PART --> SKIP["PHP: skip generated code<br/>src/Generated, src/Orm"]
     SKIP --> SCOPE{"--scope"}
@@ -87,10 +88,16 @@ flowchart TD
   - `--scope module`: detect the changed Spryker **modules** (`src/{Org}/{Layer}/{Module}`) and
     validate each whole module directory — catches breakage in files you didn't edit but that live
     in the same module.
-- **Frontend, changed-only.** Changed files are partitioned by extension and each linter runs on
-  just those files: `.js/.ts` → eslint + prettier, `.scss/.css/.less` → stylelint + prettier,
-  `.json/.html` → prettier. Configs auto-load (`eslint.config.mjs`, `.stylelintrc.js`,
-  `.prettierrc.json`; `.prettierignore` honoured). `--scope` does not apply to FE files.
+- **Frontend, changed-only, per surface.** Changed files are partitioned by extension and each
+  linter runs on just those files: `.js/.ts` (+ Merchant Portal component `.html`) → eslint +
+  prettier, `.scss/.css/.less` → stylelint + prettier, other `.json/.html` → prettier. eslint and
+  stylelint get the config the surface's npm script uses: a legacy root `eslint.config.*` /
+  `.stylelintrc.js` when present; otherwise, for **Yves** (`*/Yves/*/Theme/*`) `eslint.config.yves.mjs`
+  / `.stylelintrc.js` or the ShopUi packaged builder config, and for the **Merchant Portal**
+  (`*/Zed/*/Presentation/Components/*`) `eslint.config.mp.mjs` / `.stylelintrc.mp.js` or the ZedUi
+  packaged config. Files no config covers (e.g. Back Office `assets/Zed/**` in the builder layout)
+  are flagged *NOT linted* and still get prettier. `--scope` does not apply to FE files. The surface
+  table, rebuild commands and what no tool checks are in `SKILL.md` → *Frontend surfaces*.
 - **Covers committed, uncommitted *and* brand-new files.** Diffs `base...HEAD` (merge-base — only
   what your branch adds, not what base moved forward with), plus working-tree edits, plus untracked
   (non-ignored) files.
@@ -135,10 +142,11 @@ bash "$SCD" --base main --tools phpcs,phpmd,phpstan,eslint,stylelint,prettier
 |---|---|---|
 | `-r, --repo <path>` | cwd's git repo | Project root to validate — run from anywhere. |
 | `-b, --base <ref>` | auto-detect | Base branch/ref to diff against. |
+| `-w, --working-tree` | off | Validate only uncommitted + untracked changes against `HEAD` (no base ref). |
 | `-s, --scope <mode>` | `files` | `files` or `module` — PHP grouping only (FE always individual). |
-| `--tools <list>` | all | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
+| `--tools <list>` | all except `phpcbf` | Subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. |
 | `--fix` | off | Autofix: phpcbf (always), eslint/stylelint `--fix`, prettier `--write`. |
-| `--include-tests` | off | Include `/tests/` files in phpcs/phpcbf. |
+| `--include-tests` | off | Include test files in phpcs/phpcbf and the frontend linters. |
 | `--dry-run` | off | Print plan + per-tool paths only, run nothing. |
 | `-h, --help` | — | Show usage. |
 
@@ -167,7 +175,7 @@ STATIC_CHECK_PHPSTAN_LEVEL=8 STATIC_CHECK_PHPSTAN_CONFIG=phpstan-strict.neon \
 
 | Code | Meaning |
 |---|---|
-| `0` | Clean, or dry-run, or nothing changed. |
+| `0` | Clean, or dry-run, or nothing changed. If changed files went unanalysed (Twig, eslint "no matching configuration", no config for the surface) they are listed and the verdict reads *"passed for the files it analysed ONLY"* — report those files as unlinted. |
 | `1` | **Code violations** reported by at least one tool. |
 | `2` | Usage error (bad option, unknown `--tools` name, unresolvable base, base == HEAD, not a git repo, skill's own dir as cwd), **or a tool that failed to RUN** (missing `src/Generated`, missing `node_modules`, unresolvable tool config), **or no tool was invoked at all**. |
 
@@ -189,8 +197,10 @@ the remediation. Do not report those as findings or try to fix code for them.
   `docker/sdk cli npm install`, or `npm ci` on the host.
 - Project configs present at repo root: PHP — `phpcs.xml`, `phpstan.neon`, and the project
   architecture ruleset `phpmd.xml` (if absent, the vendored
-  `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` is used). Frontend — `eslint.config.mjs`,
-  `.stylelintrc.js`, `.prettierrc.json`.
+  `vendor/spryker/architecture-sniffer/src/Project/ruleset.xml` is used). Frontend — `.prettierrc.json`,
+  plus either legacy root `eslint.config.*` / `.stylelintrc.js` or the ShopUi / ZedUi packaged lint
+  configs under `vendor/` (with optional `eslint.config.{yves,mp}.mjs`, `.stylelintrc{,.mp}.js`
+  project overrides).
 
 ## Caveats
 
@@ -199,6 +209,10 @@ the remediation. Do not report those as findings or try to fix code for them.
 - On Docker-for-Mac the file sync back to the host is slightly async — after an autofix run, the
   host copy updates a moment later. Re-run in check mode to confirm.
 - phpstan level and phpcs standard mirror the project QA baseline.
+- **eslint "no matching configuration" means not linted.** The packaged ShopUi/ZedUi eslint configs'
+  TS/HTML `files:` globs are monorepo-shaped, so in a builder-layout project changed Yves/MP `.ts`
+  and MP `.html` can be skipped — by this script (flagged) and by `yves:lint` / `mp:lint` (silently).
+- `npm run yves:lint -- --fix` / `mp:lint -- --fix` do nothing (fixed argv); use this script's `--fix`.
 - **phpmd runs BOTH rulesets, because CI does.** Spryker ships two and they are **disjoint, not nested**:
   `phpmd.xml` (project, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml` (core,
   priority 2 — ~26 rules found nowhere else, e.g. `FacadeReturnValueRule`, `SpyEntityUsageRule`).

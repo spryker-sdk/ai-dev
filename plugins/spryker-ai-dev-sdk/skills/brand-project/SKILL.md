@@ -1,6 +1,6 @@
 ---
 name: brand-project
-description: "Use when applying or changing a Spryker project's brand identity — project name, dev domain, and docker namespace at project start (a pre-boot wizard step), or a standalone repeatable rebrand any time: 'change the palette', 'apply a new brand colour', 'set the storefront logo', 'rebrand the shop'. Works pre- or post-boot."
+description: "Use when applying or changing a Spryker project's brand identity — project name, dev domain, and docker namespace at project start (a pre-boot wizard step), or a standalone repeatable rebrand any time: 'change the palette', 'apply a new brand colour', 'set the storefront logo', 'rebrand the shop'. Works pre- or post-boot. Palette-wide colours and logos via Configuration only — styling one component is the frontend skills' job."
 ---
 
 # brand-project
@@ -68,3 +68,5 @@ Changing an already-set-up project's palette is **this same skill with only the 
 - **Pre-boot project:** nothing to run; the values flow at the next boot.
 
 Business admins can still override any colour in Back Office → Configuration → Theme; "Use Default" returns to this palette. This ships **defaults**, not seeded values — so a re-run overrides only what has not been manually overridden. Repeatable any number of times.
+
+Scope: palette values only. These settings reach the page as CSS custom properties on `:root` (Yves `--background-brand-primary`, … over the build-time `design-tokens.json`; Back Office `--bo-main-color`; MP `--spy-primary-color`). Component styling that consumes them, and the Yves design tokens, belong to `yves-atomic-frontend` and `backoffice-frontend`.

@@ -8,17 +8,33 @@ description: Use when code review is requested
 1. Identify the code to review from the context of parameters. If the caller passed an explicit **file list**, that list is the review target instead of the full diff — findings outside it are out of scope and reported as such.
 2. If is not provided by the context, ask for it, suggest reviewing changes against the master`git diff $(git merge-base HEAD master)`
 3. Determine the **reviewer count**, scaled to the change: a small diff — on the order of a handful of files — gets a **single reviewer**; the 3-5 fan-out is for large or complex diffs. Use the caller's explicit count if one was given; else derive it from a caller-supplied diff `size` — `trivial` (≤~10 changed lines, 1 file) → **1**, `normal` → **3-5**, `complex` → **5**. **With neither supplied, use 3-5** (the unchanged default). A count of 1 is a smaller fan-out, never a skipped review: the reviewer applies the full `spryker-code-reviewer` criteria and its findings gate exactly as 3-5 reviewers' would.
-4. Split the code for review among that many spryker-code-reviewer subagents by directories and delegate them code review in parallel
+4. Split the code for review among that many spryker-code-reviewer subagents by directories and delegate them code review in parallel. If the target contains frontend files, apply **Frontend changes** below when splitting and briefing.
 5. Wait for the review to be completed by subagents
 6. Combine the code review results and provide it to the User
 7. Create an interactive selection interface in the terminal for User to choose which exact issues to fix from the code review (do not group them in selection).
 8. Suggest planning to fix code review issues
 
+# Frontend changes
+
+Frontend files are reviewed against the project's frontend rules — pass the matching rule path to the reviewer that owns those files:
+
+| Changed files | Rule |
+|---|---|
+| Yves storefront — `src/*/Yves/*/Theme/**/*.{ts,js,scss,twig}` | `.claude/rules/yves-frontend.md` |
+| Back Office — `src/*/Zed/*/Presentation/**/*.twig` (outside `Components/`, not a `*MerchantPortalGui` module), `src/*/Zed/*/assets/Zed/**/*.{js,scss}`, `config/Zed/navigation.xml` | `.claude/rules/zed-backoffice-frontend.md` |
+| Merchant Portal — `src/*/Zed/*/Presentation/Components/**/*.{ts,html,less}` | `.claude/rules/merchant-portal-angular.md` |
+| Merchant Portal pages — Twig in `src/*/Zed/*MerchantPortalGui/Presentation/**` (outside `Components/`) | both `.claude/rules/zed-backoffice-frontend.md` and `.claude/rules/merchant-portal-angular.md` |
+
+- Keep a component's files together (its Twig, TS and SCSS/LESS) with one reviewer — the conventions span them.
+- If a rule file is missing from the project, say so in the combined result; do not substitute remembered conventions.
+- Lint findings are not the reviewer's job: if `static-validation` output for this diff is in context, list it first as **Tool findings** and do not re-derive it. Files that run reported as *not analysed* — every `.twig`, and any eslint "no matching configuration" / "NOT linted" file — get a full manual review, because no tool looked at them.
+- The rules cover translations and accessibility on all three surfaces and XSS for Back Office and Merchant Portal. For **Yves** additionally flag, as a security finding, customer- or merchant-controlled data reaching Twig `|raw` or a TS `innerHTML`/`insertAdjacentHTML` sink — no linter catches it.
+
 # Output Format
 
 When reporting issues, always use the clickable file path format:
 - Format: `<path_from_git_root>:<line_number>`
-- Example: `src/Spryker/Session/src/Spryker/Yves/Session/SessionConfig.php:10`
+- Example: `src/Pyz/Yves/CartPage/CartPageConfig.php:10`
 
 
 This format is recognized by most IDEs and terminals, allowing users to click and navigate directly to the issue location.

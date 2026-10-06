@@ -54,7 +54,7 @@ flowchart TD
     GATE1 -- "answered" --> S4
 
     S4["Step 4 — Edit, per the chosen bar<br/>project layer only · never vendor/ ·<br/>never src/Generated or src/Orm ·<br/>track every file you touch"]
-    S4 -- "new UI element" --> FE["HARD pre-edit gate:<br/>Skill yves-atomic-frontend BEFORE<br/>the first write to Theme/default/components<br/>or any new .scss/.ts"] --> S4
+    S4 -- "new UI element" --> FE["HARD pre-edit gate:<br/>Skill yves-atomic-frontend /<br/>backoffice-frontend BEFORE the first<br/>write to that surface's Twig/.scss/.ts"] --> S4
     S4 -- "why is this doing X at runtime?" --> DBG["Skill ai-runtime-debugging<br/>[AI-DEBUG] tagged logs"] --> S4
     S4 --> S5["Step 5 — Skill spryker-refresher<br/>pass the edited-file list<br/>NEVER inline a docker/sdk console command"]
     S5 -- "non-zero exit" --> DIAG5["spryker-issue-diagnoser"] --> S5
@@ -157,7 +157,7 @@ via the **`Skill`** tool. The two are never swapped.
 |---|---|---|
 | 0c | `product-requirement-document` | Skill |
 | 3 | `spryker-feature-expert` — always, before planning; parallel per domain | Agent |
-| 4 | `yves-atomic-frontend` (hard pre-edit gate for any UI element) | Skill |
+| 4 | `yves-atomic-frontend` / `backoffice-frontend` (hard pre-edit gate for any UI element, per surface) | Skill |
 | 4 / 7 | `ai-runtime-debugging` — when runtime values aren't in logs / DB / browser state | Skill |
 | 4 / 6 | `spryker-data-seeder` — whenever a case needs data that doesn't exist | Agent |
 | 5 | `spryker-refresher` — mandatory; the orchestrator must not inline console commands | Skill |

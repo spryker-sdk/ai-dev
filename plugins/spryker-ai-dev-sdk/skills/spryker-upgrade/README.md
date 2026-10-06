@@ -268,7 +268,10 @@ php $UP/twig-shadow-map.php diff       # after — exit 1 on conflicts
 notes for files that appeared in an overridden module scope (template splits, new
 sub-components an override may need to reference).
 
-Known POC limits: assumes vendor theme `default`; Glue has no twig in this repo.
+Known POC limits: assumes vendor theme `default`; Glue has no twig in this repo; scans `src/Pyz` only
+(not a custom namespace); and a Twig override that `extends` the core file explicitly
+(`'@SprykerShop:<Module>'`, `'@Spryker:<Module>/…'`) is reported like a full shadow although vendor
+changes outside its blocks still reach the page — review its blocks, don't text-merge it.
 
 ## bin/check-plugin-usage.php — replaced plugin stacks (UC3)
 
