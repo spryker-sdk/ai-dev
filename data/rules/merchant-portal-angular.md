@@ -41,5 +41,3 @@ Merchant Portal Angular code MUST reuse the installed `@spryker/*` UI components
 - `mp:test` passes with no tests; confirm your spec ran. Never `xit`/`skip` or weaken an assertion to reach green.
 - `max-lines` is off for Merchant Portal. `eslint-disable`, `stylelint-disable`, `@ts-ignore` and `@ts-expect-error` each need a comment explaining why the rule cannot apply.
 - Merchant Portal has no Nx, no Storybook (`.stories.ts`) and no Atomic Design level tagging. Do not invent workflows around them.
-
-For the create/extend/register/Twig/spec/build procedure, the core-override recipe, UI component lookup and the ESLint override config, use the `merchant-portal-frontend` skill.

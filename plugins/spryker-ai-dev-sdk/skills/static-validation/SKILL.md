@@ -236,7 +236,7 @@ project's frontend rules (`.claude/rules/yves-frontend.md`, `zed-backoffice-fron
   the provided project(s)` — `tsconfig.yves.json` `include` lacks `./src/{ProjectNamespace}/Yves/**/*`
   (the same entry the build needs; one-time setup in the `configure-codebase` skill). That is a wiring
   gap, not a violation. Merchant Portal Angular code outside `src/Pyz` is linted but never built — the
-  ZedUi builder only builds `src/Pyz/Zed` (`merchant-portal-frontend`).
+  ZedUi builder only builds `src/Pyz/Zed`.
 - **To autofix eslint, use this script's `--fix`** (it calls eslint directly). `npm run yves:lint -- --fix`
   and `npm run mp:lint -- --fix` are silently ignored — the wrappers build a fixed argv — and still
   exit 0. `yves:stylelint` / `mp:stylelint` do accept `-- --fix` and `-- -p <file>`.

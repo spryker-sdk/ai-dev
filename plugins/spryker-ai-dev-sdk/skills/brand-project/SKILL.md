@@ -69,4 +69,4 @@ Changing an already-set-up project's palette is **this same skill with only the 
 
 Business admins can still override any colour in Back Office → Configuration → Theme; "Use Default" returns to this palette. This ships **defaults**, not seeded values — so a re-run overrides only what has not been manually overridden. Repeatable any number of times.
 
-Scope: palette values only. These settings reach the page as CSS custom properties on `:root` (Yves `--background-brand-primary`, … over the build-time `design-tokens.json`; Back Office `--bo-main-color`; MP `--spy-primary-color`). Component styling that consumes them, and the Yves design tokens, belong to `yves-atomic-frontend`, `backoffice-frontend` and `merchant-portal-frontend`.
+Scope: palette values only. These settings reach the page as CSS custom properties on `:root` (Yves `--background-brand-primary`, … over the build-time `design-tokens.json`; Back Office `--bo-main-color`; MP `--spy-primary-color`). Component styling that consumes them, and the Yves design tokens, belong to `yves-atomic-frontend` and `backoffice-frontend`.

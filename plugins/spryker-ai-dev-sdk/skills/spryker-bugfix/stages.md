@@ -379,7 +379,7 @@ Identify *why* it happens, with **code references and an explanation**, not a gu
 
 - Apply the smallest correct change that fixes the root cause.
 - **Frontend fix** (Twig, SCSS, TS/JS, MP Angular): load the surface's skill before the first edit —
-  `yves-atomic-frontend`, `backoffice-frontend` or `merchant-portal-frontend`. It owns the
+  `yves-atomic-frontend` or `backoffice-frontend`. It owns the
   override/extend rules and the rebuild/cache commands that make the change visible.
 - **Use subagents in parallel** for independent edits when the fix spans multiple files/modules, to
   speed things up. Keep each subagent's task scoped and hand it the root-cause context.
