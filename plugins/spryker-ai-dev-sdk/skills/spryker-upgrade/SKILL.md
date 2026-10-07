@@ -344,7 +344,8 @@ exits 0. Read the lane's section of [references/lanes.md](references/lanes.md) w
   `merge-shadowed-files.php --dry-run`, then `--apply`; resolve the CONFLICTED rest semantically
   (vendor structure wins, project business content wins); never commit `*.merge-conflict` files;
   drop comments copied verbatim from the vendor counterpart (an `upgrade-debt:` marker stays);
-  finish with a clean `npm run yves` in the container.
+  finish with a clean `npm run yves` (and `npm run zed` / `npm run mp:build` for Zed/MP entries) in the
+  container, then render the merged pages — the Yves build does no type-checking.
 - **Lane 3 — Plugin stacks and deprecations** (`plugin-usage-report.json`) — below.
 - **Lane 4 — Config constants and transfer definitions** (`config-constants-report.json`,
   `transfer:generate`). Constants move to config methods per the guide; transfer `strict` attributes

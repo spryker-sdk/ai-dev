@@ -273,7 +273,7 @@ For "did clicking X actually fire a request?", don't rely on a `window.fetch` mo
 
 ### ⚠️ ALWAYS hard-reload / clear cache after rebuilding assets
 
-**After ANY frontend asset compilation — `docker/sdk cli npm run zed`, `npm run yves`, `yves:watch`, or any build that regenerates JS/CSS bundles — you MUST hard-reload the browser (cache-bypassing) before testing the UI. Always do this; do not skip it.**
+**After ANY frontend asset compilation — `docker/sdk cli npm run zed`, `npm run yves`, `yves:watch`, `npm run mp:build`, or any build that regenerates JS/CSS bundles — you MUST hard-reload the browser (cache-bypassing) before testing the UI. Always do this; do not skip it.**
 
 Why this bites silently: Spryker serves bundles at a **stable URL** (e.g. `/assets/js/<bundle>.js?v=current` — the `?v=current` does **not** change across builds). So a normal reload keeps serving the **old cached bundle** from the browser's HTTP disk cache, and your JS/CSS change appears to "not take effect" even though the server has the new code. This is the #1 cause of "I rebuilt but nothing changed" — it's stale cache, not a broken build.
 
@@ -306,7 +306,7 @@ When a page 500s, a change "doesn't take effect", navigation/menu looks stale, a
 | --- | --- |
 | General "my change isn't showing" / stale app cache | `docker/sdk cli console cache:empty-all` |
 | Twig template change / new `.twig` not picked up, or template-not-found | `docker/sdk cli console twig:cache:warmer` |
-| Back Office menu / navigation looks wrong or stale | `docker/sdk cli console navigation:cache:remove` |
+| Back Office menu / navigation looks wrong or stale | `docker/sdk cli console navigation:cache:remove` → `navigation:build-cache` |
 | Route 404 / new controller-action URL not resolving (Zed) | `docker/sdk cli console router:cache:warm-up` (regenerate Zed router cache) |
 | Route 404 specifically in Back Office / Merchant Portal / Backend Gateway (each has its OWN router cache — the generic warm-up does not cover them) | `docker/sdk cli console router:cache:warm-up:backoffice` / `router:cache:warm-up:merchant-portal` / `router:cache:warm-up:backend-gateway` |
 | Diagnose a 404: confirm whether a route is actually registered / which one matches a path | `docker/sdk cli console router:match <path>`, or `debug:router` / `router:debug:backoffice` / `router:debug:backend-gateway` to dump registered routes |
@@ -314,7 +314,7 @@ When a page 500s, a change "doesn't take effect", navigation/menu looks stale, a
 | New factory/plugin not picked up, or "method not found" on a resolved class | `docker/sdk cli console cache:class-resolver:build` (after `dump-autoload -o`) |
 | New/changed transfer not available (missing getter, `Generated\…` error) | `docker/sdk cli console transfer:generate` |
 | DB schema change / Propel entity not reflecting a column | `docker/sdk cli console propel:install` |
-| Frontend JS/CSS change not visible | rebuild assets (`npm run zed`/`yves`) **then hard-reload the browser** — see the asset-cache warning in Mode 3 |
+| Frontend JS/CSS change not visible | rebuild assets (`npm run yves` / `zed` / `mp:build`) **then hard-reload the browser** — see the asset-cache warning in Mode 3 |
 | A Zed panel/widget renders but its buttons do nothing (no JS error, no request) | the JS controller was likely **never constructed** — see the inert-controller note below |
 | Published data missing from storefront (Redis/Elasticsearch) | ensure the P&S worker runs: `docker/sdk cli console queue:worker:start` (and/or `publish:trigger-events`) |
 

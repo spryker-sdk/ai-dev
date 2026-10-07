@@ -17,7 +17,9 @@ the default stays English copies until the developer asks.
 Strictly **per-locale and opt-in**. `en_US` stays the untouched source and fallback.
 
 Not here: the English-copy default and URL localization (both `project-data` adapt); machine-
-translation *quality* (the translator's concern — this skill guarantees the mechanics are safe).
+translation *quality* (the translator's concern — this skill guarantees the mechanics are safe);
+Back Office / Merchant Portal labels (Zed translator CSVs + `translator:generate-cache` — see
+`backoffice-frontend`).
 
 ## Flow schema
 

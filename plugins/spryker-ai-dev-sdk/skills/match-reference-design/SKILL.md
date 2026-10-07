@@ -198,7 +198,7 @@ change (one thing) → build → look (screenshot, every sweep width) → compar
   rejection undoes both.
 - **Never report a visual result that was not looked at.** A markup `grep`, a `curl`, an identical
   DOM diff — none of them are evidence about appearance. They prove a string is present, never that
-  it is legible, aligned, or the right size (`yves-atomic-frontend` → Verifying a UI Fix).
+  it is legible, aligned, or the right size (`../yves-atomic-frontend/references/storefront-fixes.md` → Verifying a UI Fix).
 - **After a build, hard-reload before measuring**; after a `.twig` edit clear the compiled Twig cache
   (`src/Generated/Yves/Twig/codeBucket`, never `data/cache/Yves/<env>` — that is the DI container), and
   after creating a new override rebuild the path map — `yves-atomic-frontend` owns both recipes.

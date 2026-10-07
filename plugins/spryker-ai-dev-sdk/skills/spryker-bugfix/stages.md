@@ -378,6 +378,9 @@ Identify *why* it happens, with **code references and an explanation**, not a gu
 ## Step 5 — Implement the fix & verify it resolves the bug
 
 - Apply the smallest correct change that fixes the root cause.
+- **Frontend fix** (Twig, SCSS, TS/JS, MP Angular): load the surface's skill before the first edit —
+  `yves-atomic-frontend` or `backoffice-frontend`. It owns the
+  override/extend rules and the rebuild/cache commands that make the change visible.
 - **Use subagents in parallel** for independent edits when the fix spans multiple files/modules, to
   speed things up. Keep each subagent's task scoped and hand it the root-cause context.
 - **Verify against the bug**, not just the unit: re-run the Step 3 repro and confirm the symptom is
@@ -536,7 +539,7 @@ evidence, not just green tests.
   via `ToolSearch` first — passing `subagent_type="spryker-verifier"`), or a
   subagent using **`Skill(spryker-runtime)`** if you prefer a raw runtime drive. Hand it the changed
   files, the repro scenarios, the acceptance expectation (the exact user-visible symptom that must be
-  gone), and any env gotchas. It drives the affected surface (Yves / Back Office / Glue as relevant),
+  gone), and any env gotchas. It drives the affected surface (Yves / Back Office / Merchant Portal / Glue as relevant),
   writes its evidence to `$BUGFIX_DIR/final-verify-attempt<N>.log`, and returns only a **PASS / FAIL /
   BLOCKED** verdict with the decisive evidence (status code, the now-correct rendered value, DB/queue
   state as applicable).

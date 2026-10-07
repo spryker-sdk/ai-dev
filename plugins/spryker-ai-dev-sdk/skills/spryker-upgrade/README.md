@@ -372,6 +372,11 @@ the vendor file listing per scope. `diff` reports `VENDOR_FILE_CHANGED` with a r
 for renamed/deleted vendor files, and informational `NEW_VENDOR_FILE` notes for files that appeared in
 an overridden module scope (template splits, new sub-components an override may need to reference).
 
+Known limits: assumes vendor theme `default`; scans `src/Pyz` only (not a custom namespace); and a Twig
+override that `extends` the core file explicitly (`'@SprykerShop:<Module>'`, `'@Spryker:<Module>/…'`) is
+reported like a full shadow although vendor changes outside its blocks still reach the page — review its
+blocks, don't text-merge it.
+
 ## check-plugin-usage.php — replaced plugin stacks
 
 ```bash
