@@ -13,6 +13,8 @@
  * Usage:
  *   php $UP/check-baselines.php                   # all baselines required
  *   php $UP/check-baselines.php --no-backoffice   # Back Office smoke baseline not required
+ *   php $UP/check-baselines.php --no-data         # storage/search counts baseline not required: the
+ *                                                 # publish check (storage-search-counts --compare) is not done
  *
  * Exit 0 when all required baselines hold a result, 1 when any is missing or holds none, 2 on usage
  * error.
@@ -29,6 +31,8 @@ const BL_REQUIRED = [
     'sniff-baseline.txt' => 'code sniffer output before the upgrade',
     'evaluator-baseline.txt' => 'spryker-sdk/evaluator output before the upgrade',
     'backoffice-smoke-baseline.json' => 'php $UP/backoffice-smoke.php --url <zed url> --baseline',
+    'constant-overrides-baseline.json' => 'php $UP/check-constant-overrides.php --snapshot',
+    'storage-search-counts-before.json' => 'cp $UP/storage-search-counts.php .spryker-upgrade/state/ && docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before',
 ];
 
 const BL_POST_TOOLING = [
@@ -70,6 +74,19 @@ function bl_content_problem(string $file, string $contents): ?string
 
         return is_array($decoded) && is_array($decoded['results'] ?? null) ? null : 'not a backoffice-smoke report (no "results" list)';
     }
+    if ($file === 'constant-overrides-baseline.json') {
+        $decoded = json_decode($contents, true);
+
+        return is_array($decoded) && is_array($decoded['overrides'] ?? null) ? null : 'not a constant-overrides snapshot (no "overrides" list)';
+    }
+    if ($file === 'storage-search-counts-before.json') {
+        $decoded = json_decode($contents, true);
+        if (!is_array($decoded) || !is_array($decoded['tables'] ?? null)) {
+            return 'not a storage-search-counts snapshot (no "tables" map)';
+        }
+
+        return (int)($decoded['totalRows'] ?? 0) > 0 ? null : 'no rows: the environment held no published data (boot with --data, drain the queues)';
+    }
     $tool = explode('-', $file)[0];
     if ($tool === 'codecept') {
         return preg_match('/\bOK \(\d+ tests?|\bTests: \d+|FAILURES!|ERRORS!/', $text) === 1
@@ -102,11 +119,11 @@ function bl_content_problem(string $file, string $contents): ?string
  *
  * @return array<string, ?string>
  */
-function bl_status(string $stateDir, bool $requireBackoffice): array
+function bl_status(string $stateDir, bool $requireBackoffice, bool $requireData = true): array
 {
     $status = [];
     foreach (array_keys(BL_REQUIRED) as $file) {
-        if ($file === 'backoffice-smoke-baseline.json' && !$requireBackoffice) {
+        if (($file === 'backoffice-smoke-baseline.json' && !$requireBackoffice) || ($file === 'storage-search-counts-before.json' && !$requireData)) {
             continue;
         }
         $path = $stateDir . '/' . $file;
@@ -127,21 +144,22 @@ function bl_main(array $argv): int
     require_once __DIR__ . '/bootstrap.php';
 
     foreach (array_slice($argv, 1) as $arg) {
-        if (!in_array($arg, ['--no-backoffice', '--help'], true)) {
-            fwrite(STDERR, "Unknown argument: $arg\nUsage: php check-baselines.php [--no-backoffice]\n");
+        if (!in_array($arg, ['--no-backoffice', '--no-data', '--help'], true)) {
+            fwrite(STDERR, "Unknown argument: $arg\nUsage: php check-baselines.php [--no-backoffice] [--no-data]\n");
 
             return 2;
         }
     }
     if (in_array('--help', $argv, true)) {
-        fwrite(STDOUT, "Usage: php check-baselines.php [--no-backoffice]\n");
+        fwrite(STDOUT, "Usage: php check-baselines.php [--no-backoffice] [--no-data]\n");
 
         return 0;
     }
 
     $root = spryker_upgrade_project_root();
     $stateDir = spryker_upgrade_state_dir($root);
-    $status = bl_status($stateDir, !in_array('--no-backoffice', $argv, true));
+    $requireData = !in_array('--no-data', $argv, true);
+    $status = bl_status($stateDir, !in_array('--no-backoffice', $argv, true), $requireData);
     $missing = array_keys(array_filter($status, static fn(?string $problem): bool => $problem === 'missing'));
     $noResult = array_filter($status, static fn(?string $problem): bool => $problem !== null && $problem !== 'missing');
 
@@ -165,7 +183,10 @@ function bl_main(array $argv): int
             $problem === 'missing' => BL_REQUIRED[$file] ?? BL_POST_TOOLING[$file],
             default => $problem . ' — re-run: ' . (BL_REQUIRED[$file] ?? BL_POST_TOOLING[$file]),
         };
-        fwrite(STDOUT, sprintf("  %-10s %-32s %s\n", $label, $file, $detail));
+        fwrite(STDOUT, sprintf("  %-10s %-34s %s\n", $label, $file, $detail));
+    }
+    if (!$requireData) {
+        fwrite(STDOUT, "\n  --no-data: no storage/search counts baseline, so the publish check (storage-search-counts --compare) is not done.\n");
     }
     $failing = count($missing) + count($noResult);
     fwrite(STDOUT, "\n" . ($failing === 0

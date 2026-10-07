@@ -7,6 +7,7 @@ that close a lane; this file holds how to do the work inside it.
 - [Lane 2 — Shadowed frontend/presentation files](#lane-2--shadowed-frontendpresentation-files)
 - [Lane 3 — Plugin stacks and deprecations](#lane-3--plugin-stacks-and-deprecations)
 - [Lane 4 — Config constants and transfer definitions](#lane-4--config-constants-and-transfer-definitions)
+- [Constant overrides (all lanes)](#constant-overrides-all-lanes)
 - [Lane 5 — A dependency with no compatible release](#lane-5--a-dependency-with-no-compatible-release)
 
 ## Lane 1 — Dead overrides and broken classes
@@ -53,9 +54,16 @@ of that key — if so it may be handing core the wrong type.
 3. Every touched behaviour needs a test proving it survived — through the Facade or Client, per
    [testing.md](testing.md). Write it before porting if none exists.
 
+**1e. Constant overrides on other classes** (`constant-overrides-report.json`, `lane: Lane 1` — a
+Factory or any class that is neither DependencyProvider nor Config). Resolve them as in
+[Constant overrides](#constant-overrides-all-lanes) below.
+
 ## Lane 2 — Shadowed frontend/presentation files
 
-Input: `twig-conflicts-report.json`. Batch the mechanical part first:
+Inputs: `twig-conflicts-report.json`, and the `PRODUCT_GROUP_WIDGET_REMOVED` finding of
+`performance-report.json` — `spryker-shop/shop-ui` 1.103.0 removes `ProductGroupWidget` from
+three molecules; restore it in the project templates as [performance.md](performance.md) describes.
+Batch the mechanical part of the shadowed files first:
 
 ```bash
 php $UP/merge-shadowed-files.php --dry-run   # classify
@@ -97,7 +105,8 @@ decision; record them in a worklist instead of forcing a textual merge.
 
 ## Lane 3 — Plugin stacks and deprecations
 
-Input: `plugin-usage-report.json`.
+Inputs: `plugin-usage-report.json`, and the `constant-overrides-report.json` entries with
+`lane: Lane 3` (DependencyProvider constants; see [Constant overrides](#constant-overrides-all-lanes)).
 
 ### MISSING vendor plugins (damage)
 
@@ -157,6 +166,9 @@ the open deprecation list, with the table row.
 
 ## Lane 4 — Config constants and transfer definitions
 
+**Config classes** (`constant-overrides-report.json`, `lane: Lane 4`): see
+[Constant overrides](#constant-overrides-all-lanes).
+
 **Config** (`config-constants-report.json`): for each TYPE_MISSING / CONSTANT_MISSING the migration
 guide names the replacement (typical pattern: `XConstants::FOO` moves to `XConfig::getFoo()` — then
 the value belongs in a Pyz config class override, not `config_default.php`). Apply, and verify with
@@ -175,6 +187,29 @@ of them at once instead of iterating. Check both levels, because they are separa
 For each project transfer/property that core also declares, match core's `strict` value. A strict
 transfer generates typed constants (`public const string FOO = 'foo'`) rather than untyped ones — the
 constants still exist, so `Transfer::FOO` references keep working.
+
+## Constant overrides (all lanes)
+
+`check-constant-overrides.php` lists every constant a project class redeclares with a value that
+differs from its vendor ancestor (`differing`, for review), and every core value that changed or
+disappeared since the Phase 0 snapshot under a project override (`coreChanges`, the findings).
+
+- **`CORE_VALUE_CHANGED`** — the project keeps its value while core moved. Read why core changed it
+  (Lane 0 guide, CHANGELOG, tag diff). When the new core code depends on the new value (a renamed
+  queue, key, resource or format), port the project value to the new form. When the project value is
+  a setting core still supports, keep it: the pre-upgrade behaviour is the default under the Scope
+  rule. A project value equal to the old core value only restated the old default; ask the developer
+  whether that pin is intended, and record the answer.
+- **`CORE_CONSTANT_REMOVED`** — core removed the constant, so the project value has no effect.
+  Find the replacement (a config method, a renamed constant) and move the value there, or
+  delete the constant.
+- `newOverlaps` — core added a constant the project already declared, so the project value replaces
+  core's. Review each like a `CORE_VALUE_CHANGED`.
+- `differing` entries without a core change are the project's existing configuration: list them in
+  the report, change nothing. `comparison: expression` means the values reference other classes or
+  call functions and were compared as text.
+
+The report names each decision; every changed behaviour gets a test through the Facade or Client.
 
 ## Lane 5 — A dependency with no compatible release
 

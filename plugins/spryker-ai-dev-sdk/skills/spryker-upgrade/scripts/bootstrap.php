@@ -89,6 +89,29 @@ function spryker_upgrade_rel(string $path, string $projectRoot): string
 }
 
 /**
+ * The project's own namespaces: the `KernelConstants::PROJECT_NAMESPACES` entries of
+ * config/Shared/config_default.php that have a `src/<Ns>/` directory, else `Pyz`.
+ *
+ * @return list<string>
+ */
+function spryker_upgrade_project_namespaces(string $projectRoot): array
+{
+    $configFile = $projectRoot . '/config/Shared/config_default.php';
+    $namespaces = [];
+    $code = is_file($configFile) ? (string)file_get_contents($configFile) : '';
+    if (preg_match('/KernelConstants::PROJECT_NAMESPACES\]\s*=\s*(?:\[|array\()(.*?)(?:\]|\))\s*;/s', $code, $m)) {
+        preg_match_all('/[\'"]([A-Za-z_][A-Za-z0-9_]*)[\'"]/', $m[1], $names);
+        foreach ($names[1] as $name) {
+            if (is_dir($projectRoot . '/src/' . $name)) {
+                $namespaces[] = $name;
+            }
+        }
+    }
+
+    return $namespaces === [] ? ['Pyz'] : array_values(array_unique($namespaces));
+}
+
+/**
  * Run git in the project root without a shell.
  *
  * @param list<string> $args

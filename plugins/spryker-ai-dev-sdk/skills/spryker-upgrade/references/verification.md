@@ -1,7 +1,8 @@
 # Verification and report — Phase 5 to Phase 7 detail
 
-Read the Phase 5 section before the first regeneration command, the Phase 6.5 section before the Back
-Office crawl, and the report section before writing Phase 7.
+Read the Phase 5 section before the first regeneration command, the publish check section before the
+first `storage-search-counts.php` snapshot, the Phase 6.5 section before the Back Office crawl, and the
+report section before writing Phase 7.
 
 ## Phase 5 — regeneration is not read-only
 
@@ -47,6 +48,51 @@ else `codecept-baseline.txt` — with the exact invocation Phase 0 pinned. A tes
 baseline and is still red is not upgrade damage — list it under "Tests already red before the
 upgrade". A test that was green and is now red is classified in Phase 5.5 (app damage, harness
 damage or environment noise).
+
+## Publish check — storage and search row counts (Phase 0, Phase 4.9 / 5.5)
+
+`storage-search-counts.php` counts the rows of every `*_storage` and `*_search` table. A publisher, a
+storage or search plugin, or an event subscriber lost in the upgrade leaves its table with fewer rows,
+or none, after the same import. The database is reachable only from the cli container, so the script
+is copied into the state directory (inside the project) and run there:
+
+```bash
+cp $UP/storage-search-counts.php .spryker-upgrade/state/
+script -q /dev/null docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
+# upgraded environment, same data imported and published:
+script -q /dev/null docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot after
+php .spryker-upgrade/state/storage-search-counts.php --compare before after
+```
+
+It connects with the variables the Docker SDK sets in the cli container: `SPRYKER_DB_ENGINE` (`mysql`
+for MySQL and MariaDB, `pgsql` for PostgreSQL), `SPRYKER_DB_HOST`, `SPRYKER_DB_PORT`,
+`SPRYKER_DB_DATABASE`, `SPRYKER_DB_USERNAME`, `SPRYKER_DB_PASSWORD`. `--dsn`, `--user` and
+`--password-env <VAR>` override them. A snapshot counts the database the cli container is configured
+for; the JSON records its name, and `--compare` notes a different engine or database.
+
+The comparison is valid only when both snapshots meet the same conditions; each snapshot records its
+label, timestamp, engine, database name, table count and total rows:
+
+- the same `data/import` set and the same stores;
+- a full import (`docker/sdk up --data`, or the same `data:import` configuration);
+- the publish queues drained before the snapshot: the worker idle and every queue at length 0
+  (`script -q /dev/null docker/sdk cli vendor/bin/console queue:worker:start --stop-when-empty`, then
+  the broker's management UI). A snapshot taken while events are still queued under-counts.
+
+Reading `--compare` (`storage-search-counts-report.json`):
+
+- `dropped`, `emptied` (rows before, 0 after) or `disappeared` → upgrade damage, exit 1. Trace the
+  table to its entity's publisher wiring: the `*Storage`/`*Search` module's publisher plugins in
+  `PublisherDependencyProvider`, its event subscriber in `EventDependencyProvider`, the synchronization
+  plugins in `SynchronizationDependencyProvider`, and the queue processor in `QueueDependencyProvider`.
+  `check-plugin-usage.php` names a plugin that vanished; a Lane 0 guide names a renamed one. Fix,
+  re-publish (`publish:trigger-events` for the entity), drain the queues, snapshot `after` again.
+- `appeared` → a table the new version adds; informational.
+- `grew` → informational; more rows after the same import usually mean a new publisher. Confirm it is
+  not a duplicate.
+
+Without the `before` snapshot (`check-baselines.php --no-data`) the publish check is not done; the
+report says so and names matrix #80 as unverified.
 
 ## Phase 6.5 — Back Office crawl, then the verifier
 
@@ -120,7 +166,8 @@ that costs rather than omitting the section.
    deploy changes, differences from the reference kept as project choices, and whether the tooling
    moved in Phase 1.2 or after Phase 2.
 3. **Damage found and resolved, per lane**, with file links; remaining `upgrade-debt` markers with
-   their removal condition.
+   their removal condition; constant overrides whose core value changed, with the decision per
+   constant.
 4. **Deprecations** — the gate #3 table: applied, deferred, kept, with the consequences column.
 5. **Static checks vs baseline** — detectors, PHPStan, sniffer, evaluator; only regressions count.
    `check-added-comments.php` result (must be clean).
@@ -129,10 +176,15 @@ that costs rather than omitting the section.
    already red before the upgrade**, so nobody reads them as upgrade damage.
 7. **Back Office crawl and verifier** — new failures (must be none), pre-existing failures, the
    verifier's verdicts, what was not reached.
-8. **Pending DB migrations**, and which migration question was answered (fresh DB vs pre-upgrade DB).
-9. **Features** — gate #4 decisions (accepted, deferred, never), and REMOVED packages with what
+8. **Publish check** — `storage-search-counts.php --compare before after`: tables that lost rows and
+   how each was resolved, or why the check did not run.
+9. **Pending DB migrations**, and which migration question was answered (fresh DB vs pre-upgrade DB).
+10. **Features** — gate #4 decisions (accepted, deferred, never), and REMOVED packages with what
    replaced each.
-10. **What is proven and what is not** — give each claim its scope ("the Zed functional suites pass in
+11. **Performance recommendations** — `performance-report.json`: the SOL-477 packages below their
+    minimum, the navigation cache state, the gate #4 decision on each, and the other guideline pages'
+    findings ([performance.md](performance.md)).
+12. **What is proven and what is not** — give each claim its scope ("the Zed functional suites pass in
     the container" and "the suite passes" are different statements). For every check that did not run,
     name it and the matrix row it would have caught.
 

@@ -2,14 +2,15 @@
 
 Deterministic detectors for the *silent* failure modes of a Spryker module upgrade on a project
 with heavy `src/Pyz` customization. Orchestrated by the `/spryker-upgrade` Claude Code skill
-(`SKILL.md` next to this file); the full **78-row coverage matrix** — including the process-level modes
+(`SKILL.md` next to this file); the full **82-row coverage matrix** — including the process-level modes
 these scripts cannot cover (Propel schema merges, glossary keys, behavioural changes) — is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Every script is a standalone CLI,
 usable in CI.
 
 All scripts run on host PHP (reflection or static parsing only, no Spryker bootstrap) and keep their
 snapshots and reports in `.spryker-upgrade/state/` inside the project, created self-gitignoring on
-first use. The one exception is `backoffice-smoke.php`, which needs the booted Back Office.
+first use. Two exceptions: `backoffice-smoke.php` needs the booted Back Office, and
+`storage-search-counts.php` runs inside the cli container from a copy in the state directory.
 
 **Where they live and how to call them.** `$UP` in every example below is the scripts directory:
 `.claude/skills/spryker-upgrade/scripts` (setup install) or
@@ -22,7 +23,7 @@ SPRYKER_PROJECT_ROOT=/path/to/project        # skip discovery
 SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI cache directory)
 ```
 
-## The eighteen scripts
+## The twenty-one scripts
 
 | Script | Phase | What it answers |
 |---|---|---|
@@ -44,6 +45,9 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 | `check-legacy-css-classes.php` | Lane 2 | which legacy CSS classes does vendor still emit or select? |
 | `check-plugin-usage.php` | 0, 3, Lane 3 | which wired plugins are missing or deprecated? |
 | `check-config-constants.php` | 0, 3, Lane 4 | which config references point at removed vendor constants/types? |
+| `check-constant-overrides.php` | 0 (`--snapshot`), 3, Lanes 1/3/4 | which project constants override a vendor constant, and which core values changed under them? |
+| `storage-search-counts.php` | 0 (`--snapshot before`), 4.9/5.5 (`--snapshot after`, `--compare`) | did any `*_storage` / `*_search` table lose rows after the same import? |
+| `check-performance.php` | 3, Lane 2, 6, 7 | is the Yves widget performance set in place, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
 
 `bootstrap.php` is the shared library the scripts load. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
@@ -84,9 +88,12 @@ php $UP/check-dead-overrides.php snapshot
 php $UP/twig-shadow-map.php snapshot
 php $UP/check-plugin-usage.php || true         # record pre-existing damage
 php $UP/check-config-constants.php || true
+php $UP/check-constant-overrides.php --snapshot
 cp composer.lock .spryker-upgrade/state/composer.lock.before
 # ... PHPStan, sniffer, evaluator and codecept runs tee'd into the state dir (see SKILL.md Phase 0)
 php $UP/backoffice-smoke.php --url <zed base url> --baseline
+cp $UP/storage-search-counts.php .spryker-upgrade/state/   # queues drained first
+docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
 php $UP/check-baselines.php                    # gate: Phase 1 starts only when this exits 0
 
 # Phase 1.2: tooling, Docker SDK, deploy files
@@ -105,10 +112,16 @@ php $UP/twig-shadow-map.php diff
 php $UP/merge-shadowed-files.php --dry-run
 php $UP/check-plugin-usage.php
 php $UP/check-config-constants.php
+php $UP/check-constant-overrides.php
+php $UP/check-performance.php
 php $UP/check-added-comments.php              # end of every lane, and Phase 7
 
 # Phase 4.9 / 6.5: the whole Back Office against the baseline
 php $UP/backoffice-smoke.php --url <zed base url>
+
+# Phase 4.9 / 5.5: same data imported and published, queues drained
+docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot after
+php .spryker-upgrade/state/storage-search-counts.php --compare before after
 ```
 
 ## check-added-comments.php — no explanatory comments, no suppressions
@@ -135,14 +148,19 @@ instead of silencing it. Exit 0 clean, 1 findings, 2 no base ref.
 ```bash
 php $UP/check-baselines.php                   # all baselines required
 php $UP/check-baselines.php --no-backoffice   # only when the environment cannot boot
+php $UP/check-baselines.php --no-data         # only when the environment cannot boot with data
 ```
 
 Checks the state directory for `base-ref`, `codecept-baseline.txt`, `phpstan-baseline-run.txt`,
-`sniff-baseline.txt`, `evaluator-baseline.txt` and `backoffice-smoke-baseline.json`, and that each
-holds a real result of its tool: `2>&1 | tee` creates the file even when the command failed. The
-check is a codecept summary line (`OK (`, `Tests:`, `FAILURES!`), a PHPStan `[OK]` or `Found N
-errors` line, sniffer or evaluator output that is not only a tool error or usage message, a commit
-hash in `base-ref`, and a `results` list in the Back Office baseline; an empty file always fails.
+`sniff-baseline.txt`, `evaluator-baseline.txt`, `backoffice-smoke-baseline.json`,
+`constant-overrides-baseline.json` and `storage-search-counts-before.json`, and that each holds a real
+result of its tool: `2>&1 | tee` creates the file even when the command failed. The check is a
+codecept summary line (`OK (`, `Tests:`, `FAILURES!`), a PHPStan `[OK]` or `Found N errors` line,
+sniffer or evaluator output that is not only a tool error or usage message, a commit hash in
+`base-ref`, a `results` list in the Back Office baseline, an `overrides` list in the constant-overrides
+snapshot, and at least one row in the storage/search counts; an empty file always fails. `--no-data`
+skips the counts baseline, and the publish check (`storage-search-counts.php --compare`) is then not
+done.
 The Phase 1.2 re-takes (`codecept-`, `phpstan-`, `sniff-`, `evaluator-post-tooling.txt`) are checked
 the same way when they exist. It names the command that produces each missing file or file without
 a result. Every "after" check of the upgrade is compared against a "before" run; without it a new
@@ -166,6 +184,92 @@ without a login form, or failed login; exit 2 writes no report and no baseline.
 Table endpoints are requested as a plain GET without DataTables parameters, so a table endpoint that
 fails only here is confirmed in the browser (the skill hands that to the `spryker-verifier` agent)
 before it is called damage.
+
+## check-constant-overrides.php — project constants that override core constants
+
+Spryker classes read their settings through `static::CONSTANT`, so a project class that redeclares a
+vendor constant replaces the vendor value. When core changes that value, the project keeps the old one.
+
+```bash
+php $UP/check-constant-overrides.php --snapshot   # Phase 0, before composer moves
+php $UP/check-constant-overrides.php              # Phase 3, after the update
+```
+
+Scans every class under `src/<Ns>/` for each `KernelConstants::PROJECT_NAMESPACES` entry of
+`config/Shared/config_default.php` (else `src/Pyz`) that extends a vendor class — DependencyProviders,
+Config, Factories and any other class — with `token_get_all`. Parent classes resolve through the
+project classes and `vendor/composer/autoload_classmap.php` / `autoload_psr4.php`, up the whole chain.
+For each constant the class declares, the nearest vendor ancestor declaring the same constant gives the
+core value. Values compare as normalised source text (quote style, `array()` vs `[]`, trailing commas
+and whitespace ignored; `self::`, `static::` and `parent::` resolved along the chain; literal string
+concatenation folded); a value that still references another class or calls a function is compared
+as `expression`.
+
+`--snapshot` writes `constant-overrides-baseline.json` (project value, core value, vendor file of every
+override) and exits 0. The default run writes `constant-overrides-report.json`: `differing` (every
+override whose value differs from core, for review), `coreChanges` (`CORE_VALUE_CHANGED`,
+`CORE_CONSTANT_REMOVED` — a core value that changed or disappeared under a project override since the
+snapshot) and `newOverlaps` (core added a constant the project already declared). Each entry names the
+lane that owns the class: Lane 3 DependencyProvider, Lane 4 Config, Lane 1 otherwise. Exit 0 no core
+change, 1 core changes, 2 unknown argument, no `vendor/composer/autoload_psr4.php`, or no snapshot.
+
+## storage-search-counts.php — publish tables before and after, on the same data
+
+A publisher, storage or search plugin, or event subscriber lost in the upgrade leaves its publish
+table with fewer rows after the same import. The database is reachable only in the cli container, so
+the script is standalone (no `bootstrap.php`) and runs from a copy in the state directory:
+
+```bash
+cp $UP/storage-search-counts.php .spryker-upgrade/state/
+docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot <label> \
+  [--dsn <pdo dsn>] [--user <name>] [--password-env <VAR>]
+php .spryker-upgrade/state/storage-search-counts.php --compare <before> <after>
+```
+
+`--snapshot` counts the rows of every `*_storage` and `*_search` base table and writes
+`storage-search-counts-<label>.json` next to the script: label, timestamp, engine, database, table
+count, total rows, the per-table counts, and the conditions the comparison needs. It connects through
+PDO with the variables the Docker SDK sets in the cli container — `SPRYKER_DB_ENGINE` (`mysql` for
+MySQL/MariaDB, `pgsql` for PostgreSQL), `SPRYKER_DB_HOST`, `SPRYKER_DB_PORT`, `SPRYKER_DB_DATABASE`,
+`SPRYKER_DB_USERNAME`, `SPRYKER_DB_PASSWORD` — or `--dsn`, `--user` and `--password-env` (the name of
+the variable that holds the password). Exit 0 written, 2 usage or connection error.
+
+`--compare` takes two labels or file paths (looked up next to the script, then in
+`.spryker-upgrade/state/`) and writes `storage-search-counts-report.json` next to the `<after>` file:
+before, after and delta per table, with status `same`, `grew`, `dropped`, `emptied` (rows before, 0
+after), `disappeared` or `appeared`. Exit 1 when a table dropped, emptied or disappeared; 0
+otherwise (`appeared` and `grew` are informational); 2 usage error or a missing snapshot.
+
+The comparison is valid only when both snapshots ran with the same `data/import` set and the same
+stores, after a full import, with the publish queues drained (worker idle, queue lengths 0).
+
+## check-performance.php — Yves widget performance and the shop-ui 1.103.0 break
+
+```bash
+php $UP/check-performance.php [--before-lock <composer.lock of Phase 0>]
+```
+
+Follows the Spryker Yves widget performance guideline. Reads `composer.lock`, the Phase 0 lock
+(`.spryker-upgrade/state/composer.lock.before` unless `--before-lock` names another), the project's
+`src/<Ns>` classes and templates, `config/Shared/config_*.php` and the `data/import` manifests, and
+reports:
+
+- **(a)** each package of release group SOL-477 present in the lock, at or below its minimum version;
+- **(b)** whether a project `ContentNavigationWidgetConfig::isNavigationCacheEnabled()` returns
+  `true`, and in which config files `ContentNavigationWidgetConstants::NAVIGATION_REVALIDATION_TIME_IN_SECONDS`
+  is set;
+- **(c)** when `spryker-shop/shop-ui` crossed 1.103.0 since the Phase 0 lock: whether a project
+  template of the `product-card`, `product-item` or `product-list-item` molecule (any project
+  namespace and module) renders `ProductGroupWidget`, and whether the project uses product groups (a
+  `product-group` entry with rows in a `data/import` manifest, or rows in
+  `spy_product_abstract_group_storage` in `storage-search-counts-before.json`).
+
+Report: `performance-report.json`. (a) and (b) are recommendations — new capabilities offered at the
+new-features gate — and never fail the run. Exit 1 only for (c): product groups were imported,
+`product-group-widget` was installed before the upgrade, and no project template renders the widget,
+so the colour swatches disappear. Exit 2 on an unknown argument, a missing `--before-lock` file or no
+`composer.lock`. What the upgrade does with each item, and the other performance guideline pages, are in
+[references/performance.md](references/performance.md).
 
 ## check-tooling-alignment.php — tooling, Docker SDK and deploy files vs the reference
 
@@ -538,6 +642,14 @@ coverage before merging.
   navigation links; pages reached only through a form or a row action are not visited.
 - **`check-tooling-alignment.php`** compares against the one reference demo shop it is given; a
   project derived from a different demo shop needs that one as the reference.
+- **`check-constant-overrides.php`** walks the `extends` chain only: constants inherited from an
+  interface the vendor class implements are not compared. Values that reference other classes are
+  compared as text, so an alias change in a referenced constant reads as a difference.
+- **`check-performance.php`** detects the widget by its `{% widget 'ProductGroupWidget' %}` call in
+  the three molecule templates; a project that renders product groups through another template is
+  reported as not rendering them.
+- **`storage-search-counts.php`** counts rows, not content: a publisher that writes the right number
+  of rows with wrong data is not detected.
 - **`resolve-constraints.php`** cannot decide cohort migrations — it detects the deadlock
   (OSCILLATION / "would LOWER") and hands over to `unpin-feature-driven-modules.php`.
 - **No detector covers** Propel schema merges, glossary keys, ACL/navigation for new Backoffice

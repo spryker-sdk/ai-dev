@@ -37,22 +37,20 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    one lane routinely resolves or reveals entries in another.
    *Failure signature:* a lane closed on a report file whose mtime predates that lane's last edit.
 5. **A red detector, PHPStan or sniffer regression, or failing test blocks the next phase. Never
-   suppress.** Not with a baseline entry, not with a phpcs/phpstan ignore, not by narrowing the
-   analysed paths.
+   suppress.** Not with a baseline entry, a phpcs/phpstan ignore, or narrower analysed paths.
    *Failure signature:* the diff touches `phpstan-baseline.neon`, a `@phpstan-ignore`, a phpcs
    exclude, or a detector's exclude list — none of which is ever part of an upgrade's deliverable.
 
 **Plan tracking is mandatory.** At the end of Phase 0, create one `TaskCreate` task each for Phase
 0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.5 and 7, and
-drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once that phase's or lane's
-checks are green; a detector re-run that reopens a lane reopens its task. `TaskList` survives
-compaction; the current phase and lane otherwise do not.
+drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
+detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
 **Locate the scripts:** `.claude/skills/spryker-upgrade/scripts/` (setup install) or
 `${CLAUDE_PLUGIN_ROOT}/skills/spryker-upgrade/scripts/` (plugin install). `$UP` below stands for
 whichever resolves — substitute it inline as a literal path; never set a shell variable and never
 `cd`, both prompt on every call. Run them from the project root: they write every snapshot and report
-into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The eighteen scripts are listed in
+into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The twenty-one scripts are listed in
 `README.md` next to this skill; your job is to run the phases in order, do the semantic resolution
 work, and stop at the gates that belong to the developer.
 
@@ -60,8 +58,7 @@ work, and stop at the gates that belong to the developer.
 the code does. Allowed: the license header, docblock tags, `{@inheritDoc}`, Spryker `Specification:`
 blocks, and an `upgrade-debt:` docblock on a temporary shim. `check-added-comments.php` — which also
 reports added `phpcs:ignore`, `@phpstan-ignore` and similar as `suppression` — must exit 0 at the end
-of every lane and in Phase 7.
-Comments copied verbatim from a vendor file into a project override count as added (Lane 2).
+of every lane and in Phase 7. Vendor comments copied into a project override count as added (Lane 2).
 
 ## Scope: an upgrade updates only what the project already has
 
@@ -128,7 +125,10 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    php $UP/check-constraint-style.php || true  # baseline: patch-locked + merged constraints
    php $UP/check-test-coverage.php || true     # baseline: is the override surface verifiable at all?
    php $UP/check-vendor-class-replacement.php || true  # baseline: classes declared in vendor namespaces
+   php $UP/check-constant-overrides.php --snapshot     # core values under project constants
    cp composer.lock .spryker-upgrade/state/composer.lock.before
+   cp $UP/storage-search-counts.php .spryker-upgrade/state/   # publish baseline: drain the queues first
+   script -q /dev/null docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
    ```
 5. MISSING plugins, config problems or unloadable classes in these baselines are pre-existing breaks,
    usually leftovers of a removed feature. Surface them, offer to fix first, at minimum record counts.
@@ -158,8 +158,8 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    demo account `spryker-runtime` documents); never write them into a file.
 9. **Gate the baselines:** `php $UP/check-baselines.php` exits 0 before Phase 1 starts. It names each
    baseline file above that is missing or holds no result of its tool (`tee` writes the file even when
-   the command failed or ran nothing): re-run that command. `--no-backoffice` only when the
-   environment cannot boot — the report then says the crawl never ran.
+   the command failed or ran nothing): re-run that command. `--no-backoffice` (`--no-data`) only when
+   the environment cannot boot (with data); the report then says the crawl (publish check) never ran.
 10. **Create the task list** (§ Non-negotiables) as the last action of Phase 0.
 
 ## Phase 0.5 — Verifiability gate (developer gate #1)
@@ -244,17 +244,15 @@ the target release**, each as its own commit, following
    here on a tool's baseline is its `*-post-tooling.txt` file, so new tool rules are not upgrade damage.
 
 If the new tools cannot resolve against the pre-upgrade Spryker modules, revert the tooling edit, run
-Phase 2 without it, then do the tooling step directly after Phase 2 — before Phase 3 — with the same
-re-takes. The baseline is then the Phase 0 findings plus only the findings from rules new in the tool
-version, as the reference file describes. The image tag defers the same way if the old lock cannot
-install on the new PHP; record which image each re-baseline ran on.
+Phase 2 without it, then do the tooling step right after it, before Phase 3, with the same re-takes;
+the baseline is then the Phase 0 findings plus those from rules new in the tool version. The image tag
+defers the same way if the old lock cannot install on the new PHP; record each re-baseline's image.
 
 ## Phase 1.5 — Constraint style (before the release-group update)
 
 Bumping the `spryker-feature/*` meta-packages alone cannot resolve while individual modules are pinned
-`~x.y.z`, exactly, or `^0.x`. Read [references/constraints.md](references/constraints.md) when you
-enter this phase. First set every `spryker-feature/*` constraint in `composer.json` to the target
-release; then:
+`~x.y.z`, exactly, or `^0.x`; read [references/constraints.md](references/constraints.md) on entry. Set every
+`spryker-feature/*` constraint in `composer.json` to the target release first; then:
 
 ```bash
 php $UP/check-constraint-style.php            # report patch-locked + merged constraints
@@ -294,6 +292,8 @@ php $UP/check-dead-overrides.php verify        # exit 1 = conflicts
 php $UP/twig-shadow-map.php diff               # exit 1 = conflicts
 php $UP/check-plugin-usage.php                 # exit 1 = missing plugins
 php $UP/check-config-constants.php             # exit 1 = broken config refs
+php $UP/check-constant-overrides.php           # exit 1 = core value changed under a project constant
+php $UP/check-performance.php                  # exit 1 = ProductGroupWidget rendering lost; else recommendations
 script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6
 ```
 
@@ -323,8 +323,7 @@ For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.j
    Cross-check the "required" pile against the Phase 3 detectors' findings: a guide step no detector
    corroborates and no existing behaviour needs is a strong candidate for the "new capability" pile.
 4. No guide → the module's CHANGELOG.md and the GitHub compare URL from the report; extract the
-   `[BC]`/breaking notes for the crossed majors. A guide that contradicts the tag diff loses to the
-   diff (matrix #37).
+   `[BC]`/breaking notes for the crossed majors. A guide contradicting the tag diff loses (matrix #37).
 5. If neither yields clarity, stop for that module and ask the developer — never invent steps.
 6. Record per module: guide URL (or "none published"), steps applied, steps deliberately not applied
    as new capabilities (with what they would have added), steps skipped for other reasons + why. The
@@ -335,12 +334,14 @@ For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.j
 Work lane by lane; commit each lane separately. **Closing a lane** means: all Phase 3 detectors
 re-run and green against the baseline, no PHPStan regression, `php $UP/check-added-comments.php`
 exits 0. Read the lane's section of [references/lanes.md](references/lanes.md) when you enter it.
+Each `constant-overrides-report.json` entry names its lane: 3 DependencyProvider, 4 Config, 1 other.
 
 - **Lane 1 — Dead overrides and broken classes** (`dead-overrides-report.json`,
   `typed-members-report.json`, PHPStan). Order: typed members (the console will not start until they
   are gone), constructor arity, signature changes, dead overrides. Every touched behaviour gets a test
   through the Facade/Client.
-- **Lane 2 — Shadowed frontend/presentation files** (`twig-conflicts-report.json`).
+- **Lane 2 — Shadowed frontend/presentation files** (`twig-conflicts-report.json`, and the
+  ProductGroupWidget finding of `performance-report.json`).
   `merge-shadowed-files.php --dry-run`, then `--apply`; resolve the CONFLICTED rest semantically
   (vendor structure wins, project business content wins); never commit `*.merge-conflict` files;
   drop comments copied verbatim from the vendor counterpart (an `upgrade-debt:` marker stays);
@@ -361,13 +362,10 @@ ported, behaviour-tested first.
 **Deprecated items are neither left alone nor swapped blindly.** Collect every deprecated plugin
 (`check-plugin-usage.php` DEPRECATED, and PORTING on a deprecated interface) and every other deprecated
 vendor API the project uses where detectable (PHPStan deprecation rules, `@deprecated` on vendor
-parents and instantiated classes). Per item, analyse:
-
-- the old item and its replacement;
-- the difference between them — inputs, outputs, when it runs;
-- the possible consequences — logic change, different extension point, new config or data needed,
-  position in the stack;
-- a recommendation: swap, swap plus config, port, or keep for now.
+parents and instantiated classes). Per item, analyse the old item and its replacement; the difference
+(inputs, outputs, when it runs); the possible consequences (logic change, other extension point, new
+config or data needed, position in the stack); and a recommendation (swap, swap plus config, port, or
+keep for now).
 
 Present the table ([references/lanes.md](references/lanes.md) has the format) with AskUserQuestion
 (multiSelect: apply now / defer / keep) and apply only what the developer chose, one item at a time,
@@ -376,11 +374,9 @@ violation. Deferred and kept items go into the report with their analysis.
 
 ### Lane 5 — A dependency with no compatible release (developer decision)
 
-When `resolve-constraints.php` reports UNRESOLVED for a third-party/eco package, establish why: a
-version allowing the target majors, else what it uses from the blocking module (stable APIs → an
-upstream constraint widening; a removed class → upstream code work). Present drop / fork / wait with
-the feature's footprint (`grep -rl` across `src/` and `config/`, file count) and let the developer
-choose — never drop unilaterally. The drop procedure is in [references/lanes.md](references/lanes.md).
+When `resolve-constraints.php` reports UNRESOLVED for a third-party/eco package, establish why, then
+present drop / fork / wait with the feature's footprint and let the developer choose — never drop
+unilaterally. The analysis and the drop procedure are in [references/lanes.md](references/lanes.md).
 
 ## Phase 4.9 — Boot the upgraded environment (always attempted)
 
@@ -390,6 +386,10 @@ on the Phase 1.2 version and the same topology as the Phase 0 baseline. As soon 
 run the Back Office crawl (Phase 6.5 command): a vendor-to-vendor conflict breaks many pages at once,
 and this is the cheapest point to find it. "Could not boot" is only acceptable
 after `git submodule status` and `docker info` have been shown; then record which checks it costs.
+**Publish check:** once the same data is imported and the queues are drained, re-run the Phase 0 counts
+command with `--snapshot after`, then with `--compare before after`. Exit 1 is upgrade damage (a lost
+publisher, storage/search plugin or event subscriber): trace each table per
+[references/verification.md](references/verification.md), and re-check after Phase 5.5.
 
 ## Phase 5 — Regenerate artifacts & verify
 
@@ -446,7 +446,8 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 
 1. **New packages** — the NEW list in `.spryker-upgrade/state/lock-diff-report.json`.
 2. **New capabilities inside modules the project already had** — Lane 0's second pile, a
-   `class_exists` branch (matrix #64), a new extension point.
+   `class_exists` branch (matrix #64), a new extension point, and the `performance-report.json`
+   recommendations (read [references/performance.md](references/performance.md) before offering them).
 
 Fetch each description (`composer show <pkg>` + release notes) and ask with AskUserQuestion
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
@@ -465,8 +466,7 @@ breaks. So this phase has two parts, in order:
    `backoffice-smoke-report.json` marks each problem `inBaseline`. **Any page or endpoint that is not
    in the baseline is upgrade damage**, however unrelated it looks (matrix #72). Fix and re-run until
    there is no new failure. The crawl requests table endpoints as a plain GET without DataTables
-   parameters, so a table endpoint that fails only in the crawl is confirmed in the browser (step 2)
-   before it is called damage.
+   parameters, so an endpoint failing only in the crawl is confirmed in the browser (step 2) first.
 2. **The visual and manual checks go to the `spryker-verifier` agent**, not the main agent. Spawn it
    with acceptance criteria built from what the upgrade touched (merged templates, table overrides, CSS
    framework majors, layout and login templates, the asset build, the storefront if `yves` exists) —
@@ -480,9 +480,9 @@ Console errors, 500s and missing styling are upgrade damage; an unvisited page c
 `php $UP/check-added-comments.php` exits 0 a last time. Then write the report with the sections
 [references/verification.md](references/verification.md) lists (shape:
 [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red before the
-upgrade** under its own heading and the gate #3 deprecation table. Separate what is proven from what
-merely has not failed yet, and name the damage class every skipped check would have caught. Ask
-before committing; suggest one PR per release group.
+upgrade** under its own heading, the gate #3 deprecation table and **Performance recommendations**.
+Separate what is proven from what merely has not failed yet, and name the damage class every skipped
+check would have caught. Ask before committing; suggest one PR per release group.
 
 ## Hard rules
 
