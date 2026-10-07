@@ -5,7 +5,10 @@ description: >
   components, templates, views, Widgets — and their Twig, SCSS, and TypeScript. Triggers: "create a new
   molecule", "override the product item", "extend the cart item component", "create a widget", "style this
   component", "why isn't my style applied", "the component isn't initializing", fixing Yves lint errors.
-  Always use for any Yves Theme/ work; not for linting a diff (static-validation) or rebrands (brand-project).
+  Also for diagnosis: "my change did not show up", a Twig/SCSS edit with no visible effect, stale styles or
+  a cached template, verifying a UI fix by measuring the rendered page. Always use for any Yves Theme/
+  work; not for linting a diff (static-validation) or rebrands (brand-project). Which change a page needs
+  belongs to `match-reference-design`, the rows a component renders to `project-data`.
 ---
 
 # Spryker Yves Atomic Frontend
@@ -134,6 +137,11 @@ widgets render nothing. The tag needs `{% endwidget %}`. Details: `references/co
 `console cache:class-resolver:build` for a new PHP class. Confirm the builder picked your component up
 (`grep -l '{name}' public/Yves/assets/current/*/js/*.js`), lint per `references/validation.md` (mind the
 ESLint coverage trap) and render the page — a green build or lint proves nothing about the failures below.
+When a change "does nothing", when a template must hide or suppress something, when a checkout address
+form is involved, or before reporting a UI fix as verified, read `references/storefront-fixes.md` (Twig
+traps, the compiled Twig cache in `src/Generated/Yves/Twig/codeBucket` vs the DI container in
+`data/cache/Yves/<env>`, the stylesheet the page actually links, form-field suppression, measuring the
+rendered page).
 
 ## Troubleshooting
 
@@ -148,3 +156,4 @@ ESLint coverage trap) and render the page — a green build or lint proves nothi
 
 - `references/components.md` — Component lifecycle and base API, extending core TS, SCSS tokens/helpers and overriding core SCSS, design tokens, Widget PHP + view + tag
 - `references/validation.md` — where checks run, autofix, the ESLint coverage trap with a covering config, `tsc` as advisory
+- `references/storefront-fixes.md` — Twig traps, vendor mixins, form-field suppression, checkout address forms, builds and caches, verifying a UI fix

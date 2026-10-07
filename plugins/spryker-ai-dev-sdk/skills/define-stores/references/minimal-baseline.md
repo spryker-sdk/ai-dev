@@ -31,7 +31,7 @@ The **authoritative structural keep-set is `../../spryker-import-tools/data/enti
 ```bash
 php "$VALIDATE" manifest-diff <shipped full_<SRC-REGION>.yml> data/import/local/full_<REGION>.yml --base .
 ```
-Classify every `missing` entity as **intentional content drop** vs **must-keep structural** against the map's `class`, in writing; rank unknowns by row count (rows ≈ population → structural; rows ≪ population → garnish). **Do not boot on an unclassified diff.** The six structural entities NOT in the hand-lists above — `product-search-attribute`, `product-search-attribute-map`, `shipment-type-service-type`, `return-reason`, `merchant-oms-process`, `merchant-product-approval-status-default` — are `structural` in the map, so the diff keeps them. Then `php "$VALIDATE" known-set --base <repo-root>` confirms the map is still honest (no unclassified rows, no record counts).
+Classify every `missing` entity as **intentional content drop** vs **must-keep structural** against the map's `class`, in writing; rank unknowns by row count (rows ≈ population → structural; rows ≪ population → garnish). **Do not boot on an unclassified diff.** The six structural entities NOT in the hand-lists above — `product-search-attribute`, `product-search-attribute-map`, `shipment-type-service-type`, `return-reason`, `merchant-oms-process`, `merchant-product-approval-status-default` — are `structural` in the map, so the diff keeps them. Then `php "$VALIDATE" known-set --base <repo-root>` confirms the map is consistent (no unclassified rows, no record counts).
 
 ## Optional
 `gtc` T&C CMS page stub — recommended (the checkout T&C link soft-404s without it; not a boot blocker).

@@ -5,7 +5,7 @@ storefront content into one chosen locale — glossary, and optionally catalog, 
 labels.
 
 `project-data`'s adapt strategy leaves every project locale as an **English copy** — fast boot,
-translation debt flagged. This skill pays that debt down, one locale at a time. It is never forced;
+translation debt flagged. This skill resolves that debt, one locale at a time. It is never forced;
 the default stays English copies until the developer asks.
 
 ## When it triggers
@@ -51,7 +51,7 @@ flowchart TD
     MORE -- "yes" --> D1
     MORE -- "no" --> V
 
-    V["Verify by VALUES, not a byte-diff<br/>spot-check key_translation.&lt;locale&gt;<br/>the first-run bug lives there"]
+    V["Verify by VALUES, not a byte-diff<br/>spot-check key_translation.&lt;locale&gt;<br/>an easily skipped family"]
     V --> LIVE{Project booted?}
     LIVE -- "no" --> REP
     LIVE -- "yes" --> APPLY["Temp import config → data:import<br/>drain the queue workers<br/>DELETE the temp config immediately"]
@@ -67,7 +67,7 @@ flowchart TD
 
 ## The method — distinct → translate → map → apply
 
-The load-bearing efficiency and safety win: translate the **distinct values**, not every row. A
+The efficiency and safety rule: translate the **distinct values**, not every row. A
 column has far fewer distinct strings than rows, and `apply-translations` fans one map over all rows
 and files in a single command — no whole-file rewrite, no shell loop, no chunked reassembly.
 
@@ -116,14 +116,14 @@ names. A translation that drops a token or breaks markup is a defect.
   page first rather than rewriting into a 404.
 - **A locale is done per FILE, not per column family.** `glossary.<locale>.csv`,
   `navigation_node.csv`, `content_banner.csv` and `cms_page.csv` must all be consistent for the
-  locale — label *and* URL columns. `project-data` localizes catalog and category nodes only, and a
-  real run left three of those four files English. `content_banner`'s per-locale set
+  locale — label *and* URL columns. `project-data` localizes catalog and category nodes only, so
+  the other three files stay English unless this skill names them. `content_banner`'s per-locale set
   (`title`/`subtitle`/`click_url`/`imageUrl`/`altText`) is all-or-nothing.
-- **Green import ≠ published read model.** Queues draining to zero is not evidence; one locale of four
-  silently kept boot-time KV values. The gate is a per-locale `kv:translation:<locale>:<key>`
+- **Green import ≠ published read model.** Queues draining to zero is not evidence; one locale of
+  several can silently keep boot-time KV values. The gate is a per-locale `kv:translation:<locale>:<key>`
   timestamp/value comparison *across* locales, with `publish:trigger-events -r translation` as the fix.
 - **Verify the attribute labels specifically.** `key_translation.<locale>` still equal to the English
-  copy is the known first-run bug — the PDP then shows a translated value beside an English label.
+  copy means the attribute-name family was skipped — the PDP then shows a translated value beside an English label.
 - **Say what isn't covered.** The SEO half of localization — localized URL slugs (adapt changes only
   the language prefix; translating a category `name` *does* regenerate its slug, which is why the
   URL rebuild exists), sitemap regeneration, `hreflang`, robots — is owned by no skill in this

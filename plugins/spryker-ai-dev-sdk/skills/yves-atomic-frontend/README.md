@@ -29,6 +29,7 @@ Yves stylelint/eslint errors.
 | [`SKILL.md`](SKILL.md) | Paths, builder resolution rules, create-a-component walkthrough, override/extend + what to ship, widgets in brief, build + verify. |
 | [`references/components.md`](references/components.md) | `Component` lifecycle and gotchas, extending core TS, SCSS tokens/helpers and core overrides, design tokens, Twig resolution details, Widget PHP + view + tag. |
 | [`references/validation.md`](references/validation.md) | Where checks run, Stylelint, the ESLint coverage trap with a covering config, `tsc` as advisory, what no tool checks. |
+| [`references/storefront-fixes.md`](references/storefront-fixes.md) | Twig traps, vendor mixins, form-field suppression, checkout address forms, builds and caches, verifying a UI fix. |
 
 ## Packaging note
 

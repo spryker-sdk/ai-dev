@@ -106,8 +106,8 @@ storefront hard refresh.
 - **One command per Bash call.** So every step's exit code and output tail is captured individually.
 - **Stop on the first failure.** Dependents are not skipped-over — the run stops and the caller decides
   retry vs. hand-off to `spryker-issue-diagnoser`.
-- **`cache:class-resolver:build` is the classic miss.** The most common refresh defect is a project
-  override landing while Spryker keeps resolving to the vendor class. The skill self-checks for it before
+- **`cache:class-resolver:build` is easy to miss.** Without it, a project override lands while
+  Spryker keeps resolving to the vendor class. The skill self-checks for it before
   reporting.
 - **No `cd` prefixes in Bash.** The harness already runs from the project root; a `cd` shifts the command
   onto a different permission-allowlist pattern and triggers prompts.

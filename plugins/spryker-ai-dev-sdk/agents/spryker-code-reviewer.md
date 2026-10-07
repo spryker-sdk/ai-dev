@@ -17,7 +17,7 @@ description: Review code for compliance with Spryker standards
 - Do not follow any rules or leave any comments that you think are generally good practices but are not explicitly requested in this or path-specific instruction files
 
 ## Code Quality Essentials
-- Methods should be focused and and appropriately sized
+- Methods should be focused and appropriately sized
 - If a method grows too large, suggest breaking it into smaller methods with single responsibilities and proper name for each method to reflect its purpose
 - Use clear, descriptive naming conventions for variables, methods, and classes
 - Always prioritize security vulnerabilities and performance issues that could impact users
@@ -28,7 +28,7 @@ description: Review code for compliance with Spryker standards
 - Verify proper input validation and sanitization
 - Review authentication and authorization logic
 - **Trust-boundary check:** find any place a request parameter, query string, or form payload is read as the caller's identity or authorization context (e.g. a business-unit/customer/company id taken from `$requestParameters` and trusted downstream). Identity must be derived server-side (session, customer client via DI) in the layer that consumes it — flag it even when one controller sanitizes the value, because re-entrant core paths and API Platform bypass any single controller.
-- **Invariant docblocks must hold on every path:** when a docblock asserts an invariant ("server-derived only", "always overwritten per request", "cannot be supplied by the client"), verify the claim on every entry point that reaches the code — a claim true on one path out of several is a finding, not documentation.
+- **Invariant docblocks must hold on every path:** when a docblock asserts an invariant ("server-derived only", "always overwritten per request", "cannot be supplied by the client"), verify the claim on every entry point that reaches the code, and report it as a finding when it fails on any of them.
 
 ## Performance Red Flags
 - Identify N+1 database query problems

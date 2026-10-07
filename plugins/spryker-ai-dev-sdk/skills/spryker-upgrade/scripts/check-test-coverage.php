@@ -3,23 +3,27 @@
 /**
  * Test-coverage-vs-upgrade-risk detector (run BEFORE the upgrade starts).
  *
- * An upgrade is only safe to the extent that its result can be verified. The question is not
- * "what is the project's overall coverage" — it is much narrower and much more useful:
+ * An upgrade is only safe to the extent that its result can be verified. The measure here is
+ * narrower than the project's overall coverage:
  *
  *     for every place this project customises core, is there a test that would notice if the
  *     upgrade silently unhooked it?
  *
  * That surface is exactly what the other detectors flag later:
- *   - Pyz classes that override vendor methods              (Lane 1 damage)
- *   - vendor plugins wired in Pyz dependency providers      (Lane 3 damage)
+ *   - Pyz classes that override vendor methods with logic   (Lane 1 damage)
  *   - shadowed Twig/presentation files                      (Lane 2 damage)
- * A dead override, a replaced plugin stack and a stale template all fail *quietly* — the shop keeps
- * booting, so only a test tells you the behaviour left with the upgrade.
+ * A dead override and a stale template fail *quietly* — the shop keeps booting, so only a test
+ * tells you the behaviour left with the upgrade.
+ *
+ * Factories, Config classes and dependency providers are wiring, never test targets: a test that
+ * asserts which class a factory returns or which plugins a stack holds pins the implementation, not
+ * the behaviour. Plugin stacks are verified statically by check-plugin-usage.php; business behaviour
+ * is verified through the Facade (Zed) or the public Client/Service (Client, Service, Yves, Glue).
  *
  * The scan is static (no class loading, no infrastructure), so it runs on host PHP before anything
  * is touched. Coverage is attributed per <Layer>/<Module>, from two signals:
  *   1. a test directory tests/<*Test>/<Layer>/<Module>/ that contains real Cest/Test files —
- *      directories holding only _support/ helpers are NOT coverage, and several usually do;
+ *      directories holding only _support/ helpers do not count as coverage;
  *   2. any test file anywhere that references a `Pyz\<Layer>\<Module>\` class.
  *
  * Usage:
@@ -28,7 +32,7 @@
  *   php $UP/check-test-coverage.php --top=20      # limit the printed gap list
  *
  * Exit code 1 when a HIGH-risk module has no test at all — that is the signal to propose writing
- * characterization tests before the upgrade, not to abandon the upgrade.
+ * Facade/Client tests before the upgrade, not to abandon the upgrade.
  */
 
 declare(strict_types=1);
@@ -95,7 +99,7 @@ function isVendorClass(string $fqcn): bool
  */
 function classifyFile(string $relPath, string $fileName): string
 {
-    if (str_ends_with($fileName, 'DependencyProvider.php')) {
+    if (str_ends_with($fileName, 'DependencyProvider.php') || str_ends_with($fileName, 'Factory.php')) {
         return 'wiring';
     }
     if (str_ends_with($fileName, 'Config.php')) {
@@ -120,6 +124,22 @@ function classifyFile(string $relPath, string $fileName): string
     return 'other';
 }
 
+/**
+ * The test to write for a module whose overrides change business behaviour: always through the
+ * module's public entry point, never against its factory, config or dependency provider.
+ */
+function logicTestHint(string $layer, string $module): string
+{
+    $entryPoint = match ($layer) {
+        'Zed' => $module . 'Facade',
+        'Client' => 'the public ' . $module . 'Client',
+        'Service' => 'the public ' . $module . 'Service',
+        default => 'the public Client/Service it calls',
+    };
+
+    return sprintf('One test per business behaviour the override changes, called through %s', $entryPoint);
+}
+
 // ---------------------------------------------------------------------------
 // 1. Build the risk surface, per <Layer>/<Module>.
 // ---------------------------------------------------------------------------
@@ -134,8 +154,7 @@ function moduleSlot(array &$modules, string $layer, string $module): array
         'module' => $key,
         'layer' => $layer,
         // logicOverrides is the number that matters: overridden methods carrying business logic.
-        // Dependency-provider and Config overrides are counted separately — they are wiring, and a
-        // 200-plugin dependency provider is not 200 times the risk of a 1-plugin one.
+        // Factory, dependency-provider and Config overrides are wiring and never need a test.
         'logicOverrides' => 0,
         'wiringOverrides' => 0,
         'business' => 0,
@@ -179,9 +198,8 @@ foreach ($iterator as $file) {
     $src = (string)file_get_contents($file->getPathname());
     $kind = classifyFile($relPath, $file->getFilename());
 
-    // Count vendor plugin registrations — the Lane 3 surface.
     $pluginImports = 0;
-    if ($kind === 'wiring' && preg_match_all('/^use\s+([A-Za-z0-9_\\\\]+)(?:\s+as\s+\w+)?;/m', $src, $u)) {
+    if (str_ends_with($file->getFilename(), 'DependencyProvider.php') && preg_match_all('/^use\s+([A-Za-z0-9_\\\\]+)(?:\s+as\s+\w+)?;/m', $src, $u)) {
         foreach ($u[1] as $fqcn) {
             if (isVendorClass($fqcn) && str_contains($fqcn, 'Plugin')) {
                 $pluginImports++;
@@ -271,7 +289,7 @@ if (is_dir($testsRoot)) {
         }
     }
 
-    // Module test dirs that hold only _support helpers — they look like coverage but are not.
+    // Module test dirs that hold only _support helpers — they look like coverage but assert nothing.
     foreach (glob($testsRoot . '/*/*/*', GLOB_ONLYDIR) ?: [] as $dir) {
         $rel = str_replace($root . '/', '', $dir);
         if (str_contains($rel, '/cypress-tests/')) {
@@ -292,13 +310,7 @@ if (is_dir($testsRoot)) {
 // ---------------------------------------------------------------------------
 
 foreach ($modules as $key => &$m) {
-    // Logic overrides dominate: they are what fails *silently* when core moves the seam. Wiring is
-    // capped, because a dependency provider registering 190 plugins is not 190 units of risk — it
-    // is one file whose stack contents need asserting.
-    $m['score'] = $m['logicOverrides'] * 5
-        + min($m['wiring'], 25)
-        + min($m['presentation'], 40)
-        + min($m['wiringOverrides'], 10);
+    $m['score'] = $m['logicOverrides'] * 5 + min($m['presentation'], 40);
 
     $m['testFiles'] = $testedModuleDirs[$key] ?? 0;
     $m['referencedBy'] = array_keys($referencedModules[$key] ?? []);
@@ -307,25 +319,16 @@ foreach ($modules as $key => &$m) {
 
     $m['risk'] = match (true) {
         $m['logicOverrides'] >= 5, $m['presentation'] >= 25 => 'HIGH',
-        $m['logicOverrides'] >= 1, $m['presentation'] >= 5, $m['wiring'] >= 30 => 'MEDIUM',
+        $m['logicOverrides'] >= 1, $m['presentation'] >= 5 => 'MEDIUM',
         default => 'LOW',
     };
 
     $suggest = [];
-    if ($m['business'] > 0) {
-        $suggest[] = 'Business/Unit test pinning the overridden model output (characterization test)';
+    if ($m['business'] > 0 || $m['plugin'] > 0) {
+        $suggest[] = logicTestHint($m['layer'], substr($key, strlen($m['layer']) + 1));
     }
     if ($m['controller'] > 0) {
         $suggest[] = 'Functional/Presentation test for the overridden controller action';
-    }
-    if ($m['plugin'] > 0) {
-        $suggest[] = 'Unit test on the project plugin, asserting the interface contract it implements';
-    }
-    if ($m['wiring'] > 0) {
-        $suggest[] = sprintf(
-            'Wiring assertion: %d vendor plugin(s) registered here — assert the stack contents so a replaced stack fails loudly',
-            $m['wiring']
-        );
     }
     if ($m['presentation'] > 0) {
         $suggest[] = sprintf('Acceptance/Cypress step covering the %d overridden template(s)', $m['presentation']);
@@ -386,8 +389,8 @@ printf(
     $totals['logicOverrides'],
     $totals['logicOverridesInUncoveredModules']
 );
-printf("Wiring/config overrides:      %d  (dependency providers + Config classes)\n", $totals['wiringOverrides']);
-printf("Wired vendor plugins:         %d\n", $totals['wiredVendorPlugins']);
+printf("Wiring/config overrides:      %d  (factories, dependency providers, Config: no tests needed)\n", $totals['wiringOverrides']);
+printf("Wired vendor plugins:         %d  (verified by check-plugin-usage.php, not by tests)\n", $totals['wiredVendorPlugins']);
 printf("Overridden templates:         %d\n", $totals['overriddenTemplates']);
 printf(
     "Test files found:             %d  (module test dirs holding only _support helpers: %d)\n\n",
@@ -426,12 +429,11 @@ if ($print === []) {
         );
         printf(
             "  surface: %d logic override(s) in %d business / %d controller / %d plugin file(s), "
-            . "%d wired vendor plugin(s), %d overridden template(s)\n",
+            . "%d overridden template(s)\n",
             $m['logicOverrides'],
             $m['business'],
             $m['controller'],
             $m['plugin'],
-            $m['wiring'],
             $m['presentation']
         );
         if ($m['supportOnlyDir'] !== null) {
@@ -448,8 +450,8 @@ echo 'Full report: ' . str_replace($root . '/', '', $reportFile) . "\n";
 
 if ($uncoveredHigh !== []) {
     printf(
-        "\n%d HIGH-risk module(s) have no test at all. Propose characterization tests for these before\n"
-        . "starting the upgrade — without them a dead override or replaced plugin stack fails silently.\n",
+        "\n%d HIGH-risk module(s) have no test at all. Propose Facade/Client tests for their business\n"
+        . "behaviour before starting the upgrade — without them a dead override fails silently.\n",
         count($uncoveredHigh)
     );
     exit(1);

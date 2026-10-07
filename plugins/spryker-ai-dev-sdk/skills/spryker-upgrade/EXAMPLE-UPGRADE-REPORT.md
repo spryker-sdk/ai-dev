@@ -1,321 +1,183 @@
-# Upgrade report — sc-b2b-mp-industry-demo → Spryker 202606.0
+# Example upgrade report — `<project>` → Spryker 202606.0
 
-Branch: `upgrade/202606.0`, 9 commits. The upgrade resolves and generates cleanly; see **Final
-status** at the end for what remains.
+An illustrative report in the shape Phase 7 asks for. The project is a placeholder, the counts are
+rounded examples, and the module names and release facts are the kind a 202410 → 202606 upgrade meets.
+Copy the section headings; replace the content. Each section says which phase produces it.
 
-## Starting point
+Branch: `upgrade/202606.0`, one commit per phase or lane. **Status:** resolves, boots, all checks at
+or better than baseline; two items open for the developer (see *Open items*).
+
+## Starting point (Phase 0, Phase 1)
 
 | Fact | Value |
 |---|---|
-| Release before | mixed: 94 features on `202410.0`, 13 on `202507.0` (one `~202507.0`) |
-| Target release | `202606.0` (latest product release) |
-| Product releases crossed | 202410 → 202507 → 202512 → 202602 → 202604 → 202606 (~5 groups) |
-| `src/Pyz` PHP classes | 2 838 |
-| Dependency providers | 423 |
-| Yves twig | 663 · Zed Presentation twig | 187 |
-| Propel schema XML | 207 · transfer XML | 91 |
-| Vendor-method overrides mapped | 1 845 |
-| Shadowed frontend/presentation files | 810 across 145 module scopes |
-| Vendor plugins wired in dependency providers | 2 767 |
+| Release before (from `composer.lock`) | mixed: most features on `202410.0`, a few on `202507.0` |
+| Divergence `composer.json` vs lock | 9 features with `^` constraints; 1 feature in the lock only |
+| Target release (gate #2) | `202606.0` — latest; the developer chose one jump |
+| `src/Pyz` PHP classes | ~2 800 |
+| Vendor-method overrides mapped | ~1 800 (about 60 business-logic, the rest wiring) |
+| Shadowed frontend/presentation files | ~800 across ~140 module scopes |
 
-## Phase 0 — baseline (on 202410.0, before touching composer)
+### Baselines (Phase 0, before any constraint moved)
 
-All detectors green, i.e. this project had **no pre-existing damage** to confuse post-upgrade
-reports:
-
-| Detector | Baseline result |
+| Baseline | Result |
 |---|---|
-| `check-dead-overrides.php snapshot` | 1 845 overrides recorded, **0 unloadable classes** |
-| `twig-shadow-map.php snapshot` | 810 shadowed files, vendor merge-bases captured |
-| `check-plugin-usage.php` | **0 MISSING**, 54 deprecated, 17 project plugins on deprecated interfaces |
-| `check-config-constants.php` | 361 types / 752 constants checked, **0 real problems** |
+| `check-dead-overrides.php snapshot` | overrides recorded, 0 unloadable classes |
+| `check-plugin-usage.php` | 0 MISSING, 54 deprecated, 17 project plugins on deprecated interfaces |
+| `check-config-constants.php` | 0 problems |
+| PHPStan (`phpstan-baseline-run.txt`) | 312 errors, all environment-explained or pre-existing |
+| Sniffer (`sniff-baseline.txt`) | 41 violations |
+| Evaluator (`evaluator-baseline.txt`) | 6 findings |
+| Tests (`codecept-baseline.txt`) | 630 tests, 12 red, 3 suites skipped (no webdriver) — invocation pinned with `SPRYKER_TESTING_ENABLED=1` |
+| Back Office crawl (`backoffice-smoke-baseline.json`) | 214 pages / 96 table endpoints, 2 failing |
+| `check-baselines.php` | exit 0 |
 
-## Phase 1.5 — constraint blockers (the hard part)
+### Verifiability (gate #1)
 
-Bumping only the `spryker-feature/*` meta-packages **cannot resolve** on this project. Three
-distinct classes of blocker, found and cleared in order:
+63 business-logic overrides; 41 of them in modules with no test. The developer chose **cover a subset**:
+pricing, cart and checkout. Nine functional tests were added through `PriceProductFacade`,
+`CartFacade` and `CheckoutFacade` — one per behaviour the overrides change — and committed green
+before the upgrade branch diverged. No Factory, Config or DependencyProvider tests. The remaining
+lanes are reported as statically verified only.
 
-### 1. Patch-locked module constraints — 130 packages
-130 direct Spryker module constraints used `~x.y.z` (patch-only), so the 202606 feature packages
-could not pull the minors they require. First composer attempt: **49 unresolvable conflicts**.
-Relaxing `~` → `^` (recorded in `state/tilde-pinned-packages.json`) cut it to 24.
+## Tooling, Docker SDK and deploy files (Phase 1.2)
 
-### 2. Major bumps required — 22 packages
-With minors open, the remaining conflicts were genuine **major** boundaries. 18 found in the
-first pass, 4 more surfaced in later waves by `resolve-constraints.php`:
+Reference: `b2b-demo-marketplace` at `202606.0`, cloned into `.spryker-upgrade/state/reference/`.
 
-| Package | From | To |
+| Item | Before | After | Note |
+|---|---|---|---|
+| Docker SDK (`.git.docker`, `docker/` pointer) | 1.58.0 | 1.66.0 | release notes read for the whole range |
+| `deploy.*.yml` image tag | `spryker/php:8.2` | `spryker/php:8.3` | `config.platform.php` set to `8.3.2` |
+| Search / broker / key-value versions | as reference | as reference | `opensearch` 1 → 2 per the Docker SDK notes |
+| Database engine | MariaDB 10.6 | MariaDB 10.6 | **kept** — matches production; recorded project choice |
+| `phpstan/phpstan` | 1.10 | 1.12 | own commit |
+| `spryker/code-sniffer` | 0.17.18 | 0.17.27 | own commit |
+| `spryker-sdk/evaluator`, `codeception/*`, `phpunit/phpunit` | aligned to the reference | | own commit |
+
+The tooling resolved against the pre-upgrade modules, so it moved in Phase 1.2. The PHPStan, sniffer,
+evaluator and test baselines were re-taken right after the tooling commit: PHPStan gained 18 findings
+from new rules, the sniffer 7 — none of them counted as upgrade damage.
+`check-tooling-alignment.php` is clean apart from the database engine above.
+
+## Constraint blockers (Phase 1.5)
+
+| Blocker | Resolution |
+|---|---|
+| 130 `~x.y.z` module constraints | relaxed to `^` (`check-constraint-style.php --relax`) |
+| 22 major bumps surfaced in waves (`gui` 3 → 5, `gui-table` 3 → 4, `zed-ui` 3 → 4, the `*-merchant-portal-gui` cohort, `product-management` 0.19 → 0.20, …) | `resolve-constraints.php`; the Angular 20 cohort via `unpin-feature-driven-modules.php` |
+| `"twig/twig": "3.20"` exact pin vs security advisories on `<3.27.0` | pin raised to `^3.27.1` — a safe version existed; advisory blocking untouched |
+| Root constraints merged in from `<upstream-repo>` via composer-merge-plugin | fixed upstream, providing package installed alone first, then the release group |
+| `spryker-eco/product-management-ai` — no release supports `spryker/gui` 5 | Lane 5: the developer chose **drop** (see Lane 5) |
+
+## Composer update (Phase 2)
+
+Full `composer update` in the container, 0 problems. Lock diff against the baseline: 168 major,
+614 minor/patch, 18 new, 2 removed Spryker packages.
+
+## Migration guides (Lane 0)
+
+The majors collapse into a few coordinated platform migrations plus one functional module major:
+
+| Migration | Guide | Applied | Deliberately not applied (new capability) |
+|---|---|---|---|
+| Bootstrap 3 → 5 (Back Office) | docs.spryker.com "Upgrade the Back Office to Bootstrap 5" | `data-bs-*` renames in 2 templates, grid classes in 9 | — |
+| Angular 18 → 20 | docs.spryker.com "Upgrade to Angular 20" | `standalone: false` on 45 components, Node ≥ 20.19 | — |
+| INSPINIA theme v2 (`gui` 4 → 5) | docs.spryker.com "Update the INSPINIA theme" | composer/npm/cache steps | — |
+| MerchantProductOfferDataImport 1 → 2 | module guide, 1.\* → 2.0.0 section | new importer wiring, `propel:install`, `transfer:generate` | combined product-offer importer UI |
+| ShopUi 2.0.0 | **none published** — only "upcoming major module releases" | `frontend/settings.js` → `frontend/yves.settings.mts`, `yves:*` scripts re-pointed, Node 24+ | — |
+
+Guide discrepancies: the ProductManagement `0.19 → 0.20` section describes a change that is not in the
+tag diff (the real diff is Twig/JS only) — the diff was followed. Two JS library majors ride along in
+`gui` 4 → 5 without a guide: `sweetalert` → `sweetalert2` and `datatables.net` 1.11 → 2.x; 5 project
+JS files were ported.
+
+## Damage found and resolved (Lanes 1–4)
+
+| Lane | Found | Resolved |
 |---|---|---|
-| spryker/gui | ^3.53.2 | ^5.3.0 (**two majors**) |
-| spryker/gui-table | ^3.1.0 | ^4.0.0 |
-| spryker/zed-ui | ^3.2.0 | ^4.1.0 |
-| spryker/merchant-gui | ^3.13.0 | ^4.1.0 |
-| spryker/product-merchant-portal-gui | ^4.4.1 | ^5.1.0 |
-| spryker/product-offer-merchant-portal-gui | ^3.0.1 | ^4.0.0 |
-| spryker/price-product-merchant-relationship-merchant-portal-gui | 2.0.0 | ^3.1.0 |
-| spryker/security-merchant-portal-gui | ^3.2.0 | ^4.3.0 |
-| spryker/user-merchant-portal-gui | ^3.0.0 | ^4.1.0 |
-| spryker/product-management | ^0.19.52 | ^0.20.0 (0.x minor = breaking) |
-| spryker/product-attribute-gui | ^1.7.0 | ^2.3.0 |
-| spryker/product-set-gui | ^2.12.1 | ^3.1.0 |
-| spryker/content-gui | ^2.7.0 | ^3.1.0 |
-| spryker/file-manager-gui | ^2.8.1 | ^3.1.0 |
-| spryker/availability-gui | ^6.10.0 | ^7.1.0 |
-| spryker/shipment-gui | ^2.10.1 | ^3.3.0 |
-| spryker/stock-gui | ^2.1.0 | ^3.1.0 |
-| spryker/payment-gui | ^1.3.1 | ^2.1.0 |
-| spryker/price-product-offer-gui | ^1.2.0 | ^2.1.0 |
-| spryker/merchant-product-offer-data-import | ^1.2.0 | ^2.1.0 |
-| spryker/company-unit-address | 1.17.0 | ^1.18.0 |
-| spryker/development | ~3.40.1 | ^3.53.0 |
+| 1 — typed members | 2 constants, 2 properties untyped against PHP 8.3-typed core | types added / narrowing redeclarations deleted |
+| 1 — constructor arity (PHPStan) | 4 factories | argument lists mirrored, delegating to `parent::` |
+| 1 — signature changes | 4 overrides (e.g. `CustomerPageFactory::getSessionClient()` narrowed by core) | raw client under a `PYZ_*` key with its own accessor |
+| 1 — boot lifecycle (`spryker/application`) | `Application::boot()` a no-op; boot-time plugins silently skipped | guarded shim, `upgrade-debt:` docblock with removal condition and vendor issue |
+| 2 — shadowed files | 163 changed, 13 removed, 63 new vendor files | 15 clean merges, 148 resolved by hand; `npm run yves` clean |
+| 3 — MISSING plugins | `CustomerReorderWidget` removed: 5 plugins | rewired to the CartReorder feature the project already had |
+| 4 — config / transfers | 0 constant problems; 3 `strict` mismatches | `strict` matched to core at both levels |
 
-Conflicts arrive in **waves** — each root bump reveals the next transitive layer — which is why
-this needed an automated loop rather than one pass.
+Remaining `upgrade-debt` markers: 1 (the boot-lifecycle shim above).
 
-### 3. Security advisory — `twig/twig`
-The project pinned `"twig/twig": "3.20"` exactly. All twig 3.x below 3.27.0 are covered by 26
-sandbox-bypass advisories, so composer refused every candidate. **A safe version exists** —
-advisories affect `<3.27.0`, so the fix was bumping the root pin to `^3.27.1`, not disabling
-composer's advisory blocking. (For reference, the 202606 demoshop locks `twig/twig v3.27.1`.)
+## Deprecations (Lane 3, gate #3)
 
-### 4. BLOCKER — `spryker-eco/product-management-ai` has no compatible release
-| Version | requires spryker/gui |
+| Item | Replacement | Difference | Consequences | Developer's choice |
+|---|---|---|---|---|
+| `<OldCartExpanderPlugin>` | `<NewCartExpanderPlugin>` | same interface, adds bundle items | none beyond the swap | applied |
+| `<OldCheckoutPreConditionPlugin>` ×2 | one `<NewCheckoutValidatorPlugin>` | two plugins consolidate into one | picked the checkout pre-condition list to keep it | applied |
+| `<OldOrderSavePlugin>` | `<NewOrderPostSavePlugin>` | different extension point (post-save) | runs after persistence; order of side effects changes | deferred — needs a business check |
+| `<OldPriceDimensionPlugin>` | none named | — | behaviour still used | kept |
+
+Applied: 12. Deferred: 9. Kept: 3. Deferred and kept items stay listed here for the next upgrade.
+
+## Static checks against baseline (Phase 5)
+
+| Check | Result |
 |---|---|
-| 0.5.0 (latest) | ^4.0.0 |
-| 0.4.0 | ^4.0.0 |
-| 0.3.0 | ^3.45.0 |
-| 0.2.1 (project had) | ^3.45.0 |
+| Detectors | all clean against the baseline |
+| PHPStan | 0 regressions against the post-tooling baseline |
+| Sniffer | changed files auto-fixed (`-f`); 0 new violations |
+| Evaluator | 0 new findings |
+| `check-added-comments.php` | exit 0 |
+| `propel:diff` | 2 migrations pending — answered against a database imported from the pre-upgrade lock |
 
-Release 202606.0 requires `spryker/gui ^5.3.0`. **No published version of this package supports
-gui 5.x**, and widening the constraint would not help — it calls a gui class that 5.3.2 removed.
-**Resolved by dropping the feature**; see *The AI product-management feature: dropped* below.
+## Tests (Phase 5.5)
 
-### 5. HARD STOP — an external repository owns 216 of this project's root constraints
+630 tests in the container with the pinned invocation: 618 green, 12 red. 3 suites skipped (no
+webdriver). Every test added at gate #1 is green. Failures that are not in the baseline:
 
-This is the finding that ends the upgrade, and it is **not fixable inside this repository.**
-
-`composer.json` enables `wikimedia/composer-merge-plugin`:
-
-```json
-"extra": { "merge-plugin": { "include": ["vendor/spryker/spryker-demo/Bundles/*/composer.json"] } }
-```
-
-`spryker/spryker-demo` is a `dev-main` metapackage from the private repo
-`spryker-projects/demo-packages`. It ships **59 bundles**, and the merge plugin folds **42 of their
-composer.json files — 216 Spryker constraints — into the root package** at resolve time. That is
-why composer kept reporting *"conflicts with your root composer.json require (^3.47.1)"* for
-`spryker/gui` long after every `gui` pin had been removed from this project's composer.json: the
-constraint is real and is a root constraint, it just lives in another repository.
-
-Six merged bundles block release 202606.0, which needs `spryker/gui ^5.3.0`:
-
-| Bundle (in `spryker-projects/demo-packages`) | Pins |
-|---|---|
-| ImportProcessGui | `spryker/gui ^3.47.1` |
-| ImportProcessGoogleSheetsGui | `spryker/gui ^3.47.1` |
-| ProductAttributeSetGui | `spryker/gui ^3.47.1` |
-| ShopThemeGui | `spryker/gui ^3.47.1` |
-| MerchantReviewGui | `spryker/gui ^3.47.0` |
-| MerchantReviewMerchantPortalGui | `spryker/gui-table ^3.0.0` |
-
-This project could not reach 202606.0 until `spryker-projects/demo-packages` was updated — no
-amount of constraint editing here substitutes. **Resolved**: those seven constraints were widened
-and two code fixes applied in
-[demo-packages#149](https://github.com/spryker-projects/demo-packages/pull/149), and this project
-now points at that branch. Note the sequencing trap: the merge plugin reads from the *installed*
-`vendor/` copy, so the providing package must be updated in its own composer step before the
-release group is bumped.
-
-`check-constraint-style.php` now reports merged constraints, so this surfaces in preflight instead
-of after six composer rounds.
-
-## Lane 0 — migration guides (mandatory for every major)
-
-Researched every crossed major boundary. **The headline: the ~31 major bumps collapse into three
-coordinated platform migrations plus one genuinely functional module major.** Chasing them
-per-module would have been the wrong unit of work.
-
-| Migration | Guide | Modules it covers |
+| Kind | Count | Note |
 |---|---|---|
-| **Bootstrap 3 → 5** (Back Office) | [Upgrade the Back Office to Bootstrap 5](https://docs.spryker.com/docs/pbc/all/back-office/latest/base-shop/install-and-upgrade/upgrade-the-back-office-to-bootstrap-5.html) | `gui` 3→4 and the whole `*Gui` wave released 2025-11-16: product-attribute-gui, product-set-gui, content-gui, file-manager-gui, availability-gui, shipment-gui, stock-gui, payment-gui, price-product-offer-gui, merchant-gui, product-management |
-| **Angular 18 → 20** | [Upgrade to Angular 20](https://docs.spryker.com/docs/dg/dev/upgrade-and-migrate/upgrade-to-angular-20.html) | `gui-table` 4, `zed-ui` 4, and the 15-module `*-merchant-portal-gui` cohort |
-| **INSPINIA theme v2** | [Update the INSPINIA theme](https://docs.spryker.com/docs/pbc/all/back-office/latest/base-shop/install-and-upgrade/update-inpinia-theme-version-at-back-office.html) (thin — composer/npm/cache steps only) | `gui` 4→5 and every `x.1.0` compat minor |
-| **MerchantProductOfferDataImport 1→2** | [module guide with a real 1.\*→2.0.0 section](https://docs.spryker.com/docs/pbc/all/offer-management/latest/marketplace/install-and-upgrade/upgrade-modules/upgrade-the-merchantproductofferdataimport-module.html) | the only functional major: new combined product-offer importer, ~30 new classes, new `FILE_SYSTEME_NAME` constant, requires `propel:install` + `transfer:generate` |
-| **ShopUi 2.0.0** (2026-08-03) | **NO GUIDE PUBLISHED** — breaking changes listed only on [upcoming major module releases](https://docs.spryker.com/docs/about/all/releases/upcoming-major-module-releases.html) | Yves frontend builder moves into ShopUi: `frontend/settings.js` → `frontend/yves.settings.mts`, `yves:*` npm scripts re-pointed, **Node 24+** |
+| App damage | 0 | — |
+| Harness damage | 2 | a moved `SprykerTest` helper; test-side usage fixed |
 
-Per-module pages are mostly stale or absent: `MerchantGui` stops at 2→3 (2021), `ProductMerchantPortalGui`
-at 1→2 (2023), `ProductSetGui`/`ContentGui`/`ShipmentGui` cover only 1→2, `AvailabilityGui` stops at
-6.0.0, and `product-attribute-gui`, `file-manager-gui`, `product-offer-merchant-portal-gui`,
-`price-product-*-gui`, `payment-gui`, `gui`, `gui-table` have **no published guide at all**.
+### Tests already red before the upgrade
 
-### Corrections found while verifying
+These 12 fail identically on `codecept-baseline.txt` and are not upgrade damage (most assert core
+behaviour the project customises):
 
-1. **Two entries in my own worklist were not majors.** `spryker/development` 3.40→3.53 and
-   `spryker/company-unit-address` 1.17→1.18 stay within the same major — no guide applies. My
-   first-pass extraction over-reported because it read composer's conflict lines without checking
-   the boundary. `resolve-constraints.php` classifies correctly.
-2. **The published ProductManagement guide's `0.19→0.20` section is wrong.** It describes a
-   locale/money-form change and is dated Jun 2021, while 0.20.0 shipped Nov 2025; the real diff is
-   11 Twig/JS files with zero PHP. Following that section would have produced pointless work.
-3. **Most churn lives in the `x.1.0` minors, not the majors.** e.g. availability-gui 7.0.0 changes
-   *zero* files while 7.1.0 changes 28; product-set-gui 3.0.0 changes 4 while 3.1.0 changes 33;
-   product-management 0.20.0 changes 11 while 0.20.1–0.20.11 change 157. Scoping a Twig review to
-   major boundaries would miss ~90% of it — which is why the shadow-map detector diffs actual file
-   content over the whole range rather than reasoning about version numbers.
-4. **Two undocumented JS library majors** ride along in `gui` 4→5, mentioned in no guide or release
-   note — found only in the `assets/Zed/package.json` diff: `sweetalert ~1.1.3` → **`sweetalert2 ~11.x`**
-   (different API) and `datatables.net 1.11` → **2.3.7**. Project JS calling `swal(...)` or
-   DataTables 1.x APIs must be rewritten.
+- `PyzTest\Zed\<Module>\...` — 7 tests
+- `PyzTest\Yves\<Module>\...` — 5 tests
 
-### This project's actual exposure (measured, not assumed)
+## Back Office crawl and verifier (Phase 4.9, Phase 6.5)
 
-| Check | sc-b2b-mp-industry-demo |
+| Check | Result |
 |---|---|
-| Pyz classes extending `Gui\...\AbstractTable` | **8** — review against Bootstrap 5 table markup |
-| Uses removed `isSymfonyHttpFoundationVersion5OrHigher()` | 0 — safe |
-| References `FORM_DEFAULT_TEMPLATE_FILE_NAMES` / `bootstrap_3_layout` | 0 — safe |
-| Pyz twig with Bootstrap 3 JS data attributes | **2 files** — need `data-bs-*` rename |
-| Pyz twig with Bootstrap 3 grid classes | **9 files** — need grid-class migration |
-| Pyz JS/TS calling `swal(` or `DataTable(` | **5 files** — hit by the undocumented JS majors |
-| Pyz TS with `@Component`/`@Directive`/`@Pipe` | **45 files** — each needs `standalone: false` for Angular 20 |
-| `package.json` engines | `node >=18.13.0`, `npm >=9.0.0` — **must reach ≥20.19 for Angular 20, and 24 for ShopUi 2.0** |
+| First crawl after boot | every table data endpoint 500 — `spryker/application` newer than `spryker/silexphp` allowed; the lagging package was bumped |
+| Final crawl | 0 problems outside the baseline; the 2 `inBaseline` pages still fail (pre-existing) |
+| `spryker-verifier` | 14 criteria: 13 PASS, 1 BLOCKED (a Merchant Portal page needs a merchant user not in the seed data) |
 
-The Bootstrap-5 compatibility shims (`commons-bootstrap-compatibility.js`, `_bootstrap5-update.scss`)
-were **deleted** in gui 4.0.0, so Bootstrap 3 attribute names are now dead rather than degraded.
+## New features (gate #4) and removed packages
 
-## Tooling added during this run
+18 NEW packages listed; the developer chose none for now. REMOVED: `spryker-shop/customer-reorder-widget`
+(replaced by the CartReorder feature), `spryker-eco/product-management-ai` (dropped, Lane 5).
 
-Running against a real project exposed seven gaps in the POC detectors, all fixed and
-back-ported to the reference repo:
+## Lane 5 — dropped: `spryker-eco/product-management-ai`
 
-| Gap found | Fix |
-|---|---|
-| Module code ships from `spryker-eco`/`spryker-feature`, not just `spryker-shop` | vendor roots now glob-resolved across all four namespaces (+17% more shadowed files found) |
-| `Generated\` transfers absent before `transfer:generate` → 40 false positives | reported as a separate note, not a problem |
-| Patch-locked (`~`) module constraints silently block the upgrade | new `check-constraint-style.php` |
-| Conflicts arrive in waves | new `resolve-constraints.php` (iterative, logs every bump, flags majors) |
-| Caret on a `0.x` package is major-locked | resolver's `crossesMajorBoundary()` treats `^0.19→^0.20` as major |
-| `dev-main` branch constraints misreported as pins | floating-constraint detection |
-| Exact pins on third-party packages block Spryker modules | separate `thirdPartyPinned` report category |
-| Greedy per-package bumping **oscillated forever** (`zed-ui` ^4↔^3) on a cohort migration | monotonic constraints + oscillation detection; reports the cohort instead of looping |
-| Cohort migrations can't be resolved by per-package bumps at all | new `unpin-feature-driven-modules.php` — lets feature meta-packages govern, as the reference demoshop does |
-| A *filtered* `composer update` re-uses the lock's root requirements, so removed pins still appear as conflicts | resolver now always runs a **full** update |
+No release supports `spryker/gui` 5, and it calls a gui form type that 5.x removed, so widening
+constraints upstream would not help. Footprint: one project module, 3 plugin registrations, AI slices
+in two Back Office modules and their templates. Removed in one commit (revertable). Kept: the product
+image `alt_text` field, a project feature whose only AI link was a `template_path` hook; the
+name/description fields were unwrapped from the AI translate embed with their markup intact.
 
-Eight scripts in `$UP/`; the coverage matrix in
-`.claude/skills/spryker-upgrade/SKILL.md` grew from 24 to **37** use cases. All fixes were
-back-ported to the reference repo.
+## What is proven and what is not
 
-## Phase 2 RESOLVED — and Phase 3 detector results
+- Proven in the container: composer resolves, the console boots, the Zed and Glue functional suites
+  match the baseline, every Back Office page answers as in the baseline.
+- Proven statically only: the modules outside pricing, cart and checkout (the developer declined
+  tests there at gate #1).
+- Not run: acceptance suites (no webdriver) — matrix #23 behaviour changes in the storefront remain
+  unproven there; the verifier covered the pages listed in its report.
 
-After fixing `spryker-projects/demo-packages` (branch `upgrade/202606.0-gui5-angular20-compat`)
-and one further project pin (`spryker/customer-user-connector-gui ^1.5.0 → ^2.1.0`, gui-5 support
-arrived in 2.1.0), **composer resolved with 0 problems**: 1 589 packages locked, `spryker/gui 5.3.2`,
-`gui-table 4.0.0`, `zed-ui 4.1.1`, `product-management 0.20.11`, `locale 4.14.0`,
-`twig/twig v3.28.0`, `spryker-feature/* 202606.0`.
+## Open items
 
-Lock diff vs the 202410 baseline: **168 major, 614 minor/patch, 18 new, 2 removed** Spryker packages.
-`composer audit` reports one low-severity advisory (`firebase/php-jwt < 7.0.0`, CVE-2025-45769).
+1. The deferred `<OldOrderSavePlugin>` replacement (post-save semantics).
+2. The BLOCKED verifier criterion — needs a merchant user.
 
-### Real upgrade damage found (this is what the POC exists for)
-
-**Broken classes — 24 conflicts across 17 classes** (5 are collateral from the parked
-`product-management-ai`, leaving **12 genuine**). Every one is a hard fatal at class load, i.e. the
-shop would not boot:
-
-| Cause | Classes |
-|---|---|
-| Core added a **typed class constant**; the Pyz override is untyped | `Zed\MerchantProductGui\MerchantProductGuiDependencyProvider::FACADE_MERCHANT`, `Yves\ServicePointCartPage\ServicePointCartPageConfig::QUOTE_ITEM_FIELDS_ALLOWED_FOR_RESET` |
-| Core added a **typed property**; the Pyz override is untyped | `Yves\CheckoutPage\Process\Steps\SummaryStep::$checkoutPageConfig`, `Zed\PriceProduct\Business\Model\Reader::$priceProductMapper` |
-| **Signature change** (params or return type) | `Yves\CustomerPage\CustomerPageFactory::getSessionClient()`, `Zed\MerchantGui\...\ListMerchantController::indexAction(): array`, `Zed\PriceCartConnector\...\PriceManager::addPriceToItems()`, `Zed\ProductMerchantPortalGui\Persistence\ProductMerchantPortalGuiRepository(+Interface)::getProductsDashboardCardCounts(int, int)` |
-| **Vendor class removed entirely** | `Yves\CustomerReorderWidget\CustomerReorderWidgetDependencyProvider` — `SprykerShop\Yves\CustomerReorderWidget\...` no longer exists |
-
-Typed constants and typed properties are a whole *class* of damage worth calling out: core adopted
-PHP 8.3 `const string`/typed properties, and every untyped project override of those members is now
-a fatal. Grep-style review would not have predicted it.
-
-**Shadowed frontend/presentation files — 176 conflicts + 63 informational**, out of the 810 mapped:
-
-| Type | Count | Meaning |
-|---|---|---|
-| `VENDOR_FILE_CHANGED` | 163 | vendor changed the file but the project override shadows it — the change is **not live**; each carries a ready `git merge-file` three-way merge command |
-| `VENDOR_FILE_REMOVED` | 13 | the shadowed vendor template is gone (renamed/removed) — the override is now detached |
-| `NEW_VENDOR_FILE` | 63 | new vendor files inside overridden scopes — overridden parents may need to include them |
-
-**Plugin stacks — 8 newly-missing wired plugins** (baseline was 0), plus project plugins on
-deprecated interfaces rising 17 → 19:
-
-- **`CustomerReorderWidget` was removed as a module** in 202606, taking 5 wired plugins with it
-  (`CustomerReorderWidgetPlugin`, `CustomerReorderFormWidget`, `CustomerReorderItemsFormWidget`,
-  `CustomerReorderItemCheckboxWidget`, `CustomerReorderWidgetRouteProviderPlugin`). This is exactly
-  the "plugin stack replaced by another plugin stack" case — the replacement is the **CartReorder**
-  feature, which this project already has. The Pyz dependency providers and the
-  `CustomerReorderWidget` override must be rewired to it.
-- 3 more are collateral from the parked `product-management-ai`.
-
-**Config constants — clean.** 361 types and 752 constants still resolve; the only note is the 40
-`Generated\` transfers awaiting `transfer:generate`.
-
-### A detector bug this run exposed
-
-The dead-override detector originally died on the first fatal — a compile-time error like
-"Type of ::FACADE_MERCHANT must be compatible with…" cannot be caught by `try/catch`, so one broken
-class aborted the whole scan. It now reflects in **child processes** (batches of 100, bisecting to
-single classes on failure), so a poisoned class costs its batch rather than the run. Full scan of
-2 838 Pyz classes: ~49 s.
-
-## Final status
-
-Branch `upgrade/202606.0`, 5 commits, composer resolves clean and
-`transfer:generate` exits 0 with 2 376 transfer objects.
-
-| Phase | Result |
-|---|---|
-| Phase 0 baselines | captured (all detectors green at 202410.0) |
-| Phase 1.5 constraints | **done** — 130 tilde pins relaxed, 24 majors bumped, 155 feature-governed pins removed, twig security pin fixed, php raised to >=8.3 |
-| Phase 2 composer | **resolved, 0 problems** — 1 589 packages; gui 5.3.2, gui-table 4.0.0, zed-ui 4.1.1, twig v3.28.0 |
-| Lane 0 migration guides | **done** — 3 platform migrations + 1 functional major identified and applied |
-| Lane 1 broken classes | **done** — 12 fatals fixed (typed constants/properties, 4 signature changes, 4 constructor arities) |
-| Lane 3 plugin stacks | **done** — CustomerReorderWidget fully migrated to CartReorder |
-| Lane 4 config constants | **clean** — 361 types / 752 constants resolve |
-| Phase 5 artifacts | `transfer:generate` ✔; `propel:migration:diff` and `search:setup:index-map` need a DB / search backend, unavailable on this host |
-| Lane 2 frontend | **15 of 163 merged**; 148 need design decisions — see `LANE2-WORKLIST.md` |
-| Gate #2 new features | 18 NEW packages listed in `state/lock-diff-report.json`, none wired |
-
-### Detector state after the work
-
-| Detector | Result |
-|---|---|
-| `check-dead-overrides.php` | **clean** — all 1 845 recorded overrides still anchored |
-| `check-config-constants.php` | **clean** — 361 types / 752 constants resolve |
-| `check-plugin-usage.php` | **0 missing**; deprecated 49 → 39 after 10 swaps; 19 project plugins on deprecated interfaces |
-| `twig-shadow-map.php` | 148 conflicts + 11 removed templates remain (`LANE2-WORKLIST.md`) |
-| PHPStan level 1 | **no error that is not explained by this host lacking a database, a search backend or the Spryker bootstrap** |
-| `transfer:generate` | exit 0, 2 376 transfer objects |
-
-### The AI product-management feature: dropped
-
-`spryker-eco/product-management-ai` has **no release compatible with 202606.0**, and it is not a
-constraint problem: it uses `Spryker\Zed\Gui\Communication\Form\Type\Select`, which gui 5.3.2
-**removed**. Its latest release (0.5.0) caps at `gui ^4.0.0`, so it needs upstream code changes.
-
-Per the decision to drop it, the feature was removed in full: the project's
-`Pyz\Zed\ProductManagementAi` module (21 files), the three SprykerEco plugin registrations,
-ProductCreationWizardGui's AI price-suggestion slice (controller, data provider, facade dependency,
-JS), Gui's AI request builder, and every AI twig include, stylesheet link and `data-trans-ai-*`
-attribute — 195 files, ~19 300 lines removed.
-
-Deliberately kept: the product image `alt_text` form field, which is a project feature rather than
-an AI one — only its `template_path` hook into the AI partial is gone. The name/description fields
-were unwrapped from the AI translate embed with their markup intact.
-
-If the eco package later supports gui 5, this is a revert of one commit rather than a rebuild.
-
-### Also fixed upstream
-
-Two commits were needed in `spryker-projects/demo-packages`
-([PR #149](https://github.com/spryker-projects/demo-packages/pull/149)) beyond the constraint
-widening: `GenerateSalesInvoicePdfConsole::CODE_SUCCESS`/`CODE_ERROR` had to become `const int` to
-match core's `Console`, otherwise **every** console command aborts on startup — including
-`transfer:generate` during install. That repo's CI was also broken independently (no `setup-php`
-step, so PHP 8.1 against a `code-sniffer` needing 8.3) and is fixed in the same PR.
-
+Suggested PR: one for this release group.

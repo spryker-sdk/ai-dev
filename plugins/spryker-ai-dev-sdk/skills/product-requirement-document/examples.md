@@ -175,4 +175,3 @@ This example demonstrates:
 - ✅ Business-level NFRs (no tooling/test commands)
 - ✅ Success metrics with measurement tools; Out of Scope and Dependencies
 - ✅ NO Quality Gates, NO Tasks, NO priority tiers
-```

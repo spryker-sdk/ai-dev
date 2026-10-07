@@ -7,32 +7,32 @@
 #
 # One row per data_entity in the shipped EU manifest. `source` is the CSV
 # basename the manifest points at (it often differs from the entity name — that
-# difference is the whole reason this file exists; see stock/warehouse.csv).
+# difference is why this file exists; see stock/warehouse.csv).
 #
 # class:
-#   structural   — theme-INDEPENDENT plumbing: registries, type tables, store
+#   structural   — theme-independent plumbing: registries, type tables, store
 #                  definitions, code-registration, and the marketplace /
 #                  measurement / discount wiring a project keeps regardless of its
 #                  catalog. `clean` keeps these populated (or reshaped). `why` is
-#                  MANDATORY — the reason is the transferable knowledge.
-#   content      — theme-DEPENDENT demo data: the specific products, prices,
+#                  mandatory — the reason is the transferable knowledge.
+#   content      — theme-dependent demo data: the specific products, prices,
 #                  images, category tree, CMS copy, nav nodes, merchants, offers,
 #                  customers, companies, orders, carts, lists — regenerated or
 #                  dropped per project.
-#   unclassified — undecided. The DEFAULT for anything new, and it BLOCKS the boot
-#                  (known-set exits non-zero). A new upstream entity arrives loud
+#   unclassified — undecided. The default for anything new, and it blocks the boot
+#                  (known-set exits non-zero), so a new upstream entity is flagged
 #                  instead of being silently dropped. No shipped entity is
-#                  unclassified today.
+#                  unclassified at the measured commit.
 #
-# Three rules that keep this surviving drift:
+# Three rules keep this file accurate as the demo data changes:
 #   1. unclassified is the default for anything new, and it blocks the boot.
 #   2. why is mandatory for structural — the list alone is just data.
 #   3. the header carries the commit + date it was measured against, so staleness
 #      is a diff, not a re-audit.
 #
 # NOTE on the two entities the pure structural/content line doesn't settle:
-#   - product-search-attribute / -map are classed structural per the review's M3
-#     (search-facet plumbing) though their VALUES are theme-dependent — regenerate.
+#   - product-search-attribute / -map are classed structural (search-facet
+#     plumbing) though their values are theme-dependent — regenerate.
 #   - the SSP / service-point family is classed content (feature demo data,
 #     droppable); reclassify to structural if your project uses that feature.
 
@@ -79,7 +79,7 @@
 - entity: cms-template
   source: cms_template.csv
   class: structural
-  why: "Registers CMS PAGE Twig templates (@Cms/*) — code binding, not content."
+  why: "Registers CMS page Twig templates (@Cms/*) — code binding, not content."
 - entity: comment
   source: comment.csv
   class: content
@@ -495,11 +495,11 @@
 - entity: product-search-attribute
   source: product_search_attribute.csv
   class: structural
-  why: "Search facet config; regenerate for your attribute schema — omitting yields no search facets (M3). Theme-dependent VALUES, structural ROLE."
+  why: "Search facet config; regenerate for your attribute schema — omitting yields no search facets. Theme-dependent values, structural role."
 - entity: product-search-attribute-map
   source: product_search_attribute_map.csv
   class: structural
-  why: "Search attribute-map config; regenerate for your attribute schema (M3)."
+  why: "Search attribute-map config; regenerate for your attribute schema."
 - entity: product-set
   source: product_set.csv
   class: content
@@ -507,7 +507,7 @@
 - entity: product-shipment-type
   source: product_shipment_type.csv
   class: structural
-  why: "~1 row per concrete = required; the near-miss that breaks silently if omitted (M7/generate.md:73)."
+  why: "~1 row per concrete = required; omitting it breaks the storefront silently (see project-data generate.md step 7)."
 - entity: product-stock
   source: product_stock.csv
   class: content
@@ -539,7 +539,7 @@
 - entity: return-reason
   source: ~
   class: structural
-  why: "RMA return-reason codes — theme-independent config. NOTE: bare data_entity in full_EU.yml with no source; needs authoring or an explicit source (M3)."
+  why: "RMA return-reason codes — theme-independent config. NOTE: bare data_entity in full_EU.yml with no source; needs authoring or an explicit source."
 - entity: sales-order
   source: sales_order.csv
   class: content
@@ -595,7 +595,7 @@
 - entity: shipment-type-service-type
   source: shipment_type_service_type.csv
   class: structural
-  why: "Relation linking kept shipment-type to service-type — theme-independent (M3)."
+  why: "Relation linking kept shipment-type to service-type — theme-independent."
 - entity: shipment-type-store
   source: shipment_type_store.csv
   class: structural

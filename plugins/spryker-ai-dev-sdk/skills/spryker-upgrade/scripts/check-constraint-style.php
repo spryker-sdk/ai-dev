@@ -10,8 +10,8 @@
  * patch upgrades, so when the new release group's feature package requires "^8.28.0" composer
  * reports a root-conflict instead of upgrading. Exact pins behave the same way.
  *
- * Run this BEFORE the composer update: it turns a wall of 40+ "conflicts with your root
- * composer.json require" errors into an explicit, reviewable list.
+ * Run this before the composer update: it turns the "conflicts with your root composer.json
+ * require" errors into an explicit, reviewable list.
  *
  * Usage:
  *   php $UP/check-constraint-style.php            # report only
@@ -108,7 +108,7 @@ foreach (array_merge($json['require'] ?? [], $json['require-dev'] ?? []) as $nam
     }
     $first = $constraint[0] ?? '';
 
-    // Feature meta-packages are exact-pinned to a release group BY DESIGN — that is the Spryker
+    // Feature meta-packages are exact-pinned to a release group by design — that is the Spryker
     // layout, and moving those pins is what the upgrade does. Never report them as pinned deps.
     if (str_starts_with($name, 'spryker-feature/')) {
         $featurePins[$name] = $constraint;
@@ -179,7 +179,7 @@ if ($merged !== []) {
         }
     }
     printf(
-        "\nIf any of these live under vendor/, they belong to ANOTHER repository and a stale\n"
+        "\nIf any of these live under vendor/, they belong to another repository and a stale\n"
         . "constraint there blocks this upgrade until it is fixed upstream.\n"
     );
 }

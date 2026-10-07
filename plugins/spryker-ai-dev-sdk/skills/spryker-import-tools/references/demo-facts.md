@@ -32,7 +32,7 @@ The transactional-email blocks are matched by a **prefix on the `block_key` colu
 **no `name` column** (its columns are `block_key,block_name,template_name,template_path,active,placeholder.*`):
 
 - prefix: `cms-block-email--`
-- column: `block_key` (matching on `name` wipes every block — a real data-loss bug)
+- column: `block_key` (the file has no `name` column; `csv filter` rejects an unknown column with an error)
 
 Re-derive: `php "$CSV" distinct cms_block.csv --column block_key --plain`
 
