@@ -160,7 +160,7 @@ Interpret the result. Note that `composer outdated` only prints a row when the p
 If installing or upgrading, run:
 
 ```bash
-composer require spryker-sdk/ai-dev --dev
+composer require spryker-sdk/ai-dev --dev --ignore-platform-reqs
 ```
 
 If the project uses `docker/sdk` for Composer (common in Spryker dev environments), prefer:
