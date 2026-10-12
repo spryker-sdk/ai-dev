@@ -656,18 +656,15 @@ It reports:
 
 - **host PHP vs every `deploy*.yml` image tag** — and flags deploy files that *disagree* with each
   other, since then there is no single platform to resolve for;
-- **`config.platform.php` absent** while the host and deployment minors differ — the actual hazard;
-- **`config.platform.php` pointing at the wrong minor**;
+- **a `config.platform.php` in `composer.json`** — reported for removal: composer runs in the
+  container, which has the deployment PHP;
 - **locked packages that cannot install on the target PHP** — the decisive check, and what
   `docker/sdk up` would otherwise discover at install time;
 - **extensions the lock requires that this host lacks** (`ext-redis`, `ext-pgsql`). This is a separate
-  failure: a platform pin fixes the PHP *version*, not the *extension set*, so composer cannot resolve
-  those packages here at all. The answer is to run composer in the container — never
+  failure: composer on this host cannot resolve those packages at all. The answer is to run composer in the container — never
   `--ignore-platform-req`, which fakes the requirement and re-creates the uninstallable lock.
 
-Target precedence is `--target` → `config.platform.php` → the image tag's `.0` floor. The declared
-platform wins because it is what composer actually resolves against; inferring `.0` from an `8.3` tag
-otherwise false-positives on any package with a patch-level constraint such as `~8.3.2`.
+The target is `--target` when given, otherwise the image tag's `.0` floor.
 
 Exit 1 on anything that can produce an uninstallable lock, 0 when aligned.
 

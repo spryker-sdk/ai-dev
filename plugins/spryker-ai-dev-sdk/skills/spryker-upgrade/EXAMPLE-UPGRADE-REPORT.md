@@ -49,7 +49,7 @@ Reference: `b2b-demo-marketplace` at `202606.0`, cloned into `.spryker-upgrade/s
 | Item | Before | After | Note |
 |---|---|---|---|
 | Docker SDK (`.git.docker`, `docker/` pointer) | 1.58.0 | 1.66.0 | release notes read for the whole range |
-| `deploy.*.yml` image tag | `spryker/php:8.2` | `spryker/php:8.3` | `config.platform.php` set to `8.3.2` |
+| `deploy.*.yml` image tag | `spryker/php:8.2` | `spryker/php:8.3` | moved with the Docker SDK |
 | Search / broker / key-value versions | as reference | as reference | `opensearch` 1 → 2 per the Docker SDK notes |
 | Database engine | MariaDB 10.6 | MariaDB 10.6 | **kept** — matches production; recorded project choice |
 | `phpstan/phpstan` | 1.10 | 1.12 | own commit |

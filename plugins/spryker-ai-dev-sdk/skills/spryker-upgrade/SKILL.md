@@ -231,21 +231,19 @@ the target release**, each as its own commit, following
    update `.git.docker` and the `docker/` submodule pointer, read the Docker SDK release notes between
    the two versions, and update every `deploy.*.yml` (image tag, service versions, new and renamed
    keys), keeping the project's own topology. Validate with `docker/sdk boot`; show the developer the
-   deploy diff. Then rebuild with `script -q /dev/null docker/sdk up -t --build`: steps 3–5 run in the
-   container, which runs the old image until that rebuild.
-3. **Platform pin.** Before the first composer command, `php $UP/check-platform-alignment.php` must be
-   clean for the image just set: `config.platform.php` set to the deployment PHP, composer run in the
-   container, never `--ignore-platform-req` (matrix #56/#57).
-4. **Tooling set** — `phpstan/phpstan` and the PHPStan extensions the project has,
+   deploy diff. Then rebuild with `script -q /dev/null docker/sdk up -t --build`: steps 3–4 run in the
+   container, which runs the old image until that rebuild. Composer always runs in the container,
+   never with `--ignore-platform-req` (matrix #57).
+3. **Tooling set** — `phpstan/phpstan` and the PHPStan extensions the project has,
    `spryker-sdk/evaluator`, `spryker/code-sniffer`, `codeception/*`, `phpunit/phpunit` — to the
    reference's constraints, updated alone, in the container, as its own commit.
-5. **Re-take the PHPStan, sniffer and evaluator baselines** right after that commit (and the test
+4. **Re-take the PHPStan, sniffer and evaluator baselines** right after that commit (and the test
    baseline when codeception or phpunit moved) into `phpstan-`, `sniff-`, `evaluator-` and
    `codecept-post-tooling.txt`, keeping the Phase 0 files, then re-run `check-baselines.php`. From
    here on a tool's baseline is its `*-post-tooling.txt` file, so new tool rules are not upgrade damage.
 
-If the new tools cannot resolve against the pre-upgrade modules, the tooling step defers until
-right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
+If the new tools cannot resolve against the pre-upgrade modules, the tooling step and the image tag
+defer until right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
 
 ## Phase 1.5 — Constraint style (before the release-group update)
 

@@ -59,47 +59,15 @@ use. Move them together.
    will keep reporting it, and the report lists it as a recorded project choice.
 
 7. **Rebuild.** `script -q /dev/null docker/sdk up -t --build`. The container keeps running the old
-   image and Docker SDK until this rebuild, and steps 3 and 4 below — the platform check, the tooling
-   update and the baseline re-takes — run in the container.
+   image and Docker SDK until this rebuild, and step 3 below — the tooling update and the baseline
+   re-takes — runs in the container.
 
-A new image tag changes the PHP version the project runs on, so step 3 below comes after this one.
+If the old lock cannot install on the new image (a locked package does not support the newer PHP),
+keep the old image for now and move the image tag together with the Phase 2 update — the Docker SDK
+and the other deploy keys still move here, and the rebuild of step 7 still runs. Record in the report
+which image the re-taken baselines of step 3 ran on.
 
-## 3. Platform pin — resolve for the project's platform, not the host
-
-Do this before the first composer command below, because every lock produced without it may be
-uninstallable, and the failure appears only when something installs it in the container.
-
-```bash
-php $UP/check-platform-alignment.php                         # host PHP vs every deploy image, lock vs target PHP
-grep -hoE 'tag: spryker/php:[0-9.]+' deploy*.yml | sort -u    # what the project runs
-```
-
-If the host PHP minor differs from the image and `config.platform` is absent, stop and fix that first:
-
-```json
-"config": { "platform": { "php": "8.3.2" } }
-```
-
-`require.php` does not protect you — `">=8.3"` is satisfied by a host on 8.5, so composer selects
-dependencies (usually dev tooling: `doctrine/instantiator`, `symfony/*`, `phpunit`) that require a PHP
-the container does not have (matrix #56). Choose the lowest patch that satisfies the lock rather than
-the image's current patch, because `spryker/php:8.x` is a floating tag and environments pull it at
-different times.
-
-Then run composer inside the container anyway:
-
-```bash
-script -q /dev/null docker/sdk cli composer check-platform-reqs   # must be 0 failures
-```
-
-The pin fixes the PHP version; it does not give the host the project's extensions. A machine without
-`ext-redis` or `ext-pgsql` cannot resolve `spryker/redis` at all (matrix #57). Never use
-`--ignore-platform-req` to get past that — it re-creates the unrunnable lock the pin prevents (the
-Phase 1.5 resolver's host run only discovers constraints; its lock is discarded). Without
-the pin the damage surfaces only when `docker/sdk up` fails at `composer install`, phases later, and
-any test run on the host in the meantime ran on the wrong PHP minor.
-
-## 4. The tooling set
+## 3. The tooling set
 
 The tooling set is `phpstan/phpstan`, `spryker-sdk/evaluator`, `spryker/code-sniffer`, `codeception/*`
 and `phpunit/phpunit`, plus the PHPStan extensions the project already uses (`phpstan/*`,
@@ -150,12 +118,13 @@ New tooling can require versions of shared dependencies (`symfony/*`, `nikic/php
    a finding whose rule or error identifier is new in the tool version is a tool finding; every other
    new finding is Phase 3 upgrade damage. The baseline for the rest of the upgrade is the Phase 0
    findings plus only the tool findings; list those tool findings in the report.
-5. Say in the report that the tooling moved after Phase 2 and why.
+5. Say in the report that the tooling moved after Phase 2 and why, and which image the re-takes ran
+   on when the image tag was deferred too.
 
 Baseline here always means the run recorded under `.spryker-upgrade/state/`. It never means
 `phpstan-baseline.neon`, an ignore rule or a narrowed path (non-negotiable 5).
 
-## 5. Finish
+## 4. Finish
 
 `php $UP/check-tooling-alignment.php --reference .spryker-upgrade/state/reference` is clean, or every
 remaining difference is a recorded project choice from step 2.6.

@@ -36,8 +36,7 @@ The resolver runs `composer update … --ignore-platform-reqs --no-scripts` on t
 discovers the constraints the tree needs; it is not a resolution to keep. When the resolver is done,
 keep its `composer.json` edits and discard the rest: restore `composer.lock` with `git checkout -- composer.lock`, then
 `vendor/` with `script -q /dev/null docker/sdk cli composer install`. Phase 2's full update in the
-container is the authoritative resolution, with the platform pin and without
-`--ignore-platform-reqs`.
+container is the authoritative resolution, without `--ignore-platform-reqs`.
 
 ## Cohorts: OSCILLATION / "would LOWER"
 

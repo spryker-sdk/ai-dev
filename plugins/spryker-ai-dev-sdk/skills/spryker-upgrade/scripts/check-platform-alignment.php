@@ -18,7 +18,8 @@
  * minor, so a passing host run does not cover the deployed runtime.
  *
  * The fix is two-part, because a host can be wrong in two independent ways:
- *   1. wrong PHP version      -> `config.platform.php` in composer.json, set to the deployment PHP;
+ *   1. wrong PHP version      -> run composer inside the container, which has the deployment PHP;
+ *      a `config.platform.php` in composer.json is not used and is reported for removal;
  *   2. wrong extension set    -> resolve inside the container; a host without ext-redis cannot
  *                                resolve spryker/redis at all, and `--ignore-platform-req` only
  *                                re-creates problem 1 by pretending the requirement is met.
@@ -78,18 +79,11 @@ foreach (glob($root . '/deploy*.yml') ?: [] as $deployFile) {
 $distinctTags = array_values(array_unique($imageTags));
 
 /**
- * Target precedence matters. `config.platform.php` is what composer resolves against, so it
- * wins whenever it is declared — inferring `.0` from an `8.3` image tag instead produces false
- * positives against any package with a patch-level constraint (`~8.3.2`) and can recommend a *lower*
- * pin than the project already has. Only fall back to the image tag when nothing is declared.
+ * The target is `--target` when given, otherwise the deploy image tag.
  */
 $targetPhp = $options['target'] ?? null;
 $targetSource = $targetPhp !== null ? '--target' : null;
 
-if ($targetPhp === null && $declaredPlatform !== null) {
-    $targetPhp = (string)$declaredPlatform;
-    $targetSource = 'config.platform.php';
-}
 
 if ($targetPhp === null && count($distinctTags) === 1) {
     // "8.3" from a tag is a release line, not a version. Assume .0 — the conservative floor for that line.
@@ -111,7 +105,7 @@ fwrite(STDOUT, sprintf(
     )),
 ));
 fwrite(STDOUT, sprintf("  composer require.php        %s\n", $requirePhp ?? '(absent)'));
-fwrite(STDOUT, sprintf("  config.platform.php         %s\n", $declaredPlatform ?? "\033[33mABSENT\033[0m"));
+fwrite(STDOUT, sprintf("  config.platform.php         %s\n", $declaredPlatform ?? '(absent)'));
 fwrite(STDOUT, sprintf(
     "  target used for this check  %s%s\n\n",
     $targetPhp ?? '(undetermined)',
@@ -128,32 +122,9 @@ if ($imageTags === []) {
         . 'derived. Pass --target=<version> to check against the real one.';
 }
 
-// The host/deployment minor gap is what breaks the lock; a patch difference is harmless.
-if ($targetPhp !== null) {
-    $hostMinor = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
-    $targetMinor = implode('.', array_slice(explode('.', $targetPhp), 0, 2));
-
-    if ($hostMinor !== $targetMinor) {
-        if ($declaredPlatform === null) {
-            $problems[] = "host PHP is {$hostMinor} but the project deploys on {$targetMinor}, and "
-                . 'config.platform.php is absent. Any composer update run here can produce a lock that '
-                . 'does not install in the container. require.php (' . ($requirePhp ?? 'absent')
-                . ") does not prevent this — the host satisfies it.";
-        } else {
-            $notes[] = "host PHP ({$hostMinor}) differs from the deployment PHP ({$targetMinor}), but "
-                . "config.platform.php is set to {$declaredPlatform}, so composer resolves for the "
-                . 'target. Extensions are still not emulated — see below.';
-        }
-    }
-}
-
-if ($declaredPlatform !== null && $targetPhp !== null) {
-    $declaredMinor = implode('.', array_slice(explode('.', (string)$declaredPlatform), 0, 2));
-    $targetMinor = implode('.', array_slice(explode('.', $targetPhp), 0, 2));
-    if ($declaredMinor !== $targetMinor) {
-        $problems[] = "config.platform.php is {$declaredPlatform} but the deploy image is "
-            . "{$targetMinor}.x — the pin points at the wrong platform.";
-    }
+if ($declaredPlatform !== null) {
+    $problems[] = "composer.json sets config.platform.php to {$declaredPlatform}. Remove it: composer runs "
+        . 'inside the container, which has the deployment PHP.';
 }
 
 /**
