@@ -24,7 +24,7 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    extension point the developer did not explicitly ask for, even when the new version supports it.
    A capability the project never had is outside the definition of damage. If restoring existing
    behaviour looks impossible without adopting the new thing, report it as a **vendor BC break**
-   instead of re-architecting. Full rule: § Scope.
+   instead of re-architecting. Full rule, and its one exception (Phase 6.2 performance fixes): § Scope.
    *Failure signature:* the plan contains a file the project never had (`config/bundles.php`, a new
    service config, a new provider registration) that no phase's detector asked for.
 2. **Baselines come first.** Phase 1 does not start until `check-baselines.php` exits 0: without the
@@ -42,8 +42,8 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    exclude, or a detector's exclude list — none of which is ever part of an upgrade's deliverable.
 
 **Plan tracking is mandatory.** At the end of Phase 0, create one `TaskCreate` task each for Phase
-0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.5 and 7, and
-drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
+0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5 and 7,
+and drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
 detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
 **Locate the scripts:** `.claude/skills/spryker-upgrade/scripts/` (setup install) or
@@ -63,7 +63,8 @@ of every lane and in Phase 7. Vendor comments copied into a project override cou
 ## Scope: an upgrade updates only what the project already has
 
 **The deliverable is the project doing exactly what it did before, on newer versions.** Modernising
-the project or moving it onto the vendor's recommended architecture is out of scope.
+the project or moving it onto the vendor's recommended architecture is out of scope. **Exception:** the
+Phase 6.2 performance guideline fixes are part of the deliverable: the developer asks for them with it.
 
 - **Moving a module to a newer version does not authorise adopting what that version enables** — a
   new architecture, DI mechanism, storage backend or extension point.
@@ -243,10 +244,8 @@ the target release**, each as its own commit, following
    `codecept-post-tooling.txt`, keeping the Phase 0 files, then re-run `check-baselines.php`. From
    here on a tool's baseline is its `*-post-tooling.txt` file, so new tool rules are not upgrade damage.
 
-If the new tools cannot resolve against the pre-upgrade Spryker modules, revert the tooling edit, run
-Phase 2 without it, then do the tooling step right after it, before Phase 3, with the same re-takes;
-the baseline is then the Phase 0 findings plus those from rules new in the tool version. The image tag
-defers the same way if the old lock cannot install on the new PHP; record each re-baseline's image.
+If the new tools cannot resolve against the pre-upgrade modules, the tooling step and the image tag
+defer until right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
 
 ## Phase 1.5 — Constraint style (before the release-group update)
 
@@ -293,17 +292,14 @@ php $UP/twig-shadow-map.php diff               # exit 1 = conflicts
 php $UP/check-plugin-usage.php                 # exit 1 = missing plugins
 php $UP/check-config-constants.php             # exit 1 = broken config refs
 php $UP/check-constant-overrides.php           # exit 1 = core value changed under a project constant
-php $UP/check-performance.php                  # exit 1 = ProductGroupWidget rendering lost; else recommendations
+php $UP/check-performance.php                  # exit 1 = ProductGroupWidget rendering lost (Lane 2)
 script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6
 ```
 
 Run `check-typed-members.php` first: typed-member fatals abort `vendor/bin/console` itself (with
 composer-merge-plugin, add `vendor/<vendor>/<pkg>/Bundles`). Subtract the Phase 0 baselines and present
 a summary: packages moved (majors highlighted), conflicts per lane, NEW packages, deprecated items.
-
-**Reading PHPStan without infrastructure:** errors on `Orm\Zed\*` / `Spy*EntityTransfer` need a
-database, `Generated\Shared\Search\*IndexMap` a search backend, `Constant APPLICATION_*` the Spryker
-bootstrap. What remains is damage, typically constructor arity no reflection-based detector sees.
+PHPStan errors only a database, a search backend or the bootstrap explain are environment gaps (matrix #50).
 
 ## Lane 0 — Migration guides (mandatory for every major bump)
 
@@ -334,14 +330,12 @@ For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.j
 Work lane by lane; commit each lane separately. **Closing a lane** means: all Phase 3 detectors
 re-run and green against the baseline, no PHPStan regression, `php $UP/check-added-comments.php`
 exits 0. Read the lane's section of [references/lanes.md](references/lanes.md) when you enter it.
-Each `constant-overrides-report.json` entry names its lane: 3 DependencyProvider, 4 Config, 1 other.
+`constant-overrides-report.json` entries name their lane: 3 DependencyProvider, 4 Config/Constants, 1 other.
 
-- **Lane 1 — Dead overrides and broken classes** (`dead-overrides-report.json`,
-  `typed-members-report.json`, PHPStan). Order: typed members (the console will not start until they
-  are gone), constructor arity, signature changes, dead overrides. Every touched behaviour gets a test
-  through the Facade/Client.
-- **Lane 2 — Shadowed frontend/presentation files** (`twig-conflicts-report.json`, and the
-  ProductGroupWidget finding of `performance-report.json`).
+- **Lane 1 — Dead overrides and broken classes** (`dead-overrides-report.json`, `typed-members-report.json`,
+  PHPStan). Order: typed members (the console will not start until they are gone), constructor arity,
+  signature changes, dead overrides. Every touched behaviour gets a test through the Facade/Client.
+- **Lane 2 — Shadowed frontend/presentation files** (`twig-conflicts-report.json`, `PRODUCT_GROUP_WIDGET_REMOVED`).
   `merge-shadowed-files.php --dry-run`, then `--apply`; resolve the CONFLICTED rest semantically
   (vendor structure wins, project business content wins); never commit `*.merge-conflict` files;
   drop comments copied verbatim from the vendor counterpart (an `upgrade-debt:` marker stays);
@@ -428,13 +422,9 @@ script -q /dev/null docker/sdk testing codecept build
 script -q /dev/null docker/sdk testing codecept run 2>&1 | tee .spryker-upgrade/state/codecept-final.txt
 ```
 
-Compare per suite with the test baseline (as in Phase 5) and classify every failure before fixing:
-
-| Kind | Signature | Correct response |
-|---|---|---|
-| **App damage** | behaviour changed; the test's assertion is still what the project wants | fix `src/`, not the test |
-| **Harness damage** | a vendor `SprykerTest` Tester/Helper/fixture moved, changed signature, or a `_support` class vanished; `codecept build` usually fails first | fix the test-side usage. Report separately — this is damage in the harness, not the app |
-| **Already red / environment noise** | fails identically on the baseline; missing fixture data, no webdriver | not upgrade fallout. List it under "Tests already red before the upgrade"; do not "fix" it into the upgrade commit |
+Compare per suite with the test baseline (as in Phase 5) and classify every failure before fixing as
+app damage, harness damage or already red ([references/verification.md](references/verification.md)
+§ Phase 5.5 has the signatures and the response to each).
 
 **A Phase 0.5 test that fails after the upgrade has detected a behaviour change.** Explain the change, get the developer to
 confirm it is intended, then move the expectation in its own commit with the reason in the message.
@@ -446,12 +436,22 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 
 1. **New packages** — the NEW list in `.spryker-upgrade/state/lock-diff-report.json`.
 2. **New capabilities inside modules the project already had** — Lane 0's second pile, a
-   `class_exists` branch (matrix #64), a new extension point, and the `performance-report.json`
-   recommendations (read [references/performance.md](references/performance.md) before offering them).
+   `class_exists` branch (matrix #64), a new extension point (performance fixes: Phase 6.2, not here).
 
 Fetch each description (`composer show <pkg>` + release notes) and ask with AskUserQuestion
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
 accepted feature follows its integration guide, in its own commit. REMOVED packages: explain each.
+
+## Phase 6.2 — Performance fixes
+
+Per [references/performance.md](references/performance.md), apply Spryker's performance guidelines
+as published today: fetch the pages into `.spryker-upgrade/state/spryker-docs` (offline:
+`--unreachable`; the report says the phase did not run); `check-performance.php --init --docs <copy>`
+lists every page `pending`; read-only sub-agents per page group record each page's fixes or its
+`--no-fix` reason, never from memory. Apply only fixes that keep visible behaviour (else `not-applied`
+with the proposal), one at a time, each its own commit, after its checks and a before/after
+comparison per customer type (guest, customer, business user); a failure or difference reverts it.
+`php $UP/check-performance.php --verify` exits 0 before Phase 6.5.
 
 ## Phase 6.5 — Back Office crawl and browser verification gate
 
@@ -477,10 +477,10 @@ Console errors, 500s and missing styling are upgrade damage; an unvisited page c
 
 ## Phase 7 — Report & handoff
 
-`php $UP/check-added-comments.php` exits 0 a last time. Then write the report with the sections
-[references/verification.md](references/verification.md) lists (shape:
-[EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red before the
-upgrade** under its own heading, the gate #3 deprecation table and **Performance recommendations**.
+`php $UP/check-added-comments.php` and `php $UP/check-performance.php --verify` exit 0 first. Then
+write the report with the sections [references/verification.md](references/verification.md) lists
+(shape: [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red before
+the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
 Separate what is proven from what merely has not failed yet, and name the damage class every skipped
 check would have caught. Ask before committing; suggest one PR per release group.
 

@@ -1,21 +1,25 @@
 <?php
 
 /**
- * Constant-override detector: project classes that redeclare a constant a vendor ancestor also
- * declares, with a different value.
+ * Constant-override detector: project classes and interfaces that redeclare a constant a vendor
+ * supertype also declares, with a different value.
  *
  * Spryker classes read their settings through `static::CONSTANT`, so a project DependencyProvider,
  * Config, Factory or any other class that redeclares a vendor constant replaces the vendor value.
- * When core changes that value in an upgrade, the project keeps the old one and the core change never
- * takes effect.
+ * Since PHP 8.1 a class may also redeclare a constant of an interface it implements (unless the
+ * interface constant is `final`), and a project interface may redeclare a constant of a vendor
+ * interface it extends (e.g. a project `*Constants` interface). When core changes that value in an
+ * upgrade, the project keeps the old one and the core change never takes effect.
  *
- * Every class under src/<Ns>/ (each entry of KernelConstants::PROJECT_NAMESPACES, else src/Pyz) is
- * parsed with token_get_all; its parent chain is resolved through the project classes and
- * vendor/composer/autoload_classmap.php / autoload_psr4.php. For each constant the class declares, the
- * nearest vendor ancestor declaring the same constant supplies the core value. Values are compared as
- * normalised source text; `self::`, `static::` and `parent::` references are resolved along the same
- * class chain, and a value that still references another class or calls a function is compared as an
- * `expression`.
+ * Every class and interface under src/<Ns>/ (each entry of KernelConstants::PROJECT_NAMESPACES, else
+ * src/Pyz) is parsed with token_get_all; its supertypes (the parent class chain, the interfaces each
+ * class implements, and the interfaces each interface extends) are resolved through the project
+ * types and vendor/composer/autoload_classmap.php / autoload_psr4.php. For each constant the type
+ * declares, the nearest vendor supertype declaring the same constant supplies the core value; nearer
+ * means fewer `extends`/`implements` steps, the parent class before interfaces at the same distance.
+ * Values are compared as normalised source text; `self::`, `static::` and `parent::` references are
+ * resolved along the same supertypes, and a value that still references another class or calls a
+ * function is compared as an `expression`.
  *
  * Usage:
  *   php $UP/check-constant-overrides.php --snapshot   # Phase 0, before composer moves
@@ -157,11 +161,13 @@ function co_string_literal(string $literal): string
 }
 
 /**
- * Classes and interfaces declared in a PHP file: name, parent, and the constants each declares with
- * their raw value tokens and line.
+ * Classes and interfaces declared in a PHP file: name, kind, parent class, interfaces (implemented by
+ * a class, extended by an interface), and the constants each declares with their normalised value
+ * tokens, line and `final` modifier.
  *
- * @return list<array{name: string, parent: ?string, namespace: string, uses: array<string, string>,
- *                    constants: array<string, array{tokens: list<string>, line: int}>}>
+ * @return list<array{name: string, kind: string, parent: ?string, interfaces: list<string>,
+ *                    namespace: string, uses: array<string, string>,
+ *                    constants: array<string, array{tokens: list<string>, line: int, final: bool}>}>
  */
 function co_parse_classes(string $code): array
 {
@@ -181,6 +187,22 @@ function co_parse_classes(string $code): array
         }
 
         return $count;
+    };
+    $names = static function (int $from) use ($tokens, $count, $significant): array {
+        $found = [];
+        $k = $significant($from);
+        while ($k < $count && is_array($tokens[$k])
+            && in_array($tokens[$k][0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NAME_RELATIVE], true)
+        ) {
+            $found[] = $tokens[$k][1];
+            $k = $significant($k + 1);
+            if (($tokens[$k] ?? null) !== ',') {
+                break;
+            }
+            $k = $significant($k + 1);
+        }
+
+        return [$found, $k];
     };
     $previous = null;
 
@@ -262,16 +284,41 @@ function co_parse_classes(string $code): array
                 continue;
             }
             $name = ltrim($namespace . '\\' . $tokens[$j][1], '\\');
+            $kind = $id === T_INTERFACE ? 'interface' : 'class';
             $parent = null;
+            $interfaces = [];
             $k = $significant($j + 1);
-            if (is_array($tokens[$k]) && $tokens[$k][0] === T_EXTENDS) {
-                $p = $significant($k + 1);
-                $parent = co_resolve_name($tokens[$p][1], $namespace, $uses);
+            if (is_array($tokens[$k] ?? null) && $tokens[$k][0] === T_EXTENDS) {
+                [$extends, $k] = $names($k + 1);
+                if ($kind === 'interface') {
+                    $interfaces = $extends;
+                } else {
+                    $parent = $extends[0] ?? null;
+                }
             }
-            $current = ['name' => $name, 'parent' => $parent, 'namespace' => $namespace, 'uses' => $uses, 'constants' => []];
+            if (is_array($tokens[$k] ?? null) && $tokens[$k][0] === T_IMPLEMENTS) {
+                [$interfaces, $k] = $names($k + 1);
+            }
+            $current = [
+                'name' => $name,
+                'kind' => $kind,
+                'parent' => $parent === null ? null : co_resolve_name($parent, $namespace, $uses),
+                'interfaces' => array_map(static fn(string $n): string => co_resolve_name($n, $namespace, $uses), $interfaces),
+                'namespace' => $namespace,
+                'uses' => $uses,
+                'constants' => [],
+            ];
             $classDepth = $depth;
         } elseif ($id === T_CONST && $current !== null && $depth === $classDepth + 1) {
             $line = $token[2];
+            $final = false;
+            for ($m = $i - 1; $m >= 0; $m--) {
+                $t = $tokens[$m];
+                if (!is_array($t) || !in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL], true)) {
+                    break;
+                }
+                $final = $final || $t[0] === T_FINAL;
+            }
             $j = $i + 1;
             while ($j < $count) {
                 $nameIndex = null;
@@ -297,6 +344,7 @@ function co_parse_classes(string $code): array
                     $current['constants'][$tokens[$nameIndex][1]] = [
                         'tokens' => co_normalise_tokens($valueTokens, $namespace, $uses),
                         'line' => $line,
+                        'final' => $final,
                     ];
                 }
                 if (($tokens[$j] ?? ';') === ';') {
@@ -406,35 +454,47 @@ function co_lookup(array &$context, string $fqcn): ?array
 }
 
 /**
- * The ancestors of a class, nearest first, as far as they resolve.
+ * The supertypes of a class or interface, nearest first, as far as they resolve: breadth-first over
+ * the parent class and the implemented or extended interfaces, the parent class before interfaces at
+ * the same distance.
  *
  * @return list<array>
  */
-function co_ancestors(array &$context, array $class): array
+function co_supertypes(array &$context, array $class): array
 {
-    $chain = [];
+    $found = [];
     $seen = [$class['name'] => true];
-    while (($class['parent'] ?? null) !== null && count($chain) < CO_MAX_CHAIN && !isset($seen[$class['parent']])) {
-        $seen[$class['parent']] = true;
-        $class = co_lookup($context, $class['parent']);
-        if ($class === null) {
-            break;
+    $level = [$class];
+    for ($distance = 0; $level !== [] && $distance < CO_MAX_CHAIN; $distance++) {
+        $next = [];
+        foreach ($level as $type) {
+            foreach (array_merge((array)($type['parent'] ?? null), $type['interfaces'] ?? []) as $name) {
+                if (isset($seen[$name])) {
+                    continue;
+                }
+                $seen[$name] = true;
+                $supertype = co_lookup($context, $name);
+                if ($supertype !== null) {
+                    $found[] = $supertype;
+                    $next[] = $supertype;
+                }
+            }
         }
-        $chain[] = $class;
+        $level = $next;
     }
 
-    return $chain;
+    return $found;
 }
 
 /**
- * The class that declares a constant, starting at $class and walking up, or null.
+ * The class or interface that declares a constant, starting at $class and walking up, or null.
  */
 function co_declaring_class(array &$context, array $class, string $constant): ?array
 {
     if (isset($class['constants'][$constant])) {
         return $class;
     }
-    foreach (co_ancestors($context, $class) as $ancestor) {
+    foreach (co_supertypes($context, $class) as $ancestor) {
         if (isset($ancestor['constants'][$constant])) {
             return $ancestor;
         }
@@ -541,23 +601,27 @@ function co_fold_concatenation(array $tokens): array
 }
 
 /**
- * The lane that owns a class: DependencyProviders Lane 3, Config Lane 4, every other class Lane 1.
+ * The lane that owns a class or interface: DependencyProviders Lane 3, Config classes and Constants
+ * interfaces Lane 4, every other type Lane 1.
  */
 function co_lane(string $fqcn): string
 {
     return match (true) {
         str_ends_with($fqcn, 'DependencyProvider') => 'Lane 3',
-        str_ends_with($fqcn, 'Config') => 'Lane 4',
+        str_ends_with($fqcn, 'Config'), str_ends_with($fqcn, 'Constants') => 'Lane 4',
         default => 'Lane 1',
     };
 }
 
 /**
- * Every constant a project class declares that its nearest vendor-declaring ancestor also declares.
+ * Every constant a project class or interface declares whose nearest declaring supertype is a vendor
+ * type. `sourceKind` and `coreSourceKind` are `class` or `interface`; `coreFinal` marks a core
+ * constant declared `final`, which PHP does not allow a subtype to redeclare.
  *
- * @return list<array{class: string, constant: string, file: string, line: int, projectValue: string,
- *                    projectKind: string, coreClass: string, coreFile: string, coreValue: string,
- *                    coreKind: string, same: bool, comparison: string, lane: string}>
+ * @return list<array{class: string, sourceKind: string, constant: string, file: string, line: int,
+ *                    projectValue: string, projectKind: string, coreClass: string,
+ *                    coreSourceKind: string, coreFile: string, coreValue: string, coreKind: string,
+ *                    coreFinal: bool, same: bool, comparison: string, lane: string}>
  */
 function co_collect_overrides(array &$context): array
 {
@@ -566,7 +630,7 @@ function co_collect_overrides(array &$context): array
         if ($class['constants'] === []) {
             continue;
         }
-        $ancestors = co_ancestors($context, $class);
+        $ancestors = co_supertypes($context, $class);
         if (array_filter($ancestors, static fn(array $a): bool => $a['vendor']) === []) {
             continue;
         }
@@ -587,15 +651,18 @@ function co_collect_overrides(array &$context): array
             $same = $projectValue['text'] === $coreValue['text'];
             $overrides[] = [
                 'class' => $class['name'],
+                'sourceKind' => $class['kind'],
                 'constant' => $constant,
                 'file' => spryker_upgrade_rel($class['file'], $context['root']),
                 'line' => $class['constants'][$constant]['line'],
                 'projectValue' => $projectValue['text'],
                 'projectKind' => $projectValue['kind'],
                 'coreClass' => $core['name'],
+                'coreSourceKind' => $core['kind'],
                 'coreFile' => spryker_upgrade_rel($core['file'], $context['root']),
                 'coreValue' => $coreValue['text'],
                 'coreKind' => $coreValue['kind'],
+                'coreFinal' => $core['constants'][$constant]['final'],
                 'same' => $same,
                 'comparison' => $projectValue['kind'] === 'literal' && $coreValue['kind'] === 'literal' ? 'value' : 'expression',
                 'lane' => co_lane($class['name']),
@@ -633,6 +700,7 @@ function co_core_changes(array $baseline, array $current, array $projectClasses)
                 $changed[] = [
                     'type' => 'CORE_VALUE_CHANGED',
                     'class' => $now['class'],
+                    'sourceKind' => $now['sourceKind'],
                     'constant' => $now['constant'],
                     'file' => $now['file'],
                     'line' => $now['line'],
@@ -640,6 +708,7 @@ function co_core_changes(array $baseline, array $current, array $projectClasses)
                     'coreValueBefore' => $before['coreValue'],
                     'coreValueNow' => $now['coreValue'],
                     'coreClass' => $now['coreClass'],
+                    'coreSourceKind' => $now['coreSourceKind'],
                     'coreFile' => $now['coreFile'],
                     'lane' => $now['lane'],
                 ];
@@ -651,6 +720,7 @@ function co_core_changes(array $baseline, array $current, array $projectClasses)
             $changed[] = [
                 'type' => 'CORE_CONSTANT_REMOVED',
                 'class' => $before['class'],
+                'sourceKind' => $projectClasses[$before['class']]['kind'],
                 'constant' => $before['constant'],
                 'file' => $before['file'],
                 'line' => $projectClasses[$before['class']]['constants'][$before['constant']]['line'],
@@ -658,6 +728,7 @@ function co_core_changes(array $baseline, array $current, array $projectClasses)
                 'coreValueBefore' => $before['coreValue'],
                 'coreValueNow' => null,
                 'coreClass' => $before['coreClass'],
+                'coreSourceKind' => $before['coreSourceKind'] ?? null,
                 'coreFile' => $before['coreFile'],
                 'lane' => $before['lane'],
             ];
@@ -705,7 +776,7 @@ function co_main(array $argv): int
             'overrides' => $overrides,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
         fwrite(STDOUT, sprintf(
-            "Snapshot written: %s\n  %d project constant(s) redeclare a vendor constant in src/%s; %d with a different value.\n",
+            "Snapshot written: %s\n  %d project constant(s) redeclare a vendor class or interface constant in src/%s; %d with a different value.\n",
             spryker_upgrade_rel($baselineFile, $root),
             count($overrides),
             implode(', src/', $namespaces),
@@ -744,10 +815,11 @@ function co_main(array $argv): int
     fwrite(STDOUT, sprintf("\nFOUND %d core value(s) changed under a project override:\n\n", count($changes['changed'])));
     foreach ($changes['changed'] as $change) {
         fwrite(STDOUT, sprintf(
-            "[%s] %s::%s (%s)\n  project: %s  (%s:%d)\n  core before: %s\n  core now:    %s  (%s)\n\n",
+            "[%s] %s::%s (%s, %s)\n  project: %s  (%s:%d)\n  core before: %s\n  core now:    %s  (%s)\n\n",
             $change['type'],
             $change['class'],
             $change['constant'],
+            $change['sourceKind'],
             $change['lane'],
             $change['projectValue'],
             $change['file'],

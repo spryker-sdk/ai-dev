@@ -109,7 +109,7 @@ The workflow has these phases. **Show the user the list, mark each on/off with s
 
 Present this as a checklist to the user. Confirm their choices before moving to Step 1. **Whatever phases are off, do not invoke their subagents** — skip those steps entirely in the workflow below.
 
-Once the quality bar and phase list are confirmed, **create `$BUILD_DIR` with `run.log` and `decisions.md`** — reading [references/run-logging.md](references/run-logging.md) first, per the hard gate in "Run logging" above — and record the quality bar plus the on/off phase list as the first entries. Everything from here on appends to them.
+Once the quality bar and phase list are confirmed, **create `$BUILD_DIR` with `run.log` and `decisions.md`** — reading [references/run-logging.md](references/run-logging.md) first, per the hard gate in "Run logging" above — start `decisions.md` with its `title:` / `status:` header, and record the quality bar plus the on/off phase list as the first entries. Everything from here on appends to them.
 
 ## Step 0c: PRD source — confirm before intake
 
@@ -195,7 +195,7 @@ Build the plan from the expert findings. For each AC, the plan covers:
     2. **No pattern → `parent::` plus a positional insert** (splice/merge), anchored on the **named neighbour class**, never a numeric index — the parent's array is free to grow.
     3. **Only if the stack genuinely has to change wholesale → redefine the whole array** and move on. Note the divergence in the plan so an upgrade review can find it.
     Whichever route you take, it decides **this file only** — every other file still follows the precedence rule above.
-- **Growth characteristic** for every new table / index field / KV entry — its row-count formula stated against the Step 0d scale envelope (`rows ≈ aliases` vs `rows ≈ products × business units`). A formula that **multiplies two envelope dimensions** is rejected or explicitly justified at the gate — never silently accepted. This line catches a demo-scale design before any file exists.
+- **Growth characteristic** for every new table / index field / KV entry — its row-count formula stated against the Step 0d scale envelope (`rows ≈ products` vs `rows ≈ products × business units`). A formula that **multiplies two envelope dimensions** is rejected or explicitly justified at the gate — never silently accepted. This line catches a demo-scale design before any file exists.
 - **Post-change commands** required — delegated to `spryker-refresher`.
 - **Verification approach** — UI / API / DB / console (what `spryker-verifier` will exercise).
 
@@ -280,7 +280,7 @@ The intake step (Step 1) caught **obvious** ambiguity in the PRD. Now that `spry
 - A **PRD term that has multiple meanings** in Spryker context (e.g. "customer" could mean a `Customer` entity, a `CompanyUser`, or a `MerchantUser`).
 - An AC that **looked simple but has hidden complexity** once you know the canonical pattern (e.g. a "show value X on the cart" AC that turns out to need a publisher event the PRD didn't mention).
 - **Multiple legitimate implementation paths** the PRD doesn't pick between (e.g. a value can live on the abstract product or the concrete product — both work, with different trade-offs).
-- **An AC asserting a state the framework cannot construct.** For any criterion that asserts a *state* rather than a *transition*, ask: *"in the system as it actually works, can this state be reached at all?"* — and answer it with a grep or a probe now, not with a verifier run later. (For example, "two same-SKU cart lines merge on matching dates" is unreachable when the framework stamps a random group-key prefix on each line — two greps disprove it, where a verifier FAIL would push correct code to be "fixed" against an unreachable test.) An unreachable AC is a PRD refinement item for the user, never a build target.
+- **An AC asserting a state the framework cannot construct.** For any criterion that asserts a *state* rather than a *transition*, ask: *"in the system as it actually works, can this state be reached at all?"* — and answer it with a grep or a probe now, not with a verifier run later. (For example, "two same-SKU cart lines merge" is unreachable when the framework stamps a random group-key prefix on each line — two greps disprove it, where a verifier FAIL would push correct code to be "fixed" against an unreachable test.) An unreachable AC is a PRD refinement item for the user, never a build target.
 
 Surface these as **PRD refinement items** in the consolidated questions below. Don't pick the answer yourself; the user owns the PRD.
 

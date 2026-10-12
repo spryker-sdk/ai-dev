@@ -45,9 +45,9 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 | `check-legacy-css-classes.php` | Lane 2 | which legacy CSS classes does vendor still emit or select? |
 | `check-plugin-usage.php` | 0, 3, Lane 3 | which wired plugins are missing or deprecated? |
 | `check-config-constants.php` | 0, 3, Lane 4 | which config references point at removed vendor constants/types? |
-| `check-constant-overrides.php` | 0 (`--snapshot`), 3, Lanes 1/3/4 | which project constants override a vendor constant, and which core values changed under them? |
+| `check-constant-overrides.php` | 0 (`--snapshot`), 3, Lanes 1/3/4 | which project class and interface constants override a vendor constant, and which core values changed under them? |
 | `storage-search-counts.php` | 0 (`--snapshot before`), 4.9/5.5 (`--snapshot after`, `--compare`) | did any `*_storage` / `*_search` table lose rows after the same import? |
-| `check-performance.php` | 3, Lane 2, 6, 7 | is the Yves widget performance set in place, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
+| `check-performance.php` | 3, Lane 2, 6.2, 7 | which pages do Spryker's performance guidelines have today, has every page its fixes or a no-fix reason and every fix a final status, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
 
 `bootstrap.php` is the shared library the scripts load. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
@@ -122,6 +122,15 @@ php $UP/backoffice-smoke.php --url <zed base url>
 # Phase 4.9 / 5.5: same data imported and published, queues drained
 docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot after
 php .spryker-upgrade/state/storage-search-counts.php --compare before after
+
+# Phase 6.2: performance guidelines read at upgrade time, fixes one at a time
+git clone --depth 1 --filter=blob:none --sparse https://github.com/spryker/spryker-docs.git .spryker-upgrade/state/spryker-docs
+git -C .spryker-upgrade/state/spryker-docs sparse-checkout set docs/dg/dev/guidelines/performance-guidelines
+php $UP/check-performance.php --init --docs .spryker-upgrade/state/spryker-docs
+php $UP/check-performance.php --scan-code
+php $UP/check-performance.php --set <slug>-<n> --status <status> ... --evidence "..."
+php $UP/check-performance.php --no-fix <slug> --reason "..." --evidence "..."
+php $UP/check-performance.php --verify        # gate: Phase 7 starts only when this exits 0
 ```
 
 ## check-added-comments.php — no explanatory comments, no suppressions
@@ -188,30 +197,40 @@ before it is called damage.
 ## check-constant-overrides.php — project constants that override core constants
 
 Spryker classes read their settings through `static::CONSTANT`, so a project class that redeclares a
-vendor constant replaces the vendor value. When core changes that value, the project keeps the old one.
+vendor constant replaces the vendor value. Since PHP 8.1 that includes a constant of an interface the
+class implements (unless the interface constant is `final`), and a project interface may redeclare a
+constant of a vendor interface it extends, such as a project `*Constants` interface extending the core
+one. When core changes that value, the project keeps the old one.
 
 ```bash
 php $UP/check-constant-overrides.php --snapshot   # Phase 0, before composer moves
 php $UP/check-constant-overrides.php              # Phase 3, after the update
 ```
 
-Scans every class under `src/<Ns>/` for each `KernelConstants::PROJECT_NAMESPACES` entry of
-`config/Shared/config_default.php` (else `src/Pyz`) that extends a vendor class — DependencyProviders,
-Config, Factories and any other class — with `token_get_all`. Parent classes resolve through the
-project classes and `vendor/composer/autoload_classmap.php` / `autoload_psr4.php`, up the whole chain.
-For each constant the class declares, the nearest vendor ancestor declaring the same constant gives the
-core value. Values compare as normalised source text (quote style, `array()` vs `[]`, trailing commas
-and whitespace ignored; `self::`, `static::` and `parent::` resolved along the chain; literal string
-concatenation folded); a value that still references another class or calls a function is compared
-as `expression`.
+Scans every class and interface under `src/<Ns>/` for each `KernelConstants::PROJECT_NAMESPACES`
+entry of `config/Shared/config_default.php` (else `src/Pyz`) with `token_get_all`: DependencyProviders,
+Config, Factories and any other class that extends a vendor class or implements a vendor interface
+(directly or through its parents), and interfaces that extend a vendor interface. Supertypes resolve
+through the project types and `vendor/composer/autoload_classmap.php` / `autoload_psr4.php`: the whole
+parent class chain, the interfaces each class implements, and the interfaces each interface extends
+(an interface can extend several). For each constant the type declares, the nearest vendor supertype
+declaring the same constant gives the core value; nearer means fewer `extends`/`implements` steps, the
+parent class before interfaces at the same distance. A constant whose nearest declaration is a project
+type is not compared. Values compare as normalised source text (quote style, `array()` vs `[]`,
+trailing commas and whitespace ignored; `self::`, `static::` and `parent::` resolved along the
+supertypes; literal string concatenation folded); a value that still references another class or calls
+a function is compared as `expression`.
 
 `--snapshot` writes `constant-overrides-baseline.json` (project value, core value, vendor file of every
 override) and exits 0. The default run writes `constant-overrides-report.json`: `differing` (every
 override whose value differs from core, for review), `coreChanges` (`CORE_VALUE_CHANGED`,
 `CORE_CONSTANT_REMOVED` — a core value that changed or disappeared under a project override since the
 snapshot) and `newOverlaps` (core added a constant the project already declared). Each entry names the
-lane that owns the class: Lane 3 DependencyProvider, Lane 4 Config, Lane 1 otherwise. Exit 0 no core
-change, 1 core changes, 2 unknown argument, no `vendor/composer/autoload_psr4.php`, or no snapshot.
+source kind of the project type (`sourceKind`) and of the declaring core type (`coreSourceKind`):
+`class` or `interface`. `coreFinal: true` marks a core constant declared `final`, which PHP does not
+allow a subtype to redeclare. Each entry names the lane that owns the type: Lane 3 DependencyProvider,
+Lane 4 Config and `*Constants` interfaces, Lane 1 otherwise. Exit 0 no core change, 1 core changes,
+2 unknown argument, no `vendor/composer/autoload_psr4.php`, or no snapshot.
 
 ## storage-search-counts.php — publish tables before and after, on the same data
 
@@ -243,33 +262,62 @@ otherwise (`appeared` and `grew` are informational); 2 usage error or a missing 
 The comparison is valid only when both snapshots ran with the same `data/import` set and the same
 stores, after a full import, with the publish queues drained (worker idle, queue lengths 0).
 
-## check-performance.php — Yves widget performance and the shop-ui 1.103.0 break
+## check-performance.php — performance guideline pages, fixes and the shop-ui 1.103.0 break
 
 ```bash
 php $UP/check-performance.php [--before-lock <composer.lock of Phase 0>]
+php $UP/check-performance.php --scan-code
+php $UP/check-performance.php --init [--docs <spryker-docs copy>]
+php $UP/check-performance.php --set <slug>-<n> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
+php $UP/check-performance.php --no-fix <slug> --reason <t> --evidence <t>
+php $UP/check-performance.php --import <file.json>
+php $UP/check-performance.php --unreachable --evidence <t>
+php $UP/check-performance.php --verify
 ```
 
-Follows the Spryker Yves widget performance guideline. Reads `composer.lock`, the Phase 0 lock
-(`.spryker-upgrade/state/composer.lock.before` unless `--before-lock` names another), the project's
-`src/<Ns>` classes and templates, `config/Shared/config_*.php` and the `data/import` manifests, and
-reports:
+Serves Phase 6.2. The guideline content is not part of the skill: Phase 6.2 fetches the current
+pages of `spryker/spryker-docs` into `.spryker-upgrade/state/spryker-docs` (the `--docs` default), and
+the agent derives the fixes from them, so a guideline Spryker adds or changes reaches the next
+upgrade without a skill change. The method is in [references/performance.md](references/performance.md).
 
-- **(a)** each package of release group SOL-477 present in the lock, at or below its minimum version;
-- **(b)** whether a project `ContentNavigationWidgetConfig::isNavigationCacheEnabled()` returns
-  `true`, and in which config files `ContentNavigationWidgetConstants::NAVIGATION_REVALIDATION_TIME_IN_SECONDS`
-  is set;
-- **(c)** when `spryker-shop/shop-ui` crossed 1.103.0 since the Phase 0 lock: whether a project
-  template of the `product-card`, `product-item` or `product-list-item` molecule (any project
-  namespace and module) renders `ProductGroupWidget`, and whether the project uses product groups (a
-  `product-group` entry with rows in a `data/import` manifest, or rows in
-  `spy_product_abstract_group_storage` in `storage-search-counts-before.json`).
+`--init` reads the index page `docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.md`
+of the copy and writes `performance-fixes.json`: one entry per page the index links (in the folder or
+elsewhere in the docs), then one per page of the folder and its subfolders the index does not link;
+each with slug, path, title, URL, `pending` and an empty `fixes` list. A linked page missing from the
+copy is listed with `inDocs: false`; for a git copy, `inRepository` says whether the repository has
+it, and the output prints the `sparse-checkout add` command for those it has. Re-running keeps every
+recorded page and fix and adds pages that appeared. Exit 2 when the copy has no index page.
 
-Report: `performance-report.json`. (a) and (b) are recommendations — new capabilities offered at the
-new-features gate — and never fail the run. Exit 1 only for (c): product groups were imported,
-`product-group-widget` was installed before the upgrade, and no project template renders the widget,
-so the colour swatches disappear. Exit 2 on an unknown argument, a missing `--before-lock` file or no
-`composer.lock`. What the upgrade does with each item, and the other performance guideline pages, are in
-[references/performance.md](references/performance.md).
+`--set <slug>-<n>` records a fix of a page: a new fix needs `--title` (the page's recommendation) and
+`--detected` (what the project has); `pending` is allowed until it is applied; `applied` needs files
+and evidence; `not-applicable`, `not-applied` and `reverted` need a reason and evidence. `--no-fix`
+records a page without a fix (reason and evidence), rejected on a page with fixes or on a page the
+repository has but the copy lacks. `--import` takes a JSON object keyed by fix ID or page slug. An
+incomplete entry is rejected and nothing is written (exit 2). The writing modes lock the status file,
+so parallel sub-agents can record. `--unreachable` records that the docs could not be fetched: every
+page without fixes becomes `not-checked` with the reason "docs unreachable".
+
+`--verify` exits 0 when every page has fixes or a `no-fix` / `not-checked` reason and every fix a
+final, complete status (with `NOT RUN` when the docs were unreachable), 1 otherwise or without a
+status file, and lists what is open; Phase 7 does not start before it exits 0.
+
+`--scan-code` writes `performance-code-scan.json`: code-pattern candidates by pattern name in the
+project's `src/<Ns>` PHP files — Propel queries, entity saves, Facade calls, storage reads and HTTP
+calls inside a `foreach`, `for` or `while` body; `join<Relation>()`, `KEYS`/`SCAN`,
+`createTemplate()`, SQL functions in `where()`, storage writes anywhere; HTTP clients in Yves, Glue
+and Client code. The sub-agents read them against the pages. Exit 0.
+
+The default run reads `composer.lock`, the Phase 0 lock (`.spryker-upgrade/state/composer.lock.before`
+unless `--before-lock` names another), the project's molecule templates and the `data/import`
+manifests: when `spryker-shop/shop-ui` crossed 1.103.0 since the Phase 0 lock, whether a project
+template of the `product-card`, `product-item` or `product-list-item` molecule (any project namespace
+and module) renders `ProductGroupWidget`, and whether the project uses product groups (a
+`product-group` entry with rows in a `data/import` manifest, or rows in
+`spy_product_abstract_group_storage` in `storage-search-counts-before.json`). Report:
+`performance-report.json`. Exit 1 when product groups were imported, `product-group-widget` was
+installed before the upgrade, and no project template renders the widget, so the colour swatches
+disappear (Lane 2 restores it). Exit 2 on an unknown argument, a missing `--before-lock` file or no
+`composer.lock`.
 
 ## check-tooling-alignment.php — tooling, Docker SDK and deploy files vs the reference
 
@@ -362,7 +410,7 @@ php $UP/check-constraint-style.php --relax    # rewrite ~/exact -> ^, review the
 
 Branch/wildcard constraints (`dev-main`, `*`, `@dev`) are reported as *floating* and left alone.
 Exactly-pinned **third-party** packages are reported separately and never auto-relaxed — they block
-Spryker modules needing a newer version (for example, an exact `"twig/twig": "3.20"` pin blocks a
+Spryker modules needing a newer version (for example, an exact `"<vendor>/<package>": "x.y"` pin blocks a
 security-driven bump), but third-party majors carry their own breaking changes, so each is a manual
 decision. Constraints merged in by composer-merge-plugin are reported as `mergedConstraints`. Report:
 `.spryker-upgrade/state/constraint-style-report.json`.
@@ -642,12 +690,16 @@ coverage before merging.
   navigation links; pages reached only through a form or a row action are not visited.
 - **`check-tooling-alignment.php`** compares against the one reference demo shop it is given; a
   project derived from a different demo shop needs that one as the reference.
-- **`check-constant-overrides.php`** walks the `extends` chain only: constants inherited from an
-  interface the vendor class implements are not compared. Values that reference other classes are
-  compared as text, so an alias change in a referenced constant reads as a difference.
+- **`check-constant-overrides.php`** reads classes and interfaces only; constants declared in traits
+  and enums are not compared. Values that reference other classes are compared as text, so an alias
+  change in a referenced constant reads as a difference.
 - **`check-performance.php`** detects the widget by its `{% widget 'ProductGroupWidget' %}` call in
   the three molecule templates; a project that renders product groups through another template is
-  reported as not rendering them.
+  reported as not rendering them. `--scan-code` matches lines, not data flow: a call in a loop body is
+  a candidate whether or not it repeats per iteration, and a loop that calls a method which queries is
+  not seen. `--init` lists the pages the index links and the pages of its folder; a guideline page
+  outside the folder that the index does not link is not listed. `--verify` checks that every page
+  and fix has a complete status, not that the evidence is true or that a page's fixes are complete.
 - **`storage-search-counts.php`** counts rows, not content: a publisher that writes the right number
   of rows with wrong data is not detected.
 - **`resolve-constraints.php`** cannot decide cohort migrations — it detects the deadlock
@@ -666,6 +718,7 @@ architecture, DI mechanism or feature that the new version enables. A capability
 used and still does not use is therefore not a finding, and a new version's recommendation is no
 reason to adopt something inside an upgrade. When restoring existing behaviour appears to require
 adopting something new, report it as a vendor BC break instead of re-architecting. See the Scope
-section of `SKILL.md`. The two places where something new is adopted are both
-explicit: the tooling/Docker SDK alignment of Phase 1.2 (the release's own toolchain) and the
-deprecation replacements the developer chooses at gate #3.
+section of `SKILL.md`. The three places where something new is adopted are all
+explicit: the tooling/Docker SDK alignment of Phase 1.2 (the release's own toolchain), the
+deprecation replacements the developer chooses at gate #3, and the performance guideline fixes of
+Phase 6.2, applied only where the shop's visible behaviour stays the same.

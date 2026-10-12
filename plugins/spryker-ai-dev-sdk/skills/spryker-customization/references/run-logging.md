@@ -61,6 +61,20 @@ confirm, and **every spike/architect warning the user overruled** (with the pred
 diagnosis can match against it). This is the source for the Step 8 report's Caveats block — do not wait
 until the end to write it.
 
+**`decisions.md` opens with a two-line header**, read by tools that list a project's customizations:
+
+```
+title: Stock shown as a number in store A and as an availability label in store B
+status: in-progress
+```
+
+- `title:` — one plain sentence for a reader who does not read code: what a shopper or Back Office
+  user sees change. No class, module or file names.
+- `status:` — exactly one of `in-progress` · `built` (code done, refresh passed, not yet verified) ·
+  `checked` (every AC verified green) · `partly: <what is still missing>` · `failed: <where it stopped>`.
+  Write `in-progress` when the file is created, and update the line at each gate that changes it: the
+  Step 5 refresh → `built`; Step 6/7 verification → `checked` or `partly: …`; a stop → `failed: …`.
+
 **How.** Three rules:
 
 - **Bulk output goes to a file, not into the log or your context.** A subagent returns a compact

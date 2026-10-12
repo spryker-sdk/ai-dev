@@ -1,8 +1,9 @@
 # Verification and report — Phase 5 to Phase 7 detail
 
-Read the Phase 5 section before the first regeneration command, the publish check section before the
-first `storage-search-counts.php` snapshot, the Phase 6.5 section before the Back Office crawl, and the
-report section before writing Phase 7.
+Read the Phase 5 section before the first regeneration command, the Phase 5.5 section before
+classifying a failing test, the publish check section before the first `storage-search-counts.php`
+snapshot, the Phase 6.5 section before the Back Office crawl, and the report section before writing
+Phase 7.
 
 ## Phase 5 — regeneration is not read-only
 
@@ -48,6 +49,16 @@ else `codecept-baseline.txt` — with the exact invocation Phase 0 pinned. A tes
 baseline and is still red is not upgrade damage — list it under "Tests already red before the
 upgrade". A test that was green and is now red is classified in Phase 5.5 (app damage, harness
 damage or environment noise).
+
+## Phase 5.5 — classifying a failing test
+
+Classify every failure of the final suite run before fixing it:
+
+| Kind | Signature | Correct response |
+|---|---|---|
+| **App damage** | behaviour changed; the test's assertion is still what the project wants | fix `src/`, not the test |
+| **Harness damage** | a vendor `SprykerTest` Tester/Helper/fixture moved, changed signature, or a `_support` class vanished; `codecept build` usually fails first | fix the test-side usage. Report separately — this is damage in the harness, not the app |
+| **Already red / environment noise** | fails identically on the baseline; missing fixture data, no webdriver | not upgrade fallout. List it under "Tests already red before the upgrade"; do not "fix" it into the upgrade commit |
 
 ## Publish check — storage and search row counts (Phase 0, Phase 4.9 / 5.5)
 
@@ -181,9 +192,12 @@ that costs rather than omitting the section.
 9. **Pending DB migrations**, and which migration question was answered (fresh DB vs pre-upgrade DB).
 10. **Features** — gate #4 decisions (accepted, deferred, never), and REMOVED packages with what
    replaced each.
-11. **Performance recommendations** — `performance-report.json`: the SOL-477 packages below their
-    minimum, the navigation cache state, the gate #4 decision on each, and the other guideline pages'
-    findings ([performance.md](performance.md)).
+11. **Performance fixes** — the spryker-docs commit the guidelines were read at; one table per page
+    of `performance-fixes.json`, in its order, one row per fix: status, the files (applied) or the
+    reason (otherwise), and the evidence; a page without fixes as one line with its reason; then the
+    proposals of the `not-applied` fixes and the `operator:` items, and the
+    `check-performance.php --verify` result. When the docs were unreachable: that Phase 6.2 did not
+    run, and why ([performance.md](performance.md) § The report section).
 12. **What is proven and what is not** — give each claim its scope ("the Zed functional suites pass in
     the container" and "the suite passes" are different statements). For every check that did not run,
     name it and the matrix row it would have caught.

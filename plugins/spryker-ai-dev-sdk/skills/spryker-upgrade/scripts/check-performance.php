@@ -1,28 +1,50 @@
 <?php
 
 /**
- * Performance check against the Spryker Yves widget performance guideline (release group SOL-477).
+ * Performance fixes of the Spryker performance guidelines, read from a local copy of the
+ * spryker-docs repository at upgrade time: the page list, the per-page fix status file, the gate
+ * that every page and fix is accounted for, code-pattern candidates, and the ProductGroupWidget
+ * damage check.
  *
- * Reports, from composer.lock, the project's own classes and config/Shared/config_*.php:
- *   (a) the SOL-477 packages present in the lock, each at or below its minimum version;
- *   (b) whether the navigation cache is enabled (a project ContentNavigationWidgetConfig whose
- *       isNavigationCacheEnabled() returns true) and NAVIGATION_REVALIDATION_TIME_IN_SECONDS is set;
- *   (c) when spryker-shop/shop-ui crossed 1.103.0 between the Phase 0 lock and the current one:
- *       whether a project template of the product-card, product-item or product-list-item molecule
- *       renders ProductGroupWidget, and whether the project uses product groups (a product-group
- *       entry in a data/import manifest with rows, or rows in spy_product_abstract_group_storage in
- *       the storage-search-counts-before.json snapshot).
+ * --init reads the guideline index (docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.md
+ * inside --docs, default <state>/spryker-docs) and writes performance-fixes.json with one entry per
+ * page: every page the index links (in or outside the guideline folder) and every page of the folder
+ * and its subfolders the index does not link. A linked page missing from the docs copy is listed with
+ * inDocs false; in a git copy, inRepository says whether the repository has it. Re-running keeps
+ * the recorded data and adds pages that appeared.
  *
- * (a) and (b) are recommendations: new capabilities, offered at the new-features gate. (c) is
- * existing behaviour disappearing: shop-ui 1.103.0 removes ProductGroupWidget from the `groups`
- * blocks of those molecules, so product groups that rendered before stop rendering.
+ * Fixes are derived per page by the agent and recorded with --set or --import. A fix ID is
+ * <page slug>-<n>; the slug is the page file name without .md.
+ *
+ * Default run (Phase 3 and Lane 2): when spryker-shop/shop-ui crossed 1.103.0 between the Phase 0
+ * lock and the current one, whether a project template of the product-card, product-item or
+ * product-list-item molecule renders ProductGroupWidget, and whether the project uses product groups
+ * (a product-group entry in a data/import manifest with rows, or rows in
+ * spy_product_abstract_group_storage in the storage-search-counts-before.json snapshot). shop-ui
+ * 1.103.0 removes ProductGroupWidget from the `groups` blocks of those molecules, so product groups
+ * that rendered before stop rendering.
  *
  * Usage:
- *   php $UP/check-performance.php [--before-lock <file>]
+ *   php $UP/check-performance.php [--before-lock <file>]      ProductGroupWidget check, performance-report.json
+ *   php $UP/check-performance.php --scan-code                 code-pattern candidates, performance-code-scan.json
+ *   php $UP/check-performance.php --init [--docs <dir>]       performance-fixes.json from the guideline index
+ *   php $UP/check-performance.php --set <ID> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
+ *   php $UP/check-performance.php --no-fix <page> --reason <t> --evidence <t>
+ *   php $UP/check-performance.php --import <file.json>        {"<fix ID>": {...}, "<page slug>": {"status": "no-fix", ...}}
+ *   php $UP/check-performance.php --unreachable --evidence <t>  docs not reachable: open pages become not-checked
+ *   php $UP/check-performance.php --verify                    every page and fix accounted for
  *
- * The Phase 0 lock defaults to .spryker-upgrade/state/composer.lock.before. Report:
- * performance-report.json. Exit 0 no behaviour lost, 1 ProductGroupWidget rendering lost (c),
- * 2 usage error or no composer.lock.
+ * The writing modes hold an exclusive lock on performance-fixes.json.lock, so parallel sub-agents can
+ * record at the same time.
+ *
+ * Fix statuses: pending (title and detected), applied (files and evidence), not-applicable,
+ * not-applied and reverted (reason and evidence). Page statuses: pending, derived (has fixes),
+ * no-fix and not-checked (reason and evidence).
+ *
+ * Exit codes. Default run: 0 no behaviour lost, 1 ProductGroupWidget rendering lost, 2 no
+ * composer.lock. --verify: 0 every page and fix accounted for, 1 otherwise or no status file.
+ * --init: 0 written, 2 no index page. --set / --no-fix / --import / --unreachable: 0 written,
+ * 2 rejected. Every mode: 2 usage error.
  */
 
 declare(strict_types=1);
@@ -31,24 +53,32 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 
 require_once __DIR__ . '/bootstrap.php';
 
-const PF_SOL477_PACKAGES = [
-    'spryker/navigation-storage' => '1.12.0',
-    'spryker/product-group-storage' => '1.6.0',
-    'spryker/product-storage' => '1.49.0',
-    'spryker/router' => '1.26.0',
-    'spryker/store-storage' => '1.3.0',
-    'spryker-shop/catalog-page' => '1.35.0',
-    'spryker-shop/cms-block-widget' => '2.4.0',
-    'spryker-shop/content-navigation-widget' => '1.6.0',
-    'spryker-shop/product-group-widget' => '1.12.0',
-    'spryker-shop/product-review-widget' => '1.18.0',
-    'spryker-shop/shop-application' => '1.17.0',
-    'spryker-shop/shop-ui' => '1.103.0',
-];
 const PF_SHOP_UI_BREAK = '1.103.0';
 const PF_MOLECULES = ['product-card', 'product-item', 'product-list-item'];
 const PF_GROUP_STORAGE_TABLE = 'spy_product_abstract_group_storage';
-const PF_GUIDE_URL = 'https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/yves-performance-best-practice.html';
+const PF_DOCS_HOST = 'https://docs.spryker.com';
+const PF_INDEX_PATH = 'docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.md';
+const PF_STATUS_FILE = 'performance-fixes.json';
+const PF_FIX_STATUSES = ['pending', 'applied', 'not-applicable', 'not-applied', 'reverted'];
+const PF_FINAL_STATUSES = ['applied', 'not-applicable', 'not-applied', 'reverted'];
+const PF_PAGE_REASON_STATUSES = ['no-fix', 'not-checked'];
+const PF_SCAN_IN_LOOP = [
+    'query-in-loop' => '/->(findOne|findOneOrCreate|findPk|find)\(\s*\)/',
+    'facade-call-in-loop' => '/[Ff]acade(\(\))?->\w+\(/',
+    'entity-save-in-loop' => '/->(save|delete)\(\s*(\$\w+)?\s*\)/',
+    'storage-read-in-loop' => '/[Ss]torage\w*(\(\))?->get\(/',
+    'http-call-in-loop' => '/[Hh]ttp\w*(\(\))?->(request|send|get|post|put|patch|delete)\(/',
+];
+const PF_SCAN_ANYWHERE = [
+    'query-join' => '/->join(?!With)[A-Z]\w*\(/',
+    'storage-key-scan' => '/->(getKeys|keys|scan)\(/',
+    'twig-create-template' => '/->createTemplate\(/',
+    'sql-function-in-where' => '/->where\(.*\b(DATE|LOWER|UPPER|YEAR|MONTH|DAY|SUBSTRING|TRIM)\(/i',
+    'storage-write' => '/[Ss]torage\w*(\(\))?->set\(/',
+];
+const PF_SCAN_REQUEST_LAYERS = [
+    'http-client-in-request-layer' => '/new\s+(\\\\?GuzzleHttp\\\\)?Client\(|GuzzleHttp\\\\Client\b/',
+];
 
 /**
  * Installed versions by package name from a composer.lock (packages and packages-dev).
@@ -84,118 +114,111 @@ function pf_version(?string $version): ?string
 }
 
 /**
- * (a) Each SOL-477 package with its installed version and status: absent, below, at-or-above, unknown.
+ * Line numbers inside the `{ … }` body of a foreach, for or while loop.
  *
- * @param array<string, string> $versions
- *
- * @return list<array{package: string, minimum: string, installed: ?string, status: string}>
+ * @return array<int, true>
  */
-function pf_package_rows(array $versions): array
+function pf_loop_body_lines(string $code): array
 {
-    $rows = [];
-    foreach (PF_SOL477_PACKAGES as $package => $minimum) {
-        $installed = $versions[$package] ?? null;
-        $comparable = pf_version($installed);
-        $rows[] = [
-            'package' => $package,
-            'minimum' => $minimum,
-            'installed' => $installed,
-            'status' => match (true) {
-                $installed === null => 'absent',
-                $comparable === null => 'unknown',
-                version_compare($comparable, $minimum, '>=') => 'at-or-above',
-                default => 'below',
-            },
-        ];
-    }
+    $lines = [];
+    $depth = 0;
+    $loopDepths = [];
+    $inHeader = false;
+    $headerParens = 0;
+    $awaitBody = false;
+    $line = 1;
+    foreach (token_get_all($code) as $token) {
+        $type = is_array($token) ? $token[0] : null;
+        $text = is_array($token) ? $token[1] : $token;
+        $line = is_array($token) ? $token[2] : $line;
+        if (in_array($type, [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+            $line += substr_count($text, "\n");
 
-    return $rows;
-}
-
-/**
- * Whether a method in a PHP class returns literally `true` and nothing else. Null when the class
- * does not declare the method.
- */
-function pf_method_returns_true(string $code, string $method): ?bool
-{
-    $tokens = array_values(array_filter(
-        token_get_all($code),
-        static fn($t): bool => !is_array($t) || !in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)
-    ));
-    $count = count($tokens);
-    for ($i = 0; $i < $count; $i++) {
-        if (!is_array($tokens[$i]) || $tokens[$i][0] !== T_FUNCTION) {
             continue;
         }
-        $name = $tokens[$i + 1] ?? null;
-        if (!is_array($name) || strcasecmp($name[1], $method) !== 0) {
-            continue;
-        }
-        $j = $i;
-        while ($j < $count && $tokens[$j] !== '{' && $tokens[$j] !== ';') {
-            $j++;
-        }
-        if (($tokens[$j] ?? ';') === ';') {
-            return false;
-        }
-        $body = '';
-        $depth = 0;
-        for (; $j < $count; $j++) {
-            $text = is_array($tokens[$j]) ? $tokens[$j][1] : $tokens[$j];
-            $depth += $text === '{' ? 1 : ($text === '}' ? -1 : 0);
-            $body .= strtolower($text);
-            if ($depth === 0) {
-                break;
+        if ($loopDepths !== []) {
+            for ($l = $line; $l <= $line + substr_count($text, "\n"); $l++) {
+                $lines[$l] = true;
             }
         }
+        $line += substr_count($text, "\n");
+        if (in_array($type, [T_FOREACH, T_FOR, T_WHILE], true)) {
+            $inHeader = true;
+            $headerParens = 0;
 
-        return $body === '{returntrue;}';
+            continue;
+        }
+        if ($inHeader) {
+            $headerParens += $text === '(' ? 1 : ($text === ')' ? -1 : 0);
+            if ($text === ')' && $headerParens === 0) {
+                $inHeader = false;
+                $awaitBody = true;
+            }
+
+            continue;
+        }
+        if ($awaitBody) {
+            $awaitBody = false;
+            if ($text === '{') {
+                $depth++;
+                $loopDepths[] = $depth;
+
+                continue;
+            }
+        }
+        if ($text === '{' || $type === T_CURLY_OPEN || $type === T_DOLLAR_OPEN_CURLY_BRACES) {
+            $depth++;
+        } elseif ($text === '}') {
+            if ($loopDepths !== [] && end($loopDepths) === $depth) {
+                array_pop($loopDepths);
+            }
+            $depth--;
+        }
     }
 
-    return null;
+    return $lines;
 }
 
 /**
- * (b) Navigation cache: the project config override and the revalidation constant per config file.
+ * Code-pattern candidates in the project's own PHP code, by pattern name: `file:line: code`.
  *
  * @param list<string> $namespaces
- * @param array<string, string> $versions
  *
- * @return array{packageVersion: ?string, supported: bool, configClass: ?string, enabled: bool,
- *               revalidation: array<string, string>}
+ * @return array<string, list<string>>
  */
-function pf_navigation_cache(string $root, array $namespaces, array $versions): array
+function pf_scan_code(string $root, array $namespaces): array
 {
-    $packageVersion = $versions['spryker-shop/content-navigation-widget'] ?? null;
-    $comparable = pf_version($packageVersion);
-    $configClass = null;
-    $enabled = false;
+    $hits = array_fill_keys(array_merge(array_keys(PF_SCAN_IN_LOOP), array_keys(PF_SCAN_ANYWHERE), array_keys(PF_SCAN_REQUEST_LAYERS)), []);
     foreach ($namespaces as $namespace) {
-        $file = $root . '/src/' . $namespace . '/Yves/ContentNavigationWidget/ContentNavigationWidgetConfig.php';
-        if (!is_file($file)) {
+        $dir = $root . '/src/' . $namespace;
+        if (!is_dir($dir)) {
             continue;
         }
-        $configClass = spryker_upgrade_rel($file, $root);
-        if (pf_method_returns_true((string)file_get_contents($file), 'isNavigationCacheEnabled') === true) {
-            $enabled = true;
-
-            break;
+        $files = [];
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() === 'php') {
+                $files[] = $file->getPathname();
+            }
+        }
+        sort($files);
+        foreach ($files as $file) {
+            $code = (string)file_get_contents($file);
+            $rel = spryker_upgrade_rel($file, $root);
+            $loopLines = pf_loop_body_lines($code);
+            $requestLayer = preg_match('#/(Yves|Glue|Client)/#', $rel) === 1;
+            foreach (preg_split('/\R/', $code) ?: [] as $index => $text) {
+                $lineNumber = $index + 1;
+                $patterns = PF_SCAN_ANYWHERE + (isset($loopLines[$lineNumber]) ? PF_SCAN_IN_LOOP : []) + ($requestLayer ? PF_SCAN_REQUEST_LAYERS : []);
+                foreach ($patterns as $id => $pattern) {
+                    if (preg_match($pattern, $text) === 1) {
+                        $hits[$id][] = sprintf('%s:%d: %s', $rel, $lineNumber, trim($text));
+                    }
+                }
+            }
         }
     }
-    $revalidation = [];
-    foreach (glob($root . '/config/Shared/config_*.php') ?: [] as $configFile) {
-        if (preg_match('/NAVIGATION_REVALIDATION_TIME_IN_SECONDS\]\s*=\s*([^;]+);/', (string)file_get_contents($configFile), $m)) {
-            $revalidation[spryker_upgrade_rel($configFile, $root)] = trim($m[1]);
-        }
-    }
 
-    return [
-        'packageVersion' => $packageVersion,
-        'supported' => $comparable !== null && version_compare($comparable, '1.6.0', '>='),
-        'configClass' => $configClass,
-        'enabled' => $enabled,
-        'revalidation' => $revalidation,
-    ];
+    return $hits;
 }
 
 /**
@@ -321,102 +344,502 @@ function pf_product_group_widget(string $root, string $stateDir, array $namespac
 }
 
 /**
- * Recommendation lines for (a) and (b).
+ * The `title:` of a page's front matter.
+ */
+function pf_front_matter_title(string $markdown): ?string
+{
+    if (preg_match('/\A---\R(.*?)\R---/s', $markdown, $m) !== 1 || preg_match('/^title:\s*(.+?)\s*$/m', $m[1], $t) !== 1) {
+        return null;
+    }
+    $title = trim($t[1], " \t\"'");
+
+    return $title === '' ? null : $title;
+}
+
+/**
+ * The repository path of a docs.spryker.com link (`/docs/….html`), or null for any other target.
+ */
+function pf_link_to_path(string $href): ?string
+{
+    $href = (string)preg_replace('~^https?://docs\.spryker\.com~', '', trim($href));
+    $href = (string)preg_replace('/[#?].*$/', '', $href);
+    if (preg_match('~^/?(docs/[^\s]+)\.html$~', $href, $m) !== 1) {
+        return null;
+    }
+
+    return $m[1] . '.md';
+}
+
+/**
+ * Markdown links of a page in order of appearance, one per target path.
  *
- * @param list<array{package: string, minimum: string, installed: ?string, status: string}> $packages
- * @param array{packageVersion: ?string, supported: bool, configClass: ?string, enabled: bool, revalidation: array<string, string>} $navigation
+ * @return list<array{path: string, text: string}>
+ */
+function pf_page_links(string $markdown): array
+{
+    $links = [];
+    preg_match_all('/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/', $markdown, $matches, PREG_SET_ORDER);
+    foreach ($matches as $match) {
+        $path = pf_link_to_path($match[2]);
+        if ($path !== null && !isset($links[$path])) {
+            $links[$path] = ['path' => $path, 'text' => trim($match[1])];
+        }
+    }
+
+    return array_values($links);
+}
+
+/**
+ * Markdown files under a folder of the docs copy, recursively, as repository paths.
  *
  * @return list<string>
  */
-function pf_recommendations(array $packages, array $navigation): array
+function pf_folder_pages(string $docsDir, string $folder): array
 {
-    $recommendations = [];
-    foreach ($packages as $row) {
-        if ($row['status'] === 'below') {
-            $recommendations[] = sprintf('%s %s is below %s (SOL-477 package set)', $row['package'], $row['installed'], $row['minimum']);
+    $dir = $docsDir . '/' . $folder;
+    if (!is_dir($dir)) {
+        return [];
+    }
+    $pages = [];
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
+        if ($file->getExtension() === 'md') {
+            $pages[] = $folder . substr($file->getPathname(), strlen($dir));
         }
     }
-    if ($navigation['supported'] && !$navigation['enabled']) {
-        $recommendations[] = 'navigation cache not enabled: override ContentNavigationWidgetConfig::isNavigationCacheEnabled() to return true';
-    }
-    if ($navigation['supported'] && $navigation['revalidation'] === []) {
-        $recommendations[] = 'ContentNavigationWidgetConstants::NAVIGATION_REVALIDATION_TIME_IN_SECONDS not set (3600 in config_default.php, 300 for docker dev)';
-    }
+    sort($pages);
 
-    return $recommendations;
+    return $pages;
 }
 
-function pf_main(array $argv): int
+/**
+ * For a git copy of the docs, which of the paths the checked-out commit has (checked out or not).
+ * Null when the copy is not a git work tree.
+ *
+ * @param list<string> $paths
+ *
+ * @return array<string, bool>|null
+ */
+function pf_repository_has(string $docsDir, array $paths): ?array
 {
-    $arguments = array_slice($argv, 1);
-    $beforeLock = null;
-    for ($i = 0; $i < count($arguments); $i++) {
-        if ($arguments[$i] === '--help') {
-            fwrite(STDOUT, "Usage: php check-performance.php [--before-lock <composer.lock of Phase 0>]\n");
+    if (!file_exists($docsDir . '/.git')) {
+        return null;
+    }
+    if ($paths === []) {
+        return [];
+    }
+    [$code, $stdout] = spryker_upgrade_git($docsDir, array_merge(['ls-tree', '-r', '--name-only', 'HEAD', '--'], $paths));
+    if ($code !== 0) {
+        return null;
+    }
+    $present = array_flip(array_filter(array_map('trim', explode("\n", $stdout))));
 
-            return 0;
-        }
-        if ($arguments[$i] === '--before-lock' && isset($arguments[$i + 1])) {
-            $beforeLock = $arguments[++$i];
-        } elseif (str_starts_with($arguments[$i], '--before-lock=')) {
-            $beforeLock = substr($arguments[$i], 14);
-        } else {
-            fwrite(STDERR, "Unknown argument: {$arguments[$i]}\nUsage: php check-performance.php [--before-lock <file>]\n");
+    return array_combine($paths, array_map(static fn(string $p): bool => isset($present[$p]), $paths));
+}
 
-            return 2;
+/**
+ * The guideline pages of a docs copy: every page the index links, then every page of the index's
+ * folder the index does not link. Null when the index is missing.
+ *
+ * @return list<array{path: string, title: string, source: string, inDocs: bool, inRepository: ?bool}>|null
+ */
+function pf_guideline_pages(string $docsDir): ?array
+{
+    $indexFile = $docsDir . '/' . PF_INDEX_PATH;
+    if (!is_file($indexFile)) {
+        return null;
+    }
+    $candidates = [];
+    foreach (pf_page_links((string)file_get_contents($indexFile)) as $link) {
+        if ($link['path'] !== PF_INDEX_PATH) {
+            $candidates[$link['path']] = ['source' => 'index', 'text' => $link['text']];
         }
     }
-    $root = spryker_upgrade_project_root();
-    $stateDir = spryker_upgrade_state_dir($root);
+    foreach (pf_folder_pages($docsDir, dirname(PF_INDEX_PATH)) as $path) {
+        if ($path !== PF_INDEX_PATH && !isset($candidates[$path])) {
+            $candidates[$path] = ['source' => 'folder', 'text' => ''];
+        }
+    }
+    $absent = array_values(array_filter(array_keys($candidates), static fn(string $p): bool => !is_file($docsDir . '/' . $p)));
+    $inRepository = pf_repository_has($docsDir, $absent);
+    $pages = [];
+    foreach ($candidates as $path => $candidate) {
+        $file = $docsDir . '/' . $path;
+        $inDocs = is_file($file);
+        $title = $inDocs ? pf_front_matter_title((string)file_get_contents($file)) : null;
+        $pages[] = [
+            'path' => $path,
+            'title' => $title ?? ($candidate['text'] !== '' ? $candidate['text'] : basename($path, '.md')),
+            'source' => $candidate['source'],
+            'inDocs' => $inDocs,
+            'inRepository' => $inDocs ? true : ($inRepository === null ? null : ($inRepository[$path] ?? false)),
+        ];
+    }
+
+    return $pages;
+}
+
+/**
+ * Page slugs by path: the file name without .md, prefixed with the parent folder when two pages
+ * share a file name. Slugs already recorded for a path are kept.
+ *
+ * @param list<string> $paths
+ * @param array<string, string> $recorded slug by path
+ *
+ * @return array<string, string>
+ */
+function pf_slugs(array $paths, array $recorded): array
+{
+    $names = array_count_values(array_map(static fn(string $p): string => basename($p, '.md'), $paths));
+    $slugs = [];
+    $taken = array_flip($recorded);
+    foreach ($paths as $path) {
+        if (isset($recorded[$path])) {
+            $slugs[$path] = $recorded[$path];
+
+            continue;
+        }
+        $name = basename($path, '.md');
+        $slug = $names[$name] > 1 || isset($taken[$name]) ? basename(dirname($path)) . '-' . $name : $name;
+        $slugs[$path] = $slug;
+        $taken[$slug] = $path;
+    }
+
+    return $slugs;
+}
+
+function pf_page_url(string $path): string
+{
+    return PF_DOCS_HOST . '/' . preg_replace('/\.md$/', '.html', $path);
+}
+
+/**
+ * The page status that follows from its fixes: derived with fixes, otherwise the recorded no-fix or
+ * not-checked, otherwise pending.
+ *
+ * @param array<string, mixed> $page
+ */
+function pf_page_status(array $page): string
+{
+    if (($page['fixes'] ?? []) !== []) {
+        return 'derived';
+    }
+    $status = (string)($page['status'] ?? '');
+
+    return in_array($status, PF_PAGE_REASON_STATUSES, true) ? $status : 'pending';
+}
+
+/**
+ * --init: the status file for the current page list, keeping every page and fix already recorded.
+ *
+ * @param list<array{path: string, title: string, source: string, inDocs: bool, inRepository: ?bool}> $pages
+ * @param array<string, mixed>|null $existing
+ * @param array<string, mixed> $docs
+ *
+ * @return array<string, mixed>
+ */
+function pf_init_status(array $pages, ?array $existing, array $docs): array
+{
+    $previous = [];
+    foreach ((array)($existing['pages'] ?? []) as $slug => $page) {
+        if (is_array($page) && isset($page['path'])) {
+            $previous[(string)$page['path']] = ['slug' => (string)$slug] + $page;
+        }
+    }
+    $paths = array_column($pages, 'path');
+    $slugs = pf_slugs(array_values(array_unique(array_merge($paths, array_keys($previous)))), array_map(static fn(array $p): string => $p['slug'], $previous));
+    $entries = [];
+    foreach ($pages as $page) {
+        $old = $previous[$page['path']] ?? [];
+        if (($old['status'] ?? '') === 'not-checked') {
+            $old = array_merge($old, ['status' => 'pending', 'reason' => '', 'evidence' => '']);
+        }
+        $entry = [
+            'path' => $page['path'],
+            'title' => $page['title'],
+            'url' => pf_page_url($page['path']),
+            'source' => $page['source'],
+            'inDocs' => $page['inDocs'],
+            'inRepository' => $page['inRepository'],
+            'status' => (string)($old['status'] ?? 'pending'),
+            'reason' => (string)($old['reason'] ?? ''),
+            'evidence' => (string)($old['evidence'] ?? ''),
+            'fixes' => array_values((array)($old['fixes'] ?? [])),
+        ];
+        $entry['status'] = pf_page_status($entry);
+        $entries[$slugs[$page['path']]] = $entry;
+    }
+    foreach ($previous as $path => $old) {
+        if (!in_array($path, $paths, true)) {
+            $slug = $old['slug'];
+            unset($old['slug']);
+            $entries[$slug] = array_merge($old, ['inDocs' => false, 'source' => 'recorded']);
+        }
+    }
+
+    return [
+        'createdAt' => $existing['createdAt'] ?? date('c'),
+        'guide' => pf_page_url(PF_INDEX_PATH),
+        'docs' => $docs,
+        'pages' => $entries,
+    ];
+}
+
+/**
+ * What keeps a fix entry from being recordable (pending allowed) or final (pending not allowed).
+ *
+ * @param array<string, mixed> $fix
+ *
+ * @return list<string>
+ */
+function pf_fix_problems(array $fix, bool $final): array
+{
+    $status = (string)($fix['status'] ?? '');
+    $problems = [];
+    if (!in_array($status, PF_FIX_STATUSES, true)) {
+        return ["unknown status '$status' (" . implode(', ', PF_FIX_STATUSES) . ')'];
+    }
+    if (trim((string)($fix['title'] ?? '')) === '') {
+        $problems[] = 'no title (the guideline item)';
+    }
+    if (trim((string)($fix['detected'] ?? '')) === '') {
+        $problems[] = 'no detected (what the project has)';
+    }
+    if ($status === 'pending') {
+        if ($final) {
+            $problems[] = "status 'pending' is not final";
+        }
+
+        return $problems;
+    }
+    if ($status === 'applied' && array_filter((array)($fix['files'] ?? []), static fn($f): bool => trim((string)$f) !== '') === []) {
+        $problems[] = 'applied without the files it touched';
+    }
+    if ($status !== 'applied' && trim((string)($fix['reason'] ?? '')) === '') {
+        $problems[] = "$status without a reason";
+    }
+    if (trim((string)($fix['evidence'] ?? '')) === '') {
+        $problems[] = 'no evidence';
+    }
+
+    return $problems;
+}
+
+/**
+ * The slug of a page given by slug or repository path.
+ *
+ * @param array<string, mixed> $data
+ */
+function pf_find_page(array $data, string $ref): ?string
+{
+    if (isset($data['pages'][$ref])) {
+        return $ref;
+    }
+    foreach ((array)$data['pages'] as $slug => $page) {
+        if (($page['path'] ?? null) === $ref) {
+            return (string)$slug;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Applies fix and page entries after checking every one of them; nothing changes when one is rejected.
+ * A key that names a page records the page (status no-fix); any other key is a fix ID.
+ *
+ * @param array<string, mixed> $data
+ * @param array<string, mixed> $inputs
+ *
+ * @return list<string> rejections
+ */
+function pf_apply_entries(array &$data, array $inputs): array
+{
+    $next = $data;
+    $rejections = [];
+    foreach ($inputs as $key => $input) {
+        $key = (string)$key;
+        $input = is_array($input) ? $input : [];
+        $pageSlug = pf_find_page($next, $key);
+        if ($pageSlug !== null) {
+            $page = $next['pages'][$pageSlug];
+            $reason = trim((string)($input['reason'] ?? ''));
+            $evidence = trim((string)($input['evidence'] ?? ''));
+            $problems = [];
+            if (($input['status'] ?? '') !== 'no-fix') {
+                $problems[] = "a page takes status 'no-fix' (fixes are recorded under <slug>-<n>)";
+            }
+            if (($page['fixes'] ?? []) !== []) {
+                $problems[] = 'the page has ' . count($page['fixes']) . ' fixes recorded';
+            }
+            if (!($page['inDocs'] ?? false) && ($page['inRepository'] ?? null) === true) {
+                $problems[] = 'the repository has the page but the docs copy does not: add it to the copy and re-run --init';
+            }
+            if ($reason === '' || $evidence === '') {
+                $problems[] = 'no-fix needs a reason and evidence';
+            }
+            foreach ($problems as $problem) {
+                $rejections[] = "$pageSlug: $problem";
+            }
+            $next['pages'][$pageSlug] = array_merge($page, ['status' => 'no-fix', 'reason' => $reason, 'evidence' => $evidence]);
+
+            continue;
+        }
+        if (preg_match('/^(.+)-(\d+)$/', $key, $m) !== 1 || !isset($next['pages'][$m[1]])) {
+            $rejections[] = "$key: neither a page slug nor <page slug>-<n> of a page in performance-fixes.json";
+
+            continue;
+        }
+        $pageSlug = $m[1];
+        $page = $next['pages'][$pageSlug];
+        if (!($page['inDocs'] ?? false)) {
+            $rejections[] = "$key: page $pageSlug is not in the docs copy";
+
+            continue;
+        }
+        $files = $input['files'] ?? [];
+        $files = is_array($files) ? $files : explode(',', (string)$files);
+        $index = null;
+        foreach ($page['fixes'] as $i => $fix) {
+            if (($fix['id'] ?? null) === $key) {
+                $index = $i;
+            }
+        }
+        $old = $index === null ? [] : $page['fixes'][$index];
+        $title = trim((string)($input['title'] ?? ''));
+        $detected = trim((string)($input['detected'] ?? ''));
+        $fix = [
+            'id' => $key,
+            'title' => $title !== '' ? $title : (string)($old['title'] ?? ''),
+            'detected' => $detected !== '' ? $detected : (string)($old['detected'] ?? ''),
+            'status' => trim((string)($input['status'] ?? '')),
+            'files' => array_values(array_filter(array_map(static fn($f): string => trim((string)$f), $files), static fn(string $f): bool => $f !== '')),
+            'reason' => trim((string)($input['reason'] ?? '')),
+            'evidence' => trim((string)($input['evidence'] ?? '')),
+        ];
+        foreach (pf_fix_problems($fix, false) as $problem) {
+            $rejections[] = "$key: $problem";
+        }
+        if ($index === null) {
+            $page['fixes'][] = $fix;
+        } else {
+            $page['fixes'][$index] = $fix;
+        }
+        $page['reason'] = '';
+        $page['evidence'] = '';
+        $page['status'] = pf_page_status($page);
+        $next['pages'][$pageSlug] = $page;
+    }
+    if ($rejections === []) {
+        $data = $next;
+    }
+
+    return $rejections;
+}
+
+/**
+ * --unreachable: every page without fixes and without a recorded no-fix becomes not-checked.
+ *
+ * @param array<string, mixed>|null $data
+ *
+ * @return array<string, mixed>
+ */
+function pf_mark_unreachable(?array $data, string $evidence): array
+{
+    $data ??= ['createdAt' => date('c'), 'guide' => pf_page_url(PF_INDEX_PATH), 'docs' => [], 'pages' => []];
+    $data['docs']['unreachable'] = $evidence;
+    foreach ($data['pages'] as $slug => $page) {
+        if (pf_page_status($page) === 'pending') {
+            $data['pages'][$slug] = array_merge($page, ['status' => 'not-checked', 'reason' => 'docs unreachable', 'evidence' => $evidence]);
+        }
+    }
+
+    return $data;
+}
+
+/**
+ * --verify: problems per page and fix, and the counts per page and fix status.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return array{problems: list<string>, pages: array<string, int>, fixes: array<string, int>}
+ */
+function pf_verify(array $data): array
+{
+    $problems = [];
+    $pageCounts = [];
+    $fixCounts = [];
+    if ($data['pages'] === [] && trim((string)($data['docs']['unreachable'] ?? '')) === '') {
+        $problems[] = 'no pages: run --init against the docs copy, or --unreachable when the docs cannot be fetched';
+    }
+    foreach ($data['pages'] as $slug => $page) {
+        $status = pf_page_status($page);
+        $pageCounts[$status] = ($pageCounts[$status] ?? 0) + 1;
+        if ($status === 'pending') {
+            $problems[] = "$slug: no fix recorded and no no-fix reason";
+        } elseif ($status !== 'derived' && (trim((string)($page['reason'] ?? '')) === '' || trim((string)($page['evidence'] ?? '')) === '')) {
+            $problems[] = "$slug: $status without a reason and evidence";
+        }
+        foreach ((array)($page['fixes'] ?? []) as $fix) {
+            $fixStatus = (string)($fix['status'] ?? '');
+            $fixCounts[$fixStatus] = ($fixCounts[$fixStatus] ?? 0) + 1;
+            foreach (pf_fix_problems($fix, true) as $problem) {
+                $problems[] = ($fix['id'] ?? $slug . '-?') . ": $problem";
+            }
+        }
+    }
+    ksort($pageCounts);
+    ksort($fixCounts);
+
+    return ['problems' => $problems, 'pages' => $pageCounts, 'fixes' => $fixCounts];
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function pf_read_status(string $file): ?array
+{
+    if (!is_file($file)) {
+        return null;
+    }
+    $data = json_decode((string)file_get_contents($file), true);
+
+    return is_array($data) && is_array($data['pages'] ?? null) ? $data : null;
+}
+
+/**
+ * @param array<string, mixed> $data
+ */
+function pf_write_status(string $file, array $data): void
+{
+    $data['updatedAt'] = date('c');
+    file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+}
+
+
+/**
+ * The default run: the ProductGroupWidget check, performance-report.json.
+ */
+function pf_detect(string $root, string $stateDir, ?string $beforeLock): int
+{
     if (!is_file($root . '/composer.lock')) {
         fwrite(STDERR, "composer.lock not found in the project root.\n");
 
         return 2;
     }
-    if ($beforeLock !== null && !is_file($beforeLock)) {
-        fwrite(STDERR, "--before-lock file not found: $beforeLock\n");
-
-        return 2;
-    }
     $beforeLock ??= is_file($stateDir . '/composer.lock.before') ? $stateDir . '/composer.lock.before' : null;
-
     $namespaces = spryker_upgrade_project_namespaces($root);
-    $now = pf_lock_versions($root . '/composer.lock');
-    $before = pf_lock_versions($beforeLock);
-    $packages = pf_package_rows($now);
-    $navigation = pf_navigation_cache($root, $namespaces, $now);
-    $productGroupWidget = pf_product_group_widget($root, $stateDir, $namespaces, $before, $now);
-    $recommendations = pf_recommendations($packages, $navigation);
+    $productGroupWidget = pf_product_group_widget($root, $stateDir, $namespaces, pf_lock_versions($beforeLock), pf_lock_versions($root . '/composer.lock'));
     $reportFile = $stateDir . '/performance-report.json';
 
     file_put_contents($reportFile, json_encode([
         'createdAt' => date('c'),
-        'guide' => PF_GUIDE_URL,
         'beforeLock' => $beforeLock === null ? null : spryker_upgrade_rel($beforeLock, $root),
-        'packages' => $packages,
-        'navigationCache' => $navigation,
         'productGroupWidget' => $productGroupWidget,
-        'recommendations' => $recommendations,
         'findings' => $productGroupWidget['finding'] ? ['PRODUCT_GROUP_WIDGET_REMOVED'] : [],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    fwrite(STDOUT, "Yves widget performance (SOL-477) — " . PF_GUIDE_URL . "\n\n");
-    foreach ($packages as $row) {
-        if ($row['status'] !== 'absent') {
-            fwrite(STDOUT, sprintf("  %-40s %-12s min %-9s %s\n", $row['package'], $row['installed'], $row['minimum'], strtoupper($row['status'])));
-        }
-    }
     fwrite(STDOUT, sprintf(
-        "\n  navigation cache: %s; revalidation constant: %s\n",
-        !$navigation['supported'] ? 'not supported by the installed content-navigation-widget' : ($navigation['enabled'] ? 'enabled' : 'not enabled'),
-        $navigation['revalidation'] === [] ? 'not set' : implode(', ', array_map(static fn(string $f, string $v): string => "$f = $v", array_keys($navigation['revalidation']), $navigation['revalidation']))
-    ));
-    foreach ($recommendations as $recommendation) {
-        fwrite(STDOUT, "  RECOMMENDATION: $recommendation\n");
-    }
-
-    fwrite(STDOUT, sprintf(
-        "\n  shop-ui %s -> %s: %s\n",
+        "ProductGroupWidget — shop-ui %s -> %s: %s\n",
         $productGroupWidget['shopUiBefore'] ?? '-',
         $productGroupWidget['shopUiNow'] ?? '-',
         match ($productGroupWidget['crossed']) {
@@ -439,6 +862,222 @@ function pf_main(array $argv): int
 
         return 1;
     }
+
+    return 0;
+}
+
+/**
+ * --init output: the page list, and what to do about pages missing from the docs copy.
+ *
+ * @param array<string, mixed> $data
+ */
+function pf_print_pages(array $data, string $docsDir, string $statusFile, string $root): void
+{
+    $pages = $data['pages'];
+    $linked = count(array_filter($pages, static fn(array $p): bool => $p['source'] === 'index'));
+    $pending = count(array_filter($pages, static fn(array $p): bool => pf_page_status($p) === 'pending'));
+    fwrite(STDOUT, sprintf(
+        "%s: %d pages (%d linked from the index, %d only in the guideline folder), %d pending.\n\n",
+        spryker_upgrade_rel($statusFile, $root),
+        count($pages),
+        $linked,
+        count($pages) - $linked,
+        $pending
+    ));
+    foreach ($pages as $slug => $page) {
+        fwrite(STDOUT, sprintf("  %-55s %-8s %2d fixes  %s\n", $slug, pf_page_status($page), count($page['fixes']), $page['inDocs'] ? $page['path'] : 'NOT IN THE DOCS COPY ' . $page['path']));
+    }
+    $inRepository = [];
+    $notInRepository = [];
+    foreach ($pages as $slug => $page) {
+        if (!$page['inDocs'] && $page['source'] !== 'recorded') {
+            if ($page['inRepository'] === true) {
+                $inRepository[] = dirname($page['path']);
+            } else {
+                $notInRepository[] = [$slug, $page['path'], $page['inRepository']];
+            }
+        }
+    }
+    if ($inRepository !== []) {
+        fwrite(STDOUT, "\nLinked pages the repository has outside the checked-out folders. Add them, then run --init again:\n"
+            . '  git -C ' . escapeshellarg($docsDir) . ' sparse-checkout add ' . implode(' ', array_map('escapeshellarg', array_values(array_unique($inRepository)))) . "\n");
+    }
+    foreach ($notInRepository as [$slug, $path, $known]) {
+        fwrite(STDOUT, $known === false
+            ? "\n$slug: the index links $path, which the repository does not have. Record it: --no-fix $slug --reason \"linked page not published\" --evidence \"git ls-tree: no $path\"\n"
+            : "\n$slug: $path is not in the docs copy. Fetch https://raw.githubusercontent.com/spryker/spryker-docs/master/$path into the copy and run --init again; on 404 record --no-fix $slug.\n");
+    }
+}
+
+function pf_usage(): string
+{
+    return "Usage: php check-performance.php [--before-lock <file>] | --scan-code | --init [--docs <dir>] | --verify\n"
+        . "       | --set <ID> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]\n"
+        . "       | --no-fix <page> --reason <t> --evidence <t> | --import <file.json> | --unreachable --evidence <t>\n";
+}
+
+function pf_main(array $argv): int
+{
+    $arguments = array_slice($argv, 1);
+    $mode = 'detect';
+    $options = [];
+    $valued = ['--before-lock', '--docs', '--set', '--status', '--title', '--detected', '--files', '--reason', '--evidence', '--import', '--no-fix'];
+    $modes = ['--scan-code' => 'scan', '--init' => 'init', '--verify' => 'verify', '--set' => 'set', '--import' => 'import', '--no-fix' => 'no-fix', '--unreachable' => 'unreachable'];
+    for ($i = 0; $i < count($arguments); $i++) {
+        $argument = $arguments[$i];
+        if ($argument === '--help') {
+            fwrite(STDOUT, pf_usage());
+
+            return 0;
+        }
+        $name = str_contains($argument, '=') ? strstr($argument, '=', true) : $argument;
+        $isValued = in_array($name, $valued, true);
+        if (!$isValued && !isset($modes[$name])) {
+            fwrite(STDERR, "Unknown argument: $argument\n" . pf_usage());
+
+            return 2;
+        }
+        if (isset($modes[$name])) {
+            if ($mode !== 'detect') {
+                fwrite(STDERR, "One mode per run.\n" . pf_usage());
+
+                return 2;
+            }
+            $mode = $modes[$name];
+        }
+        if ($isValued) {
+            if (str_contains($argument, '=')) {
+                $options[$name] = substr($argument, strlen($name) + 1);
+            } elseif (isset($arguments[$i + 1])) {
+                $options[$name] = $arguments[++$i];
+            } else {
+                fwrite(STDERR, "$name needs a value.\n" . pf_usage());
+
+                return 2;
+            }
+        }
+    }
+    $root = spryker_upgrade_project_root();
+    $stateDir = spryker_upgrade_state_dir($root);
+    $statusFile = $stateDir . '/' . PF_STATUS_FILE;
+    if (in_array($mode, ['init', 'set', 'import', 'no-fix', 'unreachable'], true)) {
+        $lock = fopen($statusFile . '.lock', 'c');
+        if ($lock !== false) {
+            flock($lock, LOCK_EX);
+        }
+    }
+
+    if ($mode === 'detect') {
+        if (isset($options['--before-lock']) && !is_file($options['--before-lock'])) {
+            fwrite(STDERR, "--before-lock file not found: {$options['--before-lock']}\n");
+
+            return 2;
+        }
+
+        return pf_detect($root, $stateDir, $options['--before-lock'] ?? null);
+    }
+    if ($mode === 'scan') {
+        $hits = pf_scan_code($root, spryker_upgrade_project_namespaces($root));
+        $scanFile = $stateDir . '/performance-code-scan.json';
+        file_put_contents($scanFile, json_encode(['createdAt' => date('c'), 'candidates' => $hits], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        foreach ($hits as $pattern => $lines) {
+            fwrite(STDOUT, sprintf("  %-30s %d candidates\n", $pattern, count($lines)));
+            foreach (array_slice($lines, 0, 5) as $line) {
+                fwrite(STDOUT, "      $line\n");
+            }
+        }
+        fwrite(STDOUT, "\nCandidates, not findings: read each one against the guideline page it concerns. Full list: " . spryker_upgrade_rel($scanFile, $root) . "\n");
+
+        return 0;
+    }
+    if ($mode === 'init') {
+        $docsDir = rtrim($options['--docs'] ?? $stateDir . '/spryker-docs', '/');
+        $pages = pf_guideline_pages($docsDir);
+        if ($pages === null) {
+            fwrite(STDERR, "No guideline index at $docsDir/" . PF_INDEX_PATH . ". Fetch the docs first, or record --unreachable when they cannot be fetched.\n");
+
+            return 2;
+        }
+        $commit = null;
+        if (file_exists($docsDir . '/.git')) {
+            [$code, $stdout] = spryker_upgrade_git($docsDir, ['rev-parse', 'HEAD']);
+            $commit = $code === 0 ? trim($stdout) : null;
+        }
+        $data = pf_init_status($pages, pf_read_status($statusFile), ['dir' => spryker_upgrade_rel($docsDir, $root), 'commit' => $commit, 'readAt' => date('c')]);
+        pf_write_status($statusFile, $data);
+        pf_print_pages($data, $docsDir, $statusFile, $root);
+
+        return 0;
+    }
+    $data = pf_read_status($statusFile);
+    if ($mode === 'verify') {
+        if ($data === null) {
+            fwrite(STDOUT, 'FAIL: no readable ' . PF_STATUS_FILE . " — run --init, then record every page.\n");
+
+            return 1;
+        }
+        $result = pf_verify($data);
+        $format = static fn(array $counts): string => $counts === [] ? 'none' : implode(', ', array_map(static fn(string $s, int $n): string => "$n $s", array_keys($counts), $counts));
+        fwrite(STDOUT, sprintf("%d pages: %s\n%d fixes: %s\n", count($data['pages']), $format($result['pages']), array_sum($result['fixes']), $format($result['fixes'])));
+        foreach ($result['problems'] as $problem) {
+            fwrite(STDOUT, "  OPEN $problem\n");
+        }
+        if ($result['problems'] !== []) {
+            fwrite(STDOUT, "\nFAIL: " . count($result['problems']) . " open. Phase 7 does not start until this exits 0.\n");
+
+            return 1;
+        }
+        $unreachable = trim((string)($data['docs']['unreachable'] ?? ''));
+        fwrite(STDOUT, $unreachable !== ''
+            ? "OK, NOT RUN: the guideline docs were unreachable ($unreachable). The report states that Phase 6.2 did not run for the not-checked pages.\n"
+            : "OK: every page has fixes or a no-fix reason; every fix has a final status, its files or reason, and evidence.\n");
+
+        return 0;
+    }
+    if ($mode === 'unreachable') {
+        $evidence = trim($options['--evidence'] ?? '');
+        if ($evidence === '') {
+            fwrite(STDERR, "--unreachable needs --evidence with the failed fetch output.\n");
+
+            return 2;
+        }
+        pf_write_status($statusFile, pf_mark_unreachable($data, $evidence));
+        fwrite(STDOUT, "Recorded: guideline docs unreachable; pages without fixes are not-checked.\n");
+
+        return 0;
+    }
+    if ($data === null) {
+        fwrite(STDERR, 'No readable ' . PF_STATUS_FILE . " — run --init first.\n");
+
+        return 2;
+    }
+    if ($mode === 'set') {
+        $inputs = [$options['--set'] => [
+            'status' => $options['--status'] ?? '',
+            'title' => $options['--title'] ?? '',
+            'detected' => $options['--detected'] ?? '',
+            'files' => $options['--files'] ?? '',
+            'reason' => $options['--reason'] ?? '',
+            'evidence' => $options['--evidence'] ?? '',
+        ]];
+    } elseif ($mode === 'no-fix') {
+        $inputs = [$options['--no-fix'] => ['status' => 'no-fix', 'reason' => $options['--reason'] ?? '', 'evidence' => $options['--evidence'] ?? '']];
+    } else {
+        $inputs = is_file($options['--import']) ? json_decode((string)file_get_contents($options['--import']), true) : null;
+        if (!is_array($inputs) || $inputs === [] || array_is_list($inputs)) {
+            fwrite(STDERR, "--import needs a JSON object keyed by fix ID or page slug: {$options['--import']}\n");
+
+            return 2;
+        }
+    }
+    $rejections = pf_apply_entries($data, $inputs);
+    if ($rejections !== []) {
+        fwrite(STDERR, "Nothing written:\n  " . implode("\n  ", $rejections) . "\n");
+
+        return 2;
+    }
+    pf_write_status($statusFile, $data);
+    fwrite(STDOUT, 'Recorded ' . implode(', ', array_map('strval', array_keys($inputs))) . ".\n");
 
     return 0;
 }

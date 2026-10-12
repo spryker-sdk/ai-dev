@@ -384,8 +384,8 @@ check('baselines: exit 1 with an empty state dir', $blCode === 1);
 check('baselines: every missing file named', array_filter($allNames, static fn(string $n): bool => !str_contains($blOut, $n)) === []);
 $realResults = [
     'base-ref' => "0123456789abcdef0123456789abcdef01234567\n",
-    'codecept-baseline.txt' => "Codeception PHP Testing Framework\n\e[32mFAILURES!\e[0m\r\nTests: 630, Assertions: 2100, Failures: 12.\r\n",
-    'phpstan-baseline-run.txt' => " 312/312 [============================] 100%\n\n [ERROR] Found 312 errors\n",
+    'codecept-baseline.txt' => "Codeception PHP Testing Framework\n\e[32mFAILURES!\e[0m\r\nTests: 10, Assertions: 20, Failures: 1.\r\n",
+    'phpstan-baseline-run.txt' => " 3/3 [============================] 100%\n\n [ERROR] Found 3 errors\n",
     'sniff-baseline.txt' => "Run Code Style Sniffer for PROJECT\n",
     'evaluator-baseline.txt' => "====================\nPHP_VERSION_CHECKER\n====================\nRead more: https://docs.spryker.com\n",
     'constant-overrides-baseline.json' => json_encode(['overrides' => []]) . "\n",
@@ -656,6 +656,74 @@ check('constants: exactly three core changes', count($coChanges) === 3);
 [$coBadArg] = run_script('check-constant-overrides.php', ['--bogus'], $constants, $constantsState);
 check('constants CLI: unknown argument -> exit 2', $coBadArg === 2);
 
+// --- check-constant-overrides: interfaces ---
+$ifaces = $tmp . '/constants-interfaces';
+$ifacesState = $ifaces . '/.state';
+$ifacesVendor = $ifaces . '/vendor/spryker/spryker/src/Spryker';
+write_file($ifaces . '/composer.json', "{}\n");
+write_file($ifaces . '/vendor/composer/autoload_psr4.php', "<?php\n\$vendorDir = dirname(__DIR__);\nreturn array('Spryker\\\\' => array(\$vendorDir . '/spryker/spryker/src/Spryker'));\n");
+write_file($ifaces . '/vendor/composer/autoload_classmap.php', "<?php\nreturn array();\n");
+$vendorLimits = <<<'PHP'
+<?php
+namespace Spryker\Zed\Baz\Dependency;
+
+interface BazLimitsInterface
+{
+    public const PAGE_SIZE = 20;
+    final public const HARD_CAP = 1000;
+}
+PHP;
+write_file($ifacesVendor . '/Zed/Baz/Dependency/BazLimitsInterface.php', $vendorLimits);
+write_file($ifacesVendor . '/Zed/Baz/Dependency/BazPagingInterface.php', "<?php\nnamespace Spryker\\Zed\\Baz\\Dependency;\n\ninterface BazPagingInterface extends \\Countable, BazLimitsInterface\n{\n    public const ORDER = 'asc';\n}\n");
+write_file($ifacesVendor . '/Zed/Baz/Business/BazReader.php', "<?php\nnamespace Spryker\\Zed\\Baz\\Business;\n\nuse Spryker\\Zed\\Baz\\Dependency\\BazPagingInterface;\n\nclass BazReader implements BazPagingInterface\n{\n    public const PAGE_SIZE = 25;\n\n    public function count(): int\n    {\n        return 0;\n    }\n}\n");
+write_file($ifacesVendor . '/Shared/Foo/FooConstants.php', "<?php\nnamespace Spryker\\Shared\\Foo;\n\ninterface FooConstants\n{\n    public const FOO_HOST = 'FOO_HOST';\n}\n");
+write_file($ifaces . '/src/Pyz/Zed/Baz/Business/BazWriter.php', "<?php\nnamespace Pyz\\Zed\\Baz\\Business;\n\nuse Spryker\\Zed\\Baz\\Dependency\\BazLimitsInterface;\n\nclass BazWriter implements BazLimitsInterface\n{\n    public const PAGE_SIZE = 40;\n    public const HARD_CAP = 500;\n}\n");
+write_file($ifaces . '/src/Pyz/Zed/Baz/Business/BazReader.php', "<?php\nnamespace Pyz\\Zed\\Baz\\Business;\n\nclass BazReader extends \\Spryker\\Zed\\Baz\\Business\\BazReader\n{\n    public const PAGE_SIZE = 50;\n    public const ORDER = 'desc';\n}\n");
+write_file($ifaces . '/src/Pyz/Shared/Foo/FooConstants.php', "<?php\nnamespace Pyz\\Shared\\Foo;\n\ninterface FooConstants extends \\Spryker\\Shared\\Foo\\FooConstants\n{\n    public const FOO_HOST = 'PYZ_FOO_HOST';\n    public const PROJECT_KEY = 'PROJECT_KEY';\n}\n");
+write_file($ifaces . '/src/Pyz/Zed/Baz/Dependency/BazOptionsInterface.php', "<?php\nnamespace Pyz\\Zed\\Baz\\Dependency;\n\nuse Spryker\\Zed\\Baz\\Dependency\\BazPagingInterface;\n\ninterface BazOptionsInterface extends \\Countable, BazPagingInterface\n{\n    public const PAGE_SIZE = 20;\n}\n");
+
+$parsedLimits = co_parse_classes($vendorLimits)[0] ?? [];
+check('constants: parser reads an interface and the final modifier of its constants', ($parsedLimits['kind'] ?? '') === 'interface'
+    && ($parsedLimits['constants']['HARD_CAP']['final'] ?? false) === true && ($parsedLimits['constants']['PAGE_SIZE']['final'] ?? true) === false);
+$parsedOptions = co_parse_classes((string)file_get_contents($ifaces . '/src/Pyz/Zed/Baz/Dependency/BazOptionsInterface.php'))[0] ?? [];
+check('constants: parser reads every interface an interface extends', ($parsedOptions['interfaces'] ?? []) === ['Countable', 'Spryker\Zed\Baz\Dependency\BazPagingInterface'] && array_key_exists('parent', $parsedOptions) && $parsedOptions['parent'] === null);
+
+[$ifSnapCode] = run_script('check-constant-overrides.php', ['--snapshot'], $ifaces, $ifacesState);
+$ifByKey = [];
+foreach (read_json($ifacesState . '/constant-overrides-baseline.json')['overrides'] ?? [] as $override) {
+    $ifByKey[$override['class'] . '::' . $override['constant']] = $override;
+}
+$writerPage = $ifByKey['Pyz\Zed\Baz\Business\BazWriter::PAGE_SIZE'] ?? [];
+check('constants: class implementing a vendor interface with a differing constant reported', $ifSnapCode === 0 && ($writerPage['same'] ?? true) === false
+    && ($writerPage['coreClass'] ?? '') === 'Spryker\Zed\Baz\Dependency\BazLimitsInterface' && ($writerPage['coreValue'] ?? '') === '20'
+    && ($writerPage['sourceKind'] ?? '') === 'class' && ($writerPage['coreSourceKind'] ?? '') === 'interface' && ($writerPage['lane'] ?? '') === 'Lane 1');
+check('constants: final core constant flagged', ($ifByKey['Pyz\Zed\Baz\Business\BazWriter::HARD_CAP']['coreFinal'] ?? false) === true && ($writerPage['coreFinal'] ?? true) === false);
+check('constants: nearest declaration wins (vendor parent class before its interface)', ($ifByKey['Pyz\Zed\Baz\Business\BazReader::PAGE_SIZE']['coreValue'] ?? '') === '25'
+    && ($ifByKey['Pyz\Zed\Baz\Business\BazReader::PAGE_SIZE']['coreSourceKind'] ?? '') === 'class');
+check('constants: interface constant reached through the vendor parent class', ($ifByKey['Pyz\Zed\Baz\Business\BazReader::ORDER']['coreClass'] ?? '') === 'Spryker\Zed\Baz\Dependency\BazPagingInterface'
+    && ($ifByKey['Pyz\Zed\Baz\Business\BazReader::ORDER']['same'] ?? true) === false);
+$fooHost = $ifByKey['Pyz\Shared\Foo\FooConstants::FOO_HOST'] ?? [];
+check('constants: project interface extending a vendor interface reported, Constants owned by Lane 4', ($fooHost['sourceKind'] ?? '') === 'interface'
+    && ($fooHost['coreValue'] ?? '') === "'FOO_HOST'" && ($fooHost['same'] ?? true) === false && ($fooHost['lane'] ?? '') === 'Lane 4'
+    && !isset($ifByKey['Pyz\Shared\Foo\FooConstants::PROJECT_KEY']));
+$optionsPage = $ifByKey['Pyz\Zed\Baz\Dependency\BazOptionsInterface::PAGE_SIZE'] ?? [];
+check('constants: interface-of-interface chain resolves the declaring vendor interface', ($optionsPage['coreClass'] ?? '') === 'Spryker\Zed\Baz\Dependency\BazLimitsInterface'
+    && ($optionsPage['same'] ?? false) === true && ($optionsPage['sourceKind'] ?? '') === 'interface');
+[$ifSameCode] = run_script('check-constant-overrides.php', [], $ifaces, $ifacesState);
+check('constants CLI: unchanged core interfaces -> exit 0', $ifSameCode === 0);
+
+write_file($ifacesVendor . '/Zed/Baz/Dependency/BazLimitsInterface.php', str_replace('PAGE_SIZE = 20', 'PAGE_SIZE = 30', $vendorLimits));
+[$ifChangedCode, $ifChangedOut] = run_script('check-constant-overrides.php', [], $ifaces, $ifacesState);
+$ifChanges = [];
+foreach (read_json($ifacesState . '/constant-overrides-report.json')['coreChanges'] ?? [] as $change) {
+    $ifChanges[$change['class'] . '::' . $change['constant']] = $change;
+}
+check('constants CLI: core interface value changed under an override -> exit 1', $ifChangedCode === 1 && str_contains($ifChangedOut, 'CORE_VALUE_CHANGED'));
+check('constants: interface value change reported for the implementing class and the extending interface', count($ifChanges) === 2
+    && ($ifChanges['Pyz\Zed\Baz\Business\BazWriter::PAGE_SIZE']['coreValueNow'] ?? '') === '30'
+    && ($ifChanges['Pyz\Zed\Baz\Dependency\BazOptionsInterface::PAGE_SIZE']['coreValueBefore'] ?? '') === '20'
+    && ($ifChanges['Pyz\Zed\Baz\Dependency\BazOptionsInterface::PAGE_SIZE']['sourceKind'] ?? '') === 'interface');
+
 // --- storage-search-counts ---
 $compareRows = array_column(ssc_compare(
     ['a_storage' => 10, 'b_search' => 5, 'c_storage' => 3, 'd_storage' => 4, 'f_storage' => 0],
@@ -725,32 +793,18 @@ check('counts CLI: a missing snapshot -> exit 2', $cmpMissing === 2);
 [$noMode] = $runCounts([]);
 check('counts CLI: no mode -> exit 2', $noMode === 2);
 
-// --- check-performance ---
+// --- check-performance: ProductGroupWidget after shop-ui 1.103.0 ---
 $perf = $tmp . '/perf';
 $perfState = $perf . '/.state';
 $lock = static fn(array $versions): string => json_encode(['packages' => array_map(static fn(string $n, string $v): array => ['name' => $n, 'version' => $v], array_keys($versions), $versions)]);
-$lockNow = ['spryker/router' => '1.20.0', 'spryker-shop/catalog-page' => '1.40.0', 'spryker-shop/content-navigation-widget' => '1.6.0', 'spryker-shop/shop-ui' => '1.102.0', 'spryker-shop/product-group-widget' => '1.12.0'];
+$lockNow = ['spryker-shop/shop-ui' => '1.102.0', 'spryker-shop/product-group-widget' => '1.12.0'];
 write_file($perf . '/composer.json', "{}\n");
 write_file($perf . '/composer.lock', $lock($lockNow));
 write_file($perf . '/config/Shared/config_default.php', "<?php\n\$config[KernelConstants::PROJECT_NAMESPACES] = ['Pyz'];\n");
 mkdir($perf . '/src/Pyz', 0777, true);
-$packageRows = array_column(pf_package_rows(pf_lock_versions($perf . '/composer.lock')), null, 'package');
-check('performance: package below the minimum reported as below', ($packageRows['spryker/router']['status'] ?? '') === 'below');
-check('performance: package above the minimum reported as at-or-above', ($packageRows['spryker-shop/catalog-page']['status'] ?? '') === 'at-or-above');
-check('performance: package not in the lock is absent', ($packageRows['spryker/product-storage']['status'] ?? '') === 'absent');
 [$perfCode, $perfOut] = run_script('check-performance.php', [], $perf, $perfState);
 $perfReport = read_json($perfState . '/performance-report.json');
-check('performance CLI: recommendations only -> exit 0', $perfCode === 0);
-check('performance: navigation cache not enabled and revalidation not set are recommendations', ($perfReport['navigationCache']['enabled'] ?? true) === false && count(array_filter($perfReport['recommendations'] ?? [], static fn(string $r): bool => str_contains($r, 'navigation cache') || str_contains($r, 'NAVIGATION_REVALIDATION'))) === 2);
-check('performance: no Phase 0 lock -> crossing not checked', array_key_exists('crossed', $perfReport['productGroupWidget'] ?? []) && $perfReport['productGroupWidget']['crossed'] === null && str_contains($perfOut, 'not checked'));
-
-write_file($perf . '/src/Pyz/Yves/ContentNavigationWidget/ContentNavigationWidgetConfig.php', "<?php\nnamespace Pyz\\Yves\\ContentNavigationWidget;\n\nclass ContentNavigationWidgetConfig extends \\SprykerShop\\Yves\\ContentNavigationWidget\\ContentNavigationWidgetConfig\n{\n    public function isNavigationCacheEnabled(): bool\n    {\n        return true;\n    }\n}\n");
-write_file($perf . '/config/Shared/config_default.php', "<?php\n\$config[KernelConstants::PROJECT_NAMESPACES] = ['Pyz'];\n\$config[ContentNavigationWidgetConstants::NAVIGATION_REVALIDATION_TIME_IN_SECONDS] = 3600;\n");
-run_script('check-performance.php', [], $perf, $perfState);
-$perfReport = read_json($perfState . '/performance-report.json');
-check('performance: config override returning true and the constant are detected', ($perfReport['navigationCache']['enabled'] ?? false) === true && ($perfReport['navigationCache']['revalidation']['config/Shared/config_default.php'] ?? '') === '3600');
-check('performance: no navigation recommendation once enabled', array_filter($perfReport['recommendations'] ?? [], static fn(string $r): bool => str_contains($r, 'navigation') || str_contains($r, 'NAVIGATION')) === []);
-check('performance: method returning false or absent is not enabled', pf_method_returns_true("<?php class A { public function isNavigationCacheEnabled(): bool { return false; } }", 'isNavigationCacheEnabled') === false && pf_method_returns_true('<?php class A {}', 'isNavigationCacheEnabled') === null);
+check('performance CLI: no Phase 0 lock -> crossing not checked, exit 0', $perfCode === 0 && array_key_exists('crossed', $perfReport['productGroupWidget'] ?? []) && $perfReport['productGroupWidget']['crossed'] === null && str_contains($perfOut, 'not checked'));
 
 write_file($perfState . '/composer.lock.before', $lock(['spryker-shop/shop-ui' => '1.100.0', 'spryker-shop/product-group-widget' => '1.11.0']));
 write_file($perf . '/composer.lock', $lock(['spryker-shop/shop-ui' => '1.103.0'] + $lockNow));
@@ -775,6 +829,112 @@ write_file($perfState . '/storage-search-counts-before.json', json_encode(['tabl
 check('performance CLI: group storage rows in the before snapshot count as product groups used -> exit 1', $perfRowsCode === 1);
 [$perfBadLock] = run_script('check-performance.php', ['--before-lock', $perf . '/nope.lock'], $perf, $perfState);
 check('performance CLI: missing --before-lock file -> exit 2', $perfBadLock === 2);
+
+// --- check-performance: code-pattern candidates ---
+write_file($perf . '/src/Pyz/Zed/Demo/Business/DemoWriter.php', "<?php\nclass DemoWriter\n{\n    public function write(array \$ids): void\n    {\n        foreach (\$ids as \$id) {\n            \$entity = SpyDemoQuery::create()->filterById(\$id)->findOne();\n            \$data = \$this->storageClient->get('demo:' . \$id);\n        }\n        \$entity->save();\n        \$keys = \$this->storageClient->getKeys('demo:*');\n    }\n}\n");
+[$scanCode] = run_script('check-performance.php', ['--scan-code'], $perf, $perfState);
+$scan = read_json($perfState . '/performance-code-scan.json')['candidates'] ?? [];
+check('performance --scan-code: a query and a storage read inside a loop body are candidates', $scanCode === 0 && count($scan['query-in-loop'] ?? []) === 1 && str_contains($scan['query-in-loop'][0], 'DemoWriter.php:7') && count($scan['storage-read-in-loop'] ?? []) === 1);
+check('performance --scan-code: a save after the loop is no candidate; a key scan anywhere is', ($scan['entity-save-in-loop'] ?? null) === [] && count($scan['storage-key-scan'] ?? []) === 1);
+
+// --- check-performance: page list from the guideline index, status file, gate ---
+$docs = $tmp . '/perf-docs';
+$guideDir = $docs . '/docs/dg/dev/guidelines/performance-guidelines';
+$page = static fn(string $title): string => "---\ntitle: $title\ntemplate: concept-topic-template\n---\n\nBody.\n";
+write_file($guideDir . '/performance-guidelines.md', $page('Performance guidelines')
+    . "- [Alpha](/docs/dg/dev/guidelines/performance-guidelines/alpha.html) for alpha.\n"
+    . "- [Beta](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/beta.html#section) for beta.\n"
+    . "- [Order page](/docs/pbc/all/order/latest/order-page.html) outside the folder.\n"
+    . "- [Alpha again](/docs/dg/dev/guidelines/performance-guidelines/alpha.html) and [elsewhere](https://example.com/x.html).\n");
+write_file($guideDir . '/alpha.md', $page('Alpha guidelines'));
+write_file($guideDir . '/beta.md', $page('Beta guidelines'));
+write_file($docs . '/docs/pbc/all/order/latest/order-page.md', $page('Order page performance'));
+write_file($guideDir . '/elastic/ram-batch.md', $page('RAM-aware batches'));
+write_file($guideDir . '/unlinked.md', $page('Unlinked guideline'));
+$perfStatusFile = $perfState . '/performance-fixes.json';
+@unlink($perfStatusFile);
+
+[$verifyNoFile] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+check('performance --verify: no status file -> exit 1', $verifyNoFile === 1);
+[$initNoDocs] = run_script('check-performance.php', ['--init', '--docs', $tmp . '/no-docs'], $perf, $perfState);
+check('performance --init: no guideline index in the docs copy -> exit 2', $initNoDocs === 2);
+[$initCode, $initOut] = run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
+$status = read_json($perfStatusFile);
+check('performance --init: linked pages in index order, then folder pages incl. subfolders -> 5 pages', $initCode === 0 && array_keys($status['pages'] ?? []) === ['alpha', 'beta', 'order-page', 'ram-batch', 'unlinked']);
+check('performance --init: each page pending, empty fixes, title from front matter, source recorded', array_unique(array_column($status['pages'], 'status')) === ['pending'] && array_unique(array_map('count', array_column($status['pages'], 'fixes'))) === [0] && ($status['pages']['order-page']['title'] ?? '') === 'Order page performance' && ($status['pages']['unlinked']['source'] ?? '') === 'folder' && ($status['pages']['beta']['source'] ?? '') === 'index');
+[$verifyPending, $verifyPendingOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+check('performance --verify: a pending page -> exit 1', $verifyPending === 1 && str_contains($verifyPendingOut, 'alpha: no fix recorded and no no-fix reason'));
+
+[$setNew] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'pending', '--title', 'Cache the lookup', '--detected', 'src/Pyz/Zed/Demo/Business/DemoWriter.php:8 reads storage per item'], $perf, $perfState);
+[$setNoDetected] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'pending', '--title', 'x'], $perf, $perfState);
+[$setNoPage] = run_script('check-performance.php', ['--set', 'gamma-1', '--status', 'pending', '--title', 'x', '--detected', 'y'], $perf, $perfState);
+$status = read_json($perfStatusFile);
+check('performance --set: a new fix needs title and detected and an existing page; the page becomes derived', $setNew === 0 && $setNoDetected === 2 && $setNoPage === 2 && ($status['pages']['alpha']['status'] ?? '') === 'derived' && count($status['pages']['alpha']['fixes']) === 1);
+[$setNoFiles] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'applied', '--evidence', 'pages identical'], $perf, $perfState);
+check('performance --set: applied without files is rejected -> exit 2, nothing written', $setNoFiles === 2 && (read_json($perfStatusFile)['pages']['alpha']['fixes'][0]['status'] ?? '') === 'pending');
+[$setNoReason] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'not-applied', '--evidence', 'x'], $perf, $perfState);
+check('performance --set: not-applied without a reason -> exit 2', $setNoReason === 2);
+[$noFixEmpty] = run_script('check-performance.php', ['--no-fix', 'beta', '--reason', 'operator-only page'], $perf, $perfState);
+[$noFixOnDerived] = run_script('check-performance.php', ['--no-fix', 'alpha', '--reason', 'r', '--evidence', 'e'], $perf, $perfState);
+check('performance --no-fix: needs reason and evidence, and a page without fixes -> exit 2', $noFixEmpty === 2 && $noFixOnDerived === 2);
+
+[$initAgain] = run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
+$status = read_json($perfStatusFile);
+check('performance --init: a re-run keeps recorded fixes', $initAgain === 0 && ($status['pages']['alpha']['fixes'][0]['detected'] ?? '') === 'src/Pyz/Zed/Demo/Business/DemoWriter.php:8 reads storage per item');
+write_file($guideDir . '/new-page.md', $page('New guideline'));
+run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
+$status = read_json($perfStatusFile);
+check('performance --init: a page that appeared is added pending, recorded data kept', isset($status['pages']['new-page']) && $status['pages']['new-page']['status'] === 'pending' && count($status['pages']['alpha']['fixes']) === 1 && count($status['pages']) === 6);
+
+$complete = [
+    'alpha-1' => ['status' => 'applied', 'files' => ['src/Pyz/Zed/Demo/Business/DemoWriter.php'], 'evidence' => 'suites green; pages identical for guest, customer'],
+    'beta-1' => ['status' => 'not-applied', 'title' => 'Smaller page size', 'detected' => 'catalog page size above the default', 'reason' => 'proposal: a smaller page size changes what users see', 'evidence' => 'config_default.php:1'],
+    'order-page' => ['status' => 'no-fix', 'reason' => 'the page describes a profiling procedure', 'evidence' => 'no project change named on the page'],
+    'ram-batch-1' => ['status' => 'not-applicable', 'title' => 'RAM-aware batches', 'detected' => 'no custom publisher', 'reason' => 'operator: memory limit of the workers', 'evidence' => 'no setting in the repository'],
+    'unlinked-1' => ['status' => 'reverted', 'title' => 'Index on a filter column', 'detected' => 'filter without index', 'reason' => 'search order changed', 'evidence' => 'positions 3 and 4 swapped'],
+    'new-page' => ['status' => 'no-fix', 'reason' => 'already in place', 'evidence' => 'composer.lock: package at the named version'],
+];
+write_file($perfState . '/import-bad.json', json_encode(['beta-1' => ['status' => 'not-applied', 'title' => 't', 'detected' => 'd', 'evidence' => 'x']] + $complete));
+[$importBad] = run_script('check-performance.php', ['--import', $perfState . '/import-bad.json'], $perf, $perfState);
+check('performance --import: one incomplete entry rejects the whole file -> exit 2', $importBad === 2 && (read_json($perfStatusFile)['pages']['order-page']['status'] ?? '') === 'pending');
+write_file($perfState . '/import.json', json_encode($complete));
+[$importOk] = run_script('check-performance.php', ['--import', $perfState . '/import.json'], $perf, $perfState);
+[$verifyAll, $verifyAllOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+check('performance --verify: every page and fix accounted for -> exit 0', $importOk === 0 && $verifyAll === 0 && str_contains($verifyAllOut, 'OK: every page'));
+
+$edited = read_json($perfStatusFile);
+$edited['pages']['alpha']['fixes'][0]['files'] = [];
+write_file($perfStatusFile, json_encode($edited));
+[$verifyNoFiles, $verifyNoFilesOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+check('performance --verify: an applied fix without files -> exit 1', $verifyNoFiles === 1 && str_contains($verifyNoFilesOut, 'alpha-1: applied without the files it touched'));
+$edited['pages']['alpha']['fixes'][0]['files'] = ['src/Pyz/Zed/Demo/Business/DemoWriter.php'];
+$edited['pages']['order-page']['reason'] = '';
+write_file($perfStatusFile, json_encode($edited));
+[$verifyNoReason, $verifyNoReasonOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+check('performance --verify: a page with no fixes and no no-fix reason -> exit 1', $verifyNoReason === 1 && str_contains($verifyNoReasonOut, 'order-page: no-fix without a reason and evidence'));
+
+write_file($guideDir . '/performance-guidelines.md', (string)file_get_contents($guideDir . '/performance-guidelines.md') . "- [Gone](/docs/dg/dev/guidelines/performance-guidelines/gone.html)\n");
+run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
+$status = read_json($perfStatusFile);
+[$setOnMissing] = run_script('check-performance.php', ['--set', 'gone-1', '--status', 'pending', '--title', 'x', '--detected', 'y'], $perf, $perfState);
+[$noFixMissing] = run_script('check-performance.php', ['--no-fix', 'gone', '--reason', 'linked page not published', '--evidence', '404'], $perf, $perfState);
+check('performance --init: a linked page missing from the copy is listed; it takes no-fix, not fixes', ($status['pages']['gone']['inDocs'] ?? true) === false && $setOnMissing === 2 && $noFixMissing === 0);
+
+$perfOffline = $tmp . '/perf-offline-state';
+[$unreachableNoEvidence] = run_script('check-performance.php', ['--unreachable'], $perf, $perfOffline);
+[$unreachable] = run_script('check-performance.php', ['--unreachable', '--evidence', 'git clone: could not resolve host'], $perf, $perfOffline);
+[$verifyOffline, $verifyOfflineOut] = run_script('check-performance.php', ['--verify'], $perf, $perfOffline);
+check('performance --unreachable: needs evidence; --verify then passes and says the phase did not run', $unreachableNoEvidence === 2 && $unreachable === 0 && $verifyOffline === 0 && str_contains($verifyOfflineOut, 'NOT RUN'));
+$edited = read_json($perfStatusFile);
+$edited['pages']['new-page'] = array_merge($edited['pages']['new-page'], ['status' => 'pending', 'reason' => '', 'evidence' => '']);
+write_file($perfStatusFile, json_encode($edited));
+run_script('check-performance.php', ['--unreachable', '--evidence', 'curl: 503'], $perf, $perfState);
+$status = read_json($perfStatusFile);
+check('performance --unreachable: pending pages become not-checked with the reason, recorded pages stay', ($status['pages']['new-page']['status'] ?? '') === 'not-checked' && $status['pages']['new-page']['reason'] === 'docs unreachable' && ($status['pages']['alpha']['status'] ?? '') === 'derived');
+run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
+check('performance --init: with the docs reachable again, not-checked pages are pending', (read_json($perfStatusFile)['pages']['new-page']['status'] ?? '') === 'pending');
+[$twoModes] = run_script('check-performance.php', ['--init', '--verify'], $perf, $perfState);
+check('performance: two modes in one run -> exit 2', $twoModes === 2);
 
 $cleanup = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($cleanup as $entry) {

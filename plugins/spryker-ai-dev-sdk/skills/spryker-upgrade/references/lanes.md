@@ -61,8 +61,15 @@ Factory or any class that is neither DependencyProvider nor Config). Resolve the
 ## Lane 2 — Shadowed frontend/presentation files
 
 Inputs: `twig-conflicts-report.json`, and the `PRODUCT_GROUP_WIDGET_REMOVED` finding of
-`performance-report.json` — `spryker-shop/shop-ui` 1.103.0 removes `ProductGroupWidget` from
-three molecules; restore it in the project templates as [performance.md](performance.md) describes.
+`performance-report.json` — `spryker-shop/shop-ui` 1.103.0 removes `ProductGroupWidget` from the
+`groups` block of the `product-card`, `product-item` and `product-list-item` molecules, so product
+groups stop rendering on catalog, search and product lists. Restore it in the project, never in
+`vendor/`: for each molecule take the project template, or create one that extends the vendor
+molecule (`{% extends molecule('product-item', '@SprykerShop:ShopUi') %}`), and render the widget in
+its `groups` block with the arguments the pre-upgrade vendor template used (the Phase 0
+`twig-shadow-map.php` baseline) — typically `args [data.abstractId]` in `product-card` and
+`product-list-item`, `args [data.idProductAbstract]` in `product-item`. Then `check-performance.php`
+exits 0, `npm run yves` passes, and the swatches render as on the Phase 0 pages for every customer type.
 Batch the mechanical part of the shadowed files first:
 
 ```bash
@@ -166,8 +173,8 @@ the open deprecation list, with the table row.
 
 ## Lane 4 — Config constants and transfer definitions
 
-**Config classes** (`constant-overrides-report.json`, `lane: Lane 4`): see
-[Constant overrides](#constant-overrides-all-lanes).
+**Config classes and `*Constants` interfaces** (`constant-overrides-report.json`, `lane: Lane 4`):
+see [Constant overrides](#constant-overrides-all-lanes).
 
 **Config** (`config-constants-report.json`): for each TYPE_MISSING / CONSTANT_MISSING the migration
 guide names the replacement (typical pattern: `XConstants::FOO` moves to `XConfig::getFoo()` — then
@@ -190,9 +197,10 @@ constants still exist, so `Transfer::FOO` references keep working.
 
 ## Constant overrides (all lanes)
 
-`check-constant-overrides.php` lists every constant a project class redeclares with a value that
-differs from its vendor ancestor (`differing`, for review), and every core value that changed or
-disappeared since the Phase 0 snapshot under a project override (`coreChanges`, the findings).
+`check-constant-overrides.php` lists every constant a project class or interface redeclares with a
+value that differs from its nearest vendor supertype, a parent class or an interface (`differing`, for
+review), and every core value that changed or disappeared since the Phase 0 snapshot under a project
+override (`coreChanges`, the findings).
 
 - **`CORE_VALUE_CHANGED`** — the project keeps its value while core moved. Read why core changed it
   (Lane 0 guide, CHANGELOG, tag diff). When the new core code depends on the new value (a renamed

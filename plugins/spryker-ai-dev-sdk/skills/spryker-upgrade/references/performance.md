@@ -1,116 +1,261 @@
-# Performance — what the upgrade does with each recommendation
+# Performance fixes — method
 
-Read this when `check-performance.php` reports a finding or a recommendation (Phase 3), before the
-new-features gate (Phase 6), and before writing the "Performance recommendations" section of the
-Phase 7 report.
+Read this on entry to Phase 6.2, and before writing the "Performance fixes" section of the Phase 7
+report. The fixes come from Spryker's
+[performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.html)
+as published when the upgrade runs: Phase 6.2 fetches the pages, lists them from the guideline index,
+and derives the fixes from each page and the project. This file holds the method; the content is the
+pages themselves.
 
-Source: the Spryker [Yves widget performance best practices](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/yves-performance-best-practice.html)
-and the [performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.html)
-index.
+## Contents
 
-## The rule
+- [The rules](#the-rules)
+- [Phase 6.2 step by step](#phase-62-step-by-step)
+- [Fetching the guidelines](#fetching-the-guidelines)
+- [The page list](#the-page-list)
+- [From a page to fixes](#from-a-page-to-fixes)
+- [Customer types and page sets](#customer-types-and-page-sets)
+- [Comparing the rendered result](#comparing-the-rendered-result)
+- [Packages](#packages)
+- [Schema changes](#schema-changes)
+- [The status file](#the-status-file)
+- [The report section](#the-report-section)
 
-The Scope rule of SKILL.md decides every item: an upgrade changes versions, not architecture.
+## The rules
 
-| Item | Kind | What the upgrade does |
-|---|---|---|
-| `spryker-shop/shop-ui` 1.103.0 removes `ProductGroupWidget` from the `groups` block of the `product-card`, `product-item` and `product-list-item` molecules | existing behaviour disappearing (damage) | restore the widget in the project templates, in Lane 2 |
-| `ContentNavigationWidgetConfig::isNavigationCacheEnabled()` returning true, and `NAVIGATION_REVALIDATION_TIME_IN_SECONDS` | new capability | recommended in the report, offered at the Phase 6 gate, applied only on the developer's yes |
-| The SOL-477 package set at its minimum versions | new capability | recommended in the report, offered at the Phase 6 gate, applied only on the developer's yes |
-| Everything on the other guideline pages | recommendation | listed in the report; no automatic change |
+1. **The performance fixes are part of the upgrade's deliverable.** The developer asks for them with
+   the upgrade, so the Scope rule ("versions, not architecture") does not block them. Every guideline
+   page is accounted for — with its fixes, or with the reason it has none — and every fix gets a
+   final status; none is skipped.
+2. **Visible behaviour stays the same.** A fix is applied only when the shop shows and does the same
+   for every customer type afterwards. A fix that changes what users see or can do (a smaller page
+   size, a removed feature, data that appears later, other facet counts) is not applied: it is
+   recorded `not-applied` with the proposed change, for the developer to decide.
+3. **One fix at a time.** Apply one fix, run the checks it names, compare the rendered pages it
+   touches before and after for every customer type the project has. A failed check or a difference
+   is a failure: revert that fix and record it `reverted` with the reason. Then the next fix.
+4. **Each applied fix is its own commit** (`perf: <fix ID> <title>`), and its status entry lists the
+   files it touched.
+5. **Operator fixes are recorded, not attempted.** A fix only the hosting, the CDN, the scheduler or an
+   APM account can deliver is `not-applicable` with the reason `operator:` and what the developer
+   passes on.
+6. **Damage stays damage.** The `PRODUCT_GROUP_WIDGET_REMOVED` finding of `check-performance.php` is
+   existing behaviour lost by the upgrade; Lane 2 restores it ([lanes.md](lanes.md)). A guideline fix
+   that raises `spryker-shop/shop-ui` past 1.103.0 names that Lane 2 change in its evidence.
+7. **Nothing from memory.** Fixes come from the fetched pages. When the pages cannot be fetched, no
+   fix is derived (§ Fetching the guidelines).
 
-`check-performance.php` exits 1 only for the `ProductGroupWidget` finding. Package versions and the
-navigation cache never fail the run.
+## Phase 6.2 step by step
 
-## `ProductGroupWidget` removed from the shop-ui molecules (damage)
+1. **Fetch** the guideline sources into `.spryker-upgrade/state/spryker-docs` (§ Fetching the
+   guidelines).
+2. **List the pages:** `php $UP/check-performance.php --init --docs .spryker-upgrade/state/spryker-docs`
+   writes `.spryker-upgrade/state/performance-fixes.json`, one entry per page, `pending`. Follow what
+   it prints for linked pages missing from the copy, and run it again (§ The page list).
+3. **Code candidates:** `php $UP/check-performance.php --scan-code` writes
+   `performance-code-scan.json` — loop queries, storage and HTTP calls in loops, key scans, joins,
+   SQL functions in `where`, `createTemplate`, storage writes, HTTP clients in Yves, Glue and Client.
+   Candidates, not findings; the sub-agents read them against the pages.
+4. **Derive the fixes.** Group the pages by topic, about five per group, and spawn one read-only
+   sub-agent (`Explore`) per group, together, each with: its page paths in the docs copy, the project
+   root, `performance-code-scan.json`, [§ From a page to fixes](#from-a-page-to-fixes), and the task
+   "read each page in full; for every recommendation a project can act on, derive the fix, run its
+   Detect step against the project and record it; record a page without such a recommendation with
+   `--no-fix`; change nothing in the project". Each records with `--set` and `--no-fix`; the script
+   locks the status file, so the sub-agents record in parallel. The main agent keeps only their
+   summaries.
+5. **Check the derivation:** `php $UP/check-performance.php --verify` lists every page still
+   `pending`. Derive those before going on.
+6. **Apply the `pending` fixes, one at a time**, in this order: packages, then configuration and
+   wiring, then code, then schema changes. For each fix:
+   1. capture the pages it touches for every customer type ([§ Comparing](#comparing-the-rendered-result));
+   2. apply its Apply step, nothing else;
+   3. run its Verify step and the checks it implies: the build (`npm run yves` for templates and
+      assets, `docker/sdk up -t` for config and recipes, `composer install` and `transfer:generate` for
+      packages), the covering tests (the Phase 0.5 tests and the suites of the touched modules),
+      PHPStan and the sniffer on touched PHP files, the Back Office crawl when a Zed or Merchant Portal
+      page is involved, the publish check when publishing is involved;
+   4. capture the same pages again and compare;
+   5. pass: commit, then `--set <ID> --status applied --files <a,b> --evidence "<checks and comparison>"`;
+      fail: restore the touched files (`git checkout -- <files>`, delete the files the fix created),
+      then `--set <ID> --status reverted --reason "<what failed>" --evidence "<output>"`.
+7. **Gate:** `php $UP/check-performance.php --verify` exits 0. Phase 6.5 then verifies the result, and
+   Phase 7 does not start before it exits 0.
 
-The check fires when all of these hold:
+## Fetching the guidelines
 
-- `spryker-shop/shop-ui` crossed 1.103.0 between the Phase 0 lock (`composer.lock.before`, or
-  `--before-lock`) and the current lock;
-- `spryker-shop/product-group-widget` was installed before the upgrade;
-- the project uses product groups: a `data_entity: product-group` entry in a `data/import` manifest
-  whose source has rows, or rows in `spy_product_abstract_group_storage` in
-  `storage-search-counts-before.json`;
-- no project template of the three molecules, in any project namespace, renders
-  `{% widget 'ProductGroupWidget' … %}`. `ProductGroupColorWidget` and a
-  `view(…, 'ProductGroupWidget')` reference do not count.
+```bash
+DOCS=.spryker-upgrade/state/spryker-docs
+rm -rf "$DOCS"
+git clone --depth 1 --filter=blob:none --sparse https://github.com/spryker/spryker-docs.git "$DOCS"
+git -C "$DOCS" sparse-checkout set docs/dg/dev/guidelines/performance-guidelines
+```
 
-Before the upgrade the vendor templates rendered the product groups (colour swatches) on catalog,
-search and product-list pages; after it they do not. Restore it in the project, never in `vendor/`:
+Without git, or when the clone fails, fetch through the GitHub contents API into the same paths:
+`curl -fsSL "https://api.github.com/repos/spryker/spryker-docs/contents/<folder>?ref=master"` returns
+the folder's entries; download each `"type": "file"` entry's `download_url` to `$DOCS/<path>`
+(`curl -fsSL <download_url> --create-dirs -o "$DOCS/<path>"`) and list each `"type": "dir"` entry
+the same way. Start with `docs/dg/dev/guidelines/performance-guidelines`. A single page:
+`curl -fsSL https://raw.githubusercontent.com/spryker/spryker-docs/master/<path> --create-dirs -o "$DOCS/<path>"`.
 
-1. For each of the three molecules, take the project template (create one that extends the vendor
-   molecule when the project has none: `{% extends molecule('product-item', '@SprykerShop:ShopUi') %}`).
-2. In its `groups` block, render the widget with the arguments the pre-upgrade vendor template used.
-   Read them from the Phase 0 vendor copy (`twig-shadow-map.php` baseline) or the old package; typical:
-   `{% widget 'ProductGroupWidget' args [data.abstractId] only %}{% endwidget %}` in `product-card` and
-   `product-list-item`, `args [data.idProductAbstract]` in `product-item`.
-3. Re-run `check-performance.php` (exit 0), build the assets, and have the verifier render a catalog
-   page, a search result and a product list with grouped products. The swatches render as before.
+**Offline.** When both fail, record it with the failed commands' output:
 
-## Navigation cache and the SOL-477 package set (new capabilities)
+```bash
+php $UP/check-performance.php --unreachable --evidence "<git clone and curl output>"
+```
 
-The report lists each SOL-477 package present in the lock with its minimum version:
+Every page without fixes becomes `not-checked` with the reason "docs unreachable"; `--verify` exits 0
+with `NOT RUN`, and the report's Performance fixes section states that Phase 6.2 did not run, why,
+and that the developer runs it once the docs are reachable. With the docs reachable again,
+`--init` sets the `not-checked` pages back to `pending`.
 
-| Package | Minimum |
+## The page list
+
+`--init` reads the index page `docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.md`
+of the copy and lists, in this order: every page the index links (in the guideline folder or
+elsewhere in the docs), then every page of the guideline folder and its subfolders the index does
+not link. The index itself is not a page. Each entry has the page's slug (its file name without
+`.md`), path, title (from the front matter), URL, `source` (`index` or `folder`), whether the copy has
+it (`inDocs`) and, for a git copy, whether the repository has it (`inRepository`).
+
+- **A linked page the repository has outside the checked-out folder:** `--init` prints the
+  `git -C … sparse-checkout add <folders>` command. Run it, then `--init` again. With a curl copy,
+  fetch the page by its raw URL, then `--init` again.
+- **A linked page the repository does not have** (`inRepository: false`, or 404 on the raw URL):
+  `--no-fix <slug> --reason "linked page not published" --evidence "<ls-tree or curl output>"`.
+- **Re-running** `--init` keeps every recorded page and fix and adds pages that appeared since.
+
+## From a page to fixes
+
+A **fix** is one change a page recommends that the project can make or check: a package minimum, a
+config key, a plugin or class wiring, a code pattern, a template or asset change, an index, a deploy
+file or recipe setting, a console command at deploy time. One fix per independent change: a package
+set the page installs together is one fix; a config key and the wiring it needs are one fix; a code
+pattern is one fix listing every occurrence. The ID is `<page slug>-<n>`, numbered in page order.
+
+For each fix, derive from the page:
+
+| Part | What it holds |
 |---|---|
-| `spryker/navigation-storage` | 1.12.0 |
-| `spryker/product-group-storage` | 1.6.0 |
-| `spryker/product-storage` | 1.49.0 |
-| `spryker/router` | 1.26.0 |
-| `spryker/store-storage` | 1.3.0 |
-| `spryker-shop/catalog-page` | 1.35.0 |
-| `spryker-shop/cms-block-widget` | 2.4.0 |
-| `spryker-shop/content-navigation-widget` | 1.6.0 |
-| `spryker-shop/product-group-widget` | 1.12.0 |
-| `spryker-shop/product-review-widget` | 1.18.0 |
-| `spryker-shop/shop-application` | 1.17.0 |
-| `spryker-shop/shop-ui` | 1.103.0 |
+| Kind | packages, config, wiring, code, assets, schema, deploy, decision (alters visible behaviour), operator (outside the code) |
+| Pages | the page sets it touches (§ Customer types and page sets) |
+| Detect | what shows the project's state, with the command: installed version in `composer.lock`, the key in `config/Shared/config_*.php`, the plugin in a DependencyProvider, a project override class, a `grep` or `--scan-code` candidate (file:line), a deploy file key |
+| Apply | the change the page names, in the project, never in `vendor/` |
+| Verify | the checks of step 6 plus what the page names (a console command, a header, a log line) |
+| Does not apply | already in place; the precondition is absent (package not in the lock — never added — or the feature not used); operator-only |
 
-A package below its minimum after the release-group update stays where the release put it. Raising
-it is a separate change offered at the Phase 6 gate; a package absent from the lock is not added.
+The Detect result decides the recorded status:
 
-The navigation cache needs `spryker-shop/content-navigation-widget` 1.6.0 or later. When the developer
-accepts it at the gate, in its own commit:
+| Detect result | Record |
+|---|---|
+| applicable | `pending`, with `--title` (the page's recommendation) and `--detected` (what the project has, file:line or version) |
+| already in place, or precondition absent | `not-applicable`, reason and evidence |
+| operator-only | `not-applicable`, reason `operator: <what the developer passes on>` |
+| applying it changes what users see or can do | `not-applied`, reason `proposal: <the change and its visible effect>` |
+| a minimum in a higher major than installed | `not-applied`, reason naming the major (Lane 0 in its own upgrade) |
 
-1. `src/<Ns>/Yves/ContentNavigationWidget/ContentNavigationWidgetConfig.php` extends the
-   `SprykerShop\Yves\ContentNavigationWidget\ContentNavigationWidgetConfig` and overrides
-   `isNavigationCacheEnabled()` to return `true`.
-2. `$config[ContentNavigationWidgetConstants::NAVIGATION_REVALIDATION_TIME_IN_SECONDS] = 3600;` in
-   `config/Shared/config_default.php`, and `300` in `config/Shared/config_default-docker.dev.php`.
-3. Re-run `check-performance.php`: `navigationCache.enabled` is true and the constant is listed per
-   file.
+A page **without a fix** — it describes a profiling or troubleshooting procedure, explains a concept,
+or every recommendation needs a tool or account the project does not have — is recorded
+`--no-fix <slug> --reason "<why>" --evidence "<what the page asks for>"`.
 
-Declined or deferred items go into the report with the reason.
+## Customer types and page sets
 
-## The other performance guideline pages (recommendations only)
+The customer types are the ones the project has: **guest** always; **customer** when the storefront
+has a login (`spryker-shop/customer-page`); **business user** when the project has company accounts
+(`spryker/company-user` in the lock). The accounts come from the project's demo data or the
+environment, as the Back Office crawl's credentials do; never write them into a file.
 
-The report's "Performance recommendations" section can name what a page's check finds in the
-project. Nothing here is changed by the upgrade; each item is the developer's decision, outside the
-upgrade's scope. Links are under `https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/`.
+| Page set | Pages |
+|---|---|
+| storefront-catalog | home, a category page, a search result, a product detail page (with a product group, options, reviews and offers where the project has them) |
+| storefront-cart | the cart with several items, checkout up to the summary, the order placement and its confirmation mail |
+| storefront-account | customer overview, order history, an order detail |
+| storefront-b2b | company pages, quick order, shopping lists (business user) |
+| back-office | `backoffice-smoke.php` against its baseline, plus the Back Office pages the fix names |
+| merchant-portal | dashboard, offers, orders, profile (when the project has a Merchant Portal) |
+| publish | re-import or `publish:trigger-events` for the entity, queues drained, `storage-search-counts.php` `--snapshot` before and after the fix, `--compare` shows no dropped, emptied or disappeared table |
+| cli | the console commands the fix names exit 0 |
 
-| Page | What it covers | What can be checked in the project |
+## Comparing the rendered result
+
+Before applying a fix, have the `spryker-verifier` agent capture every page of the fix's storefront,
+Back Office and Merchant Portal sets, for every customer type: a full-page screenshot, the visible text
+and the browser console. Store them under `.spryker-upgrade/state/perf/<ID>/before/`; after the fix,
+the same under `after/`. The fix passes when the visible text is identical and the screenshots show no
+difference, apart from values that change on every request (CSRF tokens, timestamps, randomised
+recommendations — name them in the evidence), and the console has no new error. Any other difference
+is a failure. A fix without pages (deploy files, operator) is verified by its own checks only.
+
+## Packages
+
+For a fix whose page names package minimums:
+
+1. Compare each package with `composer.lock`. A package absent from the lock is never added.
+2. A minimum in a higher major than the installed one: not raised — that major goes through Lane 0 in
+   its own upgrade. The fix is `not-applied` for that package.
+3. `script -q /dev/null docker/sdk cli composer update <package>:"^<minimum>" … --with-dependencies`
+   for all remaining packages of the fix in one command, in the container. `composer.json` is not
+   edited for it. A failure to resolve: `composer why-not <package> <minimum>`, revert the lock, record
+   the blocking constraint.
+4. Checks: `composer install`, `transfer:generate`, `propel:diff` (a non-empty diff goes through
+   § Schema changes), `check-plugin-usage.php`, the covering tests, the Back Office crawl, and the
+   fix's page sets compared for every customer type.
+
+## Schema changes
+
+A fix that changes the database schema (an index, a table) creates a migration. Show the developer the
+`propel:diff` result with AskUserQuestion before it touches a database; apply it only on their yes,
+otherwise record the fix `not-applied` with the diff. The migration file is part of the fix's commit.
+
+## The status file
+
+`.spryker-upgrade/state/performance-fixes.json`: the docs copy (`docs.dir`, `docs.commit`) and
+`pages`, keyed by slug, each with `path`, `title`, `url`, `source`, `inDocs`, `inRepository`,
+`status`, `reason`, `evidence` and `fixes` — a list of `{id, title, detected, status, files, reason,
+evidence}`.
+
+| Page status | Required | Meaning |
 |---|---|---|
-| [Keeping dependencies updated](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/keeping-dependencies-updated.html) | module versions that carry performance fixes | the listed modules' versions in `composer.lock` against the page's minimums |
-| [Monitoring](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/monitoring.html) | an active, configured APM (New Relic or OpenTelemetry) | APM packages in the lock and their monitoring plugins wired |
-| [APM — New Relic based troubleshooting](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/apm-newrelic-based-troubleshooting.html) | reading APM metrics and traces | nothing static; a procedure for a running system |
-| [General performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/general-performance-guidelines.html) | server-side execution time | `optimize-autoloader` / `classmap-authoritative` in `composer.json`; debug and web profiler off in production config; `RabbitMqEnv::RABBITMQ_ENABLE_RUNTIME_SETTING_UP`; `QueueConstants::QUEUE_WORKER_WAIT_LIMIT_ENABLED`; `ZedNavigationConstants::ZED_NAVIGATION_CACHE_ENABLED`; `isRoutingCacheEnabled()`; `KernelConstants::RESOLVABLE_CLASS_NAMES_CACHE_ENABLED` |
-| [Architecture performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/architecture-performance-guidelines.html) | bulk operations, storage calls in loops, RPC, publish and sync | project code calling storage or Zed in loops; Redis `KEYS` usage in `src/` |
-| [Frontend performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/front-end-performance-guidelines.html) | asset size and loading | the asset build output and lazy-loaded components |
-| [Twig performance best practices](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/twig-performance-best-practices.html) | Twig compiler, path cache, warmup, block cache | `TwigConstants::YVES_TWIG_OPTIONS` / `ZED_TWIG_OPTIONS` cache settings; Twig cache plugins wired |
-| [Bot control](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/bot-control.html) | honest and malicious bot traffic | `robots.txt` and the deploy file's auth/whitelist settings |
-| [Batch processing of Propel entities](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/performance-guidelines-batch-processing-propel-entities.html) | `ActiveRecordBatchProcessorTrait` | project writers saving entities one by one in loops |
-| [Database performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/database-performance-guidelines.html) | indexes, queries, data volume, ID overflow | project schema XML indexes on filtered columns; unbounded project queries |
-| [Key-value storage performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/key-value-storage-performance-guidelines.html) | operations per request, admin commands at runtime | `KEYS`/`FLUSH*` in project runtime code; storage reads in loops |
-| [External HTTP requests](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/external-http-requests.html) | external calls during requests | HTTP clients called from Yves/Glue request paths in `src/` |
-| [Search performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/search-performance-guidelines.html) | aggregations, pagination, query structure | project query expanders and global aggregations; pagination limits in `CatalogConfig` |
-| [Infrastructure and worker configuration](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/infrastructure-worker-configuration-guidelines.html) | nginx buffers, workers for many stores | buffer settings and worker setup in `deploy.*.yml` |
-| [CDN and traffic management integration](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/cdn-and-traffic-management-integration.html) | compression between CDN and origin | nothing in code; the CDN configuration |
-| [Split publish queues](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/split-queues-performance.html) | per-module publish queues | `PublisherConfig::PUBLISH_QUEUE` use and the queue configuration in `RabbitMqConfig` |
-| [Custom code performance guidelines](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/custom-code-performance-guidelines.html) | caching, background jobs, Quote calculator stack | project calculator plugins in `CalculationDependencyProvider`; heavy work in controllers |
-| [KV storage deduplication](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/kv-storage-deduplication.html) | duplicated URL and product abstract data in storage | `isProductAbstractStorageUnifiedEnabled()` / `isUrlLocaleMapStorageEnabled()` overrides |
-| [Search index deduplication](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/search-index-deduplication.html) | product concrete documents in the search index | product concrete search plugins wired in the catalog and search dependency providers |
-| Elastic computing: [RAM-aware batch processing](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/elastic-computing/ram-aware-batch-processing.html), [storage caching for primary-replica setups](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/elastic-computing/storage-caching-for-primary-replica-db-setups.html), [New Relic grouping by queue names](https://docs.spryker.com/docs/dg/dev/guidelines/performance-guidelines/elastic-computing/new-relic-transaction-grouping-by-queue-names.html) | resource-aware processing and replica setups | database replica settings (`SPRYKER_DB_REPLICAS`) and the queue worker configuration |
+| `pending` | — | not derived yet; `--verify` fails |
+| `derived` | at least one fix | set by the script when a fix is recorded |
+| `no-fix` | `reason`, `evidence` | the page has no change the project can make |
+| `not-checked` | `reason`, `evidence` | the docs were unreachable (`--unreachable`) |
 
-Each recommendation in the report states the page, what was found, and that applying it is a
-separate change outside the upgrade.
+| Fix status | Required | Meaning |
+|---|---|---|
+| `pending` | `title`, `detected` | applicable, not applied yet; `--verify` fails |
+| `applied` | `files`, `evidence` | changed, verified, committed |
+| `not-applicable` | `reason`, `evidence` | already in place, the precondition is absent, or `operator:` |
+| `not-applied` | `reason`, `evidence` | applicable but not applied: visible behaviour would change, a constraint or major blocks it, or the developer declined a schema change; the reason holds the proposal |
+| `reverted` | `reason`, `evidence` | applied, failed its checks or the comparison, reverted |
+
+Every fix keeps its `title` and `detected`. Evidence is short and checkable: the command and its
+result, file:line, or the comparison verdict per customer type.
+
+Recording:
+
+```bash
+php $UP/check-performance.php --set <slug>-1 --status pending --title "<recommendation>" --detected "<file:line or version>"
+php $UP/check-performance.php --set <slug>-1 --status applied --files config/Shared/config_default.php --evidence "<checks>; pages identical for guest, customer"
+php $UP/check-performance.php --set <slug>-2 --status not-applicable --title "<recommendation>" --detected "<what the project has>" --reason "operator: <what to pass on>" --evidence "<no setting in the repository>"
+php $UP/check-performance.php --no-fix <slug> --reason "<why the page has no fix>" --evidence "<what the page asks for>"
+php $UP/check-performance.php --import .spryker-upgrade/state/perf-<group>.json
+```
+
+The import file is one JSON object keyed by fix ID (`{"status", "title", "detected", "files",
+"reason", "evidence"}`) or by page slug (`{"status": "no-fix", "reason", "evidence"}`). `--set`
+replaces a fix's status, files, reason and evidence, and keeps its title and detected when they are
+not given. `--set`, `--no-fix` and `--import` reject an entry that misses what its status requires, a
+fix of a page not in the copy, or `no-fix` on a page with fixes, and write nothing then (exit 2).
+`--verify` exits 1 while a page is `pending` or lacks its reason, or a fix is `pending` or
+incomplete, and lists them.
+
+## The report section
+
+Phase 7's **Performance fixes** section starts with the docs copy (`docs.commit`) and the
+`--verify` counts. Then one table per page, in the order of `performance-fixes.json`, headed by the
+page title and URL: one row per fix — ID, title, status, files (applied) or reason (otherwise), and
+the evidence. A `no-fix` or `not-checked` page is one line with its reason. Below the tables: the
+proposals of the `not-applied` fixes for the developer to decide, and the `operator:` items to pass
+on. When the docs were unreachable, the section is one paragraph saying Phase 6.2 did not run and why.
+The `--verify` output closes the section.

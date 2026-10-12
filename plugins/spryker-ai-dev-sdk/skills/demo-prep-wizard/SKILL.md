@@ -237,9 +237,21 @@ show it>`, then continue. It is not a hard stop and never interrupts the prepare
 
 ### 6 · Rehearsal
 
-**Walk the demo end to end, as the persona each beat names, in the browser.** Record pass/gap per beat
-in `.ai-dev/rehearsal.md` — one line per beat, quoting the beat from the brief, then `pass` or
-`gap: <what is missing>`.
+**Walk the demo end to end, as the persona each beat names, in the browser.** Record the result per
+beat in `.ai-dev/rehearsal.md`, as one table under `## Beats` with exactly these columns:
+
+```markdown
+## Beats
+
+| beat | as in the brief | result |
+|---|---|---|
+| B1 | A buyer orders below the approval limit; placed without approval | pass |
+| B2 | A buyer orders above the approval limit; goes to the approver; the approver approves | gap: approval mail not sent |
+```
+
+`beat` is the needs-list id; `as in the brief` quotes the beat; `result` is exactly one of `pending`,
+`pass`, `gap: <what is missing>` or `blocked: <what stopped the walk>`. Evidence, fixes and caveats go
+below the table as prose.
 
 **Run the mechanical check first, then walk the beats.** The check is cheap and catches the gaps that
 cost the most to find by hand:
