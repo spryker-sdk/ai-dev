@@ -5,6 +5,12 @@ classifying a failing test, the publish check section before the first `storage-
 snapshot, the Phase 6.5 section before the Back Office crawl, and the report section before writing
 Phase 7.
 
+- [Phase 5 — regeneration is not read-only](#phase-5--regeneration-is-not-read-only)
+- [Phase 5.5 — classifying a failing test](#phase-55--classifying-a-failing-test)
+- [Publish check — storage and search row counts (Phase 0, Phase 4.9 / 5.5)](#publish-check--storage-and-search-row-counts-phase-0-phase-49--55)
+- [Phase 6.5 — Back Office crawl, then the verifier](#phase-65--back-office-crawl-then-the-verifier)
+- [Phase 7 — what the report contains](#phase-7--what-the-report-contains)
+
 ## Phase 5 — regeneration is not read-only
 
 Check `git status` after every Phase 5 command. `propel:install` runs migration cleanup and deletes
