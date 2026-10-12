@@ -64,11 +64,6 @@ use. Move them together.
 
 A new image tag changes the PHP version the project runs on, so step 3 below comes after this one.
 
-If the old lock cannot install on the new image (a locked package does not support the newer PHP),
-keep the old image for now and move the image tag together with the Phase 2 update — the Docker SDK
-and the other deploy keys still move here, and the rebuild of step 7 still runs. Record in the report
-which image the re-taken baselines of step 4 ran on.
-
 ## 3. Platform pin — resolve for the project's platform, not the host
 
 Do this before the first composer command below, because every lock produced without it may be
@@ -155,8 +150,7 @@ New tooling can require versions of shared dependencies (`symfony/*`, `nikic/php
    a finding whose rule or error identifier is new in the tool version is a tool finding; every other
    new finding is Phase 3 upgrade damage. The baseline for the rest of the upgrade is the Phase 0
    findings plus only the tool findings; list those tool findings in the report.
-5. Say in the report that the tooling moved after Phase 2 and why, and which image the re-takes ran
-   on when the image tag was deferred too.
+5. Say in the report that the tooling moved after Phase 2 and why.
 
 Baseline here always means the run recorded under `.spryker-upgrade/state/`. It never means
 `phpstan-baseline.neon`, an ignore rule or a narrowed path (non-negotiable 5).

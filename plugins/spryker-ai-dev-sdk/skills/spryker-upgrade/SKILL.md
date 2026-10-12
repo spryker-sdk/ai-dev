@@ -244,8 +244,8 @@ the target release**, each as its own commit, following
    `codecept-post-tooling.txt`, keeping the Phase 0 files, then re-run `check-baselines.php`. From
    here on a tool's baseline is its `*-post-tooling.txt` file, so new tool rules are not upgrade damage.
 
-If the new tools cannot resolve against the pre-upgrade modules, the tooling step and the image tag
-defer until right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
+If the new tools cannot resolve against the pre-upgrade modules, the tooling step defers until
+right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
 
 ## Phase 1.5 — Constraint style (before the release-group update)
 
@@ -444,14 +444,14 @@ accepted feature follows its integration guide, in its own commit. REMOVED packa
 
 ## Phase 6.2 — Performance fixes
 
-Per [references/performance.md](references/performance.md), apply Spryker's performance guidelines
-as published today: fetch the pages into `.spryker-upgrade/state/spryker-docs` (offline:
-`--unreachable`; the report says the phase did not run); `check-performance.php --init --docs <copy>`
-lists every page `pending`; read-only sub-agents per page group record each page's fixes or its
-`--no-fix` reason, never from memory. Apply only fixes that keep visible behaviour (else `not-applied`
-with the proposal), one at a time, each its own commit, after its checks and a before/after
-comparison per customer type (guest, customer, business user); a failure or difference reverts it.
-`php $UP/check-performance.php --verify` exits 0 before Phase 6.5.
+Per [references/performance.md](references/performance.md): fetch Spryker's performance guidelines as
+published today into `.spryker-upgrade/state/spryker-docs` (offline: `--unreachable`); `--init` lists every
+page; read-only sub-agents per page group record its fixes, never from memory, each sized (`S` config value
+or flag, `M` package update or a few files, `L` refactor, schema change or many files) with its files and
+expected gain, or the page's `--no-fix` reason. `S` fixes apply without asking; the `M`/`L` fixes
+(`--decisions`) take one AskUserQuestion — apply now / defer / skip each, recorded with `--decide`. Keep
+visible behaviour (else `not-applied`); one fix at a time, own commit, checks and a before/after comparison
+per customer type, reverted on failure. `php $UP/check-performance.php --verify` exits 0 before Phase 6.5.
 
 ## Phase 6.5 — Back Office crawl and browser verification gate
 

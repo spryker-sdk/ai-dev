@@ -193,11 +193,13 @@ that costs rather than omitting the section.
 10. **Features** — gate #4 decisions (accepted, deferred, never), and REMOVED packages with what
    replaced each.
 11. **Performance fixes** — the spryker-docs commit the guidelines were read at; one table per page
-    of `performance-fixes.json`, in its order, one row per fix: status, the files (applied) or the
-    reason (otherwise), and the evidence; a page without fixes as one line with its reason; then the
-    proposals of the `not-applied` fixes and the `operator:` items, and the
-    `check-performance.php --verify` result. When the docs were unreachable: that Phase 6.2 did not
-    run, and why ([performance.md](performance.md) § The report section).
+    of `performance-fixes.json`, in its order, one row per fix: size, status, the files (applied) or
+    the reason (otherwise; `deferred` and `skipped` as the developer's choice), and the evidence; a
+    page without fixes as one line with its reason; then the **Performance backlog** — the `deferred`
+    fixes with size, files and expected gain (`check-performance.php --backlog`); the proposals of the
+    `not-applied` fixes and the `operator:` items, and the `check-performance.php --verify` result.
+    When the docs were unreachable: that Phase 6.2 did not run, and why
+    ([performance.md](performance.md) § The report section).
 12. **What is proven and what is not** — give each claim its scope ("the Zed functional suites pass in
     the container" and "the suite passes" are different statements). For every check that did not run,
     name it and the matrix row it would have caught.

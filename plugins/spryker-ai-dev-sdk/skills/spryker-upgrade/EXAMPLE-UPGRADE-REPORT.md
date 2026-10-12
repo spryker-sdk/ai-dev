@@ -207,37 +207,49 @@ the package's `{% embed %}` were unwrapped with their markup intact.
 
 Guidelines read from `spryker/spryker-docs` at `<commit>` (`performance-fixes.json`);
 `check-performance.php --verify`: exit 0 — `<N>` pages: `<n>` derived, `<n>` no-fix; `<M>` fixes:
-`<n>` applied, `<n>` not-applicable (`<n>` of them `operator:`), `<n>` not-applied, `<n>` reverted.
-Every applied fix is its own commit; its comparison covered guest, customer and business user on the
-pages it touches. The report has one table per page, in the order of the status file; this example
-shows three pages with fixes and two without.
+`<n>` applied, `<n>` not-applicable (`<n>` of them `operator:`), `<n>` not-applied, `<n>` deferred,
+`<n>` skipped, `<n>` reverted. `S` fixes were applied without a question; the `M` and `L` fixes went to
+the developer in one question (apply now / defer / skip). Every applied fix is its own commit; its
+comparison covered guest, customer and business user on the pages it touches. The report has one
+table per page, in the order of the status file; this example shows three pages with fixes and two
+without.
 
 **`<Page A title>`** — `<docs.spryker.com URL of page A>`
 
-| ID | Fix | Status | Files or reason | Evidence |
-|---|---|---|---|---|
-| `<page-a>-1` | `<package set the page names>` | applied | `composer.lock` | `<package-a>` 1.47.0 → 1.49.0, `<package-b>` 1.33.0 → 1.35.0; Back Office crawl as baseline; storefront-catalog and -cart identical for 3 customer types |
-| `<page-a>-2` | `<config switch the page names>` | applied | `src/Pyz/Yves/<Module>/<Module>Config.php`, `config/Shared/config_default.php` | `<console command>` exit 0; navigation identical for 3 customer types |
-| `<page-a>-3` | `<smaller default page size>` | not-applied | proposal: `<n>` instead of `<m>` products per catalog page; users see fewer products per page | `config/Shared/config_default.php:<line>` |
+| ID | Fix | Size | Status | Files or reason | Evidence |
+|---|---|---|---|---|---|
+| `<page-a>-1` | `<package set the page names>` | M | applied (developer: apply now) | `composer.lock` | `<package-a>` 1.47.0 → 1.49.0, `<package-b>` 1.33.0 → 1.35.0; Back Office crawl as baseline; storefront-catalog and -cart identical for 3 customer types |
+| `<page-a>-2` | `<config switch the page names>` | S | applied | `config/Shared/config_default.php` | `<console command>` exit 0; navigation identical for 3 customer types |
+| `<page-a>-3` | `<smaller default page size>` | S | not-applied | proposal: `<n>` instead of `<m>` products per catalog page; users see fewer products per page | `config/Shared/config_default.php:<line>` |
 
 **`<Page B title>`** — `<URL of page B>`
 
-| ID | Fix | Status | Files or reason | Evidence |
-|---|---|---|---|---|
-| `<page-b>-1` | Storage reads in a loop → one multi-read | applied | `src/Pyz/Client/<Module>/Reader/<Name>Reader.php` | `--scan-code` candidate `storage-read-in-loop` confirmed at line `<n>`; new Client test green before and after; product detail page identical for 3 customer types |
-| `<page-b>-2` | No key scans at request time | not-applicable | the one `getKeys()` call is in a console command | `src/Pyz/Zed/<Module>/Communication/Console/<Name>Console.php:<line>` |
-| `<page-b>-3` | Optimised Composer autoloader | reverted | `classmap-authoritative` left `src/Generated` classes unresolvable in the install recipe | `Class "Generated\Shared\Transfer\<X>Transfer" not found` during `docker/sdk up` |
+| ID | Fix | Size | Status | Files or reason | Evidence |
+|---|---|---|---|---|---|
+| `<page-b>-1` | Storage reads in a loop → one multi-read | M | deferred (developer) | `<the developer's reason>` | `--scan-code` candidate `storage-read-in-loop` at `src/Pyz/Client/<Module>/Reader/<Name>Reader.php:<line>` |
+| `<page-b>-2` | No key scans at request time | — | not-applicable | the one `getKeys()` call is in a console command | `src/Pyz/Zed/<Module>/Communication/Console/<Name>Console.php:<line>` |
+| `<page-b>-3` | Optimised Composer autoloader | S | reverted | `classmap-authoritative` left `src/Generated` classes unresolvable in the install recipe | `Class "Generated\Shared\Transfer\<X>Transfer" not found` during `docker/sdk up` |
 
 **`<Page C title>`** — `<URL of page C>`
 
-| ID | Fix | Status | Files or reason | Evidence |
-|---|---|---|---|---|
-| `<page-c>-1` | `<hosting resources>` | not-applicable | operator: CPU, RAM and `pm.max_children` sized to the data | no setting in the repository |
-| `<page-c>-2` | Exact-match criteria as filters | reverted | the clause contributes to relevance: result order changed on the search page | search "`<term>`": positions 3 and 4 swapped for all customer types |
+| ID | Fix | Size | Status | Files or reason | Evidence |
+|---|---|---|---|---|---|
+| `<page-c>-1` | `<hosting resources>` | — | not-applicable | operator: CPU, RAM and `pm.max_children` sized to the data | no setting in the repository |
+| `<page-c>-2` | Index on a filter column | L | skipped (developer) | `<the developer's reason>` | `propel:diff` shown: one index on `<table>.<column>` |
+| `<page-c>-3` | Exact-match criteria as filters | M | deferred (developer) | `<the developer's reason>` | `src/Pyz/Client/<Module>/Plugin/<Name>QueryExpanderPlugin.php:<line>` |
 
 **`<Page D title>`** — no-fix: the page describes a profiling procedure and names no project change.
 
 **`<Page E title>`** — no-fix: linked page not published (`git ls-tree`: no such file).
+
+### Performance backlog
+
+The fixes the developer deferred (`check-performance.php --backlog`):
+
+| ID | Fix | Size | Files | Expected gain | Reason |
+|---|---|---|---|---|---|
+| `<page-b>-1` | Storage reads in a loop → one multi-read | M | `src/Pyz/Client/<Module>/Reader/<Name>Reader.php` | `<gain the page names: one storage request per page instead of one per item>` | `<the developer's reason>` |
+| `<page-c>-3` | Exact-match criteria as filters | M | `src/Pyz/Client/<Module>/Plugin/<Name>QueryExpanderPlugin.php`, `src/Pyz/Client/<Module>/<Module>DependencyProvider.php` | `<gain the page names>` | `<the developer's reason>` |
 
 Proposals for the developer (the `not-applied` fixes): `<page-a>-3`, … — each with the change it
 proposes, as in the rows above. To pass on (`operator:`): `<page-c>-1`, …
@@ -256,6 +268,7 @@ proposes, as in the rows above. To pass on (`operator:`): `<page-c>-1`, …
 
 1. The deferred `<OldOrderSavePlugin>` replacement (post-save semantics).
 2. The BLOCKED verifier criterion — needs a merchant user.
-3. The `not-applied` performance proposals and the `operator:` items (see *Performance fixes*).
+3. The Performance backlog, the `not-applied` performance proposals and the `operator:` items (see
+   *Performance fixes*).
 
 Suggested PR: one for this release group.

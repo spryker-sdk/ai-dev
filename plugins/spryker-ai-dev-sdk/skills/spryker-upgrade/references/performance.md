@@ -14,6 +14,7 @@ pages themselves.
 - [Fetching the guidelines](#fetching-the-guidelines)
 - [The page list](#the-page-list)
 - [From a page to fixes](#from-a-page-to-fixes)
+- [Size and the developer's decision](#size-and-the-developers-decision)
 - [Customer types and page sets](#customer-types-and-page-sets)
 - [Comparing the rendered result](#comparing-the-rendered-result)
 - [Packages](#packages)
@@ -26,23 +27,26 @@ pages themselves.
 1. **The performance fixes are part of the upgrade's deliverable.** The developer asks for them with
    the upgrade, so the Scope rule ("versions, not architecture") does not block them. Every guideline
    page is accounted for — with its fixes, or with the reason it has none — and every fix gets a
-   final status; none is skipped.
+   final status.
 2. **Visible behaviour stays the same.** A fix is applied only when the shop shows and does the same
    for every customer type afterwards. A fix that changes what users see or can do (a smaller page
    size, a removed feature, data that appears later, other facet counts) is not applied: it is
    recorded `not-applied` with the proposed change, for the developer to decide.
-3. **One fix at a time.** Apply one fix, run the checks it names, compare the rendered pages it
+3. **The size decides who decides.** Every applicable fix is sized at detection (§ Size and the
+   developer's decision). `S` fixes are applied without a question; every `M` and `L` fix is applied,
+   deferred or skipped as the developer decides, in one question for all of them.
+4. **One fix at a time.** Apply one fix, run the checks it names, compare the rendered pages it
    touches before and after for every customer type the project has. A failed check or a difference
    is a failure: revert that fix and record it `reverted` with the reason. Then the next fix.
-4. **Each applied fix is its own commit** (`perf: <fix ID> <title>`), and its status entry lists the
+5. **Each applied fix is its own commit** (`perf: <fix ID> <title>`), and its status entry lists the
    files it touched.
-5. **Operator fixes are recorded, not attempted.** A fix only the hosting, the CDN, the scheduler or an
+6. **Operator fixes are recorded, not attempted.** A fix only the hosting, the CDN, the scheduler or an
    APM account can deliver is `not-applicable` with the reason `operator:` and what the developer
    passes on.
-6. **Damage stays damage.** The `PRODUCT_GROUP_WIDGET_REMOVED` finding of `check-performance.php` is
+7. **Damage stays damage.** The `PRODUCT_GROUP_WIDGET_REMOVED` finding of `check-performance.php` is
    existing behaviour lost by the upgrade; Lane 2 restores it ([lanes.md](lanes.md)). A guideline fix
    that raises `spryker-shop/shop-ui` past 1.103.0 names that Lane 2 change in its evidence.
-7. **Nothing from memory.** Fixes come from the fetched pages. When the pages cannot be fetched, no
+8. **Nothing from memory.** Fixes come from the fetched pages. When the pages cannot be fetched, no
    fix is derived (§ Fetching the guidelines).
 
 ## Phase 6.2 step by step
@@ -58,16 +62,21 @@ pages themselves.
    Candidates, not findings; the sub-agents read them against the pages.
 4. **Derive the fixes.** Group the pages by topic, about five per group, and spawn one read-only
    sub-agent (`Explore`) per group, together, each with: its page paths in the docs copy, the project
-   root, `performance-code-scan.json`, [§ From a page to fixes](#from-a-page-to-fixes), and the task
-   "read each page in full; for every recommendation a project can act on, derive the fix, run its
-   Detect step against the project and record it; record a page without such a recommendation with
-   `--no-fix`; change nothing in the project". Each records with `--set` and `--no-fix`; the script
-   locks the status file, so the sub-agents record in parallel. The main agent keeps only their
-   summaries.
+   root, `performance-code-scan.json`, [§ From a page to fixes](#from-a-page-to-fixes),
+   [§ Size and the developer's decision](#size-and-the-developers-decision), and the task "read each
+   page in full; for every recommendation a project can act on, derive the fix, run its Detect step
+   against the project, size it and record it with the files it would touch and the expected gain;
+   record a page without such a recommendation with `--no-fix`; change nothing in the project". Each
+   records with `--set` and `--no-fix`; the script locks the status file, so the sub-agents record in
+   parallel. The main agent keeps only their summaries.
 5. **Check the derivation:** `php $UP/check-performance.php --verify` lists every page still
    `pending`. Derive those before going on.
-6. **Apply the `pending` fixes, one at a time**, in this order: packages, then configuration and
-   wiring, then code, then schema changes. For each fix:
+6. **The developer's decision:** `php $UP/check-performance.php --decisions` lists the `M` and `L`
+   fixes. Ask once with AskUserQuestion, every fix with its size, files and expected gain, and per fix
+   apply now / defer / skip; record each answer with `--decide` (§ Size and the developer's decision).
+7. **Apply the `pending` fixes, one at a time** — the `S` fixes and the `M` and `L` fixes the developer
+   chose to apply — in this order: packages, then configuration and wiring, then code, then schema
+   changes. For each fix:
    1. capture the pages it touches for every customer type ([§ Comparing](#comparing-the-rendered-result));
    2. apply its Apply step, nothing else;
    3. run its Verify step and the checks it implies: the build (`npm run yves` for templates and
@@ -79,7 +88,7 @@ pages themselves.
    5. pass: commit, then `--set <ID> --status applied --files <a,b> --evidence "<checks and comparison>"`;
       fail: restore the touched files (`git checkout -- <files>`, delete the files the fix created),
       then `--set <ID> --status reverted --reason "<what failed>" --evidence "<output>"`.
-7. **Gate:** `php $UP/check-performance.php --verify` exits 0. Phase 6.5 then verifies the result, and
+8. **Gate:** `php $UP/check-performance.php --verify` exits 0. Phase 6.5 then verifies the result, and
    Phase 7 does not start before it exits 0.
 
 ## Fetching the guidelines
@@ -138,25 +147,55 @@ For each fix, derive from the page:
 | Part | What it holds |
 |---|---|
 | Kind | packages, config, wiring, code, assets, schema, deploy, decision (alters visible behaviour), operator (outside the code) |
+| Size | `S`, `M` or `L` (§ Size and the developer's decision) |
+| Touches | the files the Apply step would change |
+| Gain | the expected gain as the page states it (a measured figure, or what the page says improves) |
 | Pages | the page sets it touches (§ Customer types and page sets) |
 | Detect | what shows the project's state, with the command: installed version in `composer.lock`, the key in `config/Shared/config_*.php`, the plugin in a DependencyProvider, a project override class, a `grep` or `--scan-code` candidate (file:line), a deploy file key |
 | Apply | the change the page names, in the project, never in `vendor/` |
-| Verify | the checks of step 6 plus what the page names (a console command, a header, a log line) |
+| Verify | the checks of step 7 plus what the page names (a console command, a header, a log line) |
 | Does not apply | already in place; the precondition is absent (package not in the lock — never added — or the feature not used); operator-only |
 
 The Detect result decides the recorded status:
 
 | Detect result | Record |
 |---|---|
-| applicable | `pending`, with `--title` (the page's recommendation) and `--detected` (what the project has, file:line or version) |
+| applicable | `pending`, with `--title` (the page's recommendation), `--detected` (what the project has, file:line or version), `--size`, `--touches` and `--gain` |
 | already in place, or precondition absent | `not-applicable`, reason and evidence |
 | operator-only | `not-applicable`, reason `operator: <what the developer passes on>` |
-| applying it changes what users see or can do | `not-applied`, reason `proposal: <the change and its visible effect>` |
-| a minimum in a higher major than installed | `not-applied`, reason naming the major (Lane 0 in its own upgrade) |
+| applying it changes what users see or can do | `not-applied`, sized, reason `proposal: <the change and its visible effect>` |
+| a minimum in a higher major than installed | `not-applied`, sized, reason naming the major (Lane 0 in its own upgrade) |
 
 A page **without a fix** — it describes a profiling or troubleshooting procedure, explains a concept,
 or every recommendation needs a tool or account the project does not have — is recorded
 `--no-fix <slug> --reason "<why>" --evidence "<what the page asks for>"`.
+
+## Size and the developer's decision
+
+| Size | The fix is | Who decides |
+|---|---|---|
+| `S` | a config value or a flag | applied without a question, under the rules above |
+| `M` | a package update, or a change in a few files | the developer |
+| `L` | a code refactor, a schema change, or many files | the developer |
+
+A fix that fits two sizes takes the larger. Size, touches and gain are recorded with the fix when it
+is detected; `not-applicable` fixes need none of them.
+
+After the derivation, `--decisions` lists every `pending` `M` and `L` fix with its size, files and
+expected gain. One AskUserQuestion covers them all (multiSelect, or one choice per fix: apply now /
+defer / skip). Each answer is recorded:
+
+```bash
+php $UP/check-performance.php --decide <ID> --decision apply
+php $UP/check-performance.php --decide <ID> --decision defer --reason "<the developer's reason>"
+php $UP/check-performance.php --decide <ID> --decision skip --reason "<the developer's reason>"
+```
+
+`apply` keeps the fix `pending` for step 7; `defer` records `deferred` (the fix goes to the
+Performance backlog of the report); `skip` records `skipped`. `deferred` and `skipped` come only from
+`--decide`, so they always carry the developer's decision and reason. A decision can change while the
+fix is `pending`, `deferred` or `skipped`; `--decide` rejects an `S` fix and a fix already applied.
+An `M` or `L` fix is not applied without the `apply` decision.
 
 ## Customer types and page sets
 
@@ -188,7 +227,7 @@ is a failure. A fix without pages (deploy files, operator) is verified by its ow
 
 ## Packages
 
-For a fix whose page names package minimums:
+For a fix whose page names package minimums (`M`, applied after the developer's `apply` decision):
 
 1. Compare each package with `composer.lock`. A package absent from the lock is never added.
 2. A minimum in a higher major than the installed one: not raised — that major goes through Lane 0 in
@@ -196,23 +235,25 @@ For a fix whose page names package minimums:
 3. `script -q /dev/null docker/sdk cli composer update <package>:"^<minimum>" … --with-dependencies`
    for all remaining packages of the fix in one command, in the container. `composer.json` is not
    edited for it. A failure to resolve: `composer why-not <package> <minimum>`, revert the lock, record
-   the blocking constraint.
+   the fix `not-applied` with the blocking constraint.
 4. Checks: `composer install`, `transfer:generate`, `propel:diff` (a non-empty diff goes through
    § Schema changes), `check-plugin-usage.php`, the covering tests, the Back Office crawl, and the
    fix's page sets compared for every customer type.
 
 ## Schema changes
 
-A fix that changes the database schema (an index, a table) creates a migration. Show the developer the
-`propel:diff` result with AskUserQuestion before it touches a database; apply it only on their yes,
-otherwise record the fix `not-applied` with the diff. The migration file is part of the fix's commit.
+A fix that changes the database schema (an index, a table) is `L` and creates a migration. After the
+`apply` decision, show the developer the `propel:diff` result with AskUserQuestion before it touches a
+database; apply it only on their yes, otherwise restore the schema files and record
+`--decide <ID> --decision skip --reason "<the developer's answer>"`, with the diff in the reason. The
+migration file is part of the fix's commit.
 
 ## The status file
 
 `.spryker-upgrade/state/performance-fixes.json`: the docs copy (`docs.dir`, `docs.commit`) and
 `pages`, keyed by slug, each with `path`, `title`, `url`, `source`, `inDocs`, `inRepository`,
-`status`, `reason`, `evidence` and `fixes` — a list of `{id, title, detected, status, files, reason,
-evidence}`.
+`status`, `reason`, `evidence` and `fixes` — a list of `{id, title, detected, size, touches, gain,
+decision, status, files, reason, evidence}`.
 
 | Page status | Required | Meaning |
 |---|---|---|
@@ -223,39 +264,52 @@ evidence}`.
 
 | Fix status | Required | Meaning |
 |---|---|---|
-| `pending` | `title`, `detected` | applicable, not applied yet; `--verify` fails |
-| `applied` | `files`, `evidence` | changed, verified, committed |
+| `pending` | `size`, `touches`, `gain` | applicable, not applied yet; `--verify` fails |
+| `applied` | `files`, `evidence`; `decision: apply` when `M` or `L` | changed, verified, committed |
 | `not-applicable` | `reason`, `evidence` | already in place, the precondition is absent, or `operator:` |
-| `not-applied` | `reason`, `evidence` | applicable but not applied: visible behaviour would change, a constraint or major blocks it, or the developer declined a schema change; the reason holds the proposal |
-| `reverted` | `reason`, `evidence` | applied, failed its checks or the comparison, reverted |
+| `not-applied` | `reason`, `evidence` | applicable, not applied without a question: visible behaviour would change, or a constraint or a higher major blocks it; the reason holds the proposal or the blocker |
+| `deferred` | `decision: defer`, `reason` | the developer chose to apply it later; listed in the Performance backlog |
+| `skipped` | `decision: skip`, `reason` | the developer chose not to apply it |
+| `reverted` | `reason`, `evidence`; `decision: apply` when `M` or `L` | applied, failed its checks or the comparison, reverted |
 
-Every fix keeps its `title` and `detected`. Evidence is short and checkable: the command and its
-result, file:line, or the comparison verdict per customer type.
+Every fix keeps its `title` and `detected`; every status except `not-applicable` also its `size`,
+`touches` and `gain`. An `S` fix takes no decision; an `M` or `L` fix in any status except
+`not-applicable` and `not-applied` needs the developer's decision. Evidence is short and checkable:
+the command and its result, file:line, or the comparison verdict per customer type.
 
 Recording:
 
 ```bash
-php $UP/check-performance.php --set <slug>-1 --status pending --title "<recommendation>" --detected "<file:line or version>"
+php $UP/check-performance.php --set <slug>-1 --status pending --title "<recommendation>" --detected "<file:line or version>" --size S --touches config/Shared/config_default.php --gain "<what the page names>"
 php $UP/check-performance.php --set <slug>-1 --status applied --files config/Shared/config_default.php --evidence "<checks>; pages identical for guest, customer"
 php $UP/check-performance.php --set <slug>-2 --status not-applicable --title "<recommendation>" --detected "<what the project has>" --reason "operator: <what to pass on>" --evidence "<no setting in the repository>"
 php $UP/check-performance.php --no-fix <slug> --reason "<why the page has no fix>" --evidence "<what the page asks for>"
 php $UP/check-performance.php --import .spryker-upgrade/state/perf-<group>.json
 ```
 
-The import file is one JSON object keyed by fix ID (`{"status", "title", "detected", "files",
-"reason", "evidence"}`) or by page slug (`{"status": "no-fix", "reason", "evidence"}`). `--set`
-replaces a fix's status, files, reason and evidence, and keeps its title and detected when they are
-not given. `--set`, `--no-fix` and `--import` reject an entry that misses what its status requires, a
-fix of a page not in the copy, or `no-fix` on a page with fixes, and write nothing then (exit 2).
-`--verify` exits 1 while a page is `pending` or lacks its reason, or a fix is `pending` or
-incomplete, and lists them.
+The import file is one JSON object keyed by fix ID (`{"status", "title", "detected", "size",
+"touches", "gain", "files", "reason", "evidence"}`) or by page slug (`{"status": "no-fix", "reason",
+"evidence"}`). `--set` replaces a fix's status, files, reason and evidence, and keeps its title,
+detected, size, touches, gain and decision when they are not given. `--set`, `--no-fix` and
+`--import` reject an entry that misses what its status requires, a fix of a page not in the copy,
+`no-fix` on a page with fixes, a decision, or the status `deferred` or `skipped`, and write nothing
+then (exit 2). `--verify` exits 1 while a page is `pending` or lacks its reason, or a fix is
+`pending`, incomplete, unsized, or an `M` or `L` fix without the developer's decision, and lists
+them.
 
 ## The report section
 
 Phase 7's **Performance fixes** section starts with the docs copy (`docs.commit`) and the
 `--verify` counts. Then one table per page, in the order of `performance-fixes.json`, headed by the
-page title and URL: one row per fix — ID, title, status, files (applied) or reason (otherwise), and
-the evidence. A `no-fix` or `not-checked` page is one line with its reason. Below the tables: the
-proposals of the `not-applied` fixes for the developer to decide, and the `operator:` items to pass
-on. When the docs were unreachable, the section is one paragraph saying Phase 6.2 did not run and why.
+page title and URL: one row per fix — ID, title, size, status, files (applied) or reason (otherwise;
+for `deferred` and `skipped` marked as the developer's choice), and the evidence. A `no-fix` or
+`not-checked` page is one line with its reason. Below the tables:
+
+- **Performance backlog** — the `deferred` fixes, one row each with ID, fix, size, files, expected
+  gain and the developer's reason: the table `php $UP/check-performance.php --backlog` prints. With
+  no deferred fix, one line saying so.
+- the proposals of the `not-applied` fixes for the developer to decide, and the `operator:` items to
+  pass on.
+
+When the docs were unreachable, the section is one paragraph saying Phase 6.2 did not run and why.
 The `--verify` output closes the section.

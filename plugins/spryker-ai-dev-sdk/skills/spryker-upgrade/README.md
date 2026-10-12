@@ -47,7 +47,7 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 | `check-config-constants.php` | 0, 3, Lane 4 | which config references point at removed vendor constants/types? |
 | `check-constant-overrides.php` | 0 (`--snapshot`), 3, Lanes 1/3/4 | which project class and interface constants override a vendor constant, and which core values changed under them? |
 | `storage-search-counts.php` | 0 (`--snapshot before`), 4.9/5.5 (`--snapshot after`, `--compare`) | did any `*_storage` / `*_search` table lose rows after the same import? |
-| `check-performance.php` | 3, Lane 2, 6.2, 7 | which pages do Spryker's performance guidelines have today, has every page its fixes or a no-fix reason and every fix a final status, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
+| `check-performance.php` | 3, Lane 2, 6.2, 7 | which pages do Spryker's performance guidelines have today, has every page its fixes or a no-fix reason, every fix a size and a final status and every M/L fix the developer's decision, which fixes are deferred, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
 
 `bootstrap.php` is the shared library the scripts load. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
@@ -128,8 +128,11 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/spryker/spryk
 git -C .spryker-upgrade/state/spryker-docs sparse-checkout set docs/dg/dev/guidelines/performance-guidelines
 php $UP/check-performance.php --init --docs .spryker-upgrade/state/spryker-docs
 php $UP/check-performance.php --scan-code
-php $UP/check-performance.php --set <slug>-<n> --status <status> ... --evidence "..."
+php $UP/check-performance.php --set <slug>-<n> --status pending --size S|M|L --touches <a,b> --gain "..." ...
 php $UP/check-performance.php --no-fix <slug> --reason "..." --evidence "..."
+php $UP/check-performance.php --decisions     # the M and L fixes for the one developer question
+php $UP/check-performance.php --decide <slug>-<n> --decision apply|defer|skip [--reason "..."]
+php $UP/check-performance.php --backlog       # the deferred fixes, for the report's Performance backlog
 php $UP/check-performance.php --verify        # gate: Phase 7 starts only when this exits 0
 ```
 
@@ -268,9 +271,13 @@ stores, after a full import, with the publish queues drained (worker idle, queue
 php $UP/check-performance.php [--before-lock <composer.lock of Phase 0>]
 php $UP/check-performance.php --scan-code
 php $UP/check-performance.php --init [--docs <spryker-docs copy>]
-php $UP/check-performance.php --set <slug>-<n> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
+php $UP/check-performance.php --set <slug>-<n> --status <status> [--title <t>] [--detected <t>] [--size S|M|L]
+    [--touches <a,b>] [--gain <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
 php $UP/check-performance.php --no-fix <slug> --reason <t> --evidence <t>
 php $UP/check-performance.php --import <file.json>
+php $UP/check-performance.php --decisions
+php $UP/check-performance.php --decide <slug>-<n> --decision apply|defer|skip [--reason <t>]
+php $UP/check-performance.php --backlog
 php $UP/check-performance.php --unreachable --evidence <t>
 php $UP/check-performance.php --verify
 ```
@@ -289,17 +296,32 @@ it, and the output prints the `sparse-checkout add` command for those it has. Re
 recorded page and fix and adds pages that appeared. Exit 2 when the copy has no index page.
 
 `--set <slug>-<n>` records a fix of a page: a new fix needs `--title` (the page's recommendation) and
-`--detected` (what the project has); `pending` is allowed until it is applied; `applied` needs files
-and evidence; `not-applicable`, `not-applied` and `reverted` need a reason and evidence. `--no-fix`
+`--detected` (what the project has); every status except `not-applicable` also needs `--size` (`S` a
+config value or flag, `M` a package update or a change in a few files, `L` a code refactor, a schema
+change or many files), `--touches` (the files the fix would change) and `--gain` (the expected gain
+the page names); `pending` is allowed until it is applied; `applied` needs files and evidence;
+`not-applicable`, `not-applied` and `reverted` need a reason and evidence. Title, detected, size,
+touches and gain are kept when a later `--set` does not give them. An `M` or `L` fix is recorded
+`applied` or `reverted` only after the developer's `apply` decision. `--no-fix`
 records a page without a fix (reason and evidence), rejected on a page with fixes or on a page the
 repository has but the copy lacks. `--import` takes a JSON object keyed by fix ID or page slug. An
 incomplete entry is rejected and nothing is written (exit 2). The writing modes lock the status file,
 so parallel sub-agents can record. `--unreachable` records that the docs could not be fetched: every
 page without fixes becomes `not-checked` with the reason "docs unreachable".
 
-`--verify` exits 0 when every page has fixes or a `no-fix` / `not-checked` reason and every fix a
-final, complete status (with `NOT RUN` when the docs were unreachable), 1 otherwise or without a
-status file, and lists what is open; Phase 7 does not start before it exits 0.
+`--decisions` lists the `pending` `M` and `L` fixes without a decision, each with its size, files and
+expected gain: the content of the one AskUserQuestion. `--decide <ID> --decision apply|defer|skip`
+records the developer's answer: `apply` keeps the fix `pending` for the apply-verify-revert procedure,
+`defer` sets `deferred` and `skip` sets `skipped`, both with `--reason`. `deferred` and `skipped` are
+recorded only this way; `--set` and `--import` reject them and any decision. `--decide` rejects an `S`
+fix, a fix without a size, and a fix that is not `pending`, `deferred` or `skipped` (exit 2).
+`--backlog` prints the `deferred` fixes as rows of the report's Performance backlog table (ID, fix,
+size, files, expected gain, reason). Both exit 0.
+
+`--verify` exits 0 when every page has fixes or a `no-fix` / `not-checked` reason, every fix a
+final, complete status, every applicable fix a size, and every `M` and `L` fix the developer's
+decision (with `NOT RUN` when the docs were unreachable), 1 otherwise or without a status file, and
+lists what is open; Phase 7 does not start before it exits 0.
 
 `--scan-code` writes `performance-code-scan.json`: code-pattern candidates by pattern name in the
 project's `src/<Ns>` PHP files — Propel queries, entity saves, Facade calls, storage reads and HTTP
@@ -721,4 +743,5 @@ adopting something new, report it as a vendor BC break instead of re-architectin
 section of `SKILL.md`. The three places where something new is adopted are all
 explicit: the tooling/Docker SDK alignment of Phase 1.2 (the release's own toolchain), the
 deprecation replacements the developer chooses at gate #3, and the performance guideline fixes of
-Phase 6.2, applied only where the shop's visible behaviour stays the same.
+Phase 6.2, applied only where the shop's visible behaviour stays the same: `S` fixes without a
+question, `M` and `L` fixes on the developer's decision.

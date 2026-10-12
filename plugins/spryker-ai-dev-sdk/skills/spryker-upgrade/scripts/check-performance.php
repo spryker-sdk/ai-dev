@@ -14,7 +14,11 @@
  * the recorded data and adds pages that appeared.
  *
  * Fixes are derived per page by the agent and recorded with --set or --import. A fix ID is
- * <page slug>-<n>; the slug is the page file name without .md.
+ * <page slug>-<n>; the slug is the page file name without .md. Every fix the project can act on is
+ * sized at detection: S a config value or flag, M a package update or a change in a few files, L a
+ * code refactor, a schema change or many files; with the files it would touch and the expected gain
+ * the page names. S fixes are applied without a decision; every M and L fix takes the developer's
+ * decision (apply, defer, skip), recorded with --decide.
  *
  * Default run (Phase 3 and Lane 2): when spryker-shop/shop-ui crossed 1.103.0 between the Phase 0
  * lock and the current one, whether a project template of the product-card, product-item or
@@ -28,23 +32,28 @@
  *   php $UP/check-performance.php [--before-lock <file>]      ProductGroupWidget check, performance-report.json
  *   php $UP/check-performance.php --scan-code                 code-pattern candidates, performance-code-scan.json
  *   php $UP/check-performance.php --init [--docs <dir>]       performance-fixes.json from the guideline index
- *   php $UP/check-performance.php --set <ID> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
+ *   php $UP/check-performance.php --set <ID> --status <status> [--title <t>] [--detected <t>] [--size S|M|L]
+ *       [--touches <a,b>] [--gain <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]
  *   php $UP/check-performance.php --no-fix <page> --reason <t> --evidence <t>
  *   php $UP/check-performance.php --import <file.json>        {"<fix ID>": {...}, "<page slug>": {"status": "no-fix", ...}}
+ *   php $UP/check-performance.php --decisions                 M and L fixes waiting for the developer's decision
+ *   php $UP/check-performance.php --decide <ID> --decision apply|defer|skip [--reason <t>]
+ *   php $UP/check-performance.php --backlog                   the deferred fixes, as report table rows
  *   php $UP/check-performance.php --unreachable --evidence <t>  docs not reachable: open pages become not-checked
  *   php $UP/check-performance.php --verify                    every page and fix accounted for
  *
  * The writing modes hold an exclusive lock on performance-fixes.json.lock, so parallel sub-agents can
  * record at the same time.
  *
- * Fix statuses: pending (title and detected), applied (files and evidence), not-applicable,
- * not-applied and reverted (reason and evidence). Page statuses: pending, derived (has fixes),
- * no-fix and not-checked (reason and evidence).
+ * Fix statuses: pending (title, detected, size, touches, gain), applied (files and evidence),
+ * not-applicable, not-applied and reverted (reason and evidence), deferred and skipped (set by
+ * --decide only, with the developer's reason). Every status but not-applicable needs size, touches
+ * and gain. Page statuses: pending, derived (has fixes), no-fix and not-checked (reason and evidence).
  *
  * Exit codes. Default run: 0 no behaviour lost, 1 ProductGroupWidget rendering lost, 2 no
  * composer.lock. --verify: 0 every page and fix accounted for, 1 otherwise or no status file.
- * --init: 0 written, 2 no index page. --set / --no-fix / --import / --unreachable: 0 written,
- * 2 rejected. Every mode: 2 usage error.
+ * --init: 0 written, 2 no index page. --set / --no-fix / --import / --decide / --unreachable: 0
+ * written, 2 rejected. --decisions / --backlog: 0. Every mode: 2 usage error.
  */
 
 declare(strict_types=1);
@@ -59,8 +68,14 @@ const PF_GROUP_STORAGE_TABLE = 'spy_product_abstract_group_storage';
 const PF_DOCS_HOST = 'https://docs.spryker.com';
 const PF_INDEX_PATH = 'docs/dg/dev/guidelines/performance-guidelines/performance-guidelines.md';
 const PF_STATUS_FILE = 'performance-fixes.json';
-const PF_FIX_STATUSES = ['pending', 'applied', 'not-applicable', 'not-applied', 'reverted'];
-const PF_FINAL_STATUSES = ['applied', 'not-applicable', 'not-applied', 'reverted'];
+const PF_FIX_STATUSES = ['pending', 'applied', 'not-applicable', 'not-applied', 'deferred', 'skipped', 'reverted'];
+const PF_SIZES = ['S', 'M', 'L'];
+const PF_DECISIONS = [
+    'apply' => ['pending', 'applied', 'not-applied', 'reverted'],
+    'defer' => ['deferred'],
+    'skip' => ['skipped'],
+];
+const PF_DECISION_STATUS = ['apply' => 'pending', 'defer' => 'deferred', 'skip' => 'skipped'];
 const PF_PAGE_REASON_STATUSES = ['no-fix', 'not-checked'];
 const PF_SCAN_IN_LOOP = [
     'query-in-loop' => '/->(findOne|findOneOrCreate|findPk|find)\(\s*\)/',
@@ -598,11 +613,40 @@ function pf_fix_problems(array $fix, bool $final): array
     if (!in_array($status, PF_FIX_STATUSES, true)) {
         return ["unknown status '$status' (" . implode(', ', PF_FIX_STATUSES) . ')'];
     }
-    if (trim((string)($fix['title'] ?? '')) === '') {
+    $filled = static fn(string $key): bool => trim((string)($fix[$key] ?? '')) !== '';
+    if (!$filled('title')) {
         $problems[] = 'no title (the guideline item)';
     }
-    if (trim((string)($fix['detected'] ?? '')) === '') {
+    if (!$filled('detected')) {
         $problems[] = 'no detected (what the project has)';
+    }
+    $size = (string)($fix['size'] ?? '');
+    $decision = (string)($fix['decision'] ?? '');
+    if ($size !== '' && !in_array($size, PF_SIZES, true)) {
+        $problems[] = "unknown size '$size' (S, M or L)";
+    }
+    if ($status !== 'not-applicable') {
+        if ($size === '') {
+            $problems[] = 'no size (S, M or L)';
+        }
+        if (pf_list($fix['touches'] ?? []) === []) {
+            $problems[] = 'no touches (the files the fix would touch)';
+        }
+        if (!$filled('gain')) {
+            $problems[] = 'no gain (the expected gain the page names)';
+        }
+    }
+    if ($decision !== '' && !isset(PF_DECISIONS[$decision])) {
+        $problems[] = "unknown decision '$decision' (" . implode(', ', array_keys(PF_DECISIONS)) . ')';
+    } elseif ($size === 'S' && $decision !== '') {
+        $problems[] = 'an S fix takes no developer decision';
+    } elseif ($decision !== '' && $status !== 'not-applicable' && !in_array($status, PF_DECISIONS[$decision], true)) {
+        $problems[] = "status '$status' does not follow the developer decision '$decision'";
+    } elseif (in_array($status, ['deferred', 'skipped'], true) && $decision === '') {
+        $problems[] = "$status without the developer decision (--decide)";
+    } elseif (in_array($size, ['M', 'L'], true) && $decision === '' && ($final || in_array($status, ['applied', 'reverted'], true))
+        && !in_array($status, ['not-applicable', 'not-applied'], true)) {
+        $problems[] = "$size fix without the developer decision (--decide)";
     }
     if ($status === 'pending') {
         if ($final) {
@@ -611,17 +655,48 @@ function pf_fix_problems(array $fix, bool $final): array
 
         return $problems;
     }
-    if ($status === 'applied' && array_filter((array)($fix['files'] ?? []), static fn($f): bool => trim((string)$f) !== '') === []) {
+    if ($status === 'applied' && pf_list($fix['files'] ?? []) === []) {
         $problems[] = 'applied without the files it touched';
     }
-    if ($status !== 'applied' && trim((string)($fix['reason'] ?? '')) === '') {
+    if ($status !== 'applied' && !$filled('reason')) {
         $problems[] = "$status without a reason";
     }
-    if (trim((string)($fix['evidence'] ?? '')) === '') {
+    if (!in_array($status, ['deferred', 'skipped'], true) && !$filled('evidence')) {
         $problems[] = 'no evidence';
     }
 
     return $problems;
+}
+
+/**
+ * A comma-separated value or a list, trimmed, without empty entries.
+ *
+ * @return list<string>
+ */
+function pf_list(mixed $value): array
+{
+    $items = is_array($value) ? $value : explode(',', (string)$value);
+
+    return array_values(array_filter(array_map(static fn($f): string => trim((string)$f), $items), static fn(string $f): bool => $f !== ''));
+}
+
+/**
+ * Every fix entry with the slug of its page.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return list<array{0: string, 1: array<string, mixed>}>
+ */
+function pf_all_fixes(array $data): array
+{
+    $all = [];
+    foreach ((array)$data['pages'] as $slug => $page) {
+        foreach ((array)($page['fixes'] ?? []) as $fix) {
+            $all[] = [(string)$slug, $fix];
+        }
+    }
+
+    return $all;
 }
 
 /**
@@ -696,8 +771,6 @@ function pf_apply_entries(array &$data, array $inputs): array
 
             continue;
         }
-        $files = $input['files'] ?? [];
-        $files = is_array($files) ? $files : explode(',', (string)$files);
         $index = null;
         foreach ($page['fixes'] as $i => $fix) {
             if (($fix['id'] ?? null) === $key) {
@@ -705,14 +778,22 @@ function pf_apply_entries(array &$data, array $inputs): array
             }
         }
         $old = $index === null ? [] : $page['fixes'][$index];
-        $title = trim((string)($input['title'] ?? ''));
-        $detected = trim((string)($input['detected'] ?? ''));
+        $status = trim((string)($input['status'] ?? ''));
+        if (array_key_exists('decision', $input) || in_array($status, ['deferred', 'skipped'], true)) {
+            $rejections[] = "$key: the developer's decision and the statuses deferred and skipped are recorded with --decide";
+        }
+        $kept = static fn(string $field): string => trim((string)($input[$field] ?? '')) !== '' ? trim((string)$input[$field]) : (string)($old[$field] ?? '');
+        $touches = pf_list($input['touches'] ?? []);
         $fix = [
             'id' => $key,
-            'title' => $title !== '' ? $title : (string)($old['title'] ?? ''),
-            'detected' => $detected !== '' ? $detected : (string)($old['detected'] ?? ''),
-            'status' => trim((string)($input['status'] ?? '')),
-            'files' => array_values(array_filter(array_map(static fn($f): string => trim((string)$f), $files), static fn(string $f): bool => $f !== '')),
+            'title' => $kept('title'),
+            'detected' => $kept('detected'),
+            'size' => strtoupper($kept('size')),
+            'touches' => $touches !== [] ? $touches : pf_list($old['touches'] ?? []),
+            'gain' => $kept('gain'),
+            'decision' => (string)($old['decision'] ?? ''),
+            'status' => $status,
+            'files' => pf_list($input['files'] ?? []),
             'reason' => trim((string)($input['reason'] ?? '')),
             'evidence' => trim((string)($input['evidence'] ?? '')),
         ];
@@ -734,6 +815,104 @@ function pf_apply_entries(array &$data, array $inputs): array
     }
 
     return $rejections;
+}
+
+/**
+ * --decide: records the developer's decision on an M or L fix. apply keeps it pending for the
+ * apply-verify-revert procedure; defer and skip set deferred or skipped with the developer's reason.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return list<string> rejections
+ */
+function pf_decide(array &$data, string $id, string $decision, string $reason): array
+{
+    if (!isset(PF_DECISION_STATUS[$decision])) {
+        return ["$id: --decision is apply, defer or skip"];
+    }
+    foreach ((array)$data['pages'] as $slug => $page) {
+        foreach ((array)($page['fixes'] ?? []) as $i => $fix) {
+            if (($fix['id'] ?? null) !== $id) {
+                continue;
+            }
+            $size = (string)($fix['size'] ?? '');
+            $status = (string)($fix['status'] ?? '');
+            $problems = [];
+            if (!in_array($size, ['M', 'L'], true)) {
+                $problems[] = $size === 'S' ? 'an S fix is applied without a decision' : 'no size recorded: --set the size first';
+            }
+            if (!in_array($status, ['pending', 'deferred', 'skipped'], true)) {
+                $problems[] = "status '$status': the decision is taken on a pending, deferred or skipped fix";
+            }
+            if ($decision !== 'apply' && trim($reason) === '') {
+                $problems[] = "$decision needs --reason (the developer's reason)";
+            }
+            $decided = array_merge($fix, [
+                'decision' => $decision,
+                'status' => PF_DECISION_STATUS[$decision],
+                'files' => [],
+                'reason' => $decision === 'apply' ? '' : trim($reason),
+                'evidence' => '',
+            ]);
+            $problems = array_merge($problems, pf_fix_problems($decided, false));
+            if ($problems !== []) {
+                return array_map(static fn(string $p): string => "$id: $p", array_values(array_unique($problems)));
+            }
+            $data['pages'][$slug]['fixes'][$i] = $decided;
+
+            return [];
+        }
+    }
+
+    return ["$id: no such fix in performance-fixes.json"];
+}
+
+/**
+ * --decisions: the M and L fixes still pending without the developer's decision.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return list<array<string, mixed>>
+ */
+function pf_open_decisions(array $data): array
+{
+    $open = [];
+    foreach (pf_all_fixes($data) as [, $fix]) {
+        if (($fix['status'] ?? '') === 'pending' && in_array($fix['size'] ?? '', ['M', 'L'], true) && ($fix['decision'] ?? '') === '') {
+            $open[] = $fix;
+        }
+    }
+
+    return $open;
+}
+
+/**
+ * --backlog: the deferred fixes as rows of the report's Performance backlog table.
+ *
+ * @param array<string, mixed> $data
+ *
+ * @return list<string>
+ */
+function pf_backlog_rows(array $data): array
+{
+    $cell = static fn(string $text): string => str_replace(['|', "\n"], ['\\|', ' '], $text);
+    $rows = [];
+    foreach (pf_all_fixes($data) as [, $fix]) {
+        if (($fix['status'] ?? '') !== 'deferred') {
+            continue;
+        }
+        $rows[] = sprintf(
+            '| `%s` | %s | %s | %s | %s | %s |',
+            $fix['id'] ?? '',
+            $cell((string)($fix['title'] ?? '')),
+            $fix['size'] ?? '',
+            implode(', ', array_map(static fn(string $f): string => "`$f`", pf_list($fix['touches'] ?? []))),
+            $cell((string)($fix['gain'] ?? '')),
+            $cell((string)($fix['reason'] ?? ''))
+        );
+    }
+
+    return $rows;
 }
 
 /**
@@ -912,8 +1091,10 @@ function pf_print_pages(array $data, string $docsDir, string $statusFile, string
 function pf_usage(): string
 {
     return "Usage: php check-performance.php [--before-lock <file>] | --scan-code | --init [--docs <dir>] | --verify\n"
-        . "       | --set <ID> --status <status> [--title <t>] [--detected <t>] [--files <a,b>] [--reason <t>] [--evidence <t>]\n"
-        . "       | --no-fix <page> --reason <t> --evidence <t> | --import <file.json> | --unreachable --evidence <t>\n";
+        . "       | --set <ID> --status <status> [--title <t>] [--detected <t>] [--size S|M|L] [--touches <a,b>] [--gain <t>]\n"
+        . "         [--files <a,b>] [--reason <t>] [--evidence <t>]\n"
+        . "       | --no-fix <page> --reason <t> --evidence <t> | --import <file.json> | --unreachable --evidence <t>\n"
+        . "       | --decisions | --decide <ID> --decision apply|defer|skip [--reason <t>] | --backlog\n";
 }
 
 function pf_main(array $argv): int
@@ -921,8 +1102,11 @@ function pf_main(array $argv): int
     $arguments = array_slice($argv, 1);
     $mode = 'detect';
     $options = [];
-    $valued = ['--before-lock', '--docs', '--set', '--status', '--title', '--detected', '--files', '--reason', '--evidence', '--import', '--no-fix'];
-    $modes = ['--scan-code' => 'scan', '--init' => 'init', '--verify' => 'verify', '--set' => 'set', '--import' => 'import', '--no-fix' => 'no-fix', '--unreachable' => 'unreachable'];
+    $valued = ['--before-lock', '--docs', '--set', '--status', '--title', '--detected', '--size', '--touches', '--gain', '--files', '--reason', '--evidence', '--import', '--no-fix', '--decide', '--decision'];
+    $modes = [
+        '--scan-code' => 'scan', '--init' => 'init', '--verify' => 'verify', '--set' => 'set', '--import' => 'import', '--no-fix' => 'no-fix',
+        '--unreachable' => 'unreachable', '--decide' => 'decide', '--decisions' => 'decisions', '--backlog' => 'backlog',
+    ];
     for ($i = 0; $i < count($arguments); $i++) {
         $argument = $arguments[$i];
         if ($argument === '--help') {
@@ -957,10 +1141,15 @@ function pf_main(array $argv): int
             }
         }
     }
+    if (isset($options['--decision']) !== ($mode === 'decide')) {
+        fwrite(STDERR, "--decide and --decision go together.\n" . pf_usage());
+
+        return 2;
+    }
     $root = spryker_upgrade_project_root();
     $stateDir = spryker_upgrade_state_dir($root);
     $statusFile = $stateDir . '/' . PF_STATUS_FILE;
-    if (in_array($mode, ['init', 'set', 'import', 'no-fix', 'unreachable'], true)) {
+    if (in_array($mode, ['init', 'set', 'import', 'no-fix', 'unreachable', 'decide'], true)) {
         $lock = fopen($statusFile . '.lock', 'c');
         if ($lock !== false) {
             flock($lock, LOCK_EX);
@@ -1030,7 +1219,8 @@ function pf_main(array $argv): int
         $unreachable = trim((string)($data['docs']['unreachable'] ?? ''));
         fwrite(STDOUT, $unreachable !== ''
             ? "OK, NOT RUN: the guideline docs were unreachable ($unreachable). The report states that Phase 6.2 did not run for the not-checked pages.\n"
-            : "OK: every page has fixes or a no-fix reason; every fix has a final status, its files or reason, and evidence.\n");
+            : "OK: every page has fixes or a no-fix reason; every fix has a final status, its files or reason, and evidence;\n"
+                . "every applicable fix a size; every M and L fix the developer's decision.\n");
 
         return 0;
     }
@@ -1051,11 +1241,50 @@ function pf_main(array $argv): int
 
         return 2;
     }
+    if ($mode === 'decisions') {
+        $open = pf_open_decisions($data);
+        fwrite(STDOUT, $open === [] ? "No M or L fix waits for a decision.\n" : count($open) . " M and L fixes wait for the developer's decision (apply now / defer / skip):\n");
+        foreach ($open as $fix) {
+            fwrite(STDOUT, sprintf(
+                "  %s [%s] %s\n      files: %s\n      expected gain: %s\n",
+                $fix['id'],
+                $fix['size'],
+                $fix['title'],
+                implode(', ', pf_list($fix['touches'] ?? [])),
+                $fix['gain'] ?? ''
+            ));
+        }
+
+        return 0;
+    }
+    if ($mode === 'backlog') {
+        $rows = pf_backlog_rows($data);
+        fwrite(STDOUT, $rows === []
+            ? "No deferred fix.\n"
+            : "| ID | Fix | Size | Files | Expected gain | Reason |\n|---|---|---|---|---|---|\n" . implode("\n", $rows) . "\n");
+
+        return 0;
+    }
+    if ($mode === 'decide') {
+        $rejections = pf_decide($data, $options['--decide'], $options['--decision'], $options['--reason'] ?? '');
+        if ($rejections !== []) {
+            fwrite(STDERR, "Nothing written:\n  " . implode("\n  ", $rejections) . "\n");
+
+            return 2;
+        }
+        pf_write_status($statusFile, $data);
+        fwrite(STDOUT, "Recorded {$options['--decide']}: {$options['--decision']}.\n");
+
+        return 0;
+    }
     if ($mode === 'set') {
         $inputs = [$options['--set'] => [
             'status' => $options['--status'] ?? '',
             'title' => $options['--title'] ?? '',
             'detected' => $options['--detected'] ?? '',
+            'size' => $options['--size'] ?? '',
+            'touches' => $options['--touches'] ?? '',
+            'gain' => $options['--gain'] ?? '',
             'files' => $options['--files'] ?? '',
             'reason' => $options['--reason'] ?? '',
             'evidence' => $options['--evidence'] ?? '',

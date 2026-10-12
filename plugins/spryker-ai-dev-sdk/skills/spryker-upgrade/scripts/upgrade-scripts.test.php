@@ -865,11 +865,18 @@ check('performance --init: each page pending, empty fixes, title from front matt
 [$verifyPending, $verifyPendingOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
 check('performance --verify: a pending page -> exit 1', $verifyPending === 1 && str_contains($verifyPendingOut, 'alpha: no fix recorded and no no-fix reason'));
 
-[$setNew] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'pending', '--title', 'Cache the lookup', '--detected', 'src/Pyz/Zed/Demo/Business/DemoWriter.php:8 reads storage per item'], $perf, $perfState);
-[$setNoDetected] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'pending', '--title', 'x'], $perf, $perfState);
-[$setNoPage] = run_script('check-performance.php', ['--set', 'gamma-1', '--status', 'pending', '--title', 'x', '--detected', 'y'], $perf, $perfState);
+$sized = ['--size', 'S', '--touches', 'src/Pyz/Zed/Demo/Business/DemoWriter.php', '--gain', 'one storage read per request instead of one per item'];
+[$setNew] = run_script('check-performance.php', array_merge(['--set', 'alpha-1', '--status', 'pending', '--title', 'Cache the lookup', '--detected', 'src/Pyz/Zed/Demo/Business/DemoWriter.php:8 reads storage per item'], $sized), $perf, $perfState);
+[$setNoDetected] = run_script('check-performance.php', array_merge(['--set', 'alpha-2', '--status', 'pending', '--title', 'x'], $sized), $perf, $perfState);
+[$setNoPage] = run_script('check-performance.php', array_merge(['--set', 'gamma-1', '--status', 'pending', '--title', 'x', '--detected', 'y'], $sized), $perf, $perfState);
 $status = read_json($perfStatusFile);
 check('performance --set: a new fix needs title and detected and an existing page; the page becomes derived', $setNew === 0 && $setNoDetected === 2 && $setNoPage === 2 && ($status['pages']['alpha']['status'] ?? '') === 'derived' && count($status['pages']['alpha']['fixes']) === 1);
+check('performance --set: size, touches and gain are recorded', ($status['pages']['alpha']['fixes'][0]['size'] ?? '') === 'S' && ($status['pages']['alpha']['fixes'][0]['touches'] ?? []) === ['src/Pyz/Zed/Demo/Business/DemoWriter.php'] && ($status['pages']['alpha']['fixes'][0]['gain'] ?? '') !== '');
+[$setNoSize, $setNoSizeOut] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'pending', '--title', 'x', '--detected', 'y', '--touches', 'a.php', '--gain', 'g'], $perf, $perfState);
+[$setBadSize] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'pending', '--title', 'x', '--detected', 'y', '--size', 'XL', '--touches', 'a.php', '--gain', 'g'], $perf, $perfState);
+[$setNoGain] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'pending', '--title', 'x', '--detected', 'y', '--size', 'M', '--touches', 'a.php'], $perf, $perfState);
+[$setNaNoSize] = run_script('check-performance.php', ['--set', 'alpha-2', '--status', 'not-applicable', '--title', 'x', '--detected', 'already in place', '--reason', 'already in place', '--evidence', 'composer.lock'], $perf, $perfState);
+check('performance --set: an applicable fix needs a size, touches and gain; not-applicable needs none', $setNoSize === 2 && str_contains($setNoSizeOut, 'no size') && $setBadSize === 2 && $setNoGain === 2 && $setNaNoSize === 0);
 [$setNoFiles] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'applied', '--evidence', 'pages identical'], $perf, $perfState);
 check('performance --set: applied without files is rejected -> exit 2, nothing written', $setNoFiles === 2 && (read_json($perfStatusFile)['pages']['alpha']['fixes'][0]['status'] ?? '') === 'pending');
 [$setNoReason] = run_script('check-performance.php', ['--set', 'alpha-1', '--status', 'not-applied', '--evidence', 'x'], $perf, $perfState);
@@ -878,29 +885,90 @@ check('performance --set: not-applied without a reason -> exit 2', $setNoReason 
 [$noFixOnDerived] = run_script('check-performance.php', ['--no-fix', 'alpha', '--reason', 'r', '--evidence', 'e'], $perf, $perfState);
 check('performance --no-fix: needs reason and evidence, and a page without fixes -> exit 2', $noFixEmpty === 2 && $noFixOnDerived === 2);
 
+[$setM] = run_script('check-performance.php', ['--set', 'beta-2', '--status', 'pending', '--title', 'Product lists from search', '--detected', 'src/Pyz/Client/Catalog reads storage per product', '--size', 'M', '--touches', 'src/Pyz/Client/Catalog/CatalogClient.php,src/Pyz/Yves/CatalogPage/Controller/CatalogController.php', '--gain', 'one search request instead of one storage read per product'], $perf, $perfState);
+[$setL] = run_script('check-performance.php', ['--set', 'beta-3', '--status', 'pending', '--title', 'Split the import', '--detected', 'one import step for all stores', '--size', 'L', '--touches', 'data/import/local/full_EU.yml', '--gain', 'shorter import'], $perf, $perfState);
+[$applyNoDecision, $applyNoDecisionOut] = run_script('check-performance.php', ['--set', 'beta-2', '--status', 'applied', '--files', 'src/Pyz/Client/Catalog/CatalogClient.php', '--evidence', 'pages identical'], $perf, $perfState);
+check('performance --set: an M fix is not applied without the developer decision -> exit 2', $setM === 0 && $setL === 0 && $applyNoDecision === 2 && str_contains($applyNoDecisionOut, 'M fix without the developer decision'));
+[$setDeferred] = run_script('check-performance.php', ['--set', 'beta-2', '--status', 'deferred', '--reason', 'later', '--evidence', 'x'], $perf, $perfState);
+check('performance --set: deferred is recorded with --decide only -> exit 2', $setDeferred === 2);
+[$decisionsCode, $decisionsOut] = run_script('check-performance.php', ['--decisions'], $perf, $perfState);
+check('performance --decisions: lists the M and L fixes with size, files and gain, not the S fix', $decisionsCode === 0 && str_contains($decisionsOut, 'beta-2 [M]') && str_contains($decisionsOut, 'beta-3 [L]') && str_contains($decisionsOut, 'CatalogController.php') && str_contains($decisionsOut, 'one search request') && !str_contains($decisionsOut, 'alpha-1'));
+[$decideS] = run_script('check-performance.php', ['--decide', 'alpha-1', '--decision', 'apply'], $perf, $perfState);
+[$decideNoReason] = run_script('check-performance.php', ['--decide', 'beta-2', '--decision', 'defer'], $perf, $perfState);
+[$decideBad] = run_script('check-performance.php', ['--decide', 'beta-2', '--decision', 'later'], $perf, $perfState);
+[$decisionNoDecide] = run_script('check-performance.php', ['--decision', 'apply'], $perf, $perfState);
+check('performance --decide: rejects an S fix, defer without reason, an unknown decision, --decision alone', $decideS === 2 && $decideNoReason === 2 && $decideBad === 2 && $decisionNoDecide === 2);
+[$decideDefer] = run_script('check-performance.php', ['--decide', 'beta-2', '--decision', 'defer', '--reason', 'developer: next release'], $perf, $perfState);
+[$decideSkip] = run_script('check-performance.php', ['--decide', 'beta-3', '--decision', 'skip', '--reason', 'developer: import time is acceptable'], $perf, $perfState);
+$status = read_json($perfStatusFile);
+$betaFixes = array_column($status['pages']['beta']['fixes'] ?? [], null, 'id');
+check('performance --decide: defer and skip set deferred and skipped with the developer decision and reason', $decideDefer === 0 && $decideSkip === 0 && ($betaFixes['beta-2']['status'] ?? '') === 'deferred' && ($betaFixes['beta-2']['decision'] ?? '') === 'defer' && ($betaFixes['beta-3']['status'] ?? '') === 'skipped' && ($betaFixes['beta-3']['reason'] ?? '') === 'developer: import time is acceptable');
+[$backlogCode, $backlogOut] = run_script('check-performance.php', ['--backlog'], $perf, $perfState);
+check('performance --backlog: one table row per deferred fix with size, files and gain', $backlogCode === 0 && str_contains($backlogOut, '| ID | Fix | Size | Files | Expected gain | Reason |') && str_contains($backlogOut, '| `beta-2` | Product lists from search | M | `src/Pyz/Client/Catalog/CatalogClient.php`, `src/Pyz/Yves/CatalogPage/Controller/CatalogController.php` | one search request') && !str_contains($backlogOut, 'beta-3'));
+
+run_script('check-performance.php', ['--set', 'unlinked-2', '--status', 'pending', '--title', 'Batch the writer', '--detected', 'DemoWriter.php:7 query per item', '--size', 'L', '--touches', 'src/Pyz/Zed/Demo/Business/DemoWriter.php', '--gain', 'one query per batch'], $perf, $perfState);
+[$decideApply] = run_script('check-performance.php', ['--decide', 'unlinked-2', '--decision', 'apply'], $perf, $perfState);
+[$appliedL] = run_script('check-performance.php', ['--set', 'unlinked-2', '--status', 'applied', '--files', 'src/Pyz/Zed/Demo/Business/DemoWriter.php', '--evidence', 'suites green; pages identical for guest'], $perf, $perfState);
+[$decideApplied] = run_script('check-performance.php', ['--decide', 'unlinked-2', '--decision', 'skip', '--reason', 'r'], $perf, $perfState);
+check('performance --decide: apply keeps the L fix pending; it is then applied; no decision after applying', $decideApply === 0 && $appliedL === 0 && $decideApplied === 2 && (read_json($perfStatusFile)['pages']['unlinked']['fixes'][0]['decision'] ?? '') === 'apply');
+
 [$initAgain] = run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
 $status = read_json($perfStatusFile);
 check('performance --init: a re-run keeps recorded fixes', $initAgain === 0 && ($status['pages']['alpha']['fixes'][0]['detected'] ?? '') === 'src/Pyz/Zed/Demo/Business/DemoWriter.php:8 reads storage per item');
 write_file($guideDir . '/new-page.md', $page('New guideline'));
 run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfState);
 $status = read_json($perfStatusFile);
-check('performance --init: a page that appeared is added pending, recorded data kept', isset($status['pages']['new-page']) && $status['pages']['new-page']['status'] === 'pending' && count($status['pages']['alpha']['fixes']) === 1 && count($status['pages']) === 6);
+check('performance --init: a page that appeared is added pending, recorded data kept', isset($status['pages']['new-page']) && $status['pages']['new-page']['status'] === 'pending' && count($status['pages']['alpha']['fixes']) === 2 && count($status['pages']) === 6);
 
 $complete = [
     'alpha-1' => ['status' => 'applied', 'files' => ['src/Pyz/Zed/Demo/Business/DemoWriter.php'], 'evidence' => 'suites green; pages identical for guest, customer'],
-    'beta-1' => ['status' => 'not-applied', 'title' => 'Smaller page size', 'detected' => 'catalog page size above the default', 'reason' => 'proposal: a smaller page size changes what users see', 'evidence' => 'config_default.php:1'],
+    'beta-1' => ['status' => 'not-applied', 'title' => 'Smaller page size', 'detected' => 'catalog page size above the default', 'size' => 'S', 'touches' => ['config/Shared/config_default.php'], 'gain' => 'smaller search responses', 'reason' => 'proposal: a smaller page size changes what users see', 'evidence' => 'config_default.php:1'],
     'order-page' => ['status' => 'no-fix', 'reason' => 'the page describes a profiling procedure', 'evidence' => 'no project change named on the page'],
     'ram-batch-1' => ['status' => 'not-applicable', 'title' => 'RAM-aware batches', 'detected' => 'no custom publisher', 'reason' => 'operator: memory limit of the workers', 'evidence' => 'no setting in the repository'],
-    'unlinked-1' => ['status' => 'reverted', 'title' => 'Index on a filter column', 'detected' => 'filter without index', 'reason' => 'search order changed', 'evidence' => 'positions 3 and 4 swapped'],
+    'unlinked-1' => ['status' => 'reverted', 'title' => 'Index on a filter column', 'detected' => 'filter without index', 'size' => 'S', 'touches' => ['src/Pyz/Zed/Demo/Persistence/Propel/Schema/spy_demo.schema.xml'], 'gain' => 'faster filter query', 'reason' => 'search order changed', 'evidence' => 'positions 3 and 4 swapped'],
     'new-page' => ['status' => 'no-fix', 'reason' => 'already in place', 'evidence' => 'composer.lock: package at the named version'],
 ];
-write_file($perfState . '/import-bad.json', json_encode(['beta-1' => ['status' => 'not-applied', 'title' => 't', 'detected' => 'd', 'evidence' => 'x']] + $complete));
+write_file($perfState . '/import-bad.json', json_encode(['beta-1' => ['status' => 'not-applied', 'title' => 't', 'detected' => 'd', 'size' => 'S', 'touches' => ['a.php'], 'gain' => 'g', 'evidence' => 'x']] + $complete));
 [$importBad] = run_script('check-performance.php', ['--import', $perfState . '/import-bad.json'], $perf, $perfState);
 check('performance --import: one incomplete entry rejects the whole file -> exit 2', $importBad === 2 && (read_json($perfStatusFile)['pages']['order-page']['status'] ?? '') === 'pending');
 write_file($perfState . '/import.json', json_encode($complete));
 [$importOk] = run_script('check-performance.php', ['--import', $perfState . '/import.json'], $perf, $perfState);
 [$verifyAll, $verifyAllOut] = run_script('check-performance.php', ['--verify'], $perf, $perfState);
-check('performance --verify: every page and fix accounted for -> exit 0', $importOk === 0 && $verifyAll === 0 && str_contains($verifyAllOut, 'OK: every page'));
+check('performance --verify: every page and fix accounted for -> exit 0; S applied with files is complete', $importOk === 0 && $verifyAll === 0 && str_contains($verifyAllOut, 'OK: every page') && str_contains($verifyAllOut, '1 deferred') && str_contains($verifyAllOut, '1 skipped'));
+
+$fixIndex = static function (array $data, string $slug, string $id): int {
+    foreach ($data['pages'][$slug]['fixes'] as $i => $fix) {
+        if ($fix['id'] === $id) {
+            return $i;
+        }
+    }
+
+    return -1;
+};
+$verifyEdited = static function (callable $edit) use ($perfStatusFile, $perf, $perfState): array {
+    $original = (string)file_get_contents($perfStatusFile);
+    $data = json_decode($original, true);
+    $edit($data);
+    write_file($perfStatusFile, json_encode($data));
+    $result = run_script('check-performance.php', ['--verify'], $perf, $perfState);
+    write_file($perfStatusFile, $original);
+
+    return $result;
+};
+$current = read_json($perfStatusFile);
+$beta2 = $fixIndex($current, 'beta', 'beta-2');
+$beta3 = $fixIndex($current, 'beta', 'beta-3');
+[$vNoSize, $vNoSizeOut] = $verifyEdited(static function (array &$d) { $d['pages']['alpha']['fixes'][0]['size'] = ''; });
+check('performance --verify: an applied fix without a size -> exit 1', $vNoSize === 1 && str_contains($vNoSizeOut, 'alpha-1: no size'));
+[$vNoDecision, $vNoDecisionOut] = $verifyEdited(static function (array &$d) use ($beta2) { $d['pages']['beta']['fixes'][$beta2] = array_merge($d['pages']['beta']['fixes'][$beta2], ['status' => 'pending', 'decision' => '', 'reason' => '']); });
+check('performance --verify: an M fix without the developer decision -> exit 1', $vNoDecision === 1 && str_contains($vNoDecisionOut, 'beta-2: M fix without the developer decision'));
+[$vAppliedNoDecision] = $verifyEdited(static function (array &$d) use ($beta3) { $d['pages']['beta']['fixes'][$beta3] = array_merge($d['pages']['beta']['fixes'][$beta3], ['status' => 'applied', 'decision' => '', 'files' => ['a.php'], 'evidence' => 'e']); });
+check('performance --verify: an L fix applied without the developer decision -> exit 1', $vAppliedNoDecision === 1);
+[$vDeferredNoReason, $vDeferredNoReasonOut] = $verifyEdited(static function (array &$d) use ($beta2) { $d['pages']['beta']['fixes'][$beta2]['reason'] = ''; });
+[$vSkippedNoReason, $vSkippedNoReasonOut] = $verifyEdited(static function (array &$d) use ($beta3) { $d['pages']['beta']['fixes'][$beta3]['reason'] = ''; });
+check('performance --verify: deferred or skipped without a reason -> exit 1', $vDeferredNoReason === 1 && str_contains($vDeferredNoReasonOut, 'beta-2: deferred without a reason') && $vSkippedNoReason === 1 && str_contains($vSkippedNoReasonOut, 'beta-3: skipped without a reason'));
+[$vDeferredS] = $verifyEdited(static function (array &$d) { $d['pages']['alpha']['fixes'][0] = array_merge($d['pages']['alpha']['fixes'][0], ['status' => 'deferred', 'reason' => 'later']); });
+check('performance --verify: an S fix deferred without a developer decision -> exit 1', $vDeferredS === 1);
 
 $edited = read_json($perfStatusFile);
 $edited['pages']['alpha']['fixes'][0]['files'] = [];
