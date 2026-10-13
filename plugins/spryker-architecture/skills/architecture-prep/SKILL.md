@@ -3,7 +3,7 @@ name: architecture-prep
 description: >
   Establish or fill in a Spryker project's version-controlled architecture record — the
   `architecture/` folder as arc42 sections + C4/sequence diagrams, ADRs, and Solution Designs.
-  Interviews the user, researches Spryker docs/web/the running system, and writes each section to
+  Interviews the user, researches Spryker docs and the web, and writes each section to
   decision-grade depth (release-phased scope, components/connectors tables, per-phase volume planning,
   multi-store strategy). Runs in ANY Spryker project/demoshop and scaffolds the
   mandatory `architecture/` folder if missing — for greenfield, an existing build (onboarding), or
@@ -37,7 +37,7 @@ doesn't have it yet, the skill **scaffolds it** (Step 0) rather than refusing �
 project without an architecture folder is a gap to fix, not a blocker.
 
 The value is in the **control flow**: collect a lot of information up front, ground it in real
-Spryker documentation and (for existing projects) the real codebase/runtime, then fan the writing
+Spryker documentation, then fan the writing
 out to teammate subagents so the orchestrator stays lean and the sections stay consistent and
 cross-linked.
 
@@ -52,7 +52,7 @@ Two reasons to push heavy work into subagents (the "teammates" the user asked fo
 stays small and survives long runs, and independent teammates produce more thorough, less anchored
 work than one context writing everything sequentially.
 
-- **Research** runs in parallel teammates (docs / web / current-state), each writing findings to a
+- **Research** runs in parallel teammates (docs / web), each writing findings to a
   file and returning a compact summary — never raw dumps.
 - **Section writing** runs as **one teammate per selected arc42 section**, in parallel, each fed the
   interview answers + shared research and told exactly which file(s) and diagram(s) to produce.
@@ -66,8 +66,8 @@ work than one context writing everything sequentially.
   section boundary. Read [references/multi-deliverable.md](references/multi-deliverable.md) at Step 0
   whenever N > 1.
 
-Spawn teammates with the `Agent` tool. Prefer `subagent_type: "Explore"` for read-only research/
-current-state investigation and `subagent_type: "general-purpose"` (or a `fork`) for section writers
+Spawn teammates with the `Agent` tool. Prefer `subagent_type: "Explore"` for read-only research and
+document derivation, and `subagent_type: "general-purpose"` (or a `fork`) for section writers
 that must create files. **Exception: multi-deliverable writers must be fresh `general-purpose`
 agents, never forks** — a fork inherits the orchestrator's full context (including the other
 projects' intakes), which defeats the isolation that prevents fact bleed. Keep every teammate on a
@@ -81,10 +81,22 @@ the step that needs it, not all up front:
 - [references/run-lean.md](references/run-lean.md) — the run directory, the **State Object**, the
   **logging** discipline (bugfix-style `run.log`), the **decision log**, and the plan task list.
   **Read once at the start of every run, before Step 0.**
-- [references/questionnaire.md](references/questionnaire.md) — the **canonical fillable question list**
-  (groups A–H + run-config R; each question tagged `[REQUIRED]`/`[optional]` and mapped to an arc42
-  section). Users can pre-fill it to skip the interview, or partly fill it to shorten it. **This is the
-  single source of what to ask.** Read alongside interview.md before Step 1.
+- [references/architect-persona.md](references/architect-persona.md) — **who you are while doing
+  this**: the Senior Enterprise Solution Architect role, the communication rules (challenge by
+  default, never invent, absolute dates), the no-duplication and documentation-hygiene rules, Open
+  Question vs Risk, the quality lens, and SD-vs-ADR. **Read by the orchestrator at the start of
+  every run, and by every section-writer teammate before it writes.**
+- [references/questionnaire.md](references/questionnaire.md) — the **canonical fillable question list**,
+  organised as progressive levels **L1 (9) → L2 (21) → L3 (21) → L4 (2)** = 53 questions. Each is typed
+  (`pick`/`table`/`confirm`/`document`/`shorttext`) and most carry a **condition** naming the earlier
+  answer that opens them — a simple single-market project legitimately skips most of L3. Depth is
+  chosen **per topic, not once for the project**. Run-configuration is NOT in the bank: it's asked in
+  the Step 0 opening batch below. Users can pre-fill the bank to skip the interview, or partly fill it
+  to shorten it. **This is the single source of what to ask.** Read alongside interview.md before Step 1.
+- [references/prefill.md](references/prefill.md) — **Step 0b**: derive answers from the documents the
+  user provided *before* asking anything, show them in one batch for correction, then interview only
+  the genuine gaps. **Read at Step 0b whenever any document was provided; skip the step entirely
+  when none was.**
 - [references/interview.md](references/interview.md) — **how** to collect the questionnaire: detect a
   pre-filled/partial questionnaire (ask only the blanks), offer "fill the list yourself vs interview
   me", group the questions into `AskUserQuestion` batches, ask for existing docs first, and **always
@@ -122,6 +134,11 @@ the step that needs it, not all up front:
 
 ## Operating principles
 
+- **You are a Senior Enterprise Solution Architect, not a scribe.** Read
+  [references/architect-persona.md](references/architect-persona.md) before Step 0 and hold it for
+  the whole run: challenge inconsistencies rather than agreeing by default, separate fact from
+  assumption, never invent scope, keep every concept in exactly one place, and keep client Q&A out
+  of the deliverable. Every section-writer teammate gets this file too.
 - **Aim for decision-grade depth, expressed as code — then make it build-ready.** The bar (see
   [references/architecture-depth.md](references/architecture-depth.md)) is release-phased scope, a
   Components + Connectors rationale pair beside every architecture diagram, a rich per-phase volume
@@ -134,11 +151,11 @@ the step that needs it, not all up front:
 - **Collect first, write second.** The single biggest failure mode is writing thin, generic sections
   because the interview was shallow. Front-load information gathering — ask for real documents, then a
   broad batched interview, then research — and only start writing once you have substance. A section
-  you can't ground in a real answer, a doc, a doc-research finding, or the codebase should be flagged
+  you can't ground in a real answer, a provided doc, or a doc-research finding should be flagged
   as a gap, not filled with plausible-sounding filler.
 - **Ground every claim.** Spryker behavior goes through `spryker-docs-research`, never from memory.
-  Claims about *this* project's current system (for existing projects) go through the codebase /
-  `spryker-runtime`, never assumed. External/industry facts go through web research. If a fact has no
+  External/industry facts go through web research. Facts about *this* project come from the intake —
+  an answer, a provided document, a TAD, or any source the user pointed you at. If a fact has no
   source, say so in the doc rather than asserting it.
 - **Respect the template, replace the examples.** The template's example content (SAP, Akeneo, Auth0,
   the volume table, the diagram color scheme) is illustrative. Keep the *structure* and the *style*;
@@ -157,7 +174,7 @@ the step that needs it, not all up front:
 
 ---
 
-## The workflow (Steps 0–7)
+## The workflow (Steps 0–7, plus 0b)
 
 Read [references/run-lean.md](references/run-lean.md) now, then begin.
 
@@ -187,14 +204,10 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
    - **Existing documents first.** "Can you share any business requirements, briefs, RFPs, discovery
      notes, slide decks, existing diagrams, or tickets? Paste text or give file paths." This is the
      highest-value input — ask for it before anything else and read everything provided.
-   - **Project stage:** greenfield / new, or an existing project with code (this repo is existing).
-     This decides whether current-state investigation is offered.
    - **Which arc42 sections** to produce this run (multi-select — see the list below). Default-suggest
      the template's recommended path (1, 3, 10, then 5, 2) but let the user pick.
    - **Autonomy mode:** Gated (confirm before writing each section batch) or Autonomous (interview
      once, then write everything, logging decisions).
-   - **Current-state grounding** (existing projects only): may I read the codebase / run
-     `spryker-runtime` to ground sections about the actual system?
    - **ADRs / Solution Designs:** any decisions already made to capture as ADRs, or areas to explore
      as Solution Designs?
    See [references/interview.md](references/interview.md) for the full question bank and how to group
@@ -221,6 +234,24 @@ The 12 arc42 sections (offer as the multi-select):
 | 11 | `11-risks-and-technical-debt.md` | Risks & debt |
 | 12 | `12-glossary.md` | Domain & technical terms |
 
+### Step 0b — Pre-fill from the provided documents
+
+**Only if the user provided documents at the opening batch** (and the intake is not a TAD, which
+takes the fast-path instead). Read [references/prefill.md](references/prefill.md).
+
+Spawn one `Explore` teammate to read the provided material against
+[references/questionnaire.md](references/questionnaire.md) and return a derivation table — question
+ID, proposed answer, the quote or location backing it, and `high`/`low` confidence. Show the whole
+table to the user in **one** confirmation pass, take their corrections, and carry the result into
+Step 1 as pre-answered questions.
+
+High-confidence rows the user doesn't contest count as accepted; low-confidence rows stay
+`derived (unconfirmed)` unless explicitly confirmed. In Autonomous mode nothing is asked — log the
+low-confidence rows as CRITICAL DECISIONs instead.
+
+If no documents were provided, skip this step and say so in one line. Log `PREFILL | <n> derived,
+<m> confirmed` or `PREFILL | SKIP (no documents)`.
+
 ### Step 1 — Deep interview (batched, up front) — or the TAD fast-path
 
 **If Step 0 classified the intake as a structured brief, skip the interview**: pull the TAD(s) per
@@ -232,6 +263,10 @@ A TAD is usually richer than a live interview; interviewing on top of it wastes 
 partly), follow interview.md Rule 0b: a fully-filled questionnaire skips the interview
 (`INTERVIEW | SKIP (questionnaire pre-filled)`); a partial one means you ask ONLY the still-blank
 questions. Either way copy the provided answers verbatim into `intake.md`.
+
+**If Step 0b derived answers**, treat them exactly like a partly pre-filled questionnaire
+(interview.md Rule 0b): **re-evaluate the gates first** — a derived answer can close a gate and drop
+questions from the run — then ask only what is still blank.
 
 Otherwise run the intake interview per [references/interview.md](references/interview.md), driving the
 questions from [references/questionnaire.md](references/questionnaire.md). First (unless fully
@@ -262,10 +297,6 @@ returning a compact summary:
 - **Web research teammate** — via `WebSearch`/`WebFetch`: external systems named in the interview
   (the real ERP/PIM/CIAM/PSP products), standards (arc42, C4, GDPR, protocol specs), and any
   industry/volume benchmarks the user referenced. → `research-web.md`
-- **Current-state teammate** *(existing projects, only if grounding was permitted)* — via
-  `Skill(spryker-runtime)` and reading the codebase: which stores/locales/currencies exist, installed
-  modules, deployment files (`deploy.*.yml`), real integrations, actors at `/user`. Grounds sections
-  3/5/7 in what's actually there. → `research-current-state.md`
 
 Skip any teammate that has no relevant input (e.g. no external systems → no web teammate). Log each as
 `RESEARCH | <source> | done`. Keep only each teammate's summary in the State Object; the detail stays
@@ -288,6 +319,9 @@ guidance below, and finishes with its own Step 5 cross-link pass (see
 [references/multi-deliverable.md](references/multi-deliverable.md)).
 
 Otherwise spawn **one teammate per selected section**, in parallel. Each teammate:
+- reads [references/architect-persona.md](references/architect-persona.md) **first** — it is a peer
+  architect writing this section, bound by the never-invent, no-duplication, and
+  documentation-hygiene rules, not a template-filler;
 - reads **its own §** in [references/sections.md](references/sections.md), the shared `intake.md`, and
   the research file(s) relevant to it;
 - reads the **current template file** it's replacing (to keep the structure/heading style);
@@ -434,7 +468,6 @@ block for the user to run themselves (with the `!` prefix), then finish the rest
 | Ticket / doc intake | filled [questionnaire.md](references/questionnaire.md) → ask only blanks; `AskUserQuestion` batches per [interview.md](references/interview.md) + read provided files; TAD → [tad-mapping.md](references/tad-mapping.md) fast-path, no interview |
 | Spryker feature/behavior research | `Skill(spryker-docs-research)` (in an `Explore`/`general-purpose` teammate) — once per run, shared across deliverables |
 | External systems / standards research | `WebSearch` / `WebFetch` teammate |
-| Current-state grounding (existing project) | `Skill(spryker-runtime)` + codebase read teammate |
 | Section writing (single deliverable) | one `general-purpose`/`fork` teammate per section |
 | Multi-deliverable writing | one isolated teammate per deliverable, own worktree ([multi-deliverable.md](references/multi-deliverable.md)) |
 | Cross-link & consistency | orchestrator, inline (multi-deliverable: each writer, orchestrator spot-checks) |

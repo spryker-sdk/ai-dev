@@ -32,16 +32,19 @@ that every claim about the platform must be grounded in real Spryker capabilitie
 The failure mode that a generic reviewer misses. Check every platform claim:
 
 - [ ] **No fabrication.** Every volume, integration, actor, and module name traces to `intake.md`, a
-      provided doc, `research-docs.md`, or the codebase. A confident number with no source is a BLOCKER.
+      provided doc, or `research-docs.md`. A confident number with no source is a BLOCKER.
+- [ ] **Derived-but-unconfirmed facts are still marked.** Anything `intake.md` records as
+      `derived (unconfirmed)` — pre-filled from a document but never confirmed by the user — must
+      read as an assumption in the section, not as a stated fact. An unconfirmed derivation
+      presented as settled is a BLOCKER; it is fabrication with a citation attached.
 - [ ] **Spryker behavior is grounded, not remembered.** Any "Spryker does X / uses P&S / this module
       handles Y" claim is backed by `research-docs.md` (ideally with a docs URL). Unsourced platform
       assertions are MAJOR.
 - [ ] **Named features are real and current.** Mitigations and building blocks cite features that
-      actually exist and are GA (watch the known traps: ACP is being sunset → use direct PSP modules;
-      Glue-API/OAuth SSO is not GA but storefront Federated Auth is; "Drop Shipment" is not a feature →
-      Marketplace primitives; external search delegation is a documented pattern, not a connector;
-      Persistence ACL is real and Propel-only; DMS GA since 202410.0). A cited-but-nonexistent or
-      wrong-status feature is a BLOCKER.
+      actually exist and are generally available. Verify each named feature against the current
+      documentation via `research-docs.md` rather than from memory — including its availability
+      status, since a feature that is announced, deprecated, or partially available is easy to cite
+      as if it were GA. A cited-but-nonexistent or wrong-status feature is a BLOCKER.
 - [ ] **No template leftovers.** Grep the written sections for the template's example entities (SAP,
       Akeneo, Auth0, the sample volume figures, sample diagram labels). Any survivor in an in-scope
       section is a BLOCKER — it means the section was not actually rewritten.

@@ -2,9 +2,8 @@
 
 Turns a mostly-empty Spryker `architecture/` template folder into a real, project-specific,
 decision-grade **arc42 + C4** architecture document — version-controlled Markdown + Mermaid (`.mmd`).
-It's an **orchestrator**: it gathers inputs, grounds every claim in real Spryker docs / the running
-system, fans the writing out to teammate subagents, then runs a **review → fix → re-verify loop**
-until the document passes.
+It's an **orchestrator**: it gathers inputs, grounds every claim, fans the writing out to teammate
+subagents, then runs a **review → fix → re-verify loop** until the document passes.
 
 Runs in any Spryker project or demoshop (b2b / b2c / marketplace / suite) from the project root, and
 scaffolds the `architecture/` folder if it's missing.
@@ -22,7 +21,10 @@ design", or "turn this TAD / these TADs into architecture docs (as PRs)" — eve
 |---|---|
 | **Nothing structured** | Batched interview ([interview.md](references/interview.md)) driven by the [questionnaire.md](references/questionnaire.md) question bank |
 | **A filled/partial questionnaire** | Skips the interview (or asks only the blanks) |
-| **A Spryker TAD / structured brief** | The doc IS the intake — no interview ([tad-mapping.md](references/tad-mapping.md)) |
+| **A TAD / structured brief** | The doc IS the intake — no interview ([tad-mapping.md](references/tad-mapping.md)) |
+
+Documents provided up front are mined for answers before anything is asked
+([prefill.md](references/prefill.md)), so the interview only covers genuine gaps.
 
 One deliverable → one document edited in place. **N TADs/briefs → N documents → N PRs**, one git
 worktree per deliverable ([multi-deliverable.md](references/multi-deliverable.md)).
@@ -39,19 +41,19 @@ flowchart TD
 
     subgraph Intake[" "]
       S0["**Step 0** — Intake &amp; mode<br/>classify input · scaffold architecture/ · pick sections · Gated/Autonomous"]:::backend
+      S0b["**Step 0b** — Pre-fill from provided documents<br/>derive → confirm in one batch"]:::backend
       S1["**Step 1** — Interview OR TAD fast-path<br/>→ intake.md"]:::backend
     end
 
-    S0 --> S1
+    S0 --> S0b --> S1
 
     S1 -->|"TAD / filled questionnaire"| S2
-    S1 -->|"interview needed"| Q{{"questionnaire.md → AskUserQuestion batches"}}:::web
+    S1 -->|"gaps remain"| Q{{"questionnaire.md → AskUserQuestion batches"}}:::web
     Q --> S2
 
     subgraph Research["**Step 2** — Research (parallel teammates, shared once)"]
       R1["Spryker docs<br/>research-docs.md"]:::storage
       R2["Web / external systems<br/>research-web.md"]:::storage
-      R3["Current-state (if permitted)<br/>research-current-state.md"]:::storage
     end
     S2([grounding]):::backend --> Research
 
@@ -104,8 +106,10 @@ finding ends either *fixed* or *converted to a triaged owned gap*; nothing is si
 | File | What it covers | Read when |
 |---|---|---|
 | [run-lean.md](references/run-lean.md) | Run dir, State Object, logging, decision log | Start of every run |
-| [questionnaire.md](references/questionnaire.md) | The canonical fillable question bank (groups A–J + R) | Before Step 1 |
-| [interview.md](references/interview.md) | How to collect the questionnaire (batches, docs-first) | Before Step 1 |
+| [architect-persona.md](references/architect-persona.md) | The architect role, communication rules, no-duplication and hygiene policy | Orchestrator at start + every writer |
+| [questionnaire.md](references/questionnaire.md) | The canonical fillable question bank (L1–L4, gated) | Before Step 1 |
+| [prefill.md](references/prefill.md) | Deriving answers from provided documents before asking | Step 0b, if documents exist |
+| [interview.md](references/interview.md) | How to collect the questionnaire (levels, gates, batches) | Before Step 1 |
 | [tad-mapping.md](references/tad-mapping.md) | TAD fast-path: TAD-section → arc42-section | Step 0, if a TAD is the input |
 | [multi-deliverable.md](references/multi-deliverable.md) | N inputs → N worktrees/branches → N PRs | Step 0, if N > 1 |
 | [sections.md](references/sections.md) | Per-arc42-section writer guidance + diagram map | Step 4, each writer its own § |
