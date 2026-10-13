@@ -1,6 +1,12 @@
 ---
 name: code-review
-description: Use when code review is requested
+description: >
+  Use when the user asks to review code in a Spryker project — a diff, a branch, a PR or a
+  list of files ("review my changes", "code review this branch", "check these files before I
+  commit"). Splits the change (by default the diff against master) across spryker-code-reviewer
+  subagents, checks frontend files against the project's Yves, Back Office and Merchant Portal
+  rules, combines the findings with file:line references and lets the user choose which to fix.
+  Linting is static-validation's job.
 ---
 
 # Workflow

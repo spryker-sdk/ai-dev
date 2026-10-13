@@ -1,6 +1,12 @@
 ---
 name: codecept-functional
-description: Use the skill to create, update, fix, edit or run functional, unit, codecept tests in "src/**/tests/**, tests/**"
+description: >
+  Use when creating, updating, fixing or running Codeception tests in a Spryker project
+  (src/**/tests/**, tests/**) — unit and functional tests for Facades, Controllers, console
+  commands, plugins and Publish & Synchronize. Applies Spryker conventions: given/when/then
+  names, Arrange/Act/Assert, DataBuilders and tester helpers, per-test setup, mocks for external
+  dependencies only, module testers and codeception.yml. For browser E2E tests use
+  cypress-tests.
 ---
 
 **Testing rule**

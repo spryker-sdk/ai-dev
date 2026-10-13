@@ -1,6 +1,12 @@
 ---
 name: data-import
-description: Use the skill to create, update, fix, or implement data import.
+description: >
+  Use when creating, updating or fixing a Spryker data import for an entity — the
+  {Module}DataImport module with its config, DataSet, validator and writer steps, business
+  factory, facade and DataImportPlugin, the registration in DataImportDependencyProvider, the
+  data/import/*.yml entry and a sample CSV. Writes code only and verifies an import by the
+  database row delta; Publish & Synchronize belongs to spryker-customization. For filling,
+  reshaping or reducing existing import CSVs use project-data.
 ---
 
 # Data Import Generator
