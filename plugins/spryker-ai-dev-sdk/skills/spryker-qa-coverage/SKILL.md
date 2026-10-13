@@ -1,6 +1,14 @@
 ---
 name: spryker-qa-coverage
-description: QA and functional-test a Spryker feature by exercising the RUNNING application — turn a PRD or feature description into a test checklist and concrete test cases (happy path, negative, authorization, and corner/edge cases), then execute them against the live app and report pass/fail with real evidence. Use this at ANY point — when a feature is done, MID-development to check work-in-progress as you go, or as a quick SMOKE TEST after a refactor to confirm nothing broke. Trigger whenever the user wants to QA, test, or verify that a feature actually works end-to-end, manually test a flow, build or run a test checklist or test cases, smoke-test after refactoring or a change, sanity-check work in progress, find edge/corner cases that could break a feature, check that data lands in the database/Redis/queue after an action, or hands over a PRD and asks whether it is correctly implemented — even phrased loosely as "test this", "does this still work", "did my refactor break anything", or "make sure it works in the back office". It drives the app through the `spryker-runtime` skill (Back Office and storefront in Chrome, console/CLI commands, HTTP/API calls, storage checks), picking the lightest mode per case. This is hands-on QA against a real environment: it does NOT write automated test code (use codecept-functional or cypress-e2e-test), does NOT run static analysis or CI (use spryker-ci, static-validation, or phpstan), and does NOT fix code — it observes and reports.
+description: >
+  Hands-on QA of a Spryker feature against the running application: turns a PRD or feature
+  description into a checklist and test cases (happy path, negative, authorization, edge
+  cases), runs them through spryker-runtime (Back Office and storefront in the browser, CLI,
+  HTTP/API, database/Redis/queue checks) and reports pass/fail with evidence. Use when a
+  feature is done, mid-development, or as a smoke test after a refactor — "test this", "does
+  this still work", "did my refactor break anything", "make sure it works in the back office",
+  or a PRD with "is this implemented correctly?". Does not write automated tests
+  (codecept-functional, cypress-tests), run static analysis (static-validation) or fix code.
 ---
 
 # Spryker QA & Testing (from PRD → checklist → execute → report)

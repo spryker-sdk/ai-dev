@@ -1,6 +1,15 @@
 ---
 name: spryker-profiler
-description: Read and configure the Spryker/Symfony WebProfiler — everything it recorded about a request, across every collector. Performance numbers (SQL query counts and N+1 duplicates, Redis/key-value operations, Elasticsearch calls, Yves→Zed requests, external HTTP calls, duration, memory, Twig rendering, event listeners, session size) and diagnostics (application logs, audit logs, thrown exceptions, controller and route, redirects, PHP/Xdebug runtime). Use this whenever someone asks why a page, endpoint, or Back Office screen is slow, wants the slowest or heaviest request, asks "how many queries does this page run", suspects an N+1, wants Redis or storage call counts, wants before/after evidence that a performance fix worked, or asks what a request logged, what it threw, which controller handled it, or what the audit log recorded. Also for profiler setup — turning the web profiler on, a missing toolbar or profile data, enabling profiling for Zed, Back Office, Backend Gateway, Backend API, Glue, Merchant Portal or Yves, a collector showing no data, adding SQL/Redis/Elasticsearch collectors. Use it proactively before claiming any Spryker change improved or hurt performance — the profiler already recorded every request, so read real measurements instead of guessing.
+description: >
+  Read and configure the Spryker/Symfony WebProfiler. Use when someone asks why a page,
+  endpoint or Back Office screen is slow, wants the slowest request, asks how many queries a
+  page runs, suspects an N+1, wants Redis, Elasticsearch, Yves→Zed or external HTTP call counts,
+  or wants before/after evidence for a performance fix; also for what a request logged or
+  threw, which controller handled it, or what the audit log recorded. Covers setup too:
+  enabling the profiler for Yves, Zed/Back Office, Backend Gateway, Backend API, Glue or
+  Merchant Portal, a missing toolbar or empty collector, adding SQL/Redis/Elasticsearch
+  collectors. Use it before claiming a change improved or hurt performance: read the recorded
+  measurements instead of guessing.
 ---
 
 # Reading Spryker profiler data
