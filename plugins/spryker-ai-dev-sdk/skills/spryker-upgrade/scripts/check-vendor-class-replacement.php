@@ -1,18 +1,17 @@
 <?php
 
 /**
- * Vendor-class replacement detector (upgrade use case: the project declares a class in a VENDOR's
+ * Vendor-class replacement detector (upgrade use case: the project declares a class in a vendor's
  * own namespace and force-loads it, so the vendor's implementation is never loaded at all).
  *
- * This is the most dangerous override style in a Spryker project and the only one no other detector
- * can see. `check-dead-overrides.php` looks for Pyz classes extending a vendor parent;
+ * No other detector sees this override style. `check-dead-overrides.php` looks for Pyz classes extending a vendor parent;
  * `check-typed-members.php` compares a child against its parent. A file that simply *is*
  * `Spryker\Zed\Gui\Communication\Table\AbstractTable` has no parent to compare against — it replaces
  * the class outright, usually as a frozen copy of some older version.
  *
  * Why it matters on upgrade: the copy keeps working, so nothing turns red, but
  *   - every upstream change to that class (bug fixes, security fixes, new API) is silently discarded;
- *   - the frozen copy can break against NEW callers in core that expect the current implementation;
+ *   - the frozen copy can break against new callers in core that expect the current implementation;
  *   - if a later release moves the class, the replacement becomes an orphan nobody notices.
  *
  * Detection is structural: read the project's own autoload map from composer.json, then flag any

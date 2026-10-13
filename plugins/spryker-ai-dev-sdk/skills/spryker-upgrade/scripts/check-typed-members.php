@@ -4,13 +4,12 @@
  * Typed-member detector (upgrade use case: core adopts PHP 8.3 typed class constants or typed
  * properties, and an untyped override of one becomes a FATAL at class load).
  *
- * This is the single most common class of damage when moving onto a release whose core adopted
- * PHP 8.3 typing. "Type of Foo::BAR must be compatible with Parent::BAR of type int" is a
- * compile-time error, so it is not catchable and it aborts whatever was running — including
+ * When the target release's core adopts PHP 8.3 typing, this is a frequent class of damage.
+ * "Type of Foo::BAR must be compatible with Parent::BAR of type int" is a compile-time error, so it is not catchable and it aborts whatever was running — including
  * `vendor/bin/console`, which means transfer:generate and every other command dies on startup.
  *
- * Why a STATIC scan rather than loading classes:
- *   PHP reports only the FIRST incompatible member per class, so a class with two offending
+ * Why a static scan rather than loading classes:
+ *   PHP reports only the first incompatible member per class, so a class with two offending
  *   constants hides the second until the first is fixed. Loading also cannot see past a class
  *   that fatals. This compares declarations in the source text against the typed members found up
  *   the parent chain, so every offender in every class is reported in one pass.
@@ -191,7 +190,7 @@ foreach ($dirs as $dir) {
                     'file' => str_replace($root . '/', '', $file->getPathname()),
                     'fix' => sprintf(
                         'the parent declares $%s as %s — usually the redeclaration exists only to '
-                        . 'narrow the docblock type and should be DELETED, narrowing locally at the '
+                        . 'narrow the docblock type and should be deleted, narrowing locally at the '
                         . 'usage site instead (core may promote it as a constructor property, which '
                         . 'cannot be redeclared with a narrower type)',
                         $name,

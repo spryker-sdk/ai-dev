@@ -84,7 +84,7 @@ source, project stores differ only by locale, currency, country and name — the
 - **Rename, don't duplicate.** `mv` the primary region dir to `config/install/<REGION>/` and remove
   the other shipped region dirs — no leftover EU/US/`<REGION>` clutter pointing at stores that no
   longer exist. The one place `cp -r` is correct is seeding additional stores from the canonical dir.
-- **Broken inert config is the worst outcome.** Deleting demo store dirs breaks every manifest that
+- **Never leave broken inert config.** Deleting demo store dirs breaks every manifest that
   sources them, so Step 4 greps all of `data/import/**/*.yml` and dispositions each hit explicitly
   rather than leaving dangling YAML behind.
 - **Two owners never touch one tree, and the disposition has exactly two states.** The `b2b_robot/`
@@ -101,7 +101,7 @@ source, project stores differ only by locale, currency, country and name — the
   override in that class.
 - **The broad literal sweep is triage, not a gate.** Some hits are intentional keeps (classic-mode
   `stores.php`); classify them, don't blind-fix. `de_DE` in the Back Office translator fallback is
-  the one paired keep — it lives or dies **with** the `getBackofficeUILocales()` override, in one
+  the one paired keep — it is kept or dropped **together with** the `getBackofficeUILocales()` override, in one
   logged decision, never as a silent default on a project that speaks neither German nor English.
 - **Two translation layers, never confused.** `TRANSLATION_ZED_FALLBACK_LOCALES` and
   `getBackofficeUILocales()` govern the **Back Office/Zed** layer, whose translations ship as
@@ -111,8 +111,8 @@ source, project stores differ only by locale, currency, country and name — the
 - **Two shapes of literal, two passes.** The list-shaped sweep hunts `xx_XX` locale tokens and store
   names; it structurally cannot match a **bare** `(en|de)` alternation inside a firewall regex — which
   is why `CUSTOMER_SECURED_PATTERN` survives that pass and leaves `customer`, `cart`, `checkout` and
-  nine more routes unguarded on a non-`en`/`de` project. A *partially* correct pattern is the worst
-  case: `/en/` keeps working, so nothing looks broken.
+  nine more routes unguarded on a non-`en`/`de` project. A *partially* correct pattern hides the
+  defect: `/en/` keeps working, so nothing looks broken.
 - **Removing a locale removes everything keyed to it.** Not just the `xx_XX` tokens: the
   `.<locale>`-suffixed data-import columns, the URL/route segments in that language, and the config
   branches and regex alternations naming it. The single deliberate exception is a glossary file kept

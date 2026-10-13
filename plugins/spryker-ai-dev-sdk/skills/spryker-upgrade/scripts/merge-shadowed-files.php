@@ -16,8 +16,8 @@
  *   CLEAN      - merged without conflict markers; written when --apply
  *   CONFLICTED - needs a human; the project file is left untouched and the conflicted merge is
  *                written next to it as <file>.merge-conflict for review
- *   IDENTICAL  - project override matched the old vendor file exactly, so it was a pointless
- *                copy: the vendor version is adopted wholesale (still reported, since the
+ *   IDENTICAL  - project override matched the old vendor file exactly, so it carried no
+ *                customisation: the vendor version is adopted wholesale (still reported, since the
  *                override itself is now a candidate for deletion)
  *   NO_BASE    - no baseline copy (snapshot missing this file); skipped
  *

@@ -5,8 +5,8 @@ validation, the first `docker/sdk up`, and a fixed ladder of per-store verificat
 in an independent verifier's PASS/FAIL.
 
 This is the commit point of a project start: nothing here half-succeeds silently. A green boot log
-is not a working shop, and a correct read model is not evidence that a page renders — so the skill
-verifies at the granularity that can actually break.
+does not prove a working shop, and a correct read model does not prove that a page renders — so the
+skill verifies at the granularity that can actually break.
 
 ## When it triggers
 
@@ -82,7 +82,7 @@ flowchart TD
     G5 -- "BLOCKED — /etc/hosts declined" --> TERM([done — browser ACs BLOCKED<br/>server checks PASS server only])
     G5 -- "all PASS" --> CLOSE
 
-    CLOSE(["5 · Close<br/>git add project files only<br/>step = done · Go-live debt list<br/>re-state the /etc/hosts line"])
+    CLOSE(["5 · Close<br/>list changed files, unstaged<br/>step = done · Go-live debt list<br/>re-state the /etc/hosts line"])
     TERM --> CLOSE
 ```
 
@@ -91,6 +91,9 @@ flowchart TD
 | File | Role |
 |------|------|
 | [`SKILL.md`](SKILL.md) | The spine — pre-boot validation, bootstrap, the detached-pty boot, the §3b iteration ladder, the gate **order**, the §4c verifier gate, and the close with its go-live debt list. |
+| [`references/iteration-ladder.md`](references/iteration-ladder.md) | The §3b ladder in full — which rung (validate, targeted import, reset, clean-data + up) each kind of change needs, and how a rebuild is gated and counted. |
+| [`references/verify-gates.md`](references/verify-gates.md) | The §4 per-store gates in detail — what each one asserts and what a false green looks like. |
+| [`references/test-infrastructure.md`](references/test-infrastructure.md) | The test-infrastructure checks behind §4c — the codeception seed and the `cy:run` half that boot-and-verify carries. |
 | [`references/verify-recipes.md`](references/verify-recipes.md) | The **mechanics** of every gate and probe — exact commands, clients, schema notes and the known false-signal traps. SKILL.md owns the order; this owns how each is run. Read it before probing rather than hand-building commands. |
 
 Failure-signature triage lives one directory over, in
@@ -104,10 +107,10 @@ without it.
 
 | Gate | Asserts | The false green it catches |
 |------|---------|----------------------------|
-| **4a0** | KV/search/broker volumes are new (age + identity) | `up` recreates the DB but **reuses named volumes** — a fresh DB beside a prior project's read models, every signal correct while carrying foreign data. |
+| **4a0** | KV/search/broker volumes are new (age + identity) | `up` recreates the DB but **reuses named volumes** — a fresh DB beside an earlier project's read models, every signal correct while carrying foreign data. |
 | **4a-gen** | No `src/Generated` / `data/cache` artifact keyed by a **renamed** token | Gitignored build output no sweep or `git diff` sees — a `validation<OLD>.cache` surviving a renamed code bucket 500s every API Platform request after a green boot. |
-| **4a** | Publish queues drained, error-free, on the **project vhost** | `list_queues` against the default `/` vhost returns an empty list — a dangerous "drained". A storefront hit before the queues settle is a false 500. |
-| **4a-search** | Per-store `*_page` product-doc count > 0, via `/_count` | A missing `product-approval-status` makes the publisher write **nothing** while import, queues and DB all read perfect. `_cat/indices` lags the merge and reads near-empty. |
+| **4a** | Publish queues drained, error-free, on the **project vhost** | `list_queues` against the default `/` vhost returns an empty list — a false "drained". A storefront hit before the queues settle is a false 500. |
+| **4a-search** | Per-store `*_page` product-doc count > 0, via `/_count` | A missing `product-approval-status` makes the publisher write **nothing** while import, queues and DB all read correct. `_cat/indices` lags the merge and reads near-empty. |
 | **4b** | Per-store HTTP for **every kept app**, add-to-cart **persisted**, the logo's rendered box, **≥ N homepage slot blocks**, anonymous `/customer/overview` **302 to login** | A 200 with an error flash or an empty quote is a FAIL; a correctly-configured logo can still render at 0×0; a block-less homepage passes a `<html lang=` probe; an unguarded `/multi-cart` returns 200 and renders, so "not 500" passes the defect; Glue modelled as the Yves *fallback* leaves total API breakage unprobed. |
 | **grid** | Per store × each locale × products | An aggregate total hides a zero-locale or a price-less product slice. |
 | **4c** | An independent `spryker-verifier` agent's PASS/FAIL per AC | The agent that wrote the data judging its own work. |
@@ -115,7 +118,7 @@ without it.
 ## Design decisions baked in
 
 - **Diagnose your own delta first.** When something that worked in the fresh demoshop breaks after
-  the transformation, the change is guilty until proven otherwise — diff `data/import config src`
+  the transformation, treat the change as the cause until the evidence says otherwise — diff `data/import config src`
   and re-verify completeness before opening a single `vendor/` file.
 - **The boot needs a TTY *and* detachment.** `mutagen` and other steps run `docker … -it`, and the
   boot outlasts the 10-minute tool cap. `script` inside `run_in_background` gives both; a
@@ -126,29 +129,29 @@ without it.
 - **Never mutate the developer's Docker or host state.** No resource-limit changes, no
   `system prune`, no `volume rm`, no daemon restarts — recommend, never do.
 - **Climb the cheapest rung.** Adds → targeted `data:import` + drain; deletions, value changes and
-  insert-only importers → a DB drop via `reset`; code/deploy → `clean-data` + `up`. Testing CSV
-  edits with a full teardown each time is the waste the ladder exists to prevent.
-- **Destructive commands are announced, then asked — every time**, even when the allowlist would
-  let them through without a prompt.
+  insert-only importers → a DB drop via `reset`; code/deploy → `clean-data` + `up`. The ladder
+  exists so that CSV edits are never tested with a full teardown each time.
+- **Destructive commands are always announced; asked only when real data is at stake** — first setup,
+  a demo clone and trusted rebuilds proceed after the one-line announcement; a project that already
+  carries real data gets the question (the one policy: `spryker-import-tools`).
 - **Boot with `up -t`, always.** `-t` provides the testing container and `SPRYKER_TESTING_ENABLED=1`;
   on a plain `up`, `docker/sdk testing` is a silent no-op and codeception falls into a phantom
   `devtest` env — harness errors that read as project failures. A plain stack upgrades
   non-destructively with a re-`up -t`.
-- **Operator consent cannot clear a red gate.** A broken customer-facing surface is not a decision to
-  offer; "leave as a known issue" is not an available option. The step records `failed`/`in-progress`
+- **Operator consent cannot clear a red gate.** A broken customer-facing surface is never offered as a
+  decision; "leave as a known issue" is not an available option. The step records `failed`/`in-progress`
   and the defect goes on the go-live debt list — the declined `/etc/hosts` is the only
   terminal-with-caveat state.
 - **`script` is scoped to `up` and `reset`.** Wrapping a `console` command or `npx cypress run` in it
   fails `tcgetattr/ioctl` with an *empty* log — a wrapper failure that reads as a dead import.
 - **`/etc/hosts` declining is terminal, not a stall.** Server-side checks use `curl --resolve` and
   still stand; the browser ACs record BLOCKED and the step closes
-  `done (browser ACs BLOCKED — /etc/hosts declined)` so the run finishes honestly.
+  `done (browser ACs BLOCKED — /etc/hosts declined)` so the run finishes with an accurate status.
 
 ## Output
 
 A booted, verified project with the `boot-and-verify` step written `done` only on an all-PASS
-verifier report, the changed project files staged (run artifacts in `.ai-dev/` deliberately not
-staged), and a `## Go-live debt` section enumerating what a green boot did **not** decide: payments,
+verifier report, the changed project files listed and left unstaged for the developer, and a `## Go-live debt` section enumerating what a green boot did **not** decide: payments,
 mail, OMS, tax, legal content, demo credentials and fallback secrets, the git remote, the
 English-copy locales, and the remaining Back Office UI translation work.
 

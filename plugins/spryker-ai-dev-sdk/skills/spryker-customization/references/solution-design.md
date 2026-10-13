@@ -1,5 +1,12 @@
 # Solution design — architect brief and template (Step 3a)
 
+## Contents
+
+- [Where the document lands — sd-000, not a new format](#where-the-document-lands--sd-000-not-a-new-format)
+- [Inputs the architect must be handed (and must actually read)](#inputs-the-architect-must-be-handed-and-must-actually-read)
+- [What the plan must contain](#what-the-plan-must-contain)
+- [The architect's authority](#the-architects-authority)
+
 The brief handed to the architect subagent, and the document it produces: a **solution design** — an
 architecture document, at home in the project's `architecture/` folder. The architect is a fresh
 `general-purpose` subagent — **never a fork, never the context that will implement** — because
@@ -29,10 +36,13 @@ orchestrator's Step 0d call, not the architect's.)
 2. The **Step 0d scale envelope** (volumes + NFR numbers, with per-row sources).
 3. The Step 3 **Namespace-resolution block and `Convention:` line** — the plan's file list must sit under the resolved namespace target, and its class list is checked against the convention verdict.
 4. The feature-expert findings from Step 3.
-5. Project `CLAUDE.md` and, when present, `architecture/02-constraints.md`,
+5. **When present** — a project `CLAUDE.md`, `architecture/02-constraints.md`,
    `architecture/05-building-block-view.md`, and existing ADRs in `architecture/09-architecture-decisions/`.
+   None of these is guaranteed: a plugin-only install has no project `CLAUDE.md` at all, and a
+   composer install gets one only if `ai-dev-setup` ran and the developer accepted it. Paste what
+   exists; never block on it, and never assume a convention it would have carried.
 6. **This project's actual wiring**: `ApplicationServices.php` and the DependencyProviders the feature
-   will touch — read, never assumed. (A SEV1 whole-project outage once lived one read away in that file.)
+   will touch — read, never assumed. (A wrong entry there takes every Back Office route down.)
 
 ## What the plan must contain
 
@@ -49,7 +59,7 @@ search doc field <name>:     size ≈ <formula> per doc    → index growth <n>
 
 A formula that **multiplies two envelope dimensions** (`products × business units`,
 `customers × categories`, …) is a rejection candidate: justify it explicitly against the NFR budget
-or redesign. This single check is what disqualifies a demo-scale design before any file exists.
+or redesign. This check catches a demo-scale design before any file exists.
 
 ### 2. Publish & Synchronize design (assess → choose → agree)
 
@@ -65,7 +75,7 @@ Only for features touching search or key-value storage. Three steps, in order:
    name="event">` + a registered subscriber + queue) or a deliberate direct publish. State the
    consequence for **every write path**: import, Back Office, API, cascade delete. "Both paths
    half-present" (behavior declared, no subscriber, synchronous publish in an import hook) is a
-   forbidden end state — it shipped once and drifted the index silently on every non-import write.
+   forbidden end state — it drifts the index silently on every non-import write.
 3. **Transaction boundary.** For every write sequence touching more than one store (DB + index,
    DB + KV, delete-then-publish): name the boundary, or state explicitly *non-atomic + the recovery
    path* ("re-run the import to converge" is acceptable; not having considered it is not).
@@ -82,7 +92,7 @@ where the boundary is enforced for each. Identity never travels through client-i
 consumes it. A single sanitizing controller is the named anti-pattern: re-entrant and API paths
 bypass it.
 
-### 4. Short implementation plan (fills sd-000 §Implementation Plan — the build executes FROM this)
+### 4. Short implementation plan (fills sd-000 §Implementation Plan — the build executes from this)
 
 A **short, ordered task list** the builder works through **from the document, task by task** — so the
 build re-reads one task before starting it instead of holding the whole design in context. It opens
@@ -107,12 +117,12 @@ every file in the file-count estimate appears in exactly one task; a task with n
 a task. Step 4 executes these in order and logs `run.log` boundaries per task — deviating from the
 list mid-build is the same logged, re-surfaced decision as deviating from the design itself.
 
-### Also required (sd-000 sections, filled honestly)
+### Also required (sd-000 sections, filled in full)
 
 - **Rejected alternatives, with reasons** (§Alternatives Considered) — the seams considered and why
   the chosen one wins.
-- **Honest file-count estimate + risk list** (§Estimated Effort, §Risks). This estimate feeds Step
-  4's scope tripwire (>50% over → stop and re-plan), so it must be a real count, not a hope.
+- **Realistic file-count estimate + risk list** (§Estimated Effort, §Risks). This estimate feeds Step
+  4's scope tripwire (>50% over → stop and re-plan), so it must be a real count.
 - **Convention line** — carry the orchestrator's Code-convention resolution verdict into the plan so
   the class list is checkable against it.
 
@@ -120,6 +130,6 @@ list mid-build is the same logged, re-surfaced decision as deviating from the de
 
 The brief includes, verbatim: *"You may reject this approach outright on scale or code-volume
 grounds and demand a re-cut. Your verdict goes to the user at the plan gate — never soften a
-rejection into a caveat."* A plan whose growth characteristics bust the envelope, or whose file
+rejection into a caveat."* A plan whose growth characteristics exceed the envelope, or whose file
 count is disproportionate to the feature, is returned as REJECTED with the reason and a sketched
 alternative — not polished and passed along.

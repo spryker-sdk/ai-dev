@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Zero-dependency test for lib/csv.php. Run: php lib/tests/csv.test.php
+ * Zero-dependency test for scripts/csv.php. Run: php scripts/csv.test.php
  * Exits 0 if all pass, 1 otherwise. No phpunit (zero-dep rule).
  */
 
@@ -114,7 +114,7 @@ $bad = json_decode((string) $badJson, true);
 check('CLI missing file: status error', ($bad['status'] ?? '') === 'error');
 
 // preview (no --out/--in-place) is the destructive-op gate's evidence — the
-// counts are full, the echoed rows are capped (a glossary preview once printed 626 KB)
+// counts are full, the echoed rows are capped (a full glossary preview runs to hundreds of KB)
 $bigPrev = $tmp . '/preview_big.csv';
 $bigRows = "id,locale\n";
 for ($i = 1; $i <= 60; $i++) {
@@ -132,8 +132,7 @@ $prevLim = json_decode((string) $prevLimJson, true);
 check('CLI preview: --limit overrides the cap', is_array($prevLim['rows'] ?? null) && count($prevLim['rows']) === 5 && ($prevLim['rowsShown'] ?? null) === 5);
 
 // ---------------------------------------------------------------------------
-// General mechanics (formerly the "locale-duplicate" concept — now concept-free
-// ops the AI/skill drives with its own parameters).
+// General mechanics: concept-free ops the AI/skill drives with its own parameters.
 // ---------------------------------------------------------------------------
 
 // duplicate-columns: the locale-copy use case, but the function knows nothing of locales.
@@ -201,12 +200,12 @@ $scWhere = csv_scale($prices, 'value_gross', 2.0, true, ['currency' => 'USD']);
 check('scale --where applies to matching only', $scWhere['rows'][0]['value_gross'] === '2000');
 
 // scale JSON: volume-price tiers embedded in a cell (price_data.volume_prices).
-// String-pattern based (NOT json_decode) — the real demoshop cells are often
+// String-pattern based (not json_decode) — the demoshop cells are often
 // invalid JSON with empty values like `"gross_price":`.
 $vol = ['header' => ['sku', 'price_data.volume_prices'], 'rows' => [
     ['sku' => 'A1', 'price_data.volume_prices' => '[{"quantity":10,"net_price":900,"gross_price":1000},{"quantity":50,"net_price":800,"gross_price":900}]'],
     ['sku' => 'A2', 'price_data.volume_prices' => ''],  // empty cell → skipped
-    ['sku' => 'A3', 'price_data.volume_prices' => '[{"quantity":5,"net_price":350,"gross_price":}]'],  // real-world INVALID JSON: empty gross_price
+    ['sku' => 'A3', 'price_data.volume_prices' => '[{"quantity":5,"net_price":350,"gross_price":}]'],  // invalid JSON as shipped: empty gross_price
 ]];
 $sj = csv_scale($vol, 'price_data.volume_prices', 2.0, true, [], 'exact', ['net_price', 'gross_price']);
 $d0 = json_decode($sj['rows'][0]['price_data.volume_prices'], true);
@@ -312,7 +311,7 @@ check('scale --rates: PLN×4.3', csv_filter($rateData['rows'], ['sku' => 'A'])[0
 check('scale --rates: UAH×45', csv_filter($rateData['rows'], ['sku' => 'B'])[0]['value_gross'] === '45000');
 check('scale --rates: unlisted currency (EUR) untouched', csv_filter($rateData['rows'], ['sku' => 'C'])[0]['value_gross'] === '1000');
 
-// scale: repeated --column scales net + gross together in one call (D1 regression — was a TypeError)
+// scale: repeated --column scales net + gross together in one call
 $multiColFile = $tmp . '/multicol.csv';
 file_put_contents($multiColFile, "sku,value_net,value_gross\nA,100,200\n");
 $mc = json_decode((string) shell_exec("{$php} {$lib} scale " . escapeshellarg($multiColFile) . ' --column value_net --column value_gross --by 2 --in-place 2>&1'), true);
@@ -321,7 +320,7 @@ $mcData = csv_read($multiColFile);
 check('scale repeated --column: net doubled', csv_filter($mcData['rows'], ['sku' => 'A'])[0]['value_net'] === '200');
 check('scale repeated --column: gross doubled', csv_filter($mcData['rows'], ['sku' => 'A'])[0]['value_gross'] === '400');
 
-// read: multiple files rejected, not silently truncated to the first (D2 regression)
+// read: multiple files rejected, not silently truncated to the first
 $rd1 = $tmp . '/rd1.csv';
 $rd2 = $tmp . '/rd2.csv';
 file_put_contents($rd1, "a\n1\n");
@@ -344,7 +343,7 @@ check('apply-translations: source column untouched', csv_filter($trData1['rows']
 check('apply-translations: non-target column (url) byte-identical', array_column($trData0['rows'], 'url.uk_UA') === array_column($trData1['rows'], 'url.uk_UA'));
 check('apply-translations: missing map columns → clean error', ($e = json_decode((string) shell_exec("{$php} {$lib} apply-translations " . escapeshellarg($trFile) . ' --target-column name.uk_UA --map ' . escapeshellarg($trFile) . ' --in-place 2>&1'), true)) && ($e['status'] ?? '') === 'error');
 
-// REGRESSION (review): scale must reject a bad factor, not silently zero prices.
+// scale must reject a bad factor, not silently zero prices.
 $badScaleFile = $tmp . '/badscale.csv';
 file_put_contents($badScaleFile, "sku,value_gross,currency\nA,1000,PLN\n");
 $bs1 = json_decode((string) shell_exec("{$php} {$lib} scale " . escapeshellarg($badScaleFile) . ' --column value_gross --by abc --in-place 2>&1'), true);
@@ -356,7 +355,7 @@ $bs3 = json_decode((string) shell_exec("{$php} {$lib} scale " . escapeshellarg($
 check('scale --rates with empty rate → error', ($bs3['status'] ?? '') === 'error');
 check('scale bad rate: file still 1000', str_contains((string) file_get_contents($badScaleFile), '1000'));
 
-// REGRESSION (review): a malformed --where must be a hard error, not silently dropped.
+// a malformed --where must be a hard error, not silently dropped.
 $whereFile = $tmp . '/where.csv';
 file_put_contents($whereFile, "sku,currency\nA,PLN\nB,UAH\n");
 $w1 = json_decode((string) shell_exec("{$php} {$lib} delete " . escapeshellarg($whereFile) . ' --where currency=PLN --where TYPObadpair --in-place 2>&1'), true);
@@ -448,7 +447,7 @@ check('rename-columns: absent old → skipped, header unchanged', $rcAbsent['hea
 $rcCollide = csv_rename_columns(['header' => ['a', 'b'], 'rows' => [['a' => '1', 'b' => '2']]], [['a', 'b']]);
 check('rename-columns: rename onto existing column skipped (no silent merge)', $rcCollide['header'] === ['a', 'b'] && $rcCollide['skippedColumns'] === ['a']);
 
-// CLI rename-columns --in-place: the ostrem offer-price case (product_price columns → offer refs).
+// CLI rename-columns --in-place: deriving offer prices from product_price columns (→ offer refs).
 $rnFile = $tmp . '/rn.csv';
 file_put_contents($rnFile, "concrete_sku,value_net,value_gross\nOST-1,10,12\n");
 $rnJson = json_decode((string) shell_exec("{$php} {$lib} rename-columns " . escapeshellarg($rnFile) . ' --rename concrete_sku:product_offer_reference --in-place 2>&1'), true);
@@ -495,7 +494,7 @@ check('derive: non-numeric --factor → error (nothing zeroed)', ($dvBad['status
 $dvNoArg = json_decode((string) shell_exec("{$php} {$lib} derive " . escapeshellarg($dvFile) . ' --source value_net --factor 2 --in-place 2>&1'), true);
 check('derive: missing --target → error', ($dvNoArg['status'] ?? '') === 'error');
 
-// B4 regression — a file arg placed AFTER the first flag is a stray positional → error, not silently ignored.
+// a file arg placed after the first flag is a stray positional → error, not silently ignored.
 $b4a = $tmp . '/b4a.csv';
 $b4b = $tmp . '/b4b.csv';
 file_put_contents($b4a, "sku,store\nA,X\n");
@@ -504,8 +503,8 @@ $b4 = json_decode((string) shell_exec("{$php} {$lib} set " . escapeshellarg($b4a
 check('CLI: file arg after first flag → error, not silent skip (B4)', ($b4['status'] ?? '') === 'error');
 check('CLI: the stray-arg error left the second file untouched (B4)', csv_read($b4b)['rows'][0]['store'] === 'X');
 
-// A1/A2 regression — filter/delete must ERROR on an ABSENT column, not silently keep-nothing.
-// (Following clean.md's cms_block step with the wrong `name` column wiped every email body and reported "ok".)
+// filter/delete must error on an absent column, not silently keep nothing
+// (a keep-filter on a column cms_block.csv does not have would otherwise empty the file and report "ok").
 $cmsFile = $tmp . '/cms_block.csv';
 file_put_contents($cmsFile, "block_key,block_name\ncms-block-email--registration,Reg\nhome-hero,Hero\n");
 $fMiss = json_decode((string) shell_exec("{$php} {$lib} filter " . escapeshellarg($cmsFile) . ' --where name=cms-block-email-- --match prefix --out ' . escapeshellarg($tmp . '/o.csv') . ' 2>&1'), true);
@@ -517,19 +516,42 @@ check('filter: correct column keeps the match (A1)', ($fOk['status'] ?? '') === 
 $fTrunc = json_decode((string) shell_exec("{$php} {$lib} filter " . escapeshellarg($cmsFile) . ' --where block_key=__none__ --out ' . escapeshellarg($tmp . '/trunc.csv') . ' 2>&1'), true);
 check('filter: never-matching VALUE on a real column → ok, header-only (clean truncation preserved)', ($fTrunc['status'] ?? '') === 'ok' && count(csv_read($tmp . '/trunc.csv')['rows']) === 0);
 
-// A3 regression — replace --regex with an invalid pattern must ERROR, not blank the column.
+// replace --regex with an invalid pattern must error, not blank the column.
 $reFile = $tmp . '/re.csv';
 file_put_contents($reFile, "url\n/en/x\n");
 $reBad = json_decode((string) shell_exec("{$php} {$lib} replace " . escapeshellarg($reFile) . " --column url --search '^/en/' --with /pl/ --regex --in-place 2>&1"), true);
 check('replace --regex: invalid pattern → error (A3)', ($reBad['status'] ?? '') === 'error');
 check('replace --regex: invalid pattern left the cell unchanged (A3)', csv_read($reFile)['rows'][0]['url'] === '/en/x');
 
-// B5 regression — scale --rates with a wrong --currency-column must ERROR, not silently convert nothing.
+// scale --rates with a wrong --currency-column must error, not silently convert nothing.
 $b5File = $tmp . '/b5.csv';
 file_put_contents($b5File, "currency,value_gross\nPLN,100\n");
 $b5 = json_decode((string) shell_exec("{$php} {$lib} scale " . escapeshellarg($b5File) . ' --column value_gross --rates PLN=4.3 --currency-column currency_code --in-place 2>&1'), true);
 check('scale --rates: absent currency-column → error, not silent 0 (B5)', ($b5['status'] ?? '') === 'error');
 check('scale --rates: value unchanged after the error (B5)', csv_read($b5File)['rows'][0]['value_gross'] === '100');
+
+// --- append / add-row: the authoring operation every generate pass needs ---
+$ap = $tmp . '/glossary_ap.csv';
+file_put_contents($ap, "key,translation,locale\nk1,one,en_GB\nk2,two,en_GB\n");
+file_put_contents($tmp . '/new_rows.csv', "key,translation\nk2,dup\nk3,three\n");
+$apRes = csv_append(csv_read($ap), csv_read($tmp . '/new_rows.csv'), 'key');
+check('append: subset header accepted, missing column empty, dedupe skips existing key', $apRes['appended'] === 1 && $apRes['skipped'] === 1 && $apRes['rows'][2] === ['key' => 'k3', 'translation' => 'three', 'locale' => '']);
+$apNo = csv_append(csv_read($ap), csv_read($tmp . '/new_rows.csv'), null);
+check('append: without --dedupe-on every row is appended', $apNo['appended'] === 2);
+try {
+    csv_append(csv_read($ap), ['header' => ['key', 'bogus'], 'rows' => [['key' => 'x', 'bogus' => 'y']]], null);
+    check('append: unknown incoming column is an error', false);
+} catch (RuntimeException $e) {
+    check('append: unknown incoming column is an error', str_contains($e->getMessage(), "'bogus'"));
+}
+$apJson = json_decode((string) shell_exec("{$php} {$lib} append " . escapeshellarg($ap) . ' --from ' . escapeshellarg($tmp . '/new_rows.csv') . ' --dedupe-on key --in-place'), true);
+check('CLI append --in-place: reports appended/skipped and writes LF', ($apJson['appendedRows'] ?? null) === 1 && ($apJson['skippedRows'] ?? null) === 1 && !str_contains((string) file_get_contents($ap), "\r\n") && count(csv_read($ap)['rows']) === 3);
+$arJson = json_decode((string) shell_exec("{$php} {$lib} add-row " . escapeshellarg($ap) . ' --set key=k4 --set translation=four --set locale=de_DE --in-place'), true);
+check('CLI add-row: appends one row with the given cells', ($arJson['appendedRows'] ?? null) === 1 && csv_read($ap)['rows'][3] === ['key' => 'k4', 'translation' => 'four', 'locale' => 'de_DE']);
+$arBad = json_decode((string) shell_exec("{$php} {$lib} add-row " . escapeshellarg($ap) . ' --set nope=1 --in-place 2>/dev/null'), true);
+check('CLI add-row: unknown column is a hard error, file untouched', ($arBad['status'] ?? '') === 'error' && count(csv_read($ap)['rows']) === 4);
+$orderJson = json_decode((string) shell_exec("{$php} {$lib} columns --plain " . escapeshellarg($ap) . ' 2>/dev/null'), true);
+check('CLI: a flag before the file names the actual problem', ($orderJson['status'] ?? '') === 'error' && str_contains(json_encode($orderJson), 'did you put a --flag before the file'));
 
 // cleanup
 array_map('unlink', glob($tmp . '/*') ?: []);

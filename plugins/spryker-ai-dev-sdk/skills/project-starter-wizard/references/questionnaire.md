@@ -1,13 +1,31 @@
 # Project setup questionnaire (the fillable question list)
 
+## Contents
+
+- [Three ways to use it](#three-ways-to-use-it)
+- [How to answer](#how-to-answer)
+- [Group P — Project identity  (→ interview §1, step brand-project)](#group-p--project-identity---interview-1-step-brand-project)
+- [Group N — Code namespace  (→ interview §2, step configure-codebase)](#group-n--code-namespace---interview-2-step-configure-codebase)
+- [Group S — Services & applications  (→ interview §3, step configure-services)](#group-s--services--applications---interview-3-step-configure-services)
+- [Group T — Stores  (→ interview §4, step define-stores)](#group-t--stores---interview-4-step-define-stores)
+- [Group D — Demo data  (→ interview §5, step project-data)](#group-d--demo-data---interview-5-step-project-data)
+- [Group C — Catalog scope  (→ interview §6, project-data reduce pass)](#group-c--catalog-scope---interview-6-project-data-reduce-pass)
+- [Group L — Localization  (→ interview §7, step translate-content)](#group-l--localization---interview-7-step-translate-content)
+- [Group Q — Automatic quality checks (CI)  (→ interview §8, step project-ci-generator)](#group-q--automatic-quality-checks-ci---interview-8-step-project-ci-generator)
+- [Group R — Run configuration  (R1 and R2 are required — and asked LAST)](#group-r--run-configuration--r1-and-r2-are-required--and-asked-last)
+- [Minimum viable answer set](#minimum-viable-answer-set)
+- [Copy-paste answer block](#copy-paste-answer-block)
+
 This is the canonical list of everything the wizard needs to turn a fresh demoshop clone into your
 project **without interviewing you live**. It is the same nine decision sections the live interview
 walks through (`interview.md`), flattened into a file you can fill at your own pace.
 
 **Every question has a default.** Leaving a line blank means "take the default" — it does NOT mean
 "ask me". A file where you answered nothing at all is a valid, complete answer set: it produces a
-rebrand-only project on the shipped demoshop defaults. That is the whole point — you fill only what
-you care about.
+rebrand-only project on the shipped demoshop defaults, so you fill only what
+you care about. **This applies only to a copy of this file you filled and handed over.** A prose brief is
+not a questionnaire, and on a live interview there are no blanks — only questions not yet asked; the
+wizard asks them all before it runs in either mode.
 
 ## Three ways to use it
 
@@ -27,8 +45,12 @@ its source noted, so every step reads the same grounded input.
 
 - Plain, short answers. A name, a token, a yes/no, a comma-separated list.
 - **Blank = take the default.** Defaults are shown inline as `(default: …)`.
-- `[REQUIRED]` means the wizard cannot proceed without it — there are only **three** (P1, R1, R2).
-  Everything else has a working default.
+- `[REQUIRED]` means the wizard cannot proceed without it — P1, R1 and R2. Everything else has a
+  working default.
+- **Group R is asked last**, always. When the wizard walks you through this list interactively, the
+  run mode is the final question, after every other section has an answer. Asking it first would
+  let "autonomous" be read as licence to decide questions that were never asked. Autonomous mode
+  begins only once every question has been asked and answered; collecting them is never autonomous.
 - **"decide for me" is a valid answer to any question.** In `autonomous` mode the wizard picks and
   logs it; in `collaborative` mode it asks you.
 - Some sections are **gated** by an earlier answer (marked `only if …`). If the gate does not apply,
@@ -40,6 +62,15 @@ its source noted, so every step reads the same grounded input.
 
 ## Group P — Project identity  (→ interview §1, step `brand-project`)
 
+P0. Purpose — `demo` or `project`?  `(default: project)`
+    - **`demo`** — a customer pitch built from a real source site. CI generation and the e2e suite
+      migration default to **skipped**, go-live debt (licensing of the source content, demo password
+      rotation, CDN imagery) is **not** raised, and wherever options are offered the recommended one
+      is the one closest to the source site's appearance, not the one that imports fewer rows.
+    - **`project`** — a real customer codebase that will be developed and deployed. Everything above
+      applies in reverse: CI and the suites are in scope and go-live debt is worth naming early.
+    A wrong answer puts a demo through a CI wipe and a Cypress migration it does not need, and raises
+    licensing questions about scraped source content that a demo never has to settle.
 P1. `[REQUIRED]` Project name? (drives the composer name, docker namespace, README title)
     e.g. `acme-shop`
 P2. Local dev domain? `(default: spryker.local)` e.g. `acme.local`
@@ -51,14 +82,20 @@ P3. Brand colors — 1 or 2 hex values, primary first; the full palette is deriv
 P4. Custom logo — a file path or URL to your logo.
     `(default: keep the shipped Spryker logo — flagged as a go-live follow-up)`
     Never fabricated: no answer = the Spryker logo stays.
+P5. Which site(s) should this shop look like? — one or more URLs, usually the customer's live site.
+    `(default: none — no reference; never picked for you)` e.g. `https://www.acme.com`
+    Recorded as `project.reference_sites`; `brand-project` reads it for layout (asked with P3/P4).
 
 ## Group N — Code namespace  (→ interview §2, step `configure-codebase`)
 
 N1. Your project's own private code area, kept separate from the demo code **so Spryker updates
-    don't overwrite your customizations**. `(default: Pyz — the shipped shared area)`
-    Answer either `Pyz` (keep) or a CamelCase name, e.g. `Acme`. Recommended if you expect to
-    customize much. If you want one but don't care about the name, write `custom` and the wizard
-    derives it from P1.
+    don't overwrite your customizations**. `(default: keep — whatever namespace the clone ships;
+    `Pyz` on a stock demoshop, `Demo` ahead of `Pyz` on a demo branch, possibly something else on a
+    partner clone — the wizard reads `PROJECT_NAMESPACES` and never assumes)`
+    Answer either `keep` (recorded as `namespace: { mode: keep-shipped, name: <resolved> }`, and
+    the confirmation names the resolved value) or a CamelCase name, e.g. `Acme`. Recommended if
+    you expect to customize much. If you want one but don't care about the name, write `custom`
+    and the wizard derives it from P1.
 
 ## Group S — Services & applications  (→ interview §3, step `configure-services`)
 
@@ -87,7 +124,7 @@ T1. Your stores. `(default: keep the shipped demo stores — EU: DE, AT)`
     **Leaving this blank is what unlocks `leave` mode in D1** (a rebrand-only project).
     **This is the one default the wizard confirms OUT LOUD before acting on it, in both run modes.** A
     blank T1 resolves out of a `deploy.dev.yml` you never edited and then cascades into
-    `data.mode: leave` — and a store answer inherited from an untouched file is not an answer. So
+    `data.mode: leave` — and a store value inherited from an untouched file has not been chosen. So
     before `define-stores` runs you get a plain confirmation and it waits: **"your project will ship
     the demo stores DE/AT in region EU, and the demo data stays exactly as shipped — confirm."**
     **Your store code is public.** It appears in **every** storefront URL as `/<STORE>/<lang>/…` and in
@@ -106,7 +143,10 @@ T1. Your stores. `(default: keep the shipped demo stores — EU: DE, AT)`
     (they'd share a 2-char URL prefix, so the second is unreachable).
 T2. Region token — the deploy-file deployment group your stores live in.
     `(default: the wizard proposes one from your stores' geography, e.g. NA for US+CA)`
-    Two collisions are rejected: the shipped region tokens (`EU`, and the dormant `US`), **and any of
+    **Reusing the shipped token (`EU`) is the DEFAULT when the project REPLACES the shipped region
+    outright** — the single-region case this wizard builds — because the shipped hosts entries and
+    deploy endpoints stay valid. A collision is rejected only when the shipped region SURVIVES
+    alongside a new one, or against **any of
     your own store names** — a region named `US` alongside a store named `US` is ambiguous in the
     deploy file and later config. So a single `US` store gets region `NA`, not `US`.
     If the proposed token also collides (a store literally named `NA`), keep proposing — next-widest
@@ -123,9 +163,14 @@ D1. What to do with the shipped demo catalog? `(default: adapt if T1 changed sto
       re-persisted under new stores) — the wizard warns, it isn't a defect.
     - `clean` — no demo catalog: a minimal shop that boots green (empty catalog, working
       email/tax/payment/shipment config, your stores).
-    - `generate` — author a small themed catalog in your own vertical.
-      **⚠ experimental / supervised: unstable, interaction-heavy, NOT hands-off.** You must stay
-      present and validate the result. Do not pick this for an autonomous run.
+    - `generate` — a project catalog in place of the demo one. **Name the source** (recorded as
+      `data.source`):
+      - `generate authored` — the wizard writes the catalog content from a theme (D3 inputs).
+        **⚠ experimental / supervised: unstable, interaction-heavy, NOT hands-off.** You must stay
+        present and validate the result. Do not pick this for an autonomous run.
+      - `generate dataset: <path>` — you supply a complete, already-structured catalogue (masters,
+        variants, images, category tree, related products). No authoring; D3 asks only for the path
+        and the field mapping. **Safe for an autonomous run.**
     - `leave` — leave the demo data exactly as shipped (rebrand-only; skips all store + data work).
       **Valid only if T1 is blank / unchanged.**
     **Not an option, and never asked:** adding a generated catalog *alongside* the demo catalog.
@@ -147,7 +192,13 @@ D2. `only if D1 = adapt or generate` Currency → rate table (drives price conve
       wrong exchange rate silently mis-prices the whole catalog, so it fails the "reversible" test
       that lets autonomous decide alone.
 
-D3. `only if D1 = generate` The generate inputs (stores/locales/currencies come from Group T):
+D3. `only if D1 = generate` The generate inputs (stores/locales/currencies come from Group T).
+    **If `D1 = generate dataset`, answer only these two and skip the rest of D3:**
+    - dataset path — readable from this clone's machine, e.g. `data/acme-catalogue/`
+    - field mapping — which file/column feeds each of: sku, name, description, category, price
+      (+ currency), image, variant axis (e.g. `sku: masters.csv:article_no`). Recorded as
+      `data.dataset_mapping`; the wizard never guesses a column.
+    **If `D1 = generate authored`, the authoring inputs:**
     - theme (free text), e.g. `women's dresses`
     - product count `(default: ~20)`
     - categories (or let the wizard propose them)
@@ -171,6 +222,35 @@ D3. `only if D1 = generate` The generate inputs (stores/locales/currencies come 
       their names, or say `single-seller` for a simpler shop. Each additional seller is a distinct
       merchant (not one merchant selling the same product twice in the buy box).
 
+D4. `only if D1 = clean or generate, OR C1 removes branches` What happens to the shipped
+    **non-catalogue** data? The demoshop ships far more than products, and most of it points at demo
+    SKUs: those rows import cleanly against a changed catalogue and then fail **silently** — empty
+    screens and 404s in exactly the B2B flows a demo opens first (quote request, shopping list,
+    product list). `(default: the wizard proposes drop for SKU-bound activity, rebuild for CMS and
+    navigation, keep for accounts — and shows you the table before acting)`
+    **The wizard fills the counts, you fill the last column.** It runs
+    `php <VALIDATE> inventory <shipped manifest>` and renders, per group: entity → row count →
+    breaks when the catalogue changes? → your answer, one of `drop` / `keep` / `rebuild`:
+
+    | group | entities (from inventory) | breaks? | drop / keep / rebuild |
+    |---|---|---|---|
+    | quote requests | quote_request, quote_request_version | yes | |
+    | shopping lists | shopping_list, items, business-unit + company-user relations | yes | |
+    | product lists | product_list, categories, merchant relation, ssp model, content lists | yes | |
+    | sales orders | sales_order (+ items) | yes | |
+    | customers | customer, addresses | no (demo accounts) | |
+    | companies | company, business_unit, company_user, roles | no (demo accounts) | |
+    | CMS | cms_page, cms_block (+ slot relations) | partly (product/category links) | |
+    | navigation | navigation, navigation_node, content_navigation | partly (category targets) | |
+    | discounts | discount, discount_amount, voucher | partly (SKU/category conditions) | |
+    | SSP | ssp assets, inquiries, service points, files | partly | |
+
+    `rebuild` = re-author against the final catalogue (project-data owns it); `keep` is valid only
+    for a group referencing nothing the catalogue change removes. Recorded as
+    `data.existing_data: { <group>: … }`; **project-data diffs it against the final manifest before
+    `done`** — every `drop` absent, every `keep`/`rebuild` present and reference-clean — so a wrong
+    answer fails at the gate, not at demo time.
+
 ## Group C — Catalog scope  (→ interview §6, `project-data` reduce pass)
 
 C1. `only if D1 = adapt` Does the project sell the whole demo catalog, or only part of it?
@@ -180,7 +260,7 @@ C1. `only if D1 = adapt` Does the project sell the whole demo catalog, or only p
     `remove: office-supplies, transport`.
     **The wizard reads `category.csv` first and offers the branches BY NAME WITH THE PRODUCT COUNT
     under each** — "Office (388)", "Transport (26)" — so you are choosing a *set*, not a label. A
-    themed phrase ("only heating & energy") is never acted on unresolved: the wizard shows you which
+    themed phrase ("only one top-level branch") is never acted on unresolved: the wizard shows you which
     branches and counts it maps to and asks you to confirm that tree. **This is the only place catalog
     scope is asked** — once the set is confirmed here the run applies it without stopping again,
     however large the drop.
@@ -188,11 +268,17 @@ C1. `only if D1 = adapt` Does the project sell the whole demo catalog, or only p
 
 ## Group L — Localization  (→ interview §7, step `translate-content`)
 
-L1. Actually translate a locale's storefront content? `(default: no — every locale stays an English
-    copy, flagged as translation debt)`
+L1. Does any storefront wording need to change — **a different language, OR a different
+    register/variant of the same language** (`en_US → en_GB`, cart → basket, catalog → catalogue)?
+    `(default: no — every locale stays an English copy, flagged as translation debt)`
+    Both are the same glossary work and both are answered here — a same-language wording change is
+    not "translation" in everyday words, so it is easily recorded elsewhere and dropped.
     Translating is slow and strictly opt-in, and it runs **after** a green boot — it never blocks setup.
     If yes: which locale(s), and scope `glossary` (UI text only) or `catalog` (glossary + product
     content).
+    **Consistency rule the wizard enforces:** if your brief or any answer names specific UI wording,
+    `L1` cannot be `no` — a state file with a wording requirement beside `localize: { locales: [] }`
+    is refused and this question is asked.
 
 ## Group Q — Automatic quality checks (CI)  (→ interview §8, step `project-ci-generator`)
 
@@ -208,7 +294,7 @@ Q3. `only if Q1 = developer-tunes-it` The technical detail, for a technical answ
     code-quality + functional gating kept, heavy product-QA suites dropped), and cleanup of the demo
     CI files being replaced.
 
-## Group R — Run configuration  (always answer these two)
+## Group R — Run configuration  (R1 and R2 are required — and asked LAST)
 
 These decide HOW the wizard runs, not what your project is.
 
@@ -241,7 +327,7 @@ R2. `[REQUIRED]` Acknowledge the hard-stops (they apply in **both** modes — au
       GitHub token. The wizard cannot do these for you.
     - **a step failure** — it stops with guidance rather than pressing on.
     So even a fully-filled questionnaire in `autonomous` mode is **not** a run that never speaks
-    again: expect to be consulted on destructive operations and on any data defect the boot surfaces.
+    again: expect to be consulted on destructive operations, and on decisions only you can make (a store-keyed money decision, a namespace collision).
     Anything other than `ack` (or blank) counts as **not acknowledged** — the wizard asks R2 once as a
     plain question and waits. It never proceeds by treating a non-`ack` answer as consent, and it never
     weakens a hard-stop on the strength of this answer: `ack` records that you know they will fire, it
@@ -271,11 +357,13 @@ boolean — `NO` (Norway), `ON` (Ontario), `Y`, `N`, `OFF`, `TRUE`, `FALSE` — 
 Quote it here and the wizard keeps it quoted everywhere it lands.
 
 ```yaml
+P0: demo
 P1: acme-shop
 P2: acme.local
 P3: "#C8102E, #F0B323"
 P4:                      # logo path/URL, blank = keep Spryker logo
-N1: Acme                 # or Pyz, or `custom`
+P5:                      # reference site URL(s) to look like, blank = none
+N1: Acme                 # or `keep` (the shipped namespace), or `custom`
 S2: [swagger]            # dev services OFF
 S4: [static]             # applications OFF
 T1: |
@@ -283,10 +371,12 @@ T1: |
   |---|---|---|---|---|
   | US | en_US | USD | US | America/New_York |
 T2: NA
-D1: adapt
+D1: adapt                # or clean | generate authored | generate dataset: <path> | leave
 D2: { USD: 1.08 }
+D3:                      # generate only — dataset: path + field mapping; authored: theme, counts, prices, imagery
+D4:                      # clean/generate, or C1 removes branches — per group: drop | keep | rebuild (wizard shows the counts first)
 C1: keep all
-L1: no
+L1: no                   # any wording change, even same-language (cart → basket) = yes
 Q1: set-up
 Q2: no
 R1: autonomous

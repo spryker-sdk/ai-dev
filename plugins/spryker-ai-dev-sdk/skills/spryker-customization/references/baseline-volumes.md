@@ -27,7 +27,7 @@ as seed content when offering to populate an empty §10.
 | Business units | **4,000 – 120,000** | Branches (Business Units) |
 | Company users | **10,000 – 300,000** | Company Users |
 
-**Worked example — why the envelope rejects designs by arithmetic, not opinion.** A feature that
+**Worked example — the envelope rejects a design by arithmetic.** A feature that
 writes per-business-unit data into every product's shared search document grows as
 `abstract products × business units` = 70,000 × 120,000 ≈ **8.4 billion** index entries at the upper
 bound (~280 million at the lower). No judgement call remains: the growth-characteristic check in the

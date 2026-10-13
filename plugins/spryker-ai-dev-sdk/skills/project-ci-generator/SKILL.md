@@ -13,7 +13,7 @@ description: >-
 Product/vendor repositories ship CI that must protect every customer, every database, every
 language version, and the upstream release process. A **project** inherits all that machinery
 but needs almost none of it — it targets one environment and only needs to gate its own
-commits. This skill turns the heavy inherited CI into a single, honest project pipeline.
+commits. This skill turns the heavy inherited CI into a single project pipeline.
 
 The guiding principle: **a project CI should contain only jobs whose failure a project
 developer must act on.** Anything that exists to protect the product's release, its
@@ -46,7 +46,7 @@ they encode the upstream project's own guidance on what a project keeps vs drops
 starting classification. Still confirm each one against the questionnaire answers rather than
 applying it blindly — a marker is a strong hint, not a final decision.
 
-On an un-annotated CI (no markers), classify by these marker-free heuristics instead of vibes:
+On an un-annotated CI (no markers), classify by these marker-free heuristics instead of guessing:
 - **drop-shaped:** matrix `strategy` over PHP/database versions; release-branch or tag triggers;
   upmerge/sync automation; API/doc publishing for the product; full product QA / E2E suites that
   need the product's own infrastructure; anything gated on upstream-repo secrets.
@@ -72,8 +72,9 @@ Carry forward anything the user already answered earlier instead of re-asking.
 
 Derive the plan from the discovery plus the answers — do not recite a canned one. For each
 discovered job decide keep vs drop; for each support file decide keep (referenced by a
-surviving job) vs drop. Present the keep/drop lists and the output path, and get an explicit
-go-ahead. Deleting CI is outward-facing and hard to reverse, so confirm before acting. If the
+surviving job) vs drop. Present the keep/drop lists and the output path. Standalone, get an explicit go-ahead before
+deleting, because CI is outward-facing. In a wizard run the confirmed `ci:` block is the go-ahead:
+announce the lists, then proceed (the destructive-operation policy in `spryker-import-tools`). If the
 user hesitates at the wipe, offer to annotate the existing CI in place instead.
 
 ### 4. Rebuild
@@ -108,14 +109,14 @@ recovered afterwards.**
    State the restore command in the final report, e.g.
    `git checkout ci-pre-cleanup-<sha> -- .github/ config/install/` (tag) or
    `cp -R .ai-dev/ci-backup/github/. .github/` (copy).
-4. **Delete with `git rm`, not `rm`.** Every removal then lands as a reviewable staged change
-   the user can inspect with `git diff --cached --stat` and undo with `git restore --staged`.
-   Use `git rm -r --cached`-plus-`rm` only for files git does not track; note those separately
-   in the report, since they are the ones the tag does not cover.
+4. **Delete tracked files with `rm`, one path at a time, and leave the deletions unstaged.** They
+   show in `git status` as deleted, the user reviews them with `git diff --stat` and restores any
+   with `git restore <path>`; staging is the user's decision. Files git does not track cannot be
+   restored by git: leave them in place and list them in the report for the user to delete.
 
 Prune the files the plan drops. Write the single project CI from the surviving jobs, reusing
-their real commands verbatim — those are already correct for this repo's tooling, which is the
-whole reason to transform rather than template. Apply the agreed trims (single version,
+their real commands verbatim — those are already correct for this repo's tooling, which is why
+this skill transforms the CI rather than templating it. Apply the agreed trims (single version,
 product-only steps removed, dependencies wired only among surviving jobs, notifications on or
 off). Keep exactly the support files surviving jobs reference. Never invent a job or step: if
 the questionnaire selected something the source CI doesn't contain, say so.
@@ -138,10 +139,10 @@ a dropped job happened to reference it.**
    Resolve (c) **before deleting anything** — fixture dirs are reachable *only* through a manifest,
    so the moment a manifest is deleted the reference chain to its fixture tree is cut and the
    consumers can no longer be found. *Failure signature:* a `data/import/<something>/` tree with
-   dozens of CSVs that no surviving manifest names, discovered later by someone else's
-   dangling-manifest sweep. Observed: dropping a robot suite correctly removed its CI jobs, deploy
-   files, install recipes, `data/import/b2b_robot/` and the `*_ROBOT.yml` manifests — and left
-   `data/import/robot/{AT,DE,common}` (~85 files) fully orphaned.
+   dozens of CSVs that no surviving manifest names, found by a later dangling-manifest sweep. For
+   example, dropping a robot suite removes its CI jobs, deploy files, install recipes,
+   `data/import/b2b_robot/` and the `*_ROBOT.yml` manifests; without keep-list (c),
+   `data/import/robot/{AT,DE,common}` is left fully orphaned.
 3. **Only then walk the drop list.** Delete a `.github/deploy/*.yml` only if **no** job in the
    final CI boots it. Delete a `config/install/<recipe>.yml` only if `<recipe>` is **absent from
    the KEEP set built in (2)**. Verify each recipe with
@@ -151,7 +152,7 @@ a dropped job happened to reference it.**
 4. **On any doubt, KEEP.** An orphaned `config/install/` file is harmless; a deleted-but-referenced
    one breaks the boot — and the workflow YAML still parses, so § 5 Validate will **not**
    catch it.
-5. **After the wipe, re-derive the fixture closure from disk — belt and braces.** Keep-list (c) can
+5. **After the wipe, re-derive the fixture closure from disk.** Keep-list (c) can
    only be as complete as the manifests you thought to open, so prove it instead of trusting it: run
    `validate.php orphan-files <surviving manifest> data/import` — the `spryker-import-tools`
    script, invoked by its literal path from the project cwd, per that skill's invocation discipline;
@@ -176,8 +177,8 @@ re-grep its `docker/sdk boot` target and that deploy file's `pipeline:` recipe, 
 files **still exist**. This is the check that catches a shared recipe deleted with a dropped
 suite — the workflow YAML parses fine either way, so nothing else will.
 
-**Parsing the emitted YAML — mind when you can.** Pre-boot there is often no YAML parser on the
-host (no `vendor/`; foreign interpreters like python/ruby aren't allowlisted), so pre-boot
+**Parsing the emitted YAML — only possible post-boot.** Pre-boot there is often no YAML parser on the
+host (no `vendor/`; ruby, perl and node are not allowlisted, and python may not write project files), so pre-boot
 validation is **structural via grep** — job keys present, `needs:` targets resolve — and GitHub
 itself validates syntax on push. A true parse becomes available **post-boot** via the clone's own
 vendor (`vendor/symfony/yaml` is present). Pass the filename as an argument — the snippet is meant to
@@ -213,7 +214,7 @@ Do not consider the work done until every item below holds. Walk the list explic
 report it — this is what proves the CI folder was actually cleaned, not just added to.
 
 - [ ] **Single GATING pipeline.** Exactly one project CI file gates commits/PRs; no leftover
-      secondary workflows from the old setup remain. Additional non-gating workflows are
+      secondary workflows from the inherited setup remain. Additional non-gating workflows are
       legitimate ONLY when user-approved and listed in the report (a scheduled credential
       scan, a separate deploy workflow) — they don't belong squeezed into the PR gate, and
       they don't survive by default either.
@@ -249,5 +250,11 @@ report it — this is what proves the CI folder was actually cleaned, not just a
 - [ ] **Commands preserved.** Surviving jobs use the original discovered commands verbatim,
       not paraphrased.
 - [ ] **Parses cleanly.** The output file parses and its dependency/ordering graph resolves.
+- [ ] **Every deviation carries a decision.** A non-empty `## Deviations` block in the step report
+      records, per line, either the answer received (what was asked, what was answered) or an
+      explicit `not asked` admission. **Listing a deviation does not grant permission
+      for it** — deviations from the state file's own `ci:` values are not consented to by being
+      listed. `Deviations: none` stays the normal case (contract:
+      `../project-starter-wizard/SKILL.md` §3).
 
 If any item fails, fix it before reporting completion.

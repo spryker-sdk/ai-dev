@@ -89,13 +89,14 @@ flowchart TD
     A1B --> A2
     A1C --> A2
     A2{"Artifact 2 — .claude/rules/<br/>overwrite · merge · cancel"}
-    A2 --> FIN(["Final report, 3-5 lines<br/>+ ALWAYS: restart Claude Code /exit<br/>for the MCP tools to load"])
+    A2 --> A3{"Artifact 3 — Stop hook + permissions<br/>plugin install: permissions only"}
+    A3 --> FIN(["Final report, 3-5 lines<br/>+ ALWAYS: restart Claude Code /exit<br/>for the MCP tools to load"])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
     classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
     class SA,SB,R0,S1I,S1G,S2,S2W,S3A,DEFER,S5,A1A,A1B,A1C,U1,STATE1 step;
-    class D,U0,RC,P,S1,S1T,S1A,S2L,S2Q,S3,S4,A1,A2,ASK1,ASK2,ASK3,ASK4,ASK5 decision;
+    class D,U0,RC,P,S1,S1T,S1A,S2L,S2Q,S3,S4,A1,A2,A3,ASK1,ASK2,ASK3,ASK4,ASK5 decision;
     class A,STOP,HALT,UEND,FIN terminal;
 ```
 
@@ -107,6 +108,10 @@ flowchart TD
 3. The AI Dev MCP server registered with Claude Code, so other sessions in this project get
    Spryker-aware tools (transfers, OMS, module map, CSV/ODS).
 4. Optionally `CLAUDE.md` at the project root and `.claude/rules/` populated from the bundled content.
+5. On a **setup** install (skills copied in, no plugin): the Stop hook (`guard-stop.php` +
+   `lib.php`) in `.claude/hooks/spryker-ai-dev-sdk/`, plus the `Stop` hook and the `permissions`
+   block merged into `.claude/settings.json`. A plugin install gets the Stop hook from the plugin's
+   `hooks/hooks.json`; the skill still offers to merge the `permissions` block.
 
 `ai-dev:generate-prompts` exists in the package but is **outdated** — the skill never wires it, and
 flags an existing wiring for removal rather than deleting it silently.
@@ -160,7 +165,7 @@ It records the mode decision and the two signals behind it, each Requirements / 
 step's START/END, the actual `ConsoleDependencyProvider` path edited, the MCP server name registered,
 each Step 5 artifact decision, and every hard stop with its verbatim error. Because this onboarder is
 idempotent, **a skip is logged as explicitly as an action** (`already installed: … (skipped)`) — a
-skipped step is a result, not an absence. Bulk command output goes to `<step>.log` beside it, keeping
+skipped step is recorded as a result. Bulk command output goes to `<step>.log` beside it, keeping
 `run.log` to one line per outcome.
 
 The final report's last line is the absolute path to that folder.

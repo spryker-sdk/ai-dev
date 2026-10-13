@@ -4,24 +4,24 @@ Make a Spryker project's **custom namespace actually resolve, build, lint and te
 registration across every config overlay, composer autoload, frontend build wiring, phpcs/eslint
 configs, and a committed **runnable** codeception seed.
 
-The deliverable is not "ready to write tests". It is: a class in `src/<Ns>/…` overrides Pyz/core, a
+The deliverable is: a class in `src/<Ns>/…` overrides Pyz/core, a
 Yves component under `src/<Ns>/Yves/*/Theme` compiles, and `codecept build` + `codecept run` on a
-committed example module come back green — an empty `.gitkeep` tree proves nothing.
+committed example module come back green. An empty `.gitkeep` tree does not meet it.
 
 ## When it triggers
 
 When a Spryker project adopts a **custom namespace instead of `Pyz`** and the code layer must be
 wired for it. It is step 2 of the [project-starter-wizard](../project-starter-wizard/README.md),
 pre-boot, and **skipped entirely when the project keeps Pyz** — the skill reads
-`.ai-dev/project-setup.md` → `namespace`, records `skipped (keep-Pyz)` on `mode: keep-pyz`, and stops.
+`.ai-dev/project-setup.md` → `namespace`, records `skipped (keep-shipped: <name>)` on `mode: keep-shipped` (alias `keep-pyz`), and stops.
 
 ## Flow schema
 
 ```mermaid
 flowchart TD
     A([Invoked]) --> R["Read .ai-dev/project-setup.md<br/>→ namespace"]
-    R --> M{"mode: keep-pyz?"}
-    M -- "yes" --> SK([Record skipped keep-Pyz<br/>and stop])
+    R --> M{"mode: keep-shipped?"}
+    M -- "yes" --> SK([Record skipped keep-shipped<br/>and stop])
     M -- "no — Ns = namespace.name" --> E1
 
     E1["1 · Register the namespace<br/>config_default.php:<br/>PROJECT_NAMESPACE + PROJECT_NAMESPACES<br/>+ GlueBackendApiApplicationConstants"]
@@ -61,7 +61,7 @@ the namespace. All four are required — the first three pre-boot, the fourth ve
 | Piece | Why it's not optional |
 |-------|-----------------------|
 | Root `codeception.yml` | `include` + coverage whitelist for `tests/<Ns>Test/*/*` and `src/<Ns>/*.php`. |
-| Every aggregate suite config | Discovered with `ls tests/codeception.*.yml` — today `codeception.acceptance.yml`, `codeception.api.yml`, `codeception.ci.functional.yml`, but those are **examples, not the set**. Each ships `PyzTest/*/*` only; patching just the root config leaves them blind. |
+| Every aggregate suite config | Discovered with `ls tests/codeception.*.yml` — for example `codeception.acceptance.yml`, `codeception.api.yml`, `codeception.ci.functional.yml`; those are **examples, not the set**. Each ships `PyzTest/*/*` only; patching just the root config leaves them blind. |
 | The seed module | `tests/<Ns>Test/Shared/Example/` is both the green proof and the canonical copy-me template, carrying the `namespace:` + `projectNamespaces: ['<Ns>','Pyz']` shape every later module copies. |
 | The post-boot run | `codecept build` then `codecept run -c tests/<Ns>Test/Shared/Example Example` → `OK`, executed by [boot-and-verify](../boot-and-verify/README.md) because `vendor/` doesn't exist pre-boot. |
 
@@ -74,7 +74,7 @@ the namespace. All four are required — the first three pre-boot, the fourth ve
   across `config/Shared/config_default*.php`; a Pyz-hardcoded discovery path is any
   `sourceDirectories(...)` under `config/*/packages/`; a namespace-aware lint config is any
   ruleset carrying a hardcoded namespace list (`phpcs.xml`, `phpstan.neon`, …). Clones differ and
-  new files of these shapes appear as the demoshop evolves — run the discovery command and apply
+  may carry further files of these shapes — run the discovery command and apply
   the same rule to whatever it returns, including files not named anywhere in this skill.
 - **Placement principle — it governs the whole project run, not just this step.** Once `<Ns>` wins
   resolution, every project-level PHP customization is created in `src/<Ns>/…` **extending the Pyz
@@ -95,8 +95,8 @@ the namespace. All four are required — the first three pre-boot, the fourth ve
   a detect-first grep, because some clones already ship it and some don't.
 - **Inspect the file's real shape before editing it — and accept that it may not exist.**
   `frontend/settings.js` comes in three shapes, the third being **absent**: from ShopUi **2.0.0** the
-  Yves builder is vendorized and the project settings file becomes `frontend/yves.settings.mts`
-  (`yves:*` scripts re-pointed, Node 24+). The branch is chosen by testable facts — which settings
+  Yves builder is vendorized and the project settings file is `frontend/yves.settings.mts`
+  (`yves:*` scripts point at the vendorized builder, Node 24+). The branch is chosen by testable facts — which settings
   file exists, and the installed ShopUi version — not by how recent the clone is, and the skill
   documents the behaviour inline so it does not depend on the `spryker-upgrade` skill being
   installed. `vendor/` doesn't exist pre-boot, so that half becomes a recorded **post-boot
@@ -106,8 +106,8 @@ the namespace. All four are required — the first three pre-boot, the fourth ve
 - **`tsconfig.yves.json`'s `paths` aliases are deliberately left alone.** The build resolves each
   alias to its first entry, so prepending an empty `src/<Ns>/Yves` skeleton aborts
   `frontend:yves:build`. The namespace is wired through `settings.js` dirs instead.
-- **A mandate with no greppable check does not survive the run.** Step 4's two test-scoping
-  mandates (every aggregate config; the `projectNamespaces` sweep) are commonly skipped, so
+- **Every mandate gets a greppable check.** Step 4's two test-scoping
+  mandates (every aggregate config; the `projectNamespaces` sweep) are easy to skip, so
   § Verify checks them instead of trusting them: it greps for `<Ns>Test` **and** `PyzTest` in the
   root config and every `tests/codeception.*.yml`, plus both coverage whitelists, and for **zero** `projectNamespaces: ['Pyz']` under `tests/`. The failure is
   bidirectional — one direction runs only `<Ns>`, the other only `Pyz`, and each reports `OK` while

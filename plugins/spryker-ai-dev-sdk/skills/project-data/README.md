@@ -24,7 +24,7 @@ Whenever demo/import data must be populated, reshaped, reduced, cleaned up, or r
 
 Used by the wizard's data step (`data.mode` picks the strategy; `leave` skips it) and standalone on a
 fresh or already-running project. **Never make the user name a strategy or a file** — classify their
-plain words; ask one question only if genuinely ambiguous.
+plain words; ask one question only if the request is ambiguous.
 
 Not here: store definitions / region / import-config skeleton (`define-stores`), real translation
 (`translate-content`), go-live curation (`curate-golive-data`), the engines themselves
@@ -35,7 +35,7 @@ Not here: store definitions / region / import-config skeleton (`define-stores`),
 ```mermaid
 flowchart TD
     A([Trigger: data work<br/>wizard data.mode or plain words]) --> B["Classify intent<br/>→ one of five strategies"]
-    B --> C["Read the CURRENT state<br/>csv count on the live import dirs<br/>NEVER trust project-setup.md"]
+    B --> C["Read the current state<br/>csv count on the live import dirs<br/>never trust project-setup.md"]
     C --> D{Which strategy?}
 
     D -- "reshape demo" --> AD["adapt<br/>locales · stores · currencies<br/>locale-rows · strip · import config"]
@@ -51,19 +51,19 @@ flowchart TD
     CU --> GATE
 
     GATE{"Destructive step?<br/>in-place removal · rm · reset"}
-    GATE -- "yes" --> ASK["Preview matchedRows<br/>explain in ONE line → ask"]
+    GATE -- "yes" --> ASK["Preview matchedRows<br/>explain in one line → ask"]
     ASK -- "go-ahead" --> V
     GATE -- "no" --> V
 
-    V["Validate<br/>preflight · refs · unique<br/>required · paths · product-refs"]
+    V["Validate<br/>validate gate &lt;manifest&gt;<br/>one call, the close-out verdict"]
     V --> VOK{Clean?}
-    VOK -- "findings" --> FIX["Fix the delta<br/>suspect YOUR change first"]
+    VOK -- "findings" --> FIX["Fix the delta<br/>suspect your own change first"]
     FIX --> V
 
     VOK -- "clean" --> CONS["Consolidate &amp; clean up<br/>one project tree · delete stale files<br/>orphan-files = 0"]
     CONS --> APPLY{Booted already?}
     APPLY -- "pre-boot" --> DONE
-    APPLY -- "post-boot" --> LADDER["Reset ladder<br/>1 data:import -c<br/>2 reset for deletions TTY<br/>3 drain queue workers"]
+    APPLY -- "post-boot" --> LADDER["Reset ladder<br/>1 validate with data:import -c<br/>2 adds/updates via data:import<br/>3 reset for deletions TTY<br/>4 clean-data + up: code only<br/>then drain queue workers"]
     LADDER --> DONE([Data in shape<br/>tree matches the manifest])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
@@ -80,11 +80,12 @@ flowchart TD
 |------|------|
 | [`SKILL.md`](SKILL.md) | The router + the **shared core** every strategy applies: tool discipline, current-state reading, the destructive-op gate, the apply/reset ladder, the cross-cutting invariants, the consolidate-and-clean-up tail. |
 | [`references/adapt.md`](references/adapt.md) | **adapt** method — steps 1–6: locale columns/rows, stores, currencies, locale-row data, strip demo leftovers, import config. |
-| [`references/adapt-strategy.md`](references/adapt-strategy.md) | Per-column-family strategy map for adapt, plus the two make-or-break chains (search visibility, transactional emails) and the price/currency rules. |
-| [`references/generate.md`](references/generate.md) | **generate** method (⚠ experimental, supervised only) — reuse the skeleton, author the domain in FK order, plus the nine required-shape gotchas C1–C9. |
+| [`references/adapt-strategy.md`](references/adapt-strategy.md) | Per-column-family strategy map for adapt, plus the two required chains (search visibility, transactional emails) and the price/currency rules. |
+| [`references/generate.md`](references/generate.md) | **generate** method (⚠ experimental, supervised only) — reuse the skeleton, author the domain in FK order, plus the 17 required-shape gotchas C1–C17. |
 | [`references/clean.md`](references/clean.md) | **clean** method — build the minimal bootable tree (spec: `define-stores/references/minimal-baseline.md`). |
 | [`references/reduce.md`](references/reduce.md) | **reduce** method — keep-set → broad orphan scan → prune → verify → boot. |
 | [`references/cleanup.md`](references/cleanup.md) | **cleanup** method — plain-language domain menu, per-domain cascade, the never-remove operational config. |
+| [`references/storefront-effects.md`](references/storefront-effects.md) | Rows that import clean and do nothing on screen — shipment discount clauses (ids, not names), `category_store` for categories added later, `is_in_menu`, retiring navigation nodes, wired B2B features with dropped data. |
 
 ## Strategies
 
@@ -92,13 +93,13 @@ flowchart TD
 |---|---|---|
 | **adapt** | Reshape the shipped demo catalog to the project's stores/locales/currencies, English content everywhere. Edits the shipped import **in place** — git is the diff and the revert. | `references/adapt.md` |
 | **generate** | Author a fresh themed catalog in the project's own vertical, into its own folder. **Experimental — supervised runs only**; several failure modes pass every validator and boot green. | `references/generate.md` |
-| **clean** | No demo catalog: keep the structural files, truncate the content files to header-only, author the few genuinely-new ones, `rm -rf` what the new manifest no longer references. | `references/clean.md` |
+| **clean** | No demo catalog: keep the structural files, truncate the content files to header-only, author the few new ones, `rm -rf` what the new manifest no longer references. | `references/clean.md` |
 | **reduce** | Keep part of the catalog and remove the rest without leaving an orphan reference. | `references/reduce.md` |
 | **cleanup** | Remove whole demo domains — customers, merchants, reviews, wishlists, CMS, discounts, transactional activity. | `references/cleanup.md` |
 
 **They compose.** These are operations on the current data, runnable in any order: adapt now and
-replace with generate later; clean, then generate onto the cleared base; reduce after adapting. The
-one unbuilt path is merging a themed catalog *alongside* a still-full demo catalog — clean or reduce
+replace with generate later; clean, then generate onto the cleared base; reduce after adapting.
+Merging a themed catalog *alongside* a still-full demo catalog is not supported — clean or reduce
 first.
 
 ## Design decisions baked in
@@ -109,11 +110,13 @@ first.
 - **Statically validate before spending a boot.** `preflight` sweeps the boot-critical invariants
   across every file the manifest imports in one call — `spy_url` global uniqueness, non-blank
   `is_searchable.<locale>`, price completeness (empty **or** literal `0`), base-before-relation
-  import order. A 30–60 min install aborting on one duplicate URL is the failure being bought out.
-- **Explain, then ask, before anything destructive.** In-place `filter`/`delete` and header-only
-  truncation rewrite files without prompting; `reset`/`clean-data` can wipe DB and search volumes
-  that git cannot restore. Preview (`matchedRows` with no `--out`/`--in-place`), state in one line
-  what will be destroyed, get an explicit go-ahead — even when the allowlist would let it through.
+  import order. One duplicate URL aborts a 30–60 min install, and these checks find it in seconds.
+- **Preview and announce anything destructive; ask only when real data is at stake.** In-place
+  `filter`/`delete` and header-only truncation rewrite files without prompting; `reset`/`clean-data`
+  can wipe DB and search volumes that git cannot restore. Preview (`matchedRows` with no
+  `--out`/`--in-place`), state in one line what will be removed. During first setup, on a demo clone,
+  and for a removal the confirmed answer set decided, announce and proceed; on a project that already
+  carries real data, get an explicit go-ahead (the one policy: `spryker-import-tools`).
 - **Suspect your own data delta first.** If the shop worked before your edits and breaks after, the
   file you just changed is the prime suspect — not vendor code. Diff the delta and re-check
   completeness before reading a single vendor package.
@@ -121,9 +124,9 @@ first.
   (`duplicate-columns`) and the drop half (`drop-columns --suffix`) must be symmetric — reused demo
   files carry foreign `.<locale>` columns and `locale` rows that a green boot never flags.
 - **A blank per-locale cell is a finding; every row of a rewritten structural file must be accounted
-  for.** Two invariants the suite kept re-learning file by file: an empty `.<locale>` cell is a defect
-  unless a named importer inherits it (locale buckets are all-or-nothing), and a rewrite that touches
-  only the rows the brief named silently drops the rest — a "replace the 3 category links" brief wipes
+  for.** Two invariants that apply to every file: an empty `.<locale>` cell is a defect unless a named
+  importer inherits it (locale buckets are all-or-nothing), and a rewrite that touches only the rows
+  the brief named silently drops the rest — for example, replacing three category links also removes
   the footer's legal links, social icons and payment logos, on a green boot.
 - **Keep the shipped import dependency order — never reorder it.** Reordering breaks it two ways: a
   store's `locale-store` after the catalog leaves a silently empty store; `currency-store` hoisted

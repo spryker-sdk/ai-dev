@@ -12,6 +12,17 @@ Connect your Spryker application to AI assistants through the Model Context Prot
 - [Install AI Dev](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-installation) — installation and setup.
 - [AI Dev SDK](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev) — overview, configuration, usage, and extension points.
 
+## Claude Code plugin — enforcement hooks
+
+The `spryker-ai-dev-sdk` plugin ships hooks (`plugins/spryker-ai-dev-sdk/hooks/`) that make the
+project-starter run's load-bearing rules checkable instead of remembered: the static data gate
+(`validate.php gate`) runs before every `docker/sdk reset|clean-data|up|console data:import` and
+denies a known-broken data set, every rebuild is confirmed by the developer and counted, a wizard
+step cannot be marked `done` while the gate fails, and installed skill copies are read-only.
+See [hooks/README.md](plugins/spryker-ai-dev-sdk/hooks/README.md) and the design note in
+[docs/plans/2026-09-16-enforcement-hooks-design.md](docs/plans/2026-09-16-enforcement-hooks-design.md).
+Setup installs (no plugin) merge `hooks/settings.example.json` into `.claude/settings.json`.
+
 ## Contribution
 
 We welcome contributions to improve this experimental module.
