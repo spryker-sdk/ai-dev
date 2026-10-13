@@ -1,0 +1,9 @@
+<?php
+namespace Pyz\Zed\Baz\Business\Model;
+
+use Spryker\Zed\Foo\Business\Model\Calculator as SprykerCalculator;
+
+class Calculator extends SprykerCalculator
+{
+    public function calculate() {}
+}
