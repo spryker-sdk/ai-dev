@@ -62,6 +62,11 @@ function write_file(string $path, string $contents): void
     file_put_contents($path, $contents);
 }
 
+function fixture(string $path): string
+{
+    return (string)file_get_contents(__DIR__ . '/fixtures/' . $path);
+}
+
 function line_of(string $src, string $needle): int
 {
     foreach (explode("\n", $src) as $i => $row) {
@@ -105,30 +110,8 @@ namespace Spryker\Zed\Foo {
     class FooDependencyProvider { public function getPlugins() {} }
 }
 PHP);
-write_file($coverage . '/src/Pyz/Zed/Foo/Business/FooBusinessFactory.php', <<<'PHP'
-<?php
-namespace Pyz\Zed\Foo\Business;
-
-use Spryker\Zed\Foo\Business\FooBusinessFactory as SprykerFooBusinessFactory;
-
-class FooBusinessFactory extends SprykerFooBusinessFactory
-{
-    public function createA() {} public function createB() {} public function createC() {}
-    public function createD() {} public function createE() {} public function createF() {}
-}
-PHP);
-write_file($coverage . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', <<<'PHP'
-<?php
-namespace Pyz\Zed\Foo;
-
-use Spryker\Zed\Foo\FooDependencyProvider as SprykerFooDependencyProvider;
-use Spryker\Zed\Foo\Communication\Plugin\FooPlugin;
-
-class FooDependencyProvider extends SprykerFooDependencyProvider
-{
-    public function getPlugins() {}
-}
-PHP);
+write_file($coverage . '/src/Pyz/Zed/Foo/Business/FooBusinessFactory.php', fixture('coverage/FooBusinessFactory.php.fixture'));
+write_file($coverage . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', fixture('coverage/FooDependencyProvider.php.fixture'));
 write_file($coverage . '/src/Pyz/Client/Bar/BarFactory.php', <<<'PHP'
 <?php
 namespace Pyz\Client\Bar;
@@ -138,17 +121,7 @@ class BarFactory extends \Spryker\Client\Bar\BarFactory
     public function createReader() {}
 }
 PHP);
-write_file($coverage . '/src/Pyz/Zed/Baz/Business/Model/Calculator.php', <<<'PHP'
-<?php
-namespace Pyz\Zed\Baz\Business\Model;
-
-use Spryker\Zed\Foo\Business\Model\Calculator as SprykerCalculator;
-
-class Calculator extends SprykerCalculator
-{
-    public function calculate() {}
-}
-PHP);
+write_file($coverage . '/src/Pyz/Zed/Baz/Business/Model/Calculator.php', fixture('coverage/Calculator.php.fixture'));
 [$covCode, $covOut] = run_script('check-test-coverage.php', ['--all'], $coverage, $coverageState);
 $covReport = read_json($coverageState . '/test-coverage-report.json');
 $covModules = array_column($covReport['modules'] ?? [], null, 'module');
@@ -575,42 +548,11 @@ abstract class AbstractBundleDependencyProvider
     protected const CHAIN_LIMIT = 5;
 }
 PHP;
-$vendorFoo = <<<'PHP'
-<?php
-namespace Spryker\Zed\Foo;
-
-use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
-
-class FooDependencyProvider extends AbstractBundleDependencyProvider
-{
-    public const PLUGINS_FOO = 'PLUGINS_FOO';
-    protected const BATCH_SIZE = 100;
-    protected const MODE = 'strict';
-    protected const PREFIX = 'core-';
-    protected const LABEL = self::PREFIX . 'foo';
-    protected const LIST = array(1, 2,);
-}
-PHP;
+$vendorFoo = fixture('constants/VendorFooDependencyProvider.php.fixture');
 write_file($constants . '/vendor/spryker/spryker/src/Spryker/Zed/Kernel/AbstractBundleDependencyProvider.php', $vendorKernel);
 write_file($constants . '/vendor/spryker/spryker/src/Spryker/Zed/Foo/FooDependencyProvider.php', $vendorFoo);
 write_file($constants . '/vendor/spryker/spryker/src/Spryker/Zed/Bar/BarConfig.php', "<?php\nnamespace Spryker\\Zed\\Bar;\n\nclass BarConfig\n{\n    protected const TIMEOUT = 60;\n}\n");
-write_file($constants . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', <<<'PHP'
-<?php
-namespace Pyz\Zed\Foo;
-
-use Spryker\Zed\Foo\FooDependencyProvider as SprykerFooDependencyProvider;
-
-class FooDependencyProvider extends SprykerFooDependencyProvider
-{
-    public const PLUGINS_FOO = 'PLUGINS_FOO';
-    protected const BATCH_SIZE = 500;
-    protected const MODE = "strict";
-    protected const PROJECT_ONLY = 1;
-    protected const CHAIN_LIMIT = 10;
-    protected const LABEL = 'core-foo';
-    protected const LIST = [1, 2];
-}
-PHP);
+write_file($constants . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', fixture('constants/FooDependencyProvider.php.fixture'));
 write_file($constants . '/src/Acme/Zed/Bar/BarConfig.php', "<?php\nnamespace Acme\\Zed\\Bar;\n\nclass BarConfig extends \\Spryker\\Zed\\Bar\\BarConfig\n{\n    protected const TIMEOUT = 30;\n}\n");
 write_file($constants . '/src/Pyz/Zed/Foo/FooChildDependencyProvider.php', "<?php\nnamespace Pyz\\Zed\\Foo;\n\nclass FooChildDependencyProvider extends FooDependencyProvider\n{\n    protected const BATCH_SIZE = 700;\n}\n");
 

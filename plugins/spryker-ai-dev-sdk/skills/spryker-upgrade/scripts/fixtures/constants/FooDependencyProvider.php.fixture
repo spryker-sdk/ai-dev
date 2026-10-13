@@ -1,0 +1,15 @@
+<?php
+namespace Pyz\Zed\Foo;
+
+use Spryker\Zed\Foo\FooDependencyProvider as SprykerFooDependencyProvider;
+
+class FooDependencyProvider extends SprykerFooDependencyProvider
+{
+    public const PLUGINS_FOO = 'PLUGINS_FOO';
+    protected const BATCH_SIZE = 500;
+    protected const MODE = "strict";
+    protected const PROJECT_ONLY = 1;
+    protected const CHAIN_LIMIT = 10;
+    protected const LABEL = 'core-foo';
+    protected const LIST = [1, 2];
+}

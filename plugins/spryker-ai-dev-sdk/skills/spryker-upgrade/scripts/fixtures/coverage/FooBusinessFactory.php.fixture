@@ -1,0 +1,10 @@
+<?php
+namespace Pyz\Zed\Foo\Business;
+
+use Spryker\Zed\Foo\Business\FooBusinessFactory as SprykerFooBusinessFactory;
+
+class FooBusinessFactory extends SprykerFooBusinessFactory
+{
+    public function createA() {} public function createB() {} public function createC() {}
+    public function createD() {} public function createE() {} public function createF() {}
+}

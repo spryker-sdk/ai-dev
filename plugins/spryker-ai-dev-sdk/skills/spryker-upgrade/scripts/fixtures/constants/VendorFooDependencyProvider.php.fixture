@@ -1,0 +1,14 @@
+<?php
+namespace Spryker\Zed\Foo;
+
+use Spryker\Zed\Kernel\AbstractBundleDependencyProvider;
+
+class FooDependencyProvider extends AbstractBundleDependencyProvider
+{
+    public const PLUGINS_FOO = 'PLUGINS_FOO';
+    protected const BATCH_SIZE = 100;
+    protected const MODE = 'strict';
+    protected const PREFIX = 'core-';
+    protected const LABEL = self::PREFIX . 'foo';
+    protected const LIST = array(1, 2,);
+}
