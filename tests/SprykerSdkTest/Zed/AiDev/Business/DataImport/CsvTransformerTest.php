@@ -22,9 +22,6 @@ class CsvTransformerTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
     /**
@@ -32,9 +29,6 @@ class CsvTransformerTest extends Unit
      */
     protected $tester;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -46,9 +40,6 @@ class CsvTransformerTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -65,7 +56,6 @@ class CsvTransformerTest extends Unit
     /**
      * @dataProvider positiveTransformDataProvider
      *
-     * @param string $testName
      * @param array<string>|null $sourceHeaders
      * @param array<int, array<string, mixed>>|null $sourceRows
      * @param array<string> $targetHeaders
@@ -75,11 +65,7 @@ class CsvTransformerTest extends Unit
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param string $mode
-     * @param bool $createBackup
      * @param array<string, mixed> $expectedAssertions
-     *
-     * @return void
      */
     public function testTransformPositiveCases(
         string $testName,
@@ -131,7 +117,6 @@ class CsvTransformerTest extends Unit
     /**
      * @dataProvider negativeTransformDataProvider
      *
-     * @param string $testName
      * @param array<string> $sourceHeaders
      * @param array<int, array<string, mixed>> $sourceRows
      * @param array<string> $targetHeaders
@@ -141,10 +126,6 @@ class CsvTransformerTest extends Unit
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param string $mode
-     * @param string $expectedErrorCode
-     *
-     * @return void
      */
     public function testTransformNegativeCases(
         string $testName,

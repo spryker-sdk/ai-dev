@@ -1,0 +1,237 @@
+# project-starter-wizard
+
+Turn an **unmodified clone of a Spryker b2b / b2b-marketplace demoshop into the customer's
+project** — the setup decisions collected once up front, then nine orchestrated steps to a verified
+running shop.
+
+This skill owns the conversation and the flow; it writes almost nothing itself. The transformation
+work belongs to the sibling step-skills, and the wizard's job is to collect everything once, record
+the answers in a resumable state file, and drive the steps in the one order that works.
+
+## Two ways to answer
+
+The nine decision sections arrive either way — same fields, same state file:
+
+- **Fill the questionnaire** ([`references/questionnaire.md`](references/questionnaire.md)) and hand it
+  over → **no interview at all.** Minimum viable set is three answers: `P1` project name, `R1` mode,
+  `R2` hard-stop acknowledgement. **Every other line is optional — blank means "take the default"**,
+  and in `autonomous` mode a blank the wizard must actually resolve becomes a logged decision, not a
+  question. Partial fills are first-class.
+- **Be interviewed** — the batched `AskUserQuestion` path, when nothing was supplied. If you'd rather
+  fill the file, the wizard offers that choice before asking anything.
+
+A **demo** (`purpose: demo`) takes neither: the demo fast path asks at most five plain questions and
+derives everything technical — and when `demo-prep-wizard` runs it, it asks nothing at all and takes the
+answers its one sitting already confirmed (`answers_source: demo-prep`).
+
+## When it triggers
+
+At the very start of a new customer project, on a fresh clone: "turn this demoshop into our
+project", "start the project setup", "run the project starter". Also on "give me the setup
+questionnaire" and "here are my filled answers — run it autonomously". It is **also the resume
+entry** — if a prior run left `.ai-dev/project-setup.md`, invoking it skips collection entirely and
+continues from the first step that isn't `done` or `skipped`.
+
+**The gate is "still an unmodified demoshop?", not "un-booted".** A **booted** demoshop is fine (the
+run just needs a `clean-data` + re-boot for the data changes to land), and so is the AI Dev SDK's own
+onboarding delta (`composer.json`/`composer.lock`/`ConsoleDependencyProvider.php`, plus `.ai-dev/`,
+`CLAUDE.md`, `.claude/`) — no commit required. What stops the run is a clone **already customized into
+a project**: tracked changes under `src/`/`data/import/`/`config/`, a registered custom namespace,
+stores already changed, or real business data. That stops with the **"Return to fresh" recipe**, never
+a bare refusal.
+
+## Flow schema
+
+```mermaid
+flowchart TD
+    A([Invoked on a clone]) --> P["0 · Pre-flight<br/>flavor · unmodified demoshop?<br/>docker volume collision<br/>ports · composer auth · disk<br/>.git.docker SDK pin · inventory"]
+
+    P --> PS{"State file<br/>.ai-dev/project-setup.md<br/>exists?"}
+    PS -- "yes" --> RES["Resume<br/>re-read run_mode<br/>skip to first step<br/>not done/skipped"]
+    PS -- "no" --> PF{"Still an unmodified<br/>demoshop?<br/>(booted is fine)"}
+
+    PF -- "no · already a project" --> STOP([Stop + hand over<br/>the Return-to-fresh recipe])
+    PF -- "yes" --> DM{"purpose: demo?"}
+    DM -- "run from demo-prep-wizard<br/>(up_front_confirmed_at)" --> DP["Ask nothing, confirm nothing<br/>copy up_front + stamp<br/>answers_source: demo-prep"]
+    DP --> W
+    DM -- "demo, standalone" --> DF["Demo fast path<br/>at most five plain questions<br/>everything technical derived"]
+    DF --> C
+    DM -- "project" --> Q{"1 · Answers supplied?<br/>references/questionnaire.md<br/>(interview.md Rule 0)"}
+
+    Q -- "filled<br/>P1+R1+R2" --> FILL["Skip the interview<br/>blanks → shipped defaults<br/>log INTERVIEW | SKIP"]
+    Q -- "partial +<br/>R1 autonomous" --> FILL
+    Q -- "partial +<br/>R1 collaborative" --> I
+    Q -- "R1 missing" --> R1Q["Ask R1 only —<br/>it decides whether blanks<br/>are questions or decisions"]
+    R1Q --> Q
+    Q -- "nothing supplied" --> OFFER{"Rule 1 · offer:<br/>fill the list yourself<br/>vs interview me"}
+    OFFER -- "fill it" --> HAND([Hand over questionnaire<br/>and wait])
+    HAND --> Q
+    OFFER -- "interview" --> I
+
+    I["Live interview<br/>nine sections, AskUserQuestion<br/>identity · namespace · services ·<br/>stores+region · data mode ·<br/>catalog scope · localization ·<br/>CI · run mode"]
+
+    I --> C
+    FILL --> C
+    C{"2 · Confirm the<br/>RESOLVED set<br/>(typed + defaulted)"}
+    C -- "no" --> I
+    C -- "yes" --> W["Write .ai-dev/project-setup.md<br/>frontmatter + answers_source<br/>+ answers_defaulted + Steps table"]
+
+    W --> S1["1 · project-ci-generator<br/>pre-boot, runs FIRST"]
+    RES --> S1
+    S1 --> S2["2 · configure-codebase<br/>skipped if keep-shipped"]
+    S2 --> S3["3 · brand-project<br/>identity half only"]
+    S3 --> S4["4 · configure-services"]
+    S4 --> S5["5 · define-stores<br/>skipped if data.mode = leave"]
+    S5 --> S6["6 · project-data<br/>adapt / clean / generate / leave<br/>+ reduce pass, adapt only"]
+    S6 --> S7["7 · cypress-migration<br/>last pre-boot step"]
+
+    S7 --> GATE{"Ordering gate<br/>steps 1–7 all<br/>done or skipped?"}
+    GATE -- "no" --> S1
+    GATE -- "yes" --> S8["8 · boot-and-verify<br/>first boot + verification<br/>+ brand theming half<br/>+ codecept seed + cy:run"]
+
+    S8 --> S9["9 · translate-content<br/>only if localize.locales<br/>is non-empty"]
+    S9 --> DONE([Close: changed files, unstaged ·<br/>go-live debt · /etc/hosts line])
+
+    S1 -.-> MODE
+    S8 -.-> MODE
+    MODE{"Per step:<br/>run mode + hard-stops"}
+    MODE -- "autonomous · reversible" --> LOG["Decide, log to<br/>.ai-dev/decision-log.md,<br/>keep going"]
+    MODE -- "collaborative · step boundary" --> ASK["Ask 'Continue to next step?'<br/>and wait"]
+    MODE -- "⚠ ACTION NEEDED<br/>(both modes)" --> HUMAN["Wait for the developer<br/>Docker · /etc/hosts · token"]
+    MODE -- "irrecoverable action<br/>(both modes; reset/clean-data<br/>exempt during setup)" --> HUMAN2["Present blast radius,<br/>get explicit go-ahead"]
+    MODE -- "step failure" --> FAIL([Stop with guidance,<br/>state file records where])
+```
+
+## Files
+
+| File | Role |
+|------|------|
+| [`SKILL.md`](SKILL.md) | The spine — pre-flight, the nine steps and their ordering rationale, run modes, hard-stops, resume, abort paths, and the tooling discipline that binds every step. |
+| [`references/questionnaire.md`](references/questionnaire.md) | **The fillable question bank** — every decision as a question carrying its default inline, grouped P/N/S/T/D/C/L/Q + run-config R, with a copy-paste YAML answer block. Fill it to skip the interview; hand it to a colleague who isn't at the keyboard. |
+| [`references/interview.md`](references/interview.md) | **How** to collect the bank — Rule 0 (filled/partial/missing detection + parsing), Rule 1 (offer fill-it-yourself vs interview), AskUserQuestion mechanics, plain-language phrasings for the jargon, the nine sections, and the `.ai-dev/project-setup.md` template. Read **before** the first question. |
+| [`references/preflight.md`](references/preflight.md) | The §0 environment checks in full — volume collision and its ranked fix hierarchy, boot-environment probes, the SDK pin, the permission allowlist, `/etc/hosts`. |
+| [`references/steps.md`](references/steps.md) | Detail behind steps 1 and 7 — the robot/acceptance lane decision, a dropped suite's footprint, cypress-migration's ordering and gating. |
+| [`references/hard-stops.md`](references/hard-stops.md) | Detail behind hard-stop (b) and standing approval — the three recoverability preconditions, batching deletions into one gate, the proof a decision-log entry carries. |
+| [`references/autonomous-runs.md`](references/autonomous-runs.md) | Read before the first autonomous turn — how a stop is judged, denied sub-agent calls, what every sub-agent prompt must carry, what "done" requires. |
+| [`references/run-logging.md`](references/run-logging.md) | The `.ai-dev/run.log` contract — line format and every line type. |
+| [`references/tooling-discipline.md`](references/tooling-discipline.md) | The full tooling rules — self-contained tree, one simple command per call, interpreters as a last resort, `script` as the one pty, bounded wait loops. |
+| [`references/pitfalls.md`](references/pitfalls.md) | The Known-traps catalog — every known failure signature across the whole run as *signature → cause → fix*, grouped by area (cross-cutting, boot aborts, post-boot false greens, per-step). Match a failure here before diagnosing from scratch. |
+
+## Step → skill map
+
+The wizard runs these in this exact order; each links to its own README.
+
+| Step | Skill | Notes |
+|------|-------|-------|
+| 1 | [project-ci-generator](../project-ci-generator/README.md) | Pre-boot, first — executes interview §8's `ci:` plan; owns a dropped suite's whole footprint. |
+| 2 | [configure-codebase](../configure-codebase/README.md) | Namespace + FE/test wiring; skipped on `keep-shipped`. |
+| 3 | [brand-project](../brand-project/README.md) | Identity half only — theming half runs in step 8. |
+| 4 | [configure-services](../configure-services/README.md) | Dev services and applications into `deploy.dev.yml` (engines are fixed). |
+| 5 | [define-stores](../define-stores/README.md) | Region + store definitions; skipped if `data.mode = leave`. |
+| 6 | [project-data](../project-data/README.md) | Strategy by `data.mode`: adapt / clean / generate / leave. |
+| 7 | [cypress-migration](../cypress-migration/README.md) | E2E infra; last pre-boot because it reads steps 1, 3, 4, 5 and 6's output. |
+| 8 | [boot-and-verify](../boot-and-verify/README.md) | First boot, per-store verification, and the post-boot halves of steps 2, 3 and 7. |
+| 9 | [translate-content](../translate-content/README.md) | Optional; only when `localize.locales` is non-empty. |
+
+Steps also lean on [spryker-import-tools](../spryker-import-tools/README.md) for all CSV work, and
+step 8 spawns the `spryker-verifier` agent for its authoritative verdict.
+
+## Modes
+
+Questionnaire `R1` (or interview §9), recorded as `run_mode` in the state file, honoured again on
+resume. Same work either way — only the check-in cadence differs.
+
+- **autonomous** — steps 1–9 as one continuous pass, no "continue?" check-ins. At a reversible,
+  in-project decision point — **including every questionnaire question you left blank** — it picks the
+  best option and records it in `.ai-dev/decision-log.md`. Asking a configuration question mid-run is
+  a mode violation.
+- **collaborative** (alias: `supervised`) — a one-line result and an explicit "Continue to
+  `<next step>`?" at each step boundary; every decision surfaced as a question with a recommendation.
+  It also asks the questionnaire's blanks instead of resolving them.
+
+Neither mode relaxes the hard-stops — this is what `R2` acknowledges: a `⚠ ACTION NEEDED`
+prerequisite, any **irrecoverable** action (`sudo`, publishing outside the clone, deleting untracked
+files, destructive operations on a project that already carries real data — `reset`/`clean-data`
+during first setup are **not** gated), and a step failure all return control to the developer in
+**both** modes. **A filled questionnaire is not a promise of an uninterrupted run**; it's a promise of
+no further *configuration* questions.
+
+## Design decisions baked in
+
+- **Collect once, then no further configuration questions.** All nine sections are collected up
+  front — from a filled questionnaire or one interview — so the run needs no new config decisions.
+  But the skill refuses to over-promise silence: destructive operations and decisions only the developer can make are still raised.
+- **A blank is a default, not a question.** Only `P1`/`R1`/`R2` are required; everything else has a
+  working default, and answering nothing at all is a valid, complete answer set (a rebrand-only
+  project on shipped defaults). `answers_defaulted` in the state file plus the decision log record
+  every value you didn't choose, so each one can be traced.
+- **`R1` is the one answer with no safe default.** It decides whether a blank becomes a question or a
+  logged decision, so a questionnaire arriving without it gets exactly one question back.
+- **A questionnaire skips questions, never checks.** Pre-flight runs in full either way — the volume/
+  namespace collision check in particular is re-run as soon as the project name is known.
+- **Communication rules decide whether an unattended run completes.** A required human action leads the message as a
+  single `⚠ ACTION NEEDED:` line, alone, above any status — a prerequisite buried under a
+  validation table reads as status, and the run stalls on an unread ask. In `autonomous` a turn that
+  needs nothing **doesn't return control at all** — it continues in the same message; control comes
+  back only for a blocking human action, closing with `⚠ NEEDS YOU:` (numbered exact commands, each
+  with the cost of declining). The `✅ NEEDS NOTHING — say "continue"` close is `collaborative`-only.
+  "Ready when you are" is banned in both, because it hands back control without saying what is needed.
+- **A verbose step report stalls an autonomous run.** A message shaped like a
+  finished deliverable ends the turn — so a step report is capped at three lines and the next
+  skill's call must land in the *same* message as the state-file update and the `run.log` line.
+- **Recoverability gates deletions; catalog scope is settled in the interview.** The destructive gate
+  asks "can `git checkout` undo this?", not "does this say `rm`?" — and `reset`/`clean-data` during
+  first setup aren't gated at all. The resolved category tree with product counts is confirmed once,
+  when the answers are collected; the reduce pass reports it and prunes, never re-asking mid-run.
+- **The state file is the run.** `.ai-dev/project-setup.md` carries the answers and a Steps table
+  with per-step status and intra-step progress notes, so an interrupted run resumes precisely
+  instead of blindly re-running a non-idempotent deletion pass.
+- **Surgical edits only.** A step changes only the exact keys it owns; neighbouring blocks stay
+  byte-for-byte as shipped (removing the adjacent `docker.mount.mutagen` block while editing the region,
+  for example, cripples the Mac dev env).
+- **Environment limits are not project defects.** No TTY, the tool timeout, shell word-splitting —
+  those are limits of how the agent runs. Surface them; never edit project config to work around one.
+- **A closed set of capabilities, one simple command per call.** CSV work goes through the
+  `spryker-import-tools` php tools, file work through Read/Grep/Edit, state changes through
+  `docker/sdk`. Pipes, `&&`, loops and subshells prompt regardless of the allowlist — so they're
+  avoided by shape, not by permission.
+
+## Run artifacts
+
+The run writes four files into the clone's own tree — it is self-contained, and "Return to fresh"
+lists them for the developer to delete:
+
+| File | Role |
+|------|------|
+| `.ai-dev/project-setup.md` | The **state** — interview answers + the Steps table Resume operates on. |
+| `.ai-dev/run.log` | The **timeline** — step START/END, conditional skips with their reason, hard-stops, sub-skill handoffs, the step-8 verifier verdict, and every `RESUME`. |
+| `.ai-dev/decision-log.md` | The **rationale** — each autonomous decision with its evidence and how to reverse it. |
+| `.ai-dev/skill-improvement-log.md` | Skill-gap feedback for the SDK maintainers. |
+
+The log is created in §2 beside the state file, and a resumed run **appends a `RESUME` line rather
+than starting a new file**, so one run reads as one continuous timeline across interruptions. It is
+written with Write/Edit — not `printf >>` — because redirects prompt regardless of the allowlist,
+which would break the hands-off guarantee.
+
+The four files sit flat at `.ai-dev/` because the state file's path is load-bearing: pre-flight
+detects a prior run by it, Resume reads it, and "Return to fresh" lists it for the developer to delete.
+
+## Output
+
+A transformed clone: project identity and branding, a registered namespace, the chosen services and
+stores, project-shaped import data, a lean CI pipeline, a vendored Cypress suite — booted, verified
+per store by an independent verifier agent, with changes left unstaged for the developer.
+
+Two kinds of leftover work are tracked rather than silently dropped:
+
+- **`## Required follow-ups`** in the state file — durable cross-step handoffs, written by the step
+  that discovers one and read by the step that consumes it, so they survive a resume.
+- **The close summary** — flags what still needs a human before go-live, such as an `origin` that
+  still points at the demoshop upstream, a still-shipped Spryker logo, and any translation debt from
+  locales left as English copies.
+
+## Packaging note
+
+This skill ships in the `spryker-ai-dev-sdk` plugin under `vendor/spryker-sdk/ai-dev/…`, which is
+Composer-managed — `composer update spryker-sdk/ai-dev` may overwrite it. The durable home for edits
+is the plugin's own repository (`github.com/spryker-sdk/ai-dev`).

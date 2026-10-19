@@ -33,27 +33,16 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
      */
     protected const array ALLOWED_METADATA_FIELDS = ['type', 'is_collection', 'is_transfer', 'is_strict'];
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'getTransferStructureByName';
     }
 
-    /**
-     * @return string
-     */
     public function getDescription(): string
     {
         return 'Tool to get transfer structure by name. Uses reflection to get transfer metadata.';
     }
 
-    /**
-     * @param string $name
-     *
-     * @return string
-     */
     public function getTransferStructureByName(string $name): string
     {
         $name = $this->ensureTransferSuffix($name);
@@ -79,11 +68,6 @@ class GetTransferStructureByNameAiDevMcpToolPlugin extends AbstractPlugin implem
         ], JSON_PRETTY_PRINT);
     }
 
-    /**
-     * @param string $name
-     *
-     * @return string
-     */
     private function ensureTransferSuffix(string $name): string
     {
         if (strcasecmp(substr($name, -strlen(static::TRANSFER_SUFFIX)), static::TRANSFER_SUFFIX) !== 0) {

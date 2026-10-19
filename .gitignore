@@ -34,3 +34,7 @@ src/*/Zed/*/Persistence/Propel/Map/*
 tests/**/_generated/
 tests/_output/*
 !tests/_output/.gitkeep
+
+# Maintainer-only validation tooling. Never committed: the replay corpus is derived from real
+# customer sessions, and `corpus/curate.php` exists only to strip identities out of it.
+tools/

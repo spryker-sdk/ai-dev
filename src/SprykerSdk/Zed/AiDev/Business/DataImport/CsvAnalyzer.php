@@ -20,19 +20,12 @@ class CsvAnalyzer implements CsvAnalyzerInterface
 
     private const int SAMPLE_SECTIONS = 3;
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
-     */
     public function __construct(protected CsvReaderInterface $csvReader)
     {
     }
 
     /**
-     * @param string $filePath
-     * @param int $sampleRows
      * @param array<string> $analyzeColumns
-     *
-     * @return string
      */
     public function analyze(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string
     {
@@ -96,10 +89,7 @@ class CsvAnalyzer implements CsvAnalyzerInterface
     }
 
     /**
-     * @param int $sampleRows
      * @param array<string> $analyzeColumns
-     *
-     * @return string|null
      */
     protected function validateInputParameters(int $sampleRows, array $analyzeColumns): ?string
     {
@@ -125,10 +115,6 @@ class CsvAnalyzer implements CsvAnalyzerInterface
     }
 
     /**
-     * @param string $filePath
-     * @param int $rowCount
-     * @param int $sampleRows
-     *
      * @return array<array<string, string>>
      */
     protected function getSampleRows(string $filePath, int $rowCount, int $sampleRows): array
@@ -141,10 +127,6 @@ class CsvAnalyzer implements CsvAnalyzerInterface
     }
 
     /**
-     * @param string $filePath
-     * @param int $rowCount
-     * @param int $sampleRows
-     *
      * @return array<array<string, string>>
      */
     protected function getSamplesFromLargeFile(string $filePath, int $rowCount, int $sampleRows): array
@@ -165,7 +147,6 @@ class CsvAnalyzer implements CsvAnalyzerInterface
     }
 
     /**
-     * @param string $filePath
      * @param array<string> $headers
      * @param array<string> $analyzeColumns
      *
@@ -196,7 +177,6 @@ class CsvAnalyzer implements CsvAnalyzerInterface
 
     /**
      * @param array<array<string, mixed>> $rows
-     * @param string $column
      *
      * @return array<string, mixed>
      */

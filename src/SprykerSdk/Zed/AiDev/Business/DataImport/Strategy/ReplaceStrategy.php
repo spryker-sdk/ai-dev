@@ -11,19 +11,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class ReplaceStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_REPLACE;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array

@@ -12,8 +12,6 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
 class TransformContext
 {
     /**
-     * @param string $targetPath
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      * @param array<int, array<string, mixed>>|null $sourceRows
      * @param array<string>|null $sourceHeaders
      * @param array<string>|null $targetHeaders

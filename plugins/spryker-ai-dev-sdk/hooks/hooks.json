@@ -1,0 +1,16 @@
+{
+    "description": "Stop guard for project-starter and demo-prep wizard runs: while a state file has run_mode: autonomous and steps are still open, the turn does not end \u2014 except on a question only the person can answer, a NEEDS YOU: line, or AskUserQuestion.",
+    "hooks": {
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "command -v php >/dev/null 2>&1 && exec php \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-stop.php\" || exit 0",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ]
+    }
+}

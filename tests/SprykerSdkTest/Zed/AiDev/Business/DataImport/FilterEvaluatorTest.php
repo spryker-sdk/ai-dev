@@ -25,9 +25,6 @@ class FilterEvaluatorTest extends Unit
      *
      * @param array<string, mixed> $row
      * @param array<int, array<string, mixed>> $criteria
-     * @param bool $expected
-     *
-     * @return void
      */
     public function testEvaluate(array $row, array $criteria, bool $expected): void
     {
@@ -47,8 +44,6 @@ class FilterEvaluatorTest extends Unit
      * @param array<int, array<string, mixed>> $criteria
      * @param array<string> $availableColumns
      * @param array<string> $expectedErrors
-     *
-     * @return void
      */
     public function testValidateCriteria(array $criteria, array $availableColumns, array $expectedErrors): void
     {

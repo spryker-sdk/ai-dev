@@ -12,11 +12,7 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport;
 interface CsvAnalyzerInterface
 {
     /**
-     * @param string $filePath
-     * @param int $sampleRows
      * @param array<string> $analyzeColumns
-     *
-     * @return string
      */
     public function analyze(string $filePath, int $sampleRows = 5, array $analyzeColumns = []): string;
 }

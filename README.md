@@ -7,73 +7,21 @@
 
 Connect your Spryker application to AI assistants through the Model Context Protocol (MCP).
 
-## Installation
-
-```bash
-composer require spryker-sdk/ai-dev --dev
-docker/sdk console transfer:generate
-```
-
-Register the console commands in your `ConsoleDependencyProvider`:
-
-```php
-use SprykerSdk\Zed\AiDev\Communication\Console\GeneratePromptsConsole;
-use SprykerSdk\Zed\AiDev\Communication\Console\McpServerConsole;
-
-protected function getConsoleCommands(Container $container): array
-{
-       if (class_exists(GeneratePromptsConsole::class)) {
-           $commands[] = new GeneratePromptsConsole();
-       }
-
-       if (class_exists(McpServerConsole::class)) {
-           $commands[] = new McpServerConsole();
-       }
-}
-```
-
-## Quick Start
-
-Connect to AI assistants:
-
-**Claude Code**
-```bash
-claude mcp add spryker-project  -- $(pwd)/docker/sdk console ai-dev:mcp-server -q
-```
-
-**Claude Desktop** - Add to `claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "spryker-ai-dev": {
-      "command": "/path/to/your/project/docker/sdk",
-      "args": ["console", "ai-dev:mcp-server", "-q"]
-    }
-  }
-}
-```
-
-## Prompts
-
-Prompts are auto-generated from the [Spryker Prompt Library](https://github.com/spryker-dev/prompt-library) on first run. To regenerate:
-
-```bash
-docker/sdk console ai-dev:generate-prompts
-```
-
 ## Documentation
 
-For detailed setup, configuration, and extension points:
-- [AI Dev Overview](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-overview.html)
-- [MCP Server Configuration](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html)
+- [Install AI Dev](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-installation) — installation and setup.
+- [AI Dev SDK](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev) — overview, configuration, usage, and extension points.
 
-## Debugging
+## Claude Code plugin — enforcement hooks
 
-Use [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to test your MCP server:
-
-```bash
-npx @modelcontextprotocol/inspector docker/sdk console ai-dev:mcp-server -q
-```
+The `spryker-ai-dev-sdk` plugin ships hooks (`plugins/spryker-ai-dev-sdk/hooks/`) that make the
+project-starter run's load-bearing rules checkable instead of remembered: the static data gate
+(`validate.php gate`) runs before every `docker/sdk reset|clean-data|up|console data:import` and
+denies a known-broken data set, every rebuild is confirmed by the developer and counted, a wizard
+step cannot be marked `done` while the gate fails, and installed skill copies are read-only.
+See [hooks/README.md](plugins/spryker-ai-dev-sdk/hooks/README.md) and the design note in
+[docs/plans/2026-09-16-enforcement-hooks-design.md](docs/plans/2026-09-16-enforcement-hooks-design.md).
+Setup installs (no plugin) merge `hooks/settings.example.json` into `.claude/settings.json`.
 
 ## Contribution
 

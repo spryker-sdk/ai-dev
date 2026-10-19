@@ -22,14 +22,8 @@ class CsvReaderTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -38,9 +32,6 @@ class CsvReaderTest extends Unit
         mkdir($this->tempDir);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -53,13 +44,6 @@ class CsvReaderTest extends Unit
 
     /**
      * @dataProvider readDataProvider
-     *
-     * @param string $delimiter
-     * @param int $offset
-     * @param int|null $limit
-     * @param int $expectedRowCount
-     *
-     * @return void
      */
     public function testRead(string $delimiter, int $offset, ?int $limit, int $expectedRowCount): void
     {

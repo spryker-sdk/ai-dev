@@ -10,10 +10,7 @@ namespace SprykerSdk\Shared\AiDev;
 class AbstractPrompt
 {
     /**
-     * @param string $template
      * @param array<string, string> $params
-     *
-     * @return string
      */
     protected function replacePlaceholders(string $template, array $params): string
     {

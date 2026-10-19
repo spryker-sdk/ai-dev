@@ -13,8 +13,6 @@ trait JsonResponseTrait
 {
     /**
      * @param array<string, mixed> $data
-     *
-     * @return string
      */
     protected function successResponse(array $data): string
     {
@@ -22,11 +20,7 @@ trait JsonResponseTrait
     }
 
     /**
-     * @param string $errorCode
-     * @param string $errorMessage
      * @param array<string, mixed> $details
-     *
-     * @return string
      */
     protected function errorResponse(string $errorCode, string $errorMessage, array $details = []): string
     {
