@@ -77,9 +77,13 @@ fi
 # not which one is running, so it is not a signal. Nothing matching leaves HARNESS empty, and
 # harness_spec below refuses it.
 if [ -z "$HARNESS" ]; then
-    if [ -n "$(json_string hook_event_name)" ] || [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] || [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    if [ -n "$(json_string hook_event_name)" ]; then
         HARNESS="claude"
-    elif [ -n "$(json_string sessionId)" ] || [ -n "${COPILOT_HOME:-}" ]; then
+    elif [ -n "$(json_string sessionId)" ]; then
+        HARNESS="copilot"
+    elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] || [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+        HARNESS="claude"
+    elif [ -n "${COPILOT_HOME:-}" ]; then
         HARNESS="copilot"
     fi
 fi

@@ -7,6 +7,8 @@
 
 set -uo pipefail
 
+unset GITHUB_ACTIONS CLAUDECODE CLAUDE_PLUGIN_ROOT CLAUDE_PROJECT_DIR COPILOT_HOME
+
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 SYNC="$REPO_ROOT/plugins/spryker-ai-dev-sdk/scripts/sync-rules.sh"
 WORK="$(mktemp -d)"
