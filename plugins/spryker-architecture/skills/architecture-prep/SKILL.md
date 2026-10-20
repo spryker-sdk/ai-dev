@@ -66,12 +66,21 @@ work than one context writing everything sequentially.
   section boundary. Read [references/multi-deliverable.md](references/multi-deliverable.md) at Step 0
   whenever N > 1.
 
-Spawn teammates with the `Agent` tool. Prefer `subagent_type: "Explore"` for read-only research/
-current-state investigation and `subagent_type: "general-purpose"` (or a `fork`) for section writers
-that must create files. **Exception: multi-deliverable writers must be fresh `general-purpose`
-agents, never forks** — a fork inherits the orchestrator's full context (including the other
-projects' intakes), which defeats the isolation that prevents fact bleed. Keep every teammate on a
-Claude model.
+Spawn teammates with your harness's subagent tool — the same mechanism behind a custom agent or agent
+type. Prefer **a read-only research subagent** for research and current-state investigation, and **a
+general-purpose subagent** (or a fork of the current context) for section writers that must create
+files. **Exception: multi-deliverable writers must be fresh general-purpose subagents, never forks** —
+a fork inherits the orchestrator's full context (including the other projects' intakes), which defeats
+the isolation that prevents fact bleed. Keep every teammate on a full-strength model; a downgraded
+writer produces exactly the thin sections this skill exists to avoid.
+
+This skill leans on skills from the **other** Spryker plugin — `spryker-docs-research`,
+`spryker-runtime`, `product-requirement-document` all ship in `spryker-ai-dev-sdk`, not here. Install
+that plugin alongside this one to get them; invoke one with its slash command, which carries the
+plugin prefix on a plugin install (`/spryker-ai-dev-sdk:spryker-runtime`).
+
+**Where one is missing, say so and carry on.** Each place below that calls for one names what to do
+without it. Never report a step blocked purely because the companion plugin is not installed.
 
 ## The companion files (read the right one at the right time)
 
@@ -87,7 +96,7 @@ the step that needs it, not all up front:
   single source of what to ask.** Read alongside interview.md before Step 1.
 - [references/interview.md](references/interview.md) — **how** to collect the questionnaire: detect a
   pre-filled/partial questionnaire (ask only the blanks), offer "fill the list yourself vs interview
-  me", group the questions into `AskUserQuestion` batches, ask for existing docs first, and **always
+  me", group the questions into batched multiple-choice question sets, ask for existing docs first, and **always
   write every answer to `intake.md`**. **Read before Step 1 — unless a TAD/structured brief was
   provided (then tad-mapping.md replaces it).**
 - [references/tad-mapping.md](references/tad-mapping.md) — the **TAD fast-path**: when a Spryker TAD
@@ -152,7 +161,7 @@ the step that needs it, not all up front:
   `> **TODO:**` note naming what's missing) rather than dressing it up. A truthful gap is more useful
   to the PRD author than confident invention.
 - **Autonomous means autonomous (after Step 0/1).** In Autonomous mode, after the intake interview is
-  answered you run to the Step 6 review without further `AskUserQuestion`; every fork becomes a logged
+  answered you run to the Step 6 review without asking the user anything further; every fork becomes a logged
   CRITICAL DECISION (see run-lean.md), not a question. Gated mode keeps its confirmation stops.
 
 ---
@@ -182,8 +191,10 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
    current project's root. If no local source is reachable, recreate the structure from the section
    list below and the templates described in `sections.md`. Never invent a different structure — the
    arc42 + C4 layout is the standard. Tell the user you scaffolded it and from where.
-2. **Ask the opening batch** (one or more `AskUserQuestion` calls — this is the "multi-tab section in
-   the beginning" the user wants). Cover at minimum, in this order of priority:
+2. **Ask the opening batch** — ask the user a structured multiple-choice question (use your harness's
+   question tool if it has one, otherwise ask in chat and wait for the answer), in one or more batches;
+   this is the "multi-tab section in the beginning" the user wants. Cover at minimum, in this order of
+   priority:
    - **Existing documents first.** "Can you share any business requirements, briefs, RFPs, discovery
      notes, slide decks, existing diagrams, or tickets? Paste text or give file paths." This is the
      highest-value input — ask for it before anything else and read everything provided.
@@ -198,7 +209,7 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
    - **ADRs / Solution Designs:** any decisions already made to capture as ADRs, or areas to explore
      as Solution Designs?
    See [references/interview.md](references/interview.md) for the full question bank and how to group
-   it into tabs. Batch aggressively (up to 4 questions per `AskUserQuestion`, several calls) so the
+   it into tabs. Batch aggressively (up to 4 questions per batch, several batches back-to-back) so the
    user is interviewed carefully but in one pass, not drip-fed.
 3. **Set up the run.** Create the run directory, the `run.log`, the decision log, and the State Object
    per run-lean.md. Record: template path, output target (default `architecture/` in place), chosen
@@ -237,7 +248,7 @@ Otherwise run the intake interview per [references/interview.md](references/inte
 questions from [references/questionnaire.md](references/questionnaire.md). First (unless fully
 autonomous) offer the user the choice to fill the questionnaire themselves vs be interviewed
 (interview.md Rule 1b). Then ask everything useful for the **selected** sections in batched
-`AskUserQuestion` calls (one call per questionnaire group), read every document the user provided, and
+multiple-choice batches (one batch per questionnaire group), read every document the user provided, and
 **write every answer — from any source — into a single `intake.md`** under the run directory (keyed by
 question ID, with each fact's source noted). This is the shared source every section writer will read.
 Do not start writing sections until this file has real substance. Log `INTERVIEW | complete`.
@@ -251,19 +262,19 @@ Do not start writing sections until this file has real substance. Log `INTERVIEW
 Spawn research teammates **in parallel**, each writing to a findings file under the run directory and
 returning a compact summary:
 
-- **Spryker docs teammate** — via `Skill(spryker-docs-research)` (or an `Explore` teammate that
-  invokes it): confirm how the Spryker features/modules named in the interview actually work, the real
+- **Spryker docs teammate** — by invoking the `spryker-docs-research` skill (or a read-only research
+  subagent that invokes it): confirm how the Spryker features/modules named in the interview actually work, the real
   actor names, PBC/feature names, integration patterns, and Publish & Sync behavior. Everything that
   will appear in sections 3/5/6/8 as "how Spryker does X" comes from here. → `research-docs.md`
   For a **multi-deliverable run, this runs ONCE** over the union of features named across all
   intakes, noting per feature which project(s) need it — never once per project (near-identical
   answers at N× the cost). Tip: docs.spryker.com is JS-rendered — fetch page markdown from the
-  public `spryker/spryker-docs` GitHub repo instead of WebFetch-ing the site.
-- **Web research teammate** — via `WebSearch`/`WebFetch`: external systems named in the interview
+  public `spryker/spryker-docs` GitHub repo instead of fetching the site with the web fetch tool.
+- **Web research teammate** — via the web search and web fetch tools: external systems named in the interview
   (the real ERP/PIM/CIAM/PSP products), standards (arc42, C4, GDPR, protocol specs), and any
   industry/volume benchmarks the user referenced. → `research-web.md`
 - **Current-state teammate** *(existing projects, only if grounding was permitted)* — via
-  `Skill(spryker-runtime)` and reading the codebase: which stores/locales/currencies exist, installed
+  the `spryker-runtime` skill and reading the codebase: which stores/locales/currencies exist, installed
   modules, deployment files (`deploy.*.yml`), real integrations, actors at `/user`. Grounds sections
   3/5/7 in what's actually there. → `research-current-state.md`
 
@@ -327,8 +338,8 @@ consciously accepted as owned TODOs). The loop:
 **6a — Review.** Spawn one **review subagent** to grade the written document against the
 Spryker-specific self-review checklist in [references/review.md](references/review.md). Read that file
 now. The reviewer:
-- must be **independent of the writers** — a fresh `Explore` or `general-purpose` teammate on a Claude
-  model, never a fork of the orchestrator and never the same context that wrote the sections (an author
+- must be **independent of the writers** — a fresh read-only research or general-purpose subagent on a
+  full-strength model, never a fork of the orchestrator and never the same context that wrote the sections (an author
   can't see its own gaps);
 - is fed: the list of files written this run, the run's `intake.md`, `research-docs.md`, and
   `references/review.md`;
@@ -406,22 +417,24 @@ which splices the shared `head.html` + shared `render-core.js` + a one-line load
 the only difference) and **asserts via `shasum` that the render core is byte-identical in both**,
 failing if they ever diverge:
 ```bash
-ARCH="<ABS>/architecture" ASSETS="<SKILL>/references/preview-assets" \
-  bash "<SKILL>/references/preview-assets/build-previews.sh"
+ARCH="<ABS>/architecture" ASSETS="<skill-dir>/references/preview-assets" \
+  bash "<skill-dir>/references/preview-assets/build-previews.sh"
 ```
+`<skill-dir>` is the path reported as `Base directory for this skill:` when this skill loaded —
+substitute the literal absolute path. `<ABS>` is the project root.
 
 Why two files at all: browsers block `fetch()` on `file://`, so no single file can both open on
 `file://` and read the live folder — live-read needs a server, double-click needs baked content. In Gated mode ask which the user wants; in Autonomous
 mode write `preview.html` and compile the standalone at handover, verify (`preview.html` render-checked
 over http — assert every section + **every SD and ADR** shows in the TOC; the standalone static- or
-http-validated since the Chrome extension can't open `file://`), and hand over both paths + the "print
+http-validated since browser automation can't open `file://`), and hand over both paths + the "print
 to PDF" one-liner.
 
 When the user **did** ask for commits/PRs (typical for multi-deliverable runs): treat push/PR as an
 outward-facing gate. Commit everything push-ready **first** (all branches/worktrees), then attempt
 the push; if the environment denies it, don't retry or work around the denial — an in-conversation
 "yes" doesn't satisfy a harness permission rule. Emit the exact `git push` + `gh pr create` command
-block for the user to run themselves (with the `!` prefix), then finish the rest of the handoff
+block for the user to run themselves (as a copy-paste-ready shell block), then finish the rest of the handoff
 (TODO list, worktree cleanup once PRs exist). See
 [references/multi-deliverable.md](references/multi-deliverable.md) for the N-PR command-block shape.
 
@@ -431,11 +444,11 @@ block for the user to run themselves (with the `!` prefix), then finish the rest
 
 | Stage | Delegate to |
 |-------|-------------|
-| Ticket / doc intake | filled [questionnaire.md](references/questionnaire.md) → ask only blanks; `AskUserQuestion` batches per [interview.md](references/interview.md) + read provided files; TAD → [tad-mapping.md](references/tad-mapping.md) fast-path, no interview |
-| Spryker feature/behavior research | `Skill(spryker-docs-research)` (in an `Explore`/`general-purpose` teammate) — once per run, shared across deliverables |
-| External systems / standards research | `WebSearch` / `WebFetch` teammate |
-| Current-state grounding (existing project) | `Skill(spryker-runtime)` + codebase read teammate |
-| Section writing (single deliverable) | one `general-purpose`/`fork` teammate per section |
+| Ticket / doc intake | filled [questionnaire.md](references/questionnaire.md) → ask only blanks; batched multiple-choice questions per [interview.md](references/interview.md) + read provided files; TAD → [tad-mapping.md](references/tad-mapping.md) fast-path, no interview |
+| Spryker feature/behavior research | the `spryker-docs-research` skill (in a read-only research or general-purpose subagent) — once per run, shared across deliverables |
+| External systems / standards research | web search / web fetch teammate |
+| Current-state grounding (existing project) | the `spryker-runtime` skill + codebase read teammate |
+| Section writing (single deliverable) | one general-purpose (or fork) teammate per section |
 | Multi-deliverable writing | one isolated teammate per deliverable, own worktree ([multi-deliverable.md](references/multi-deliverable.md)) |
 | Cross-link & consistency | orchestrator, inline (multi-deliverable: each writer, orchestrator spot-checks) |
 | Self-review | independent reviewer teammate against [review.md](references/review.md) → ranked findings; orchestrator applies fixes (Autonomous) or surfaces to user (Gated) |

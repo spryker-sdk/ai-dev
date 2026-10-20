@@ -11,7 +11,7 @@ description: >
 # Spryker Back Office Frontend
 
 The always-on conventions (Bootstrap 5 only, no new jQuery, `| raw` safety, `| trans`, ACL server-side,
-`data-qa`) live in `.claude/rules/zed-backoffice-frontend.md`. This skill is the procedure.
+`data-qa`) live in the `zed-backoffice-frontend` rule. This skill is the procedure.
 
 Project code goes in `src/{ProjectNamespace}/Zed/{Module}/`; core (`vendor/spryker*/`) is read-only.
 `{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`. Twig, PHP, navigation and translations work in any project namespace; JS needs step 5's
@@ -26,23 +26,23 @@ build registration. Copy the structure of the nearest existing screen.
 ## 1. Controller — `src/{ProjectNamespace}/Zed/{Module}/Communication/Controller/{Name}Controller.php`
 
 URL is `/{module-kebab}/{controller-kebab}/{action-kebab}` (`FooGui` `IndexController::listAction()` →
-`/foo-gui/index/list`). Thin controller per `.claude/rules/controller.md`.
+`/foo-gui/index/list`). Thin controller per the `controller` rule.
 
 - List page = `indexAction()` (`viewResponse(['fooTable' => $table->render()])`) **and** `tableAction()`
   (`jsonResponse($table->fetchData())`) — DataTables calls the second one; one controller per table
-  (`.claude/rules/table.md`).
+  (the `table` rule).
 - Form page: `handleRequest()` → on valid submit call the facade, `addSuccessMessage()`, then
   `redirectResponse($url)`; otherwise `viewResponse(['form' => $form->createView()])`.
 - Flash messages take placeholders as a parameter array — `addErrorMessage('Foo %name% not found.', ['%name%' => $name])` — never a `sprintf()` result (breaks translation).
 
 ## 2. Table / form / tabs — created in the `{Module}CommunicationFactory`
 
-- Table extends `Spryker\Zed\Gui\Communication\Table\AbstractTable` (rules: `.claude/rules/table.md`).
+- Table extends `Spryker\Zed\Gui\Communication\Table\AbstractTable` (see the `table` rule).
   Row buttons: `generateEditButton()` / `generateViewButton()` / `generateRemoveButton()` /
   `generateButtonGroup()`; register those columns in `setRawColumns()`.
 - Table JS features (`data-selectable`, `data-filterable`, …; the set depends on the installed `spryker/gui`)
   are declared in PHP via `$config->setTableAttributes([...])` — no JS. See `references/assets-and-build.md`.
-- Forms: Symfony types in `Communication/Form/` (choice data per `.claude/rules/form-data-loading-performance.md`).
+- Forms: Symfony types in `Communication/Form/` (choice data per the `form-data-loading-performance` rule).
 - Tabbed pages: a class extending `Spryker\Zed\Gui\Communication\Tabs\AbstractTabs`, `->createView()` passed
   to Twig, rendered with `{{ tabs(fooTabs, {...context}) }}`.
 

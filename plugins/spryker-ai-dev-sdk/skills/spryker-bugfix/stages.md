@@ -3,16 +3,21 @@
 Full, authoritative per-step instructions for the workflow spine in [SKILL.md](SKILL.md).
 Read the relevant § before executing each step.
 
+Invoke a skill with its slash command (`/spryker-runtime`, or `/spryker-ai-dev-sdk:spryker-runtime`
+on a plugin install); delegate to an agent with your harness's subagent tool. See
+[§ Stage → skill quick map](#stage--skill-quick-map) for the full delegation table.
+
 ## Step 0 — Choose mode and gather context (ALWAYS FIRST)
 
 This is the **one and only** place the skill collects choices up front. In **Autonomous** mode,
 everything you need to run unattended must be settled here — after this step, Autonomous mode asks
 nothing more (see the Operating principle above).
 
-Begin with **one up-front intake round of `AskUserQuestion` calls**. `AskUserQuestion` carries at
-most **4 questions per call**, so ask the 8 questions below in **two back-to-back multi-tab calls**
-— questions 1–4, then questions 5–8 — with nothing in between. This is still a single intake: after
-the second call's answers, nothing more is asked. Ask:
+Begin with **one up-front intake round**: ask the user the 8 structured multiple-choice questions
+below — use your harness's question tool if it has one, otherwise ask in chat and wait for the answer.
+Ask them in **two back-to-back batches** — questions 1–4, then questions 5–8 — with nothing in between
+(a question tool typically caps a single call at four). This is still a single intake: after the second
+batch's answers, nothing more is asked. Ask:
 
 1. **Mode** — `Autonomous` (agent decides everything, no human in the loop, goes all the way to
    pushed Draft PR + watch loop) vs `Collaborative` (agent asks the user at the important decision
@@ -45,7 +50,7 @@ the second call's answers, nothing more is asked. Ask:
    Step 11. Because Autonomous mode won't ask again, this is the moment to capture "don't open a PR" or
    "use the GitLab MCP, not gh".
 7. **Cypress E2E coverage** — should the run also fix/improve/add a **Cypress E2E test** for this
-   bug (Step 9b, via `Skill(cypress-tests)`, after QA acceptance)? Offer:
+   bug (Step 9b, via the `cypress-tests` skill, after QA acceptance)? Offer:
    - **Auto (recommended)** — cover it with Cypress only when the bug is user-visible on an E2E
      surface (storefront / Back Office / Merchant Portal / Glue API) and the project's Cypress suite
      exists; otherwise skip with a logged reason.
@@ -78,13 +83,13 @@ in your running decision log. In **Collaborative** mode, pause for confirmation 
 
 **Set up the run directory and step logger (do this immediately after the answers).** Create the
 per-bugfix folder and a single run log file inside it, and write every step's start/end and key
-outcome there as you go — this is the file whose path you show at the very end (Step 12). Anchor the
-run directory to `$CLAUDE_PROJECT_DIR` (the project root Claude Code loaded) so it is stable no matter
-the current working directory; fall back to `$(pwd)` if the variable is unset.
+outcome there as you go — this is the file whose path you show at the very end (Step 12). **Run this
+from the project root** so the run directory is anchored there, then reuse the resolved absolute path
+— it must stay stable no matter the current working directory.
 
 ```bash
 # <bugfix-id>: JIRA key if known, else "no-ticket-<brief-name>". Finalize after Step 2 if unknown now.
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+PROJECT_DIR="$(pwd)"        # run from the project root
 BUGFIX_DIR="$PROJECT_DIR/.ai-dev/spryker-bugfix/<bugfix-id>"
 mkdir -p "$BUGFIX_DIR"
 # Make the run directory ignore itself, so this run's own scratch files cannot make
@@ -119,8 +124,9 @@ channel is a property of its repo, not of a globally-authenticated tool):
    CLI: push + Draft PR + `gh pr checks` watch loop.
 3. **`mcp`** — a **forge MCP server matching the remote host is connected** (e.g. a GitHub MCP for a
    `github.com` remote, a GitLab MCP for a `gitlab.*` remote, a Bitbucket MCP for `bitbucket.org`). Use
-   the MCP's create-PR / list-checks tools for the same push + PR + watch flow. Discover these via
-   `ToolSearch` (e.g. query the forge name + "pull request"/"merge request"); if a create-PR tool
+   the MCP's create-PR / list-checks tools for the same push + PR + watch flow. Look for them among the
+   connected MCP tools (the forge name plus "pull request"/"merge request"); if your harness defers MCP
+   tools until requested, load them first (in Claude Code, `ToolSearch`). If a create-PR tool
    resolves for the remote's host, the channel is `mcp`. **Prefer `gh` over `mcp` only for GitHub when
    both exist** (native `gh pr checks` is the cheapest poll); for non-GitHub remotes `mcp` is the *only*
    PR-capable channel.
@@ -128,7 +134,7 @@ channel is a property of its repo, not of a globally-authenticated tool):
    but no PR API.
 
 ```bash
-# CLI/remote part of the probe (the MCP check is a ToolSearch, done in-agent — see below).
+# CLI/remote part of the probe (the forge-MCP check is a tool lookup, done in-agent — see below).
 REMOTE_URL="$(git remote get-url origin 2>/dev/null || true)"
 if [ -z "$REMOTE_URL" ]; then
   PR_CHANNEL="none"                      # no origin remote → local-only
@@ -143,7 +149,7 @@ else
   esac
 fi
 # Then, if PR_CHANNEL is still "git-only", check for a forge MCP matching the remote host
-# (ToolSearch for the host's create-PR/MR tool). If one resolves, set PR_CHANNEL="mcp"
+# (look for the host's create-PR/MR tool). If one resolves, set PR_CHANNEL="mcp"
 # and remember the tool names. This step is done by the agent, not in bash.
 printf '[%s] STEP 0 — PR_CHANNEL=%s remote=%s | probe\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$PR_CHANNEL" "${REMOTE_URL:-none}" >> "$BUGFIX_LOG"
 ```
@@ -168,40 +174,41 @@ ask the user to install `gh` or connect an MCP.
 
 ### Arrange the plan as a task list (do this right after the logger)
 
-Immediately after setting up the run directory, **create the plan as a task list** so the run's
-progress is visible and survives compaction or a scheduled wake-up. Use `TaskCreate` once per stage
-— one task for each of Steps 1–12 — with the mode/`<bugfix-id>` in each subject for context:
+Immediately after setting up the run directory, **create the plan in your harness's task list** (Claude
+Code: `TaskCreate`, `TaskUpdate`, `TaskList`; Copilot: the todo tool) so the run's progress is visible
+and survives compaction or a scheduled wake-up. Create one task per stage — one for each of
+Steps 1–12 — with the mode/`<bugfix-id>` in each subject for context:
 
 ```
-TaskCreate  "S1  Intake & framing"
-TaskCreate  "S2  Create bugfix branch (safety gate)"
-TaskCreate  "S3  Reproduce & understand"
-TaskCreate  "S4  Root-cause investigation (loop re-entry)"
-TaskCreate  "S5  Implement fix & verify repro"
-TaskCreate  "S6  Functional test coverage"
-TaskCreate  "S7  Static validation"
-TaskCreate  "S8  Code review (gate)"
-TaskCreate  "S9  QA acceptance (gate)"
-TaskCreate  "S9b Cypress E2E coverage (conditional)"
-TaskCreate  "S10 Final verification before commit"
-TaskCreate  "S11 Commit / push / Draft PR / watch (mode gate)"
-TaskCreate  "S12 Final report"
+S1  Intake & framing
+S2  Create bugfix branch (safety gate)
+S3  Reproduce & understand
+S4  Root-cause investigation (loop re-entry)
+S5  Implement fix & verify repro
+S6  Functional test coverage
+S7  Static validation
+S8  Code review (gate)
+S9  QA acceptance (gate)
+S9b Cypress E2E coverage (conditional)
+S10 Final verification before commit
+S11 Commit / push / Draft PR / watch (mode gate)
+S12 Final report
 ```
 
 Then drive it as you go:
 
-- **Entering a stage** → `TaskUpdate <id> status=in_progress`. Keep **exactly one** task `in_progress`
+- **Entering a stage** → set that task `in_progress`. Keep **exactly one** task `in_progress`
   at a time (the stage you're actually running) so the list reads as the true current position.
-- **Stage green** → `TaskUpdate <id> status=completed`, then move to the next.
+- **Stage green** → set that task `completed`, then move to the next.
 - **On a loopback** (Step 8 review fail / Step 9 QA reject / Step 10 verify fail / Step 11 red CI) →
-  reopen the affected gate task (`status=in_progress` again) and `TaskCreate` a short attempt task
+  reopen the affected gate task (`in_progress` again) and add a short attempt task
   (e.g. `"S4 re-investigate — attempt <N>"`) so each pass through the loop is auditable. Mirror the
   same `attempt=<n>` note into `run.log`.
 - **At any terminal state** (success, stop-before-push, or `attempt > 3`) → mark the reached task
   completed and leave the rest as-is; Step 12's report reflects the final task states.
 
-`TaskList` is the live checklist — read it (not the full transcript) to see where the run stands; the
-watch loop and any resumed run should re-orient from it plus `$BUGFIX_DIR/watch-state.md`. This
+The task list is the live checklist — read it (not the full transcript) to see where the run stands;
+the watch loop and any resumed run should re-orient from it plus `$BUGFIX_DIR/watch-state.md`. This
 **complements** the `run.log` timeline and the `decisions.md` rationale — it does not replace either.
 
 ### Environment reset decision (item from Step 0 answer 4)
@@ -304,7 +311,7 @@ is not a deviation:
 
 - **Record the bug's file list** in the State Object as `scoped_paths` — the files this fix owns — plus a
   one-line note of what unrelated changes were already in the tree.
-- **Scope Step 8** to those paths: hand `Skill(code-review)` that explicit file list as the review
+- **Scope Step 8** to those paths: hand the `code-review` skill that explicit file list as the review
   target instead of `base...HEAD`, and treat findings outside it as out-of-scope.
 - **Narrow Steps 9 and 10** to the flows those paths affect. Pre-existing breakage from the unrelated
   changes is reported separately — never as a gate failure of this fix, never inside the attempt budget.
@@ -324,14 +331,15 @@ Goal: a written, **reproducible** scenario — there may be several to cover the
   a live env. If you ran a reset in Step 0, the env is already up; otherwise bring it up before
   reproducing: `script -q /dev/null docker/sdk run` (or `up` for a cold build). A repro that fails
   because the stack is down wastes the investigation.
-- **Delegate the reproduction to a subagent** so the Chrome/console bulk (screenshots, page text,
-  command output) stays out of the orchestrator. Spawn an `Agent` that uses `Skill(spryker-runtime)`
-  to reproduce the reported steps end-to-end as the right actor (resolve hosts from `deploy.dev.yml`;
-  lightest mode that shows the symptom, but drive Chrome for rendered-UI/JS symptoms). Tell it to
+- **Delegate the reproduction to a subagent** so the browser/console bulk (screenshots, page text,
+  command output) stays out of the orchestrator. Spawn a subagent that runs the `spryker-runtime`
+  skill to reproduce the reported steps end-to-end as the right actor (resolve hosts from
+  `deploy.dev.yml`; lightest mode that shows the symptom, but drive the browser for rendered-UI/JS
+  symptoms — see that skill's Browser tool map for the tool names in your setup). Tell it to
   **write the full repro notes + evidence to `$BUGFIX_DIR/repro-notes.md`** and return only:
   reproduced yes/no, a 1–3 line scenario summary per scenario, and the key evidence values (status
   code, the wrong vs expected rendered value). The orchestrator keeps that summary in the State Object.
-- In parallel, spawn **`Skill(spryker-docs-research)`** as a subagent to ground the affected
+- In parallel, spawn a subagent running the **`spryker-docs-research`** skill to ground the affected
   functionality in official docs — how it's *supposed* to behave. It is docs-only and starts **blind**,
   so pass it the **module/feature name**, **reported symptom**, **actor/surface**, and the specific
   **expected-vs-actual question**. Ask it to return a short "expected behavior" summary, not a doc dump.
@@ -357,9 +365,9 @@ references it by path and carries only the summary forward.
 Identify *why* it happens, with **code references and an explanation**, not a guess.
 
 - **Delegate the runtime tracing to a subagent.** XDebug variable dumps and `[AI-DEBUG]` log streams
-  are bulky — run them in an `Agent` that uses **`Skill(ai-runtime-debugging)`** + **`Skill(spryker-runtime)`**
-  to confirm which path actually executes and the values at the failure point, writes the raw trace to
-  `$BUGFIX_DIR/rootcause-attempt<N>.log`, and returns only: the confirmed executing path
+  are bulky — run them in a subagent that uses the **`ai-runtime-debugging`** + **`spryker-runtime`**
+  skills to confirm which path actually executes and the values at the failure point, writes the raw
+  trace to `$BUGFIX_DIR/rootcause-attempt<N>.log`, and returns only: the confirmed executing path
   (`file:line`), the decisive values observed, and which candidate paths it ruled out. Keep that, not
   the trace.
 - Remember the core lesson: **the displayed symptom may be produced by a different path than the
@@ -388,9 +396,9 @@ Identify *why* it happens, with **code references and an explanation**, not a gu
 
 ## Step 6 — Functional test coverage  (run in a subagent)
 
-**Delegate this whole stage to one subagent** that uses **`Skill(codecept-functional)`** — test
+**Delegate this whole stage to one subagent** that uses the **`codecept-functional`** skill — test
 authoring, the `codecept build`/`codecept run` cycle, and any fix iterations all produce bulk output
-(build chatter, stack traces) that must not land in the orchestrator. Spawn an `Agent` and hand it the
+(build chatter, stack traces) that must not land in the orchestrator. Spawn the subagent and hand it the
 root-cause `file:line`, the changed files, and the repro scenarios; instruct it to:
 
 - Decide whether a test must be **updated or added** to lock in the fix and prevent regression, and
@@ -419,21 +427,23 @@ root-cause `file:line`, the changed files, and the repro scenarios; instruct it 
   the path(s) of any test file it created/edited, and — if failing — the failing test names + the
   one-line assertion message each.
 
-The orchestrator keeps just that verdict (and the new test paths, for the diff); it `Read`s the log
-only for a failure it must act on. Confirm green before moving on.
+The orchestrator keeps just that verdict (and the new test paths, for the diff); it opens the log
+— with the built-in file read tool, not shell — only for a failure it must act on. Confirm green
+before moving on.
 
 ## Step 7 — Static validation  (run in a subagent)
 
-**Delegate to a subagent** that runs **`Skill(static-validation)`** (phpcbf/phpcs/phpstan on the diff)
-— the raw sniffer output is verbose. The subagent applies the auto-fixes, addresses what the sniffer
-cannot, re-runs until clean, writes the run to `$BUGFIX_DIR/static-attempt<N>.log`, and returns only
-`clean` or the list of remaining violations (`file:line` + rule). Keep just that verdict. (For a quick
-interim check `sh .claude/bash-local/validation.sh` is fine; the skill is the authoritative gate.)
+**Delegate to a subagent** that runs the **`static-validation`** skill (phpcbf/phpcs/phpstan on the
+diff) — the raw sniffer output is verbose. The subagent applies the auto-fixes, addresses what the
+sniffer cannot, re-runs until clean, writes the run to `$BUGFIX_DIR/static-attempt<N>.log`, and returns
+only `clean` or the list of remaining violations (`file:line` + rule). Keep just that verdict. (For a
+quick interim check, any validation script the project already keeps for this is fine; the skill is
+the authoritative gate.)
 
 ## Step 8 — Code review  ← GATE (loops back to Step 4)
 
-1. Run **`Skill(code-review)`**, passing the State Object's **`size`** so the fan-out scales — `trivial`
-   → **1** reviewer, `normal` → the default **3–5**, `complex` → **5** — and, if the Step 2 clean-tree
+1. Run the **`code-review`** skill, passing the State Object's **`size`** so the fan-out scales —
+   `trivial` → **1** reviewer, `normal` → the default **3–5**, `complex` → **5** — and, if the Step 2 clean-tree
    gate was overridden, the `scoped_paths` file list as the review target. A smaller fan-out is a
    lighter gate, never a skipped one: the review still runs and its blocker/major findings still gate.
    It fans the diff out to `spryker-code-reviewer` subagents. Have the
@@ -442,8 +452,8 @@ interim check `sh .claude/bash-local/validation.sh` is fine; the skill is the au
    the file. The orchestrator keeps only that short blocker/major list in the State Object.
 2. **Fix the findings that relate to the code** (blockers/majors first; apply nits where cheap — open
    the review file to read a nit only when you're about to fix it).
-3. After fixing, **re-run `Skill(static-validation)`** and **re-run the functional tests if the review
-   fixes touched tested behavior** (on a loopback pass, that includes the Step 9b Cypress spec if one
+3. After fixing, **re-run the `static-validation` skill** and **re-run the functional tests if the
+   review fixes touched tested behavior** (on a loopback pass, that includes the Step 9b Cypress spec if one
    exists from a previous attempt and the fixes touched its flow).
 
 **The verification loop:**
@@ -461,8 +471,8 @@ interim check `sh .claude/bash-local/validation.sh` is fine; the skill is the au
 
 ## Step 9 — QA acceptance (independent)
 
-Spawn **`Skill(spryker-qa-coverage)` as a subagent in an isolated context** and have it return a QA
-report that explicitly **accepts or rejects** the fix. Because the subagent starts blind, you MUST
+Run the **`spryker-qa-coverage`** skill **in a subagent with an isolated context** and have it return
+a QA report that explicitly **accepts or rejects** the fix. Because the subagent starts blind, you MUST
 pass it the session context per that skill's rule: what changed (files), the bug + repro scenarios,
 environment gotchas (worker running, accounts/passwords, queue state, feature installed), **which
 regen/cache commands were already run in Step 5** (so the QA env matches — e.g. transfer regen, schema
@@ -494,7 +504,7 @@ nature of the bug:
   log it (Autonomous: as a CRITICAL DECISION — "no Cypress coverage because <reason>") and mark the
   S9b task completed with that note.
 
-When it runs, **delegate the whole stage to one subagent** that uses **`Skill(cypress-tests)`** —
+When it runs, **delegate the whole stage to one subagent** that uses the **`cypress-tests`** skill —
 `npm ci`, cypress run output, and lint chatter are bulky and must not land in the orchestrator. Hand
 it the repro scenarios, the root-cause summary, the changed files, and the QA report's E2E steps
 (they are the ready-made scenario the spec should encode), and instruct it to:
@@ -534,12 +544,12 @@ evidence, not just green tests.
 
 - Re-run the affected functional tests once more for a clean final signal (subagent, as in Step 6);
   if Step 9b produced or changed a Cypress spec, re-run that spec targeted (`--spec`) as well.
-- **Perform an end-to-end final verification in the running app (subagent).** Spawn the
-  `spryker-verifier` agent (via the harness's subagent-spawning tool — commonly `Agent`; resolve it
-  via `ToolSearch` first — passing `subagent_type="spryker-verifier"`), or a
-  subagent using **`Skill(spryker-runtime)`** if you prefer a raw runtime drive. Hand it the changed
-  files, the repro scenarios, the acceptance expectation (the exact user-visible symptom that must be
-  gone), and any env gotchas. It drives the affected surface (Yves / Back Office / Merchant Portal / Glue as relevant),
+- **Perform an end-to-end final verification in the running app (subagent).** Delegate to the
+  `spryker-verifier` agent with your harness's subagent tool (see the delegation cheatsheet in
+  `spryker-customization`), or to a subagent using the **`spryker-runtime`** skill if you prefer a raw
+  runtime drive. Hand it the changed files, the repro scenarios, the acceptance expectation (the exact
+  user-visible symptom that must be gone), and any env gotchas. It drives the affected surface
+  (Yves / Back Office / Merchant Portal / Glue as relevant),
   writes its evidence to `$BUGFIX_DIR/final-verify-attempt<N>.log`, and returns only a **PASS / FAIL /
   BLOCKED** verdict with the decisive evidence (status code, the now-correct rendered value, DB/queue
   state as applicable).
@@ -629,9 +639,10 @@ with no ticket, omit the trailing key.
      because the run may already be long: re-reading the whole conversation on every 15-min wake is
      exactly what pushes context to the danger zone. The handoff file is the loop's working memory.
 
-     Pick the mechanism by what this harness actually exposes — **resolve it via `ToolSearch` first
-     and use its real schema**; the names below are the common ones, not a guarantee, and parameters
-     differ between them (a cron tool takes a cron expression, not a delay in seconds):
+     Pick the mechanism by what this harness actually exposes — **check its real schema before you
+     call it** (and if your harness defers such tools until requested, load it first); the names below
+     are the common ones, not a guarantee, and parameters differ between them (a cron tool takes a cron
+     expression, not a delay in seconds):
        - A **polling/monitor** tool (e.g. `Monitor`) is the best fit when available: it is built for
          "poll a command, emit each terminal state, exit when the run completes".
        - A **self-wakeup** tool (e.g. `ScheduleWakeup`) for an interactive session. Re-pass a
@@ -694,31 +705,29 @@ Keep it skimmable — it is the artifact the user reads instead of having been i
 
 ## Stage → skill quick map
 
-**Skill invocation names.** Every skill this workflow delegates to ships in the
-`spryker-ai-dev-sdk` plugin, so its invocable name carries that prefix —
-`Skill(spryker-ai-dev-sdk:spryker-runtime)`, `Skill(spryker-ai-dev-sdk:code-review)`, and so on.
-The bare names used in this document and in the table below are **shorthand for the prefixed
-form**. If a bare name fails to resolve, retry it with the `spryker-ai-dev-sdk:` prefix before
-reporting a stage blocked — a delegation that cannot resolve is a naming problem, not a blocked
-gate.
+**Skill names carry the plugin prefix on a plugin install.** Every skill this workflow delegates to
+ships in the `spryker-ai-dev-sdk` plugin, so its slash command carries that prefix —
+`/spryker-ai-dev-sdk:spryker-runtime`, `/spryker-ai-dev-sdk:code-review`, and so on, in both
+harnesses. The bare names used in this document and in the table below are **shorthand for the
+prefixed form**. If a bare name fails to resolve, retry it with the prefix before reporting a stage
+blocked — a delegation that cannot resolve is a naming problem, not a blocked gate.
 
-**The same applies to agent types.** On a plugin install the registered `subagent_type` is
-prefixed too — `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare
-`spryker-verifier` (the `Agent` tool rejects an unregistered bare name with an "Agent type not
-found" error listing the valid names). Bare agent names in these documents are the same
-shorthand: if one fails to resolve, retry with the prefix.
+**Agents take the prefix too, with a separator that differs by harness** —
+`spryker-ai-dev-sdk:spryker-verifier` under Claude Code, `spryker-ai-dev-sdk/spryker-verifier` under
+GitHub Copilot. Bare agent names in these documents are the same shorthand. Agents are delegated to with your harness's subagent tool, not
+invoked the way a skill is — see the delegation cheatsheet in `spryker-customization`.
 
 | Step | Skill / tool |
 |------|--------------|
-| 0 Mode, context, logger, PR-channel probe, env-reset decision | `AskUserQuestion`, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `PR_CHANNEL` probe (`command -v gh` + `gh auth status` + remote check), `docker/sdk reset` (if chosen) |
-| 3 Reproduce | `Skill(spryker-runtime)` + `Skill(spryker-docs-research)` — **subagents**, return summaries to `repro-notes.md` |
-| 4 Root cause | `Skill(ai-runtime-debugging)` + `Skill(spryker-runtime)` — **subagent**, returns path+values |
+| 0 Mode, context, logger, PR-channel probe, env-reset decision | structured multiple-choice intake questions, **optional** ticket pull (JIRA via Atlassian MCP `jira_get_issue`/`jira_get_issue_images`, or `gh issue view`, or paste) — skipped when there's no ticket, `PR_CHANNEL` probe (`command -v gh` + `gh auth status` + remote check), `docker/sdk reset` (if chosen) |
+| 3 Reproduce | `spryker-runtime` + `spryker-docs-research` skills — **subagents**, return summaries to `repro-notes.md` |
+| 4 Root cause | `ai-runtime-debugging` + `spryker-runtime` skills — **subagent**, returns path+values |
 | 5 Fix | edits (+ parallel subagents), regen/cache commands |
-| 6 Tests | `Skill(codecept-functional)` — **subagent**, returns pass/fail + failing names |
-| 7 Static | `Skill(static-validation)` — **subagent**, returns clean/violations |
-| 8 Review (gate) | `Skill(code-review)` — returns ≤5 blocker/major; loop to 4 (max 3) |
-| 9 QA | `Skill(spryker-qa-coverage)` (isolated subagent) |
-| 9b Cypress E2E (conditional, Step 0 answer 7 + user-visible surface) | `Skill(cypress-tests)` — **subagent**, returns pass/fail/skipped + action (fix/improve/add/none) + spec paths |
-| 10 Final verification (gate) | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` — **subagent**, returns PASS/FAIL + evidence |
-| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + a watch loop on whichever scheduler/monitor tool `ToolSearch` resolves (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
+| 6 Tests | `codecept-functional` skill — **subagent**, returns pass/fail + failing names |
+| 7 Static | `static-validation` skill — **subagent**, returns clean/violations |
+| 8 Review (gate) | `code-review` skill — returns ≤5 blocker/major; loop to 4 (max 3) |
+| 9 QA | `spryker-qa-coverage` skill (isolated subagent) |
+| 9b Cypress E2E (conditional, Step 0 answer 7 + user-visible surface) | `cypress-tests` skill — **subagent**, returns pass/fail/skipped + action (fix/improve/add/none) + spec paths |
+| 10 Final verification (gate) | `codecept-functional` skill re-run + `spryker-verifier` agent / `spryker-runtime` skill — **subagent**, returns PASS/FAIL + evidence |
+| 11 Ship + remote CI watch (PR-pref + channel gated) | always `git commit`; then by PR preference + `PR_CHANNEL`: `gh`/`mcp` → `git push` + Draft PR (no labels; `gh pr create` or forge-MCP create-PR tool) + a watch loop on whichever scheduler/monitor tool the harness exposes (polling `gh pr checks` / MCP status) · `git-only` → `git push` + handover create-PR line · `none` or "no PR" → commit (push if allowed), report publish commands |
 | 12 Final report | decision log + step log → user-facing report ending with the log file path |

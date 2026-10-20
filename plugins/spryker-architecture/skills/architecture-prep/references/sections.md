@@ -96,12 +96,15 @@ flowcharts as the examples do. When restyling a harvested diagram, remap its col
 
 ## § 02 — Constraints
 
-**File:** `02-constraints.md`. **Inputs:** intake tab group D; conventions from CLAUDE.md.
+**File:** `02-constraints.md`. **Inputs:** intake tab group D; conventions from the project
+instructions file.
 
 Fill the three tables (Technical / Organizational / Conventions) with real constraints and their
 *motivation* (the "why" column is the point — a constraint without a reason is noise). Hosting model,
 compliance, team size, release cadence, PHPStan level, branching model. Pull Spryker/PHP conventions
-from the project's own `CLAUDE.md`/`.claude/rules` where relevant.
+from the project's own instructions file and rules folder where relevant — `CLAUDE.md` +
+`.claude/rules/` under Claude Code, `.github/copilot-instructions.md` + `.github/instructions/` under
+GitHub Copilot.
 
 ## § 03 — System Scope and Context  ⟶ C1
 

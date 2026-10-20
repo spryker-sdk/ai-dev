@@ -18,7 +18,7 @@ description: >
 
 # Spryker Customization Workflow
 
-Take a PRD or acceptance criteria and walk it to a committed branch. Invoke focused subagents at the points called out below, using whichever subagent-spawning tool this harness exposes (commonly `Agent` — resolve it via `ToolSearch` first). User-facing interactions are limited to the consolidated planning gate and the commit gate.
+Take a PRD or acceptance criteria and walk it to a committed branch. Delegate focused work to the agents named below with your harness's subagent tool (see the "Subagent delegation cheatsheet" at the end of this document), and invoke a skill with its slash command (`/spryker-refresher`, or `/spryker-ai-dev-sdk:spryker-refresher` on a plugin install). User-facing interactions are limited to the consolidated planning gate and the commit gate.
 
 ## Intake rule — state the class of the work before accepting it (runs before Step 0)
 
@@ -33,7 +33,7 @@ Without this step, a sizing change can turn into a new Twig organism, PHP overri
 
 ## Run logging — the contract
 
-Every run keeps a written trail in `$BUILD_DIR` = `${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-customization/<feature-slug>/`, so the commit gate is judged on evidence rather than memory and a resumed run can re-orient. Three files: `run.log` (append-only timeline, one line per step boundary), `decisions.md` (rationale per fork + an OPEN QUESTIONS / RISKS section that feeds the Step 8 Caveats), `<stage>-<n>.log` (bulk subagent/gate output — never into `run.log` or your context). Three fixed rules: **never log a step green that wasn't**, **log every self-correct iteration, not just the exit**, and **bulk output goes to a file**.
+Every run keeps a written trail in `$BUILD_DIR` = `$(pwd)/.ai-dev/spryker-customization/<feature-slug>/`, so the commit gate is judged on evidence rather than memory and a resumed run can re-orient. Three files: `run.log` (append-only timeline, one line per step boundary), `decisions.md` (rationale per fork + an OPEN QUESTIONS / RISKS section that feeds the Step 8 Caveats), `<stage>-<n>.log` (bulk subagent/gate output — never into `run.log` or your context). Three fixed rules: **never log a step green that wasn't**, **log every self-correct iteration, not just the exit**, and **bulk output goes to a file**.
 
 **Hard gate — before creating `$BUILD_DIR` at the end of Step 0, read [references/run-logging.md](references/run-logging.md) now.** It carries the folder layout, the `run.log` line format, the full what-to-log list, and the `decisions.md` rules (including recording overruled warnings with their predicted failure). Do not log from memory of this summary.
 
@@ -115,10 +115,10 @@ Once the quality bar and phase list are confirmed, **create `$BUILD_DIR` with `r
 
 Intake (Step 1) needs a PRD or acceptance criteria to read. Before assuming one, resolve where it comes from. Branch on whether a PRD is already in context:
 
-- **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **confirm before relying on it** — don't silently assume it's current, since requests drift from stale PRDs. Use `AskUserQuestion` with options: (a) *Use this PRD* (recommended), (b) *Refresh/extend the existing one* via `Skill(product-requirement-document)`, (c) *Create a new PRD from scratch* via `Skill(product-requirement-document)`.
-- **No PRD is present:** ask how to proceed. Use `AskUserQuestion` with options: (a) *I'll provide a PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* via `Skill(product-requirement-document)` (recommended), (c) *Proceed from acceptance criteria / a feature description only* — no PRD; intake works from what the user states directly (note in the final report that the build wasn't PRD-grounded).
+- **A PRD is present in context** (the user attached/pasted one, named a `*.prd.md` path, or created one earlier this session): **confirm before relying on it** — don't silently assume it's current, since requests drift from stale PRDs. Ask the user a structured multiple-choice question (use your harness's question tool if it has one, otherwise ask in chat and wait for the answer) with options: (a) *Use this PRD* (recommended), (b) *Refresh/extend the existing one* with the `product-requirement-document` skill, (c) *Create a new PRD from scratch* with the `product-requirement-document` skill.
+- **No PRD is present:** ask how to proceed — again a structured multiple-choice question, with options: (a) *I'll provide a PRD* — the user has one to share; ask for the path or pasted content, then treat it as "PRD present" above, (b) *Create a new PRD first* with the `product-requirement-document` skill (recommended), (c) *Proceed from acceptance criteria / a feature description only* — no PRD; intake works from what the user states directly (note in the final report that the build wasn't PRD-grounded).
 
-When the user chooses to create or refresh a PRD, hand off to `Skill(product-requirement-document)` and **resume at Step 0d** once it returns — the scale envelope is never skipped on the PRD-creation path. Only after the PRD source is settled do you proceed to Step 0d and then Intake.
+When the user chooses to create or refresh a PRD, hand off to the `product-requirement-document` skill and **resume at Step 0d** once it returns — the scale envelope is never skipped on the PRD-creation path. Only after the PRD source is settled do you proceed to Step 0d and then Intake.
 
 For a user new to the suite: the full feature path is `product-requirement-document` → **this skill** (plan → build → verify → commit gate) → optionally deeper QA via `spryker-qa-coverage` and E2E via `cypress-tests` (both already wired in as phases here). The PRD skill is the only upstream stop — everything after it is driven from this workflow.
 
@@ -173,7 +173,7 @@ A short ask ("hide this label") still gets a one-line intake before any edit —
 - **Discovery is the expert's, never yours.** *Which* mechanism, *which* extension point, *how does feature X work*, *which fields does this transfer have*, *which modules exist* — sweeping questions where the expert's synthesis beats raw grepping (`getTransferStructureByName`, `getInterfaceMethodsByNamespace`, `getSprykerModules`, docs). If the expert's first answer isn't enough, ask a more specific follow-up — don't fall back to exploratory grep of `vendor/spryker/`.
 - **Confirmation is yours, inline.** The exact spelling, signature, or stack position of a **symbol you can already name** (a method's parameter order, a plugin's position between two named neighbours, whether one named plugin is in one named stack) is one `Grep`/`Read` and a few seconds — dispatching an agent for it wastes minutes and tens of thousands of tokens. Allowed, with one standing requirement: **anything load-bearing gets stated with its `file:line`.** When a confirmation grep turns into exploration, it has become discovery: stop and ask the expert.
 
-If the PRD touches multiple domains, **issue the feature-expert calls in parallel** — one Agent tool call per domain, all in a single message.
+If the PRD touches multiple domains, **issue the feature-expert calls in parallel** — one subagent call per domain, all in a single message.
 
 **When a follow-up expert answer contradicts an earlier one, neither is accepted on argument — the cheaper runtime probe decides** (one live query against the index/DB settles most such disputes in seconds). Log the contradiction and the probe result in `decisions.md`. A second research pass that reverses the first is a signal to test, not a decision: a query shape shipped on reversed reasoning can make every search return 0 results.
 
@@ -217,7 +217,7 @@ Run the `grep` — it takes seconds and settles the question. Then **every path 
 
 Projects legitimately differ — one writes interfaces per business model, another writes none. Never hardcode either; resolve the convention per project, in this order (an established convention wins outright, exactly like the plugin-stack rule above):
 
-1. **An explicit project rule wins.** A project CLAUDE.md / contribution doc that *deliberately states* its convention is followed as written. (The SDK-shipped skeleton tables show canonical *shapes*, not a project rule — only the project's own stated convention counts.)
+1. **An explicit project rule wins.** A project instructions file (`CLAUDE.md` for Claude Code, `.github/copilot-instructions.md` for GitHub Copilot) or contribution doc that *deliberately states* its convention is followed as written. (The SDK-shipped skeleton tables show canonical *shapes*, not a project rule — only the project's own stated convention counts.)
 2. **No stated rule → read the existing customizations, feature code only.** Sample already-developed feature classes in the project layer — Business models, resolvers, mappers with real logic. **Config / DependencyProvider / Factory classes are excluded as evidence**: every module has them regardless of convention, so they prove nothing about how this project writes business code. Consistent interfaces on the sampled feature classes → follow that.
 3. **No rule and no feature-code signal** (sparse/new project layer, or only config/DP boilerplate) → **default: no interfaces for single-implementation classes**, except the published framework seams: `…FacadeInterface`, `…RepositoryInterface`, `…EntityManagerInterface`, and plugin/extension contracts. Everything else (`…ResolverInterface`, `…MapperInterface`, one-consumer `Dependency/…To…Interface` bridges) must pass the justification check: *"what breaks if I inline this?"* — core-level rules exist for code with third-party consumers across versions; a project layer has exactly one consumer, itself. An interface nothing requires adds a file, an import, and a second place to change every signature.
 
@@ -338,7 +338,7 @@ Apply changes per the chosen quality bar.
 
 ## Step 5: Post-change commands
 
-**Invoke the `spryker-refresher` skill** (via the `Skill` tool — note: this is a Skill, not an Agent; do not use `subagent_type`) and pass it the list of files you just edited. The skill is loaded into your context and you then execute its file-pattern → command mapping directly. **Do not improvise the command chain** — follow the skill's mapping table. The skill encodes the file-pattern → command mapping drawn from this project's install recipes (composer dumpautoload, codegen, schema, cache clears including the critical `cache:class-resolver:build` for project-layer overrides, frontend builds, cache warmups).
+**Invoke the `spryker-refresher` skill** by its slash command (`/spryker-refresher`, or `/spryker-ai-dev-sdk:spryker-refresher` on a plugin install — note: this is a skill, not an agent; never hand it to the subagent tool) and pass it the list of files you just edited. The skill is loaded into your context and you then execute its file-pattern → command mapping directly. **Do not improvise the command chain** — follow the skill's mapping table. The skill encodes the file-pattern → command mapping drawn from this project's install recipes (composer dumpautoload, codegen, schema, cache clears including the critical `cache:class-resolver:build` for project-layer overrides, frontend builds, cache warmups).
 
 **Self-correction signal.** If you catch yourself about to run a `docker/sdk console <command>` directly during Step 5 — because *"it's just one command"* or *"I know what's needed"* — **stop**. Invoke the refresher with the file list. The refresher catches mandatory commands (notably `cache:class-resolver:build`) that an inlined command chain tends to miss.
 
@@ -438,7 +438,7 @@ grep -rn '<Ns>\\Shared\\.*Events' src/ config/        # an events interface refe
 
 A schema event behavior with no subscriber (or the inverse), or an events interface with zero consumers, means a **half-built propagation path**: events emitted that nobody reads, plus a synchronous publish bypassing the queue. Exactly **one** propagation mechanism ships, per the plan's §P&S decision (event-behavior-plus-subscriber, or deliberate direct publish) — never both half-present. A hit here goes back through the Step 7 loop, not into a comment.
 
-**Static validation (if the phase is on):** invoke the **`static-validation`** skill (via the `Skill` tool — it's a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. **Run it in `--working-tree` mode** — the branch's work is uncommitted at this step, which a base-diff run refuses. If an intermediate commit was made on the branch (nothing forbids the user doing so), pass `--base <the branch point>` instead, or working-tree mode covers only the uncommitted residue. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
+**Static validation (if the phase is on):** invoke the **`static-validation`** skill (a skill, not a subagent) to run lint / phpcs / phpstan over the edited files. **Run it in `--working-tree` mode** — the branch's work is uncommitted at this step, which a base-diff run refuses. If an intermediate commit was made on the branch (nothing forbids the user doing so), pass `--base <the branch point>` instead, or working-tree mode covers only the uncommitted residue. Treat any blocking issues like red ACs: fix the smallest change, re-run any relevant refresh, re-run static-validation. Bounded retries: N=2. After 2 failed retries, surface the remaining issues in the final report.
 
 **Code review (if the phase is on):** invoke `spryker-code-reviewer` after static validation passes — that way the reviewer sees a clean diff, not one cluttered with automated fixes. The reviewer's findings go into the final report.
 
@@ -452,7 +452,7 @@ Apply a clean local fix; escalate with options when a clean fix needs more scope
 
 **Run this before the commit gate**, not after — the captures become part of the implementation report the user reviews when deciding to commit.
 
-If the "Demo artifact capture" phase is on (per Step 0b), invoke `spryker-screenshot-collector` (via the `Agent` tool, `subagent_type="spryker-screenshot-collector"` — prefixed as `spryker-ai-dev-sdk:spryker-screenshot-collector` on a plugin install, see the delegation cheatsheet) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
+If the "Demo artifact capture" phase is on (per Step 0b), delegate to the `spryker-screenshot-collector` agent with your harness's subagent tool (see the cheatsheet at the end of this document, including the plugin-prefix retry) and pass it the list of states to capture — typically one per green AC, plus any before/after pairs the feature suggests. The agent writes GIFs to `~/Downloads/` and returns the file paths.
 
 Include the returned paths in the **Evidence** column of the Step 8 final report (under the AC the screenshot illustrates), so the user can open them in `~/Downloads/` before deciding whether to commit.
 
@@ -473,8 +473,8 @@ section of `decisions.md` — not from recollection. The report is the log, summ
 
 **Read [references/delegation.md](references/delegation.md) before the first dispatch** — which agent or skill each step invokes, and how to weigh a verifier FAIL/BLOCKED before acting on it. Two rules that bind every dispatch:
 
-- **Agent type names carry the plugin prefix on a plugin install** — `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`. Try the bare name only on a setup install; if it fails to resolve, retry with the prefix before reporting a step blocked.
-- **Skills are loaded with the `Skill` tool, never dispatched with `Agent`.**
+- **Agent names carry the plugin prefix on a plugin install, and the separator differs by harness** — Claude Code registers `spryker-ai-dev-sdk:spryker-verifier`, GitHub Copilot `spryker-ai-dev-sdk/spryker-verifier`. Try the bare name only on a setup install; if it does not resolve, retry with your harness's prefixed form before reporting a step blocked.
+- **Skills are invoked by their slash command, never handed to the subagent tool.**
 
 ## What you do NOT do
 
@@ -491,7 +491,7 @@ section of `decisions.md` — not from recollection. The report is the log, summ
 - When you *do* need to read project files directly (e.g. project namespaces from `composer.json`, install recipes from `config/install/*.yml`), prefer **native tools over `Bash`**: `Read` for files (relative paths from the project root, never absolute `/Users/...`), `Glob` for filename discovery, `Grep` for content search. When the session has no `Grep`/`Glob` tool, a read-only `grep -rn` / `find` from the project root is the fallback — never `sed -i`, `awk` rewrites or a `cd` + `&&` chain into another directory.
 - Do not manipulate CSV files. Delegate to `spryker-data-seeder`.
 - Do not touch the database directly via any shell route. Reads go through `executeDatabaseQuery` (delegated to expert / verifier / debugger); writes go through the data-import path (delegated to data-seeder) or schema XML + propel migrations.
-- **Do not drive the browser from the main loop.** Verification UI work belongs to `spryker-verifier`; demo capture belongs to `spryker-screenshot-collector`. When a screenshot or verification result looks wrong, the answer is to **re-invoke the agent with sharper instructions** — never to load `mcp__claude-in-chrome__*` tools into the main session and *"just check it yourself"*. Self-correction signal: if you're about to call `ToolSearch(query="...claude-in-chrome...")` from the main loop, **stop**. The agents own the browser; the orchestrator delegates. This rule applies equally to *"just one quick screenshot to verify the agent's output"* — that quick check is still the agent's job.
+- **Do not drive the browser from the main loop.** Verification UI work belongs to `spryker-verifier`; demo capture belongs to `spryker-screenshot-collector`. When a screenshot or verification result looks wrong, the answer is to **re-invoke the agent with sharper instructions** — never to load browser-automation tools into the main session and *"just check it yourself"*. Self-correction signal: if you're about to pull in any of the tools listed in the `spryker-runtime` skill's Browser tool map from the main loop, **stop** — that is main-loop bleed. The agents own the browser; the orchestrator delegates. This rule applies equally to *"just one quick screenshot to verify the agent's output"* — that quick check is still the agent's job.
 - Do not run `docker/sdk reset` or any environment-destructive command. When the change needs one, say so in the report; under the demo preset `demo-prep-wizard` runs it.
 - Do not produce MVP-grade ceremony when the chosen bar is PoC. If you have more than ~5 PHP classes in a PoC, you're building MVP — re-cut.
 - Do not produce PoC-grade shortcuts when the chosen bar is MVP. Canonical patterns are required for MVP.

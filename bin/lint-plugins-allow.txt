@@ -1,0 +1,94 @@
+# Deliberate harness-specific mentions, as "path|token|count".
+#
+# The count is the number of uses reviewed and accepted in that file. If the real count changes, the
+# lint fails rather than silently accepting new ones, so every future use gets looked at.
+#
+# A mention earns a place here only when naming one harness's real artifact helps the reader AND the
+# other harness's equivalent is named alongside it.
+
+# --- Install and setup docs: they must name both products by name ------------
+plugins/README.md|.claude/|1
+plugins/README.md|Claude|8
+
+# --- ai-dev-setup: owns the per-harness setup commands -----------------------
+# Harness detection reads CLAUDE_PROJECT_DIR next to COPILOT_HOME; the artifact table lists the
+# Claude Code row above the Copilot rows; MCP branch A is paired with branch B (copilot mcp add).
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/SKILL.md|.claude/|1
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/SKILL.md|CLAUDE.md|2
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/SKILL.md|CLAUDE_PROJECT_DIR|3
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/SKILL.md|Claude|12
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/SKILL.md|claude mcp add|1
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/README.md|.claude/|1
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/README.md|CLAUDE.md|1
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/README.md|CLAUDE_PROJECT_DIR|1
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/README.md|Claude|6
+plugins/spryker-ai-dev-sdk/skills/ai-dev-setup/README.md|claude mcp add|2
+
+# --- spryker-runtime: owns the Browser tool map ------------------------------
+# The table's own column header is "Claude in Chrome", and one line names ToolSearch as the
+# Claude Code way to load deferred MCP tools.
+plugins/spryker-ai-dev-sdk/skills/spryker-runtime/SKILL.md|Claude|4
+plugins/spryker-ai-dev-sdk/skills/spryker-runtime/SKILL.md|ToolSearch|1
+
+# --- The rules folder named for both harnesses -------------------------------
+plugins/spryker-ai-dev-sdk/skills/code-review/SKILL.md|.claude/|1
+plugins/spryker-ai-dev-sdk/agents/spryker-code-reviewer.agent.md|.claude/|1
+plugins/spryker-ai-dev-sdk/skills/spryker-profiler/SKILL.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/reference.md|.claude/|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/reference.md|Claude|2
+plugins/spryker-architecture/skills/architecture-prep/references/sections.md|.claude/|1
+plugins/spryker-architecture/skills/architecture-prep/references/sections.md|CLAUDE.md|1
+plugins/spryker-architecture/skills/architecture-prep/references/sections.md|Claude|1
+
+# --- The project instructions file named for both harnesses ------------------
+plugins/spryker-ai-dev-sdk/skills/spryker-customization/SKILL.md|CLAUDE.md|2
+plugins/spryker-ai-dev-sdk/skills/spryker-customization/SKILL.md|Claude|2
+plugins/spryker-ai-dev-sdk/skills/spryker-customization/README.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/README.md|Claude|1
+
+# --- The project skills folder listed across harnesses -----------------------
+plugins/spryker-ai-dev-sdk/skills/cypress-migration/SKILL.md|.claude/|1
+plugins/spryker-ai-dev-sdk/skills/cypress-migration/README.md|.claude/|1
+
+# --- project-starter-wizard ---------------------------------------------------
+# The expected-untracked-tooling list covers several tools, and the permission allowlist file
+# (.claude/settings.local.json) genuinely belongs to Claude Code, and is qualified as such.
+plugins/spryker-ai-dev-sdk/skills/project-starter-wizard/SKILL.md|.claude/|1
+
+# --- The task list, named once per skill for both harnesses ------------------
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/stages.md|TaskCreate|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/stages.md|TaskUpdate|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/stages.md|TaskList|1
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/stages.md|Claude|3
+plugins/spryker-ai-dev-sdk/skills/spryker-bugfix/stages.md|ToolSearch|1
+plugins/spryker-ai-dev-sdk/skills/spryker-upgrade/SKILL.md|TaskCreate|1
+plugins/spryker-ai-dev-sdk/skills/spryker-upgrade/SKILL.md|TaskUpdate|1
+plugins/spryker-ai-dev-sdk/skills/spryker-upgrade/SKILL.md|TaskList|1
+
+# --- Deferred-MCP-tool loading, named once ------------------------------------
+plugins/spryker-ai-dev-sdk/skills/ai-runtime-debugging/step-debug.md|ToolSearch|1
+plugins/spryker-ai-dev-sdk/skills/ai-runtime-debugging/step-debug.md|Claude|1
+
+# --- The stop guard: a Claude Code hook, with the Copilot equivalent named ---
+# The guard ships as a Claude Code Stop hook and a Copilot agentStop hook; the README names the
+# Claude Code settings and hooks paths next to the harness-neutral description.
+plugins/spryker-ai-dev-sdk/hooks/README.md|.claude/|3
+plugins/spryker-ai-dev-sdk/hooks/README.md|Claude|8
+
+# --- Claude in Chrome named as one of the two browser setups -----------------
+# Each of these points at the spryker-runtime Browser tool map and names Claude in Chrome beside
+# Playwright MCP, or names the Claude in Chrome tool next to its Playwright counterpart.
+plugins/spryker-ai-dev-sdk/agents/spryker-screenshot-collector.agent.md|Claude|2
+plugins/spryker-ai-dev-sdk/agents/spryker-verifier.agent.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/demo-prep-wizard/SKILL.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/boot-and-verify/SKILL.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/match-reference-design/SKILL.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/match-reference-design/references/visual-defects.md|Claude|1
+
+# --- The agent-name prefix: the separator genuinely differs per harness ------
+plugins/spryker-ai-dev-sdk/skills/spryker-customization/references/delegation.md|Claude|1
+
+# --- Named in a two-harness pairing added while fixing review findings -------
+plugins/spryker-ai-dev-sdk/skills/cypress-migration/SKILL.md|Claude|1
+plugins/spryker-ai-dev-sdk/skills/cypress-migration/README.md|Claude|1
+plugins/spryker-architecture/skills/architecture-prep/references/preview.md|Claude|1

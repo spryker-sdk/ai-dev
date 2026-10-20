@@ -3,7 +3,7 @@
 These rules apply while `run_mode: autonomous`. Follow each of them as written. The plugin's Stop hook
 (`hooks/guard-stop.php`) backs the first one: while the state file's Steps table has a row that is not
 `done` or `skipped`, the turn cannot end, except on a question only the developer can answer — a
-`⚠ NEEDS YOU:` line or an `AskUserQuestion`.
+`⚠ NEEDS YOU:` line or a structured question.
 
 ---
 
@@ -33,12 +33,12 @@ grant included); (b) an irrecoverable action outside the first-setup carve-out; 
 
 ## 2. Sub-agents inherit the work, not the discipline
 
-A sub-agent loads **no skill, no project `CLAUDE.md`, and none of this session's conventions.** Every
+A sub-agent loads **no skill, no project instructions file, and none of this session's conventions.** Every
 constraint you hold exists for that worker only if you wrote it into the prompt.
 
 A parent that uses the named tools consistently still loses that discipline at the dispatch if the
 prompt omits it. For example, a `general-purpose` worker told to "hand-write RFC4180 CSV with the
-Write tool" hand-rolls quoting, reaches for python to verify it, and produces both malformed data and
+file write tool" hand-rolls quoting, reaches for python to verify it, and produces both malformed data and
 a stream of permission prompts.
 
 Every dispatch prompt carries three blocks:

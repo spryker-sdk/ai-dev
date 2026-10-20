@@ -11,11 +11,10 @@ every scheduled wake-up. A bloated orchestrator is the #1 failure mode here — 
 working room the later gates need and eventually destabilizes the run.
 
 **The rule: heavy work happens in subagents; the orchestrator holds only compact state.** A "heavy"
-stage is anything that produces bulk output — driving Chrome (screenshots, page text), runtime/XDebug
+stage is anything that produces bulk output — driving the browser (screenshots, page text), runtime/XDebug
 dumps, `codecept run` output, phpcs/phpstan reports, code-review findings, final-verification runs, and
-`gh run view --log-failed`. Run each of those **inside a subagent** (via whichever subagent-spawning
-tool this harness exposes — commonly `Agent`; resolve it via `ToolSearch` first — pointing it
-at the relevant `Skill(...)` or agent `subagent_type`), and require the subagent to:
+`gh run view --log-failed`. Run each of those **inside a subagent** — delegate with your harness's
+subagent tool, pointing it at the relevant bundled skill or agent — and require the subagent to:
 
 - **write its raw output to a file** under the run directory `$BUGFIX_DIR` (e.g.
   `$BUGFIX_DIR/<stage>-attempt<N>.log`), and
@@ -28,11 +27,11 @@ memory the main loop needs; if something isn't in it, it lives in a file you can
 
 Every file this skill produces — logs, decision log, repro notes, per-gate output, the watch handoff —
 lives together in **one per-bugfix folder** so a run is self-contained and easy to find or clean up.
-Anchor it to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`, with a `$(pwd)` fallback) so
-it is stable regardless of the current working directory:
+Resolve it once from the project root (run the setup from the project root, so `$(pwd)` is that root)
+and reuse the resolved absolute path, so it is stable regardless of the current working directory:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-bugfix/<bugfix-id>/
+$(pwd)/.ai-dev/spryker-bugfix/<bugfix-id>/
 ```
 
 `<bugfix-id>` is the ticket key (e.g. a JIRA key `CC-39232` or a GitHub issue number) when there is
@@ -72,9 +71,9 @@ Keep this small block current in your head and mirror it into the step log. Ever
   the surrounding report.
 - Pointers to the **decision log** and **step log** files.
 
-If you ever need detail you dropped (a full stack trace, the complete review report), `Read` the file
-the subagent wrote — pull the specific lines you need, don't reload the whole thing. Pulling 20 lines
-on demand beats carrying 2,000 lines for the whole run.
+If you ever need detail you dropped (a full stack trace, the complete review report), open the file
+the subagent wrote with the built-in file read tool (not shell) — pull the specific lines you need,
+don't reload the whole thing. Pulling 20 lines on demand beats carrying 2,000 lines for the whole run.
 
 ### Plan task list
 
@@ -86,22 +85,23 @@ keep them distinct:
 
 - **`run.log`** — the append-only *timeline* (what happened, when).
 - **`decisions.md`** — the *rationale* (why each fork was resolved a given way).
-- **Task list (`TaskCreate`/`TaskUpdate`/`TaskList`)** — the *current state* (where the run is now).
+- **Task list** — the *current state* (where the run is now).
 
-The task list is the cheapest thing to read to re-orient — a resumed run or the watch loop should check
-`TaskList` first, then `$BUGFIX_DIR/watch-state.md`, before touching the transcript. Because it lives
-outside the conversation, it survives compaction and scheduled wake-ups. Drive it faithfully: never
+The task list is the cheapest thing to read to re-orient — a resumed run or the watch loop should read
+it first, then `$BUGFIX_DIR/watch-state.md`, before touching the transcript. Because it lives outside
+the conversation, it survives compaction and scheduled wake-ups. Drive it faithfully: never
 mark a stage completed whose gate wasn't actually green (the same honesty rule as the step log).
 
 ## Operating principles
 
-- **Skill and agent invocation names are prefixed.** Every skill this workflow delegates to ships
-  in the `spryker-ai-dev-sdk` plugin, so the invocable name is `spryker-ai-dev-sdk:<name>` — e.g.
-  `Skill(spryker-ai-dev-sdk:spryker-runtime)`. Agent types follow the same rule on a plugin
-  install: `subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare name (the `Agent`
-  tool rejects unregistered bare names). The bare names written throughout these documents
-  are shorthand for that prefixed form. If a bare name fails to resolve, retry with the prefix
-  before reporting a stage blocked.
+- **Skill and agent names carry the plugin prefix on a plugin install.** Every skill this workflow
+  delegates to ships in the `spryker-ai-dev-sdk` plugin. Invoke a skill with its slash command —
+  `/spryker-runtime`, or `/spryker-ai-dev-sdk:spryker-runtime` on a plugin install, in both harnesses.
+  Agent names take the prefix with a separator that differs: `spryker-ai-dev-sdk:spryker-verifier`
+  under Claude Code, `spryker-ai-dev-sdk/spryker-verifier` under GitHub Copilot. The bare names
+  written throughout these documents are shorthand for that prefixed form: if a bare name fails to
+  resolve, retry it with your harness's prefixed form before reporting a stage blocked — a
+  delegation that cannot resolve is a naming problem, not a blocked gate.
 - **The bug is the contract.** Everything is judged against "does the original reported symptom no
   longer reproduce, with evidence". A green test suite is necessary but not sufficient — reproduce
   the *user-visible* symptom and confirm it's gone (see `spryker-qa-coverage`'s E2E-over-workaround rule).
@@ -114,15 +114,17 @@ mark a stage completed whose gate wasn't actually green (the same honesty rule a
 - **The ticket is optional.** The bug context may be an **optional** tracker ticket (JIRA, GitHub
   Issues, any service) **or** a plain free-text description — a ticket is never required. Branch name,
   PR title, and commit message all have a `no-ticket` / `NO-TICKET` fallback.
-- **Claude-only orchestration.** Every stage delegates to a bundled/installed `Skill(...)` or a Claude
-  subagent — no third-party MCP server is required for the core flow. The single **optional** external
+- **Self-contained orchestration.** The flow runs entirely on the bundled skills and agents: every
+  stage delegates to one of them in a subagent, and no third-party MCP server is required for the
+  core flow. The single **optional** external
   touchpoint is the Step 0 ticket pull (e.g. JIRA via the Atlassian MCP, or `gh issue view`); if the
-  ticket text is provided directly, or there's no ticket at all, the run needs no external MCP. Keep
-  every subagent on a Claude model.
-- **Project rules still apply.** Honor the repo's `.claude/rules/*` (php-code-style, no-redundant-docblocks,
-  facade-method-signatures, BC policy, etc.) and `CLAUDE.local.md` file-reference format throughout.
+  ticket text is provided directly, or there's no ticket at all, the run needs no external MCP.
+- **Project rules still apply.** Honor the repo's rule set in the harness's rules folder
+  (`.claude/rules/` for Claude Code, `.github/instructions/` for GitHub Copilot — php-code-style,
+  no-redundant-docblocks, facade-method-signatures, BC policy, etc.) and the project instructions
+  file's local file-reference format throughout.
 - **Autonomous means autonomous (from Step 3 onward).** After the single Step 0 intake, Autonomous
-  mode runs to completion **without any further `AskUserQuestion` or permission stop** — no scope
+  mode runs to completion **without any further question or permission stop** — no scope
   clarifications, no "which fix should I pick", no "is this in scope" pauses. When you hit a fork
   (multiple candidate root causes, ambiguous scope, a second bug discovered, a risky trade-off),
   **decide it yourself using the most reasonable interpretation, proceed, and record it as a

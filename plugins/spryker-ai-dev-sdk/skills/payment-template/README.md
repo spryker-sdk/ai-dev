@@ -48,7 +48,7 @@ flowchart TD
     CARD -- "clear" --> C3{"Confirm the full<br/>collected-requirements summary"}
     C3 -- "no" --> ST3
 
-    C3 -- "yes" --> P2["Phase 2 — WebFetch IMPLEMENTATION.md<br/>from spryker-community/payment-template<br/>Generate a numbered plan with PSP-specific<br/>values substituted per checklist section"]
+    C3 -- "yes" --> P2["Phase 2 — fetch IMPLEMENTATION.md<br/>from spryker-community/payment-template<br/>Generate a numbered plan with PSP-specific<br/>values substituted per checklist section"]
     P2 --> GATE{"Confirm the plan<br/>NO code, NO file changes<br/>before this passes"}
     GATE -- "no" --> P2
 
@@ -124,13 +124,14 @@ as blocking.
 | **2 — Shared config** | Credentials (+ which need Yves frontend access), sandbox/production base URLs, auth mechanism (`api-key-header` / `bearer` / `basic` / `hmac` / `other`), Authorize/Capture/Cancel sync-or-async with body fields, provider-reference field and error shape, webhooks with signature header + event→status map, status constant names. |
 | **3 — Per method** | A filled-in table: Flow (`redirect` / `direct` / `js-sdk`), form fields, line items, method-specific request fields, redirect domains. Plus the SDK script URL and init config if any method is `js-sdk`. |
 
-Each stage ends in an explicit `AskUserQuestion` confirmation, and the whole collection ends in a
+Each stage ends in an explicit structured confirmation question (use your harness's question tool if
+it has one, otherwise ask in chat and wait for the answer), and the whole collection ends in a
 full summary confirmation before Phase 2.
 
 ## Standing instruction — clarify before continuing
 
-Any ambiguous, contradictory, or hard-rule-conflicting answer stops the interview and resolves via
-`AskUserQuestion`. Named triggers: a method name with card keywords on a `direct` flow; an async
+Any ambiguous, contradictory, or hard-rule-conflicting answer stops the interview and is resolved by
+asking the user. Named triggers: a method name with card keywords on a `direct` flow; an async
 operation declared while webhooks are disabled; a redirect flow with no redirect domains; two answers
 that contradict each other.
 

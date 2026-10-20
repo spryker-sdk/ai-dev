@@ -98,12 +98,18 @@ class AiDevConfig extends AbstractBundleConfig
      * Detection order: indicator path (relative to project root) => tool name.
      * First match wins; .codex requires an extra confirmation step in the command.
      *
+     * GitHub Copilot is detected by a Copilot-specific file rather than by ".github", which exists
+     * in every repository hosted on GitHub and would otherwise claim projects using another tool.
+     *
      * @var array<string, string>
      */
     protected const array TOOL_DETECTION_MAP = [
         '.claude' => self::TOOL_CLAUDE_CODE,
         '.windsurf' => self::TOOL_WINDSURF,
-        '.github' => self::TOOL_COPILOT,
+        '.github/copilot-instructions.md' => self::TOOL_COPILOT,
+        '.github/instructions' => self::TOOL_COPILOT,
+        '.github/agents' => self::TOOL_COPILOT,
+        '.github/skills' => self::TOOL_COPILOT,
         '.cursor' => self::TOOL_CURSOR,
         'opencode.json' => self::TOOL_OPENCODE,
         '.codex' => self::TOOL_CODEX,
@@ -268,7 +274,7 @@ class AiDevConfig extends AbstractBundleConfig
      */
     public function getRulesSourceDirectory(): string
     {
-        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/rules';
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/rules';
     }
 
     /**

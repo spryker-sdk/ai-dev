@@ -43,7 +43,7 @@ Pick only the relevant results and fetch their content from `github_api_url` (ra
 
 **b) Docs corpus query (MCP)** — for conceptual depth and code examples, query the official corpus with `query-docs` (docs server, often `context7`). **Always pass `libraryId: "/spryker/spryker-docs"` directly** (the fixed Spryker docs library, from `https://context7.com/spryker/spryker-docs`). **Never call `resolve-library-id`** — the ID is known and constant, resolving wastes a call and risks selecting the wrong library. Keep to ≤3 queries; make each specific (e.g. "How does Spryker model agent assist for customers in the Back Office").
 
-From this research, **extract the actual documentation content that is relevant to the task** — not just a one-line summary. Pull the passages, steps, lists, config snippets, and constraints the docs state, and keep each tied to the **source URL** it came from. Fetch full page content (via `query-docs` or `WebFetch` on the doc URL) when a snippet isn't enough to answer the task.
+From this research, **extract the actual documentation content that is relevant to the task** — not just a one-line summary. Pull the passages, steps, lists, config snippets, and constraints the docs state, and keep each tied to the **source URL** it came from. Fetch full page content (via `query-docs` or the web fetch tool on the doc URL) when a snippet isn't enough to answer the task.
 
 ## Output format
 

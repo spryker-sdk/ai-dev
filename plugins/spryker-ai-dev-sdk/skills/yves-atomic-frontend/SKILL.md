@@ -13,7 +13,7 @@ description: >
 
 # Spryker Yves Atomic Frontend
 
-Non-negotiables live in the always-loaded rule `.claude/rules/yves-frontend.md`; this is the workflow.
+Non-negotiables live in the `yves-frontend` rule — read it from `<plugin-root>/rules/yves-frontend.md`, or skip it where the project has the rules installed and the harness is already applying them. This skill is the workflow.
 `{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed
 first in `KernelConstants::PROJECT_NAMESPACES`, `config/Shared/config_default.php`), otherwise `Pyz`.
 

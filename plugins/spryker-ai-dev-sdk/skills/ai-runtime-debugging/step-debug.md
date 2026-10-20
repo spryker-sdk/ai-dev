@@ -6,11 +6,13 @@ This file is the detail reference for the **step-debug** technique. Load this on
 
 ## Detect what's available first
 
-Check whether any debugger MCP tools are loaded in this session **before** assuming you can step-debug:
+Check whether any debugger MCP tools are loaded in this session **before** assuming you can step-debug.
+If your harness defers MCP tools until requested, load them first — in Claude Code that means
+`ToolSearch`. Search for:
 
 ```
-ToolSearch(query="debugger xdebug breakpoint", max_results=10)
-ToolSearch(query="phpstorm dbgp", max_results=10)
+debugger xdebug breakpoint
+phpstorm dbgp
 ```
 
 If neither query surfaces tools, **stop and tell the user**: *"No debugger MCP is installed in this session. Step-debug needs one of the options below; otherwise we'll use logging instead."*
@@ -24,9 +26,9 @@ If neither query surfaces tools, **stop and tell the user**: *"No debugger MCP i
 | **koriym/xdebug-mcp** | `mcp__xdebug-*` (varies) | Editor-agnostic (VS Code, PHPStorm, terminal) | <https://github.com/koriym/xdebug-mcp> — bridges DBGp directly to Xdebug, no editor required |
 | **kpanuragh/xdebug-mcp** | `mcp__xdebug-*` (varies) | Editor-agnostic | <https://github.com/kpanuragh/xdebug-mcp> — similar standalone DBGp bridge |
 
-VS Code's native `PHP Debug` extension (`felixfbecker.php-debug`) speaks DBGp directly to Xdebug but **is not an MCP server**, so Claude can't drive it. VS Code users should install one of the standalone bridges above.
+VS Code's native `PHP Debug` extension (`felixfbecker.php-debug`) speaks DBGp directly to Xdebug but **is not an MCP server**, so your coding agent can't drive it. VS Code users should install one of the standalone bridges above.
 
-## One-time human-side setup (ask the user — Claude can't do these)
+## One-time human-side setup (ask the user — the assistant can't do these)
 
 1. **Editor open** with this project loaded (PHPStorm or VS Code, depending on which bridge you picked).
 2. **Debugger MCP bridge installed** — see the table above.
@@ -41,14 +43,14 @@ VS Code's native `PHP Debug` extension (`felixfbecker.php-debug`) speaks DBGp di
    docker/sdk start -x
    ```
 
-Confirm setup is live before working (tool name depends on which bridge you have — likely `list_debug_sessions` or similar; consult `ToolSearch` results from above).
+Confirm setup is live before working (tool name depends on which bridge you have — likely `list_debug_sessions` or similar; consult the tools the search above surfaced).
 
 ## Worked example — investigating why `FooFacade::updateFoo()` is failing
 
 Tool names below are shown as generic verbs (`<set_breakpoint>`, `<wait_for_pause>`, etc.); replace with your bridge's actual tool names — the verbs are usually the same across bridges.
 
 ```
-1. ToolSearch(query="select:<your bridge's tool names>", max_results=10)
+1. Make sure your bridge's tools are loaded (see "Detect what's available first")
 
 2. <set_breakpoint>
        file_path: src/Pyz/Zed/Foo/Business/FooFacade.php   # project namespace example

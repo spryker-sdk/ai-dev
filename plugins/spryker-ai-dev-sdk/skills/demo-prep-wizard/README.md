@@ -42,7 +42,7 @@ flowchart TD
     G4 -- "gap" --> GAP["Carried forward, named<br/>never closed by substitution"]
     GAP --> P5
     G4 -- "covered" --> P5["5 · Build — the project track<br/>project-data · define-stores · translate-content ·<br/>match-reference-design · boot-and-verify ·<br/>spryker-customization demo preset per PoC row<br/>3rd rebuild: log the reason, continue"]
-    P5 --> P6["6 · Rehearsal<br/>validate.php demo-needs first,<br/>then walk every beat in Claude in Chrome;<br/>logins → spryker-verifier"]
+    P5 --> P6["6 · Rehearsal<br/>validate.php demo-needs first,<br/>then walk every beat in the browser;<br/>logins → spryker-verifier"]
     P6 --> G6{"Every beat pass, or a<br/>named gap?<br/>.ai-dev/rehearsal.md"}
     G6 -- "fixable" --> P5
     G6 -- "yes" --> P7["7 · Run sheet — demo-run-sheet<br/>format from up_front.run_sheet_format<br/>local copy always on disk"]
@@ -126,7 +126,7 @@ path and the plain-language table) and `autonomous-runs.md`.
 - **A gap is named, never filled.** A need the source cannot supply is a gap line; behaviour the platform
   lacks is its own customization row, built only once confirmed.
 - **Rehearsal is its own phase**, so the first end-to-end walk happens before the demo, not during it. The mechanical check runs first; the browser walk proves the story reads well.
-- **The local shop is driven in Claude in Chrome**, never the built-in browser, which prompts on every
+- **The local shop is driven through a browser-automation MCP server**, never a built-in browser pane, which prompts on every
   action for a local host.
 - **What crosses a phase boundary is an artifact** — the intake block, the needs list, `spec.md`, the
   coverage record, `rehearsal.md` — so a resume hours later has the file, not the chat.
@@ -142,7 +142,7 @@ path and the plain-language table) and `autonomous-runs.md`.
   written after the last rebuild, and `.ai-dev/demo-run-sheet.html`, `.md` or `.txt` for the run sheet.
 - In an autonomous run the Stop guard (`hooks/guard-stop.php`, [hooks/README.md](../../hooks/README.md))
   keeps the turn going while a step is neither `done` nor `skipped`, unless the turn ends on a question
-  only the preparer can answer, a `NEEDS YOU:` line, or an AskUserQuestion.
+  only the preparer can answer, a `NEEDS YOU:` line, or a structured question.
 
 ## Output
 

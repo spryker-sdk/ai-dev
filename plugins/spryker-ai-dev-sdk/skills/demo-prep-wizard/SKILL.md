@@ -33,7 +33,7 @@ and feel; the engineering is yours.
 - The plain-language table in `../project-starter-wizard/references/interview.md` applies to every line
   shown to them.
 
-**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host.
+**Open the local shop through a browser-automation MCP server**, not a built-in browser pane that prompts the person for each action on a local host. The `spryker-runtime` skill's **Browser tool map** gives the tool name for each capability under Claude in Chrome and under Playwright MCP.
 
 **You own the conversation and the flow; you own no mechanics.** Every phase below names the skill that
 does the work. Read that skill, hand it its input, take its output — never restate its rules and never
@@ -123,7 +123,7 @@ then decide how the row reaches the demo:
   the story, and offer it as a talking point on the run sheet instead.
 
 Show the preparer the table in **their** terms — what they asked for, how it will appear, your
-recommendation — and confirm the routing table with one AskUserQuestion. The state file's first write
+recommendation — and confirm the routing table with one structured question. The state file's first write
 waits for that answer. It is the run's routing confirmation, which stamps `answers_confirmed_at`; the one
 sitting's confirmation is the only other:
 
@@ -257,11 +257,12 @@ below the table as prose.
 cost the most to find by hand:
 
 ```bash
-php .claude/skills/spryker-import-tools/scripts/validate.php demo-needs .ai-dev/demo-prep.md
+php <skill-dir>/../spryker-import-tools/scripts/validate.php demo-needs .ai-dev/demo-prep.md
 ```
 
 That is the setup-install path; on a plugin install the script is
-`${CLAUDE_PLUGIN_ROOT}/skills/spryker-import-tools/scripts/validate.php`. Invoke it by the literal path from
+`<skill-dir>/../spryker-import-tools/scripts/validate.php`, where `<skill-dir>` is the path reported as
+`Base directory for this skill:` when this skill loaded. Invoke it by the literal path from
 the project directory, as `boot-and-verify` describes.
 
 It reads the phase-2 needs list and reports, per beat: a named product no row carries, a product whose
@@ -312,7 +313,7 @@ moments with the preparer: the routing-table confirmation, the one sitting (with
 the final review — nothing in between. After the routing table (phase 2):
 
 1. **One sitting, up front** — straight after the routing table is confirmed, ask everything the run
-   will ever need, in as few AskUserQuestion calls as possible (up to four questions each), each with
+   will ever need, in as few structured-question calls as possible (up to four questions each), each with
    the recommended option first:
    - **products that must appear** — names or links (unless the brief already names them);
    - **the intake block's open questions** — in plain words, each with your recommendation;

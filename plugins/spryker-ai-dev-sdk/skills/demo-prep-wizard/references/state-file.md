@@ -57,7 +57,7 @@ up_front:                               # the one sitting (SKILL.md, Run modes) 
 ## Rules the file follows
 
 - **The first write waits for the routing confirmation.** Write `.ai-dev/demo-prep.md` only after the
-  preparer has confirmed the routing table with one AskUserQuestion (phase 2). The demo fast path writes
+  preparer has confirmed the routing table with one structured question (phase 2). The demo fast path writes
   `.ai-dev/project-setup.md` with `answers_source: demo-prep` only when `.ai-dev/demo-prep.md` carries
   `up_front_confirmed_at`.
 - **The phase-5 step skills wait for `answers_confirmed_at`.** Do not start `project-data`,
@@ -72,4 +72,4 @@ up_front:                               # the one sitting (SKILL.md, Run modes) 
 - **An autonomous run does not end its turn early.** While `run_mode: autonomous` and the Steps table
   has a row that is not `done` or `skipped`, the Stop guard (`hooks/guard-stop.php`,
   [`hooks/README.md`](../../../hooks/README.md)) keeps the turn going; it lets the turn end on a question
-  only the preparer can answer, a `NEEDS YOU:` line, or an AskUserQuestion.
+  only the preparer can answer, a `NEEDS YOU:` line, or a structured question.

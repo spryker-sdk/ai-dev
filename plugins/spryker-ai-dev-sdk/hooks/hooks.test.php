@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-/** Zero-dependency test for the plugin's Stop hook. */
+/** Zero-dependency test for the plugin's stop guard, under both harnesses. */
 
 $failures = 0;
 $count = 0;
@@ -22,11 +22,12 @@ $php = PHP_BINARY;
 require_once $hooksDir . '/lib.php';
 
 /** Run a hook script with a payload; returns [decision|null, reason, stderr, exit]. */
-function run_hook(string $script, array $payload): array
+function run_hook(string $script, array $payload, ?array $env = null): array
 {
     global $pluginRoot, $hooksDir, $php;
     $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-    $proc = proc_open([$php, $hooksDir . '/' . $script], $desc, $pipes, null, ['CLAUDE_PLUGIN_ROOT' => $pluginRoot, 'PATH' => getenv('PATH')]);
+    $env = $env ?? ['CLAUDE_PLUGIN_ROOT' => $pluginRoot, 'PATH' => getenv('PATH')];
+    $proc = proc_open([$php, $hooksDir . '/' . $script], $desc, $pipes, null, $env);
     fwrite($pipes[0], json_encode($payload));
     fclose($pipes[0]);
     $out = stream_get_contents($pipes[1]);
@@ -38,7 +39,7 @@ function run_hook(string $script, array $payload): array
     $decision = is_array($json) ? ($json['hookSpecificOutput']['permissionDecision'] ?? ($json['hookSpecificOutput']['decision'] ?? null)) : null;
     $reason = is_array($json) ? (string) ($json['hookSpecificOutput']['permissionDecisionReason'] ?? ($json['hookSpecificOutput']['reason'] ?? '')) : '';
 
-    return [$decision, $reason, (string) $err, $exit];
+    return [$decision, $reason, (string) $err, $exit, is_array($json) ? $json : []];
 }
 
 $proj = sys_get_temp_dir() . '/hooks_' . getmypid();
@@ -147,6 +148,72 @@ check('stop guard: the escalation names the two options', str_contains($r2, 'out
 [$d, , , $exit] = run_hook('guard-stop.php', []);
 check('stop guard: empty payload → exit 0, no decision', $d === null && $exit === 0);
 
+// --- GitHub Copilot: agentStop sends camelCase keys, no closing message, and rejects exit != 0 ---
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+@unlink($proj . '/.ai-dev/hooks.log');
+$transcript = $proj . '/.ai-dev/copilot-transcript.jsonl';
+$writeTranscript = static function (string $assistant, string $userLine = '') use ($transcript): void {
+    $lines = ['{"type":"session.start","data":{"sessionId":"s1"}}'];
+    if ($userLine !== '') {
+        $lines[] = $userLine;
+    }
+    $lines[] = json_encode(['type' => 'assistant.message', 'data' => ['content' => $assistant]], JSON_UNESCAPED_SLASHES);
+    file_put_contents($transcript, implode("\n", $lines) . "\n");
+};
+$copilotPayload = static fn (): array => ['cwd' => $proj, 'sessionId' => 's1', 'transcriptPath' => $transcript, 'stopReason' => 'end_turn', 'timestamp' => 1];
+
+$writeTranscript('Phase 6 is still in progress; stopping here for now.');
+[$d, $r, , $exit, $raw] = run_hook('guard-stop.php', $copilotPayload());
+check('copilot agentStop: blocks on an autonomous run with open steps', $d === 'block' && str_contains($r, 'define-stores'));
+check('copilot agentStop: the decision is also flat, where Copilot reads it', ($raw['decision'] ?? null) === 'block' && str_contains((string) ($raw['reason'] ?? ''), 'define-stores'));
+check('copilot agentStop: exits 0, because Copilot discards the output of a non-zero hook', $exit === 0);
+
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+$writeTranscript('Which store should the demo open on, EU or US?');
+[$d] = run_hook('guard-stop.php', $copilotPayload());
+check('copilot agentStop: a closing question read from the transcript lets the turn end', $d === null);
+
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+$writeTranscript('Continuing with the build.', '{"type":"user.message","data":{"content":"[ask_user] EU"}}');
+[$d] = run_hook('guard-stop.php', $copilotPayload());
+check('copilot agentStop: an ask_user turn lets the turn end', $d === null);
+
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+$writeTranscript('Progress report A.');
+[$d] = run_hook('guard-stop.php', $copilotPayload());
+$writeTranscript('Progress report B.');
+[$d2, $r2] = run_hook('guard-stop.php', $copilotPayload());
+check('copilot agentStop: the escalation counter advances, so the message is not compared to itself', $d === 'block' && $d2 === 'block' && str_contains($r2, 'block #2 on the same set of open steps'));
+
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+[$d] = run_hook('guard-stop.php', ['cwd' => $proj, 'sessionId' => 's1', 'transcriptPath' => $proj . '/.ai-dev/absent.jsonl', 'stopReason' => 'end_turn']);
+check('copilot agentStop: an unreadable transcript still blocks rather than erroring', $d === 'block');
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+
+// A question is recognised by the format the transcript is in, not by which harness we think
+// we are under, so a harness the detection does not know still gets its questions honoured.
+$writeTranscript('Continuing with the build.', '{"type":"user.message","data":{"content":"[ask_user] EU"}}');
+[$d] = run_hook('guard-stop.php', ['cwd' => $proj, 'transcriptPath' => $transcript]);
+check('an ask_user question is honoured even when the payload names no harness', $d === null);
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+
+$writeTranscript('Continuing with the build.', '{"type":"user","message":{"content":[{"name":"AskUserQuestion"}]}}');
+[$d] = run_hook('guard-stop.php', ['cwd' => $proj, 'sessionId' => 's1', 'transcriptPath' => $transcript]);
+check('an AskUserQuestion is honoured even when the payload looks like copilot', $d === null);
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+
+
+// An unrecognised harness must not be handed Claude Code's exit code: Copilot and anything else
+// read a non-zero exit as a failed hook and throw the decision away with it.
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+[$d, , , $exit, $raw] = run_hook('guard-stop.php', ['cwd' => $proj, 'someOtherTool' => 'x'], ['PATH' => getenv('PATH')]);
+check('an unknown harness still emits a usable decision', $d === 'block' && ($raw['decision'] ?? null) === 'block');
+check('an unknown harness exits 0, never 2', $exit === 0);
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+
+[, , , $exitClaude] = run_hook('guard-stop.php', $stopPayload('Progress report C.'));
+check('claude code still blocks with exit 2', $exitClaude === 2);
+@unlink($proj . '/.ai-dev/stop-blocks.json');
 
 $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($proj, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($it as $entry) {

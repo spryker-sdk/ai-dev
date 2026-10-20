@@ -9,7 +9,7 @@
 
 The brief handed to the architect subagent, and the document it produces: a **solution design** — an
 architecture document, at home in the project's `architecture/` folder. The architect is a fresh
-`general-purpose` subagent — **never a fork, never the context that will implement** — because
+general-purpose subagent — **never a fork, never the context that will implement** — because
 implementation planning done by the implementing role gets written to fit the code that is already
 forming, and an author can't see its own gaps.
 
@@ -36,9 +36,9 @@ orchestrator's Step 0d call, not the architect's.)
 2. The **Step 0d scale envelope** (volumes + NFR numbers, with per-row sources).
 3. The Step 3 **Namespace-resolution block and `Convention:` line** — the plan's file list must sit under the resolved namespace target, and its class list is checked against the convention verdict.
 4. The feature-expert findings from Step 3.
-5. **When present** — a project `CLAUDE.md`, `architecture/02-constraints.md`,
+5. The project instructions file and, when present, `architecture/02-constraints.md`,
    `architecture/05-building-block-view.md`, and existing ADRs in `architecture/09-architecture-decisions/`.
-   None of these is guaranteed: a plugin-only install has no project `CLAUDE.md` at all, and a
+   None of these is guaranteed: a plugin-only install has no project instructions file at all, and a
    composer install gets one only if `ai-dev-setup` ran and the developer accepted it. Paste what
    exists; never block on it, and never assume a convention it would have carried.
 6. **This project's actual wiring**: `ApplicationServices.php` and the DependencyProviders the feature

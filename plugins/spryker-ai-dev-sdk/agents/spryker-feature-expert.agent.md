@@ -67,13 +67,13 @@ When a structured Spryker MCP tool can answer a question, **use it — do not** 
 
 If these tools are not present in your environment, skip directly to the fallback sources — do not block on the MCP server's absence.
 
-### Documentation research — `Skill(spryker-docs-research)`
+### Documentation research — the `spryker-docs-research` skill
 
-For any question that needs the official Spryker documentation (concepts, capabilities, supported actors, framework primitives, integration/installation steps), invoke **`Skill(spryker-docs-research)`**. It handles MCP availability, fallback search, and returns documented content tied to source links.
+For any question that needs the official Spryker documentation (concepts, capabilities, supported actors, framework primitives, integration/installation steps), invoke the **`spryker-docs-research`** skill. It handles MCP availability, fallback search, and returns documented content tied to source links.
 
 ### Local code
 
-Use native **Read / Grep / Glob** on every project-namespace directory under `src/` (find them via `composer.json` `autoload.psr-4` — there may be multiple), then `src/Orm/Propel/Schema/`, then `vendor/spryker/` — in that order. Project layer wins; check it first.
+Use the built-in **file read/search tools** on every project-namespace directory under `src/` (find them via `composer.json` `autoload.psr-4` — there may be multiple), then `src/Orm/Propel/Schema/`, then `vendor/spryker/` — in that order. Project layer wins; check it first.
 
 **Always use relative paths from the project root** (e.g. `vendor/spryker/<module>/...`, `src/<Namespace>/...`) and **use native tools, not `Bash`, for file inspection.** This is not just preference — `Bash` invocations prompt for approval every time, while native tools auto-approve, are faster, and give you results in a parseable form.
 
@@ -90,7 +90,7 @@ Spryker transfer XMLs, schema XMLs, and config PHP files are small enough that `
 ## Approach
 
 1. **Run the mandatory checklist** above. State its key outputs (applicable primitives, reinvention flags, scope confirmation) at the top of your answer.
-2. **Identify the feature / problem class.** Use `Skill(spryker-docs-research)` to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
+2. **Identify the feature / problem class.** Use the `spryker-docs-research` skill to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
 3. **Build the explanation at the depth the question requires.** Cover:
    - What the feature does — capabilities, types, behaviour.
    - Key concepts and terminology.

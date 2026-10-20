@@ -46,8 +46,8 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
 and drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
 detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
-**Locate the scripts:** `.claude/skills/spryker-upgrade/scripts/` (setup install) or
-`${CLAUDE_PLUGIN_ROOT}/skills/spryker-upgrade/scripts/` (plugin install). `$UP` below stands for
+**Locate the scripts:** `<skill-dir>/scripts/`, where `<skill-dir>` is the path reported as
+`Base directory for this skill:` when this skill loaded — that line is correct for every install. `$UP` below stands for
 whichever resolves — substitute it inline as a literal path; never set a shell variable and never
 `cd`, both prompt on every call. Run them from the project root: they write every snapshot and report
 into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The twenty-one scripts are listed in
@@ -179,7 +179,7 @@ per `<Layer>/<Module>`) with what the suite touches, and ranks the gaps. Wiring 
 providers. Exit 1 means at least one HIGH-risk module has no test at all.
 
 Report two numbers to the developer — business-logic overrides, and how many sit in modules with no
-test — and ask with AskUserQuestion:
+test — and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait):
 
 - **Write tests for the HIGH-risk gaps first (recommended)** — a test written after the upgrade pins
   whatever the upgrade produced.
@@ -214,7 +214,7 @@ grep '"spryker-feature/' composer.json    # the intent, for comparison only
    file only (matrix row 38: a lock too stale to trust). *Failure signature:* a target chosen from a
    `^x.y` constraint, so the report's "current" release is not the one the lock installed.
 2. Find newer releases (`composer show -a spryker-feature/spryker-core | grep versions`) and ask with
-   AskUserQuestion — never pick silently: **next release group (recommended)** — the smallest
+   a structured question — never pick silently: **next release group (recommended)** — the smallest
    reviewable step, repeating the skill per release — or **latest release**, one big jump.
 
 ## Phase 1.2 — Tooling, Docker SDK and deploy files
@@ -302,10 +302,10 @@ PHPStan errors only a database, a search backend or the bootstrap explain are en
 ## Lane 0 — Migration guides (mandatory for every major bump)
 
 For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.json`:
-1. Locate the guide — the `spryker-docs-research` skill, or WebSearch
+1. Locate the guide — the `spryker-docs-research` skill, or a web search for
    `site:docs.spryker.com upgrade the <Module> module` ("Upgrade the <Module> module" pages under
    `docs.spryker.com/docs/pbc/all/<pbc>/<version>/…/upgrade-modules/`).
-2. WebFetch it and extract the sections for the crossed major boundary only (e.g. 10.x → 11.0).
+2. Fetch it with your harness's web fetch tool and extract the sections for the crossed major boundary only (e.g. 10.x → 11.0).
 3. **Sort the steps into two piles before executing any of them** — guides freely mix them, and the
    distinction is the Scope rule applied:
    - **Required to keep working** — interface swaps, constant→config-method moves, plugin rewiring,
@@ -359,7 +359,7 @@ parents and instantiated classes). Per item, analyse the old item and its replac
 config or data needed, position in the stack); and a recommendation (swap, swap plus config, port, or
 keep for now).
 
-Present the table ([references/lanes.md](references/lanes.md) has the format) with AskUserQuestion
+Present the table ([references/lanes.md](references/lanes.md) has the format) with a structured question
 (multiSelect: apply now / defer / keep) and apply only what the developer chose, one item at a time,
 linting every touched file and running the covering test — a chosen replacement is not a Scope
 violation. Deferred and kept items go into the report with their analysis.
@@ -436,7 +436,7 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 2. **New capabilities inside modules the project already had** — Lane 0's second pile, a
    `class_exists` branch (matrix #64), a new extension point (performance fixes: Phase 6.2, not here).
 
-Fetch each description (`composer show <pkg>` + release notes) and ask with AskUserQuestion
+Fetch each description (`composer show <pkg>` + release notes) and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait)
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
 accepted feature follows its integration guide, in its own commit. REMOVED packages: explain each.
 
@@ -447,7 +447,7 @@ published today into `.spryker-upgrade/state/spryker-docs` (offline: `--unreacha
 page; read-only sub-agents per page group record its fixes, never from memory, each sized (`S` config value
 or flag, `M` package update or a few files, `L` refactor, schema change or many files) with its files and
 expected gain, or the page's `--no-fix` reason. `S` fixes apply without asking; the `M`/`L` fixes
-(`--decisions`) take one AskUserQuestion — apply now / defer / skip each, recorded with `--decide`. Keep
+(`--decisions`) take one structured question — apply now / defer / skip each, recorded with `--decide`. Keep
 visible behaviour (else `not-applied`); one fix at a time, own commit, checks and a before/after comparison
 per customer type, reverted on failure. `php $UP/check-performance.php --verify` exits 0 before Phase 6.5.
 

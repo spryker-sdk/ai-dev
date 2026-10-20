@@ -27,7 +27,7 @@ at **what cost**, and how the result is **proved**. The mechanics of the change 
 | a logged-in flow (account, checkout, B2B pricing) | `spryker-verifier` agent — this skill never logs in |
 | short-request intake discipline | `spryker-customization` Step 1 demo-intake micro-step |
 
-Work products live in `$MRD = ${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/match-reference/<slug>/`.
+Work products live in `$MRD = $(pwd)/.ai-dev/match-reference/<slug>/`.
 
 ---
 
@@ -50,7 +50,7 @@ Plus the reference itself: read `up_front.reference_sites` in `.ai-dev/demo-prep
 → "Who runs this"): they judge **what they see** — layout, size, colour, order, whether it looks like
 the reference. Everything about **how** — which rung, which file, which importer — is yours to decide.
 
-**Open the local shop in Claude in Chrome (`mcp__claude-in-chrome__*`), not the built-in browser** — the built-in browser asks the person on every action for a local host. The reference site itself may use either browser.
+**Open the local shop through a browser-automation MCP server**, not a built-in browser pane that prompts the person for each action on a local host. The `spryker-runtime` skill's **Browser tool map** gives the tool name for each capability under Claude in Chrome and under Playwright MCP. The reference site itself may use any browser.
 
 ---
 

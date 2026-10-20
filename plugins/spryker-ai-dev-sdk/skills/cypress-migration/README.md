@@ -77,7 +77,7 @@ flowchart TD
 
     S9 --> YAML{"python3 yaml.safe_load<br/>parses?"}
     YAML -- "no" --> S9
-    YAML -- "yes" --> S10["Step 10 — generate the companion<br/>.claude/skills/cypress-tests/SKILL.md<br/>with DISCOVERED values, not placeholders"]
+    YAML -- "yes" --> S10["Step 10 — generate the companion<br/>cypress-tests/SKILL.md in the project<br/>skills folder — DISCOVERED values, not placeholders"]
     S10 --> S11["Step 11 — update project README"]
     S11 --> AC{"Final checklist —<br/>10 acceptance criteria"}
     AC -- "a criterion fails" --> S1
@@ -166,7 +166,8 @@ doesn't take them with it.
 - `tests/cypress-boilerplate/` committed to the project — not a Composer dependency, not re-fetched
   at CI or runtime.
 - Two CI jobs: a fast Docker-independent lint/format job, and an E2E job that `needs:` it.
-- `.claude/skills/cypress-tests/SKILL.md` in the target project, documenting the *actual* discovered
+- `cypress-tests/SKILL.md` in the target project's skills folder for the harness in use
+  (`.claude/skills/` under Claude Code, `.github/skills/` under GitHub Copilot), documenting the *actual* discovered
   paths, locator convention, npm scripts, and CI job names — plus an executable quality gate (tests
   pass, lint/format clean, no raw `cy.get()` outside page objects, no positional/XPath selectors,
   deterministic setup/cleanup, specific assertions).

@@ -5,14 +5,13 @@
 - [The question bank lives in [questionnaire.md](questionnaire.md) — this file is HOW to collect it](#the-question-bank-lives-in-questionnairemdquestionnairemd--this-file-is-how-to-collect-it)
 - [Rule 0 — A filled questionnaire replaces (or shortens) the interview; a BRIEF does not](#rule-0--a-filled-questionnaire-replaces-or-shortens-the-interview-a-brief-does-not)
 - [Rule 1 — Offer "fill the list yourself" vs "interview me"](#rule-1--offer-fill-the-list-yourself-vs-interview-me)
-- [How to ask (AskUserQuestion mechanics — the live-interview path)](#how-to-ask-askuserquestion-mechanics--the-live-interview-path)
+- [How to ask (structured-question mechanics — the live-interview path)](#how-to-ask-structured-question-mechanics--the-live-interview-path)
 - [Plain language — the operator may not be an engineer (never make them google a word)](#plain-language--the-operator-may-not-be-an-engineer-never-make-them-google-a-word)
 - [Demo fast path — purpose: demo](#demo-fast-path--purpose-demo)
 - [The nine decision sections](#the-nine-decision-sections)
 - [Confirm & write state (the state-file template)](#confirm--write-state-the-state-file-template)
 
-The wizard's interview phase: **how** to collect the nine decision sections (live AskUserQuestion
-interview, or a pre-filled questionnaire), and the state-file template the answers are written to.
+The wizard's interview phase: **how** to collect the nine decision sections (live interview of structured questions, or a pre-filled questionnaire), and the state-file template the answers are written to.
 Read this BEFORE the first question; the flow, pre-flight, execution steps, and cross-cutting rules
 live in `../SKILL.md`.
 
@@ -40,7 +39,7 @@ was "filled". **A prose brief does not count as a questionnaire** — "Store Uni
 replace the catalogue with …" is *input to the interview*, not a substitute for it. A brief pre-fills
 the candidates you offer (mark them "from your brief" and put them first), and every section is still
 asked and the whole resolved set still confirmed — **except on the demo fast path** (`purpose: demo`, below), where the technical sections are derived rather than asked and appear in the confirmation instead. Failure signature: a brief read as a
-questionnaire, `answers_source: questionnaire+interview`, one `AskUserQuestion` for the run mode, a
+questionnaire, `answers_source: questionnaire+interview`, one structured question for the run mode, a
 dozen values recorded as agreed, over answers that were never requested. Write the state file for
 the first time only when the transcript shows either a questionnaire (ID-tagged answers from the
 developer) or the interview (the questions plus a confirmation question) — or, on the `demo-prep`
@@ -61,7 +60,7 @@ copy (a path or pasted text) or a `yaml` answer block keyed by question IDs:
 - **Filled** (P1, R1, R2 answered by ID — the minimum viable set): **skip the interview entirely.** Copy the
   answers verbatim into the state file, apply the shipped default for every blank, and log
   `INTERVIEW | SKIP (questionnaire pre-filled)` to `.ai-dev/run.log`. Confirm the resolved set once
-  (§ Confirm & write state — an `AskUserQuestion` whose text contains "confirm", listing every resolved
+  (§ Confirm & write state — a structured question whose text contains "confirm", listing every resolved
   value) and start running — that single confirmation is the
   gate that keeps a typo from reaching a 40-minute boot.
 - **Partially filled** — behaviour depends on `R1`:
@@ -71,7 +70,7 @@ copy (a path or pasted text) or a `yaml` answer block keyed by question IDs:
   - `R1: collaborative` → ask **ONLY the still-blank questions**, batched per § How to ask. Never
     re-ask something already answered.
 - **`R1` itself missing** while other answers are present: that is the one blank you must ask about
-  (a single AskUserQuestion), because it decides whether every other blank becomes a question or a
+  (a single structured question), because it decides whether every other blank becomes a question or a
   logged decision. Do not assume either mode.
 - **Not provided at all:** offer the choice in Rule 1 before defaulting to the full live interview.
 
@@ -90,7 +89,7 @@ developer-must-do findings are still surfaced as `⚠ ACTION NEEDED`. A filled q
 ## Rule 1 — Offer "fill the list yourself" vs "interview me"
 
 When no filled questionnaire exists, don't launch straight into nine sections. First offer both paths
-in a single AskUserQuestion:
+in a single structured question:
 
 > "I can either (a) hand you the setup questionnaire to fill at your own pace — then run with no
 > interview at all, or (b) interview you now in a few batched question sets. Which do you prefer?"
@@ -104,14 +103,14 @@ in a single AskUserQuestion:
   `run_mode: autonomous`, log `INTERVIEW | SKIP (autonomous, defaults)`, and confirm the resolved set
   once before running.
 
-## How to ask (AskUserQuestion mechanics — the live-interview path)
+## How to ask (structured-question mechanics — the live-interview path)
 
-**Conduct the interview with the AskUserQuestion tool.** Present each decision as a structured question with selectable options; do **not** dump a markdown list of defaults and wait for a freeform reply. For each question:
+**Conduct the interview by asking the user a structured question — use your harness's question tool if it has one, otherwise ask in chat and wait for the answer.** Present each decision as a structured question with selectable options; do **not** dump a markdown list of defaults and wait for a freeform reply. For each question:
 - Put the **default first** as a selectable option (e.g. "Keep default: b2b-demo-marketplace", "Keep `Pyz`").
 - List the real alternatives when the answer is a small closed set (which apps to disable [multiSelect], mail engine).
 - For **free-text values** (project name, dev domain, hex colors, custom namespace, store codes, currencies, rates): **offer 2–4 concrete PRE-COMPUTED candidates** as options — derived from the repo dir name, the store geography, common hex shades — with the built-in **"Other"** field as the escape hatch, in the **same** step. Be ready to map a prose answer to tokens in a single follow-up (`golden colors`→`#F0B323`; `Swedish, Norwegian and Polish`→`SE/NO/PL`). **NEVER** a yes/no "do you want to customise X?" gate followed by a separate "now type it" prompt, and never a bare "type it in Other" as the only path — it unreliably returns the typed value (an option such as "Custom namespace" or "Type my store set" can return only the label, or prose instead of the token), which costs the extra turn the inline design avoids.
-- **Every question needs AT LEAST TWO options — the tool REJECTS a single-option question**, and that rejection costs a full retry turn. When only one concrete candidate exists, **pair the default with an explicit deferral option**. The logo is the canonical case: "Keep the shipped Spryker logo (flagged as a go-live follow-up)" + "I'll provide a file path or URL", with the built-in `Other` still available. Failure signature: an `AskUserQuestion` rejected for having one option — or a yes/no "do you want to customise X?" standing in for the missing second option (which the rule above already forbids).
-- **Batch a section's related decisions into one AskUserQuestion call** (it takes up to 4 questions) — e.g. name + domain + colors as one identity screen. A section should be one exchange, not many.
+- **Every question needs AT LEAST TWO options — a question tool rejects a single-option question**, and that rejection costs a full retry turn. When only one concrete candidate exists, **pair the default with an explicit deferral option**. The logo is the canonical case: "Keep the shipped Spryker logo (flagged as a go-live follow-up)" + "I'll provide a file path or URL", with the built-in `Other` still available. Failure signature: a structured question rejected for having one option — or a yes/no "do you want to customise X?" standing in for the missing second option (which the rule above already forbids).
+- **Batch a section's related decisions into one structured-question call** (it takes up to 4 questions) — e.g. name + domain + colors as one identity screen. A section should be one exchange, not many.
 
 Picking the default option is always a valid answer, for every question.
 
@@ -235,7 +234,7 @@ Every derived value appears in the confirmation, so the preparer can still chang
      - **merchant sellers** — this is a marketplace by default, so author merchants and offers as the shipped norm. (A product is still buyable from its own price+stock, so offers aren't a checkout prerequisite — but the default model is a marketplace, not a single-seller shop.) Ask how many sellers per product and their names (default: the shipped marketplace model), or whether the developer wants a simpler single-seller setup. Each additional seller is a distinct merchant — unless explicitly asked, not the same merchant selling a product both directly and via an offer (one merchant twice in the buy box).
    - **leave** — nothing to collect; the demo data (and demo stores) stay as-is.
    - **D4 — disposition of the shipped NON-catalogue data.** Ask it whenever `data.mode` is `clean`/`generate` (either source) **or** step 6 (C1) removes branches. Group C covers only which category branches survive; nothing else asks what happens to the rest of what the demoshop ships, and those entities **import cleanly against missing SKUs and then fail silently** — empty screens and 404s in exactly the B2B flows a demo opens first (quote request, shopping list, product list), surfacing at demo time rather than at import time. Skipping the question leaves the shipped quotes, orders and lists unasked about.
-     - **Derive the table first, never ask it abstractly:** run `php <VALIDATE> inventory <shipped manifest>` and render, per group, **entity → row count (from inventory) → breaks when the catalogue changes? (yes / no / partly)**, then ask `drop` / `keep` / `rebuild` per group as one `AskUserQuestion` (multiSelect what to `drop`, default recommendation marked). Groups: **quote requests + versions**; **shopping lists** (+ items, business-unit and company-user relations); **product lists** (+ categories, merchant relation, ssp model, content lists); **sales orders**; **customers**; **companies / business units / company users**; **CMS pages / blocks**; **navigation**; **discounts**; **SSP assets / inquiries / service points / files**.
+     - **Derive the table first, never ask it abstractly:** run `php <VALIDATE> inventory <shipped manifest>` and render, per group, **entity → row count (from inventory) → breaks when the catalogue changes? (yes / no / partly)**, then ask `drop` / `keep` / `rebuild` per group as one structured question (multiSelect what to `drop`, default recommendation marked). Groups: **quote requests + versions**; **shopping lists** (+ items, business-unit and company-user relations); **product lists** (+ categories, merchant relation, ssp model, content lists); **sales orders**; **customers**; **companies / business units / company users**; **CMS pages / blocks**; **navigation**; **discounts**; **SSP assets / inquiries / service points / files**.
      - `rebuild` means re-author the group against the final catalog (project-data owns it, recorded as a required follow-up if post-boot); `keep` is valid only for a group that references nothing the catalog change removes.
      - Record it as `data.existing_data: { <group>: drop|keep|rebuild, … }` in the state file. **project-data diffs it against the final manifest before `done`** (every `drop` absent; every `keep`/`rebuild` present and `product-refs`-clean) — the answer is checked mechanically, not trusted.
 6. **Catalog scope (adapt mode only — skip for clean/generate/leave; optional, default: keep the whole demo catalog)** — ask whether the project sells the entire demo catalog or only part of it. Most projects keep everything (the demo catalog is a placeholder they'll replace later). Default: keep all. This drives `project-data`'s **reduce** strategy, which runs **pre-boot** (so the first boot imports the reduced set — no reset).

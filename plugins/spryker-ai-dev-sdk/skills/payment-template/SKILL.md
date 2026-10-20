@@ -54,8 +54,9 @@ These patterns are non-negotiable and override anything in IMPLEMENTATION.md:
 ## Standing Instruction — Clarify Before Continuing
 
 At any point during requirements collection or implementation: if an answer is ambiguous,
-contradictory, or conflicts with the hard rules — **stop and use `AskUserQuestion` to resolve
-it before proceeding**.
+contradictory, or conflicts with the hard rules — **stop and ask the user a structured
+multiple-choice question (use your harness's question tool if it has one, otherwise ask in chat and
+wait for the answer) to resolve it before proceeding**.
 
 Specific triggers:
 - Method name contains card keywords but flow is `direct`
@@ -96,7 +97,7 @@ Establish once, reuse everywhere:
 
 ### Stage 1 — PSP Identity
 
-Use `AskUserQuestion` to collect:
+Ask the user a structured question to collect:
 
 1. **PSP name** in kebab-case (e.g. `adyen`, `mollie`, `pay-pal`)
 2. **Namespace** — leave blank for `Pyz` (default), or specify a custom value
@@ -105,7 +106,7 @@ Use `AskUserQuestion` to collect:
 
 After receiving answers: establish the case conversion table.
 
-Use `AskUserQuestion` to confirm Stage 1 answers before continuing. After confirmation, if still
+Ask the user to confirm Stage 1 answers before continuing. After confirmation, if still
 on a protected branch, create the feature branch:
 
 ```bash
@@ -116,7 +117,7 @@ git checkout -b feature/payment-integration/{psp-name}
 
 ### Stage 2 — Shared PSP Configuration
 
-Use `AskUserQuestion` to collect all of the following in one question block:
+Ask the user a structured question to collect all of the following in one question block:
 
 **Credentials**
 - Name each credential in SCREAMING_SNAKE (e.g. `API_KEY`, `MERCHANT_ID`, `WEBHOOK_SECRET`)
@@ -148,10 +149,10 @@ Use `AskUserQuestion` to collect all of the following in one question block:
 - Leave blank to use defaults: `authorized`, `authorization_failed`, `authorization_pending`,
   `captured`, `capture_failed`, `capture_pending`, `cancelled`, `cancel_failed`
 
-Use `AskUserQuestion` to confirm Stage 2 before continuing.
+Ask the user to confirm Stage 2 before continuing.
 
 **Webhook secret validation**: if webhooks are enabled and no credential with `SECRET` or
-`WEBHOOK` in its name was listed, use `AskUserQuestion`:
+`WEBHOOK` in its name was listed, ask the user:
 > "Webhook signature validation requires a shared secret. What should this credential be named
 > (e.g. `WEBHOOK_SECRET`)?"
 Add the answer to the credentials list before continuing.
@@ -160,7 +161,7 @@ Add the answer to the credentials list before continuing.
 
 ### Stage 3 — Per-Method Details
 
-Use `AskUserQuestion` to present this table template and wait for it to be filled in:
+Present this table template to the user and wait for it to be filled in:
 
 > For each payment method from Stage 1, fill in one row.
 > Use `redirect`, `direct`, or `js-sdk` for the Flow column.
@@ -194,7 +195,7 @@ For every detected card method where Flow is not `redirect` and not `js-sdk` —
 
 Do not proceed until resolved.
 
-Use `AskUserQuestion` to present a full collected-requirements summary and get final confirmation
+Present a full collected-requirements summary to the user and get final confirmation
 before moving to Phase 2.
 
 ---
@@ -204,7 +205,8 @@ before moving to Phase 2.
 Fetch the authoritative implementation checklist from GitHub:
 
 ```
-WebFetch: https://raw.githubusercontent.com/spryker-community/payment-template/main/IMPLEMENTATION.md
+Fetch with the web fetch tool:
+https://raw.githubusercontent.com/spryker-community/payment-template/main/IMPLEMENTATION.md
 ```
 
 Read the full document. For each checklist section, generate a concrete plan entry with PSP-specific
@@ -252,7 +254,7 @@ Security overrides active:
   - Secret separation: publishable keys in Yves Config only
 ```
 
-Use `AskUserQuestion` to present the plan and ask for confirmation. Do not write any code or modify
+Present the plan to the user and ask for confirmation. Do not write any code or modify
 any file before confirmation is received.
 
 ---

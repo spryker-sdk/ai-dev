@@ -31,7 +31,7 @@ It is the engine behind `project-data`, `define-stores`, `curate-golive-data` an
 
 ```mermaid
 flowchart TD
-    A([Data work on data/import/**]) --> L["Locate the scripts<br/>.claude/skills/… or CLAUDE_PLUGIN_ROOT<br/>docker php:8.3-cli if no host php"]
+    A([Data work on data/import/**]) --> L["Locate the scripts<br/>&lt;skill-dir&gt;/scripts — the skill's base directory<br/>docker php:8.3-cli if no host php"]
     L --> I["Inspect first — never hardcode a header<br/>csv columns / count / distinct --plain"]
     I --> M{Mutating or removing?}
 
@@ -172,7 +172,7 @@ holds the full text; the short form:
   redirects and env-prefixes can never be allowlisted.
 - **One op over many files = one command** — list the files before the flags, add `--in-place`.
 - **Count with the tool** — `rowCount` / `matchedRows` / `count --plain`, never `| grep -c`.
-- **Explore with the built-in Read / Grep / Glob**, edit YAML with the built-in Edit tool — never
+- **Explore with the built-in file read/search tools**, edit YAML with the built-in file edit tool — never
   `python`/`ruby`/`sed` regenerating a config file.
 - **Delete only what git can restore or this run created** — leave anything else in place and list it
   for the person; surface every deletion as an explicit step.

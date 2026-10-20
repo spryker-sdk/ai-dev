@@ -6,7 +6,7 @@ surface and per width** in the §11a sweep, and the rows the change touched at t
 cycle. A check's result is the evidence token for its sweep row (`sw=768/768, cut=[]`), not the word
 "checked".
 
-**Widths:** 390, 768, 900, 1100, 1440 — set with Claude in Chrome's `resize_window`, then read
+**Widths:** 390, 768, 900, 1100, 1440 — set with the browser's viewport-resize tool (`resize_window` under Claude in Chrome, `browser_resize` under Playwright MCP — see the `spryker-runtime` Browser tool map), then read
 `innerWidth` back (window width is not viewport width; record the value you got). Add one width just
 below any breakpoint where a row changes shape: a row class that scrolls sideways below `$lg` is
 designed to do so, and the width just below it is where a cut card shows.

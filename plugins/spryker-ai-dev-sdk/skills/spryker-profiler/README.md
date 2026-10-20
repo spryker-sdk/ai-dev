@@ -8,7 +8,7 @@ of truth for performance work: instead of guessing which code is slow, read what
 ran. This skill reduces a stored profile to the metrics that matter and prints JSON, so
 nobody has to scrape the profiler's HTML or open a browser.
 
-> This README is for humans. `SKILL.md` holds the instructions Claude follows;
+> This README is for humans. `SKILL.md` holds the instructions the coding agent follows;
 > `references/setup.md` holds the configuration detail.
 
 ## What it can tell you
@@ -121,7 +121,7 @@ flowchart LR
     C --> S["Stored profile<br/>gzip + PHP-serialized<br/>+ index.csv"]
     S --> P["profiler-read.php<br/>docker/sdk cli"]
     P --> J["JSON metrics"]
-    J --> A["Claude interprets<br/>vs .claude/rules/performance.md"]
+    J --> A["The agent interprets<br/>vs the project's<br/>performance rules"]
 ```
 
 The script reads the stored files directly rather than the profiler UI, so it works
@@ -158,10 +158,13 @@ Two habits this encodes, both learned the hard way:
 
 ## Usage
 
-Run from the project root so the script can locate the project:
+Run from the project root so the script can locate the project. `<skill-dir>` below is the path
+reported as `Base directory for this skill:` when the skill loads — substitute the literal
+absolute path, and copy the script into the project first if it resolves outside it (see
+[Installed as a plugin?](#installed-as-a-plugin)):
 
 ```bash
-SCRIPT=.claude/skills/spryker-profiler/scripts/profiler-read.php
+SCRIPT=<skill-dir>/scripts/profiler-read.php
 
 # What was recorded, newest first
 docker/sdk cli php $SCRIPT --list --limit=10
@@ -214,7 +217,7 @@ scaffolding.
 **The script is a starting point, not a boundary.** A stored profile holds far more than
 the script prints — full SQL text, headers, routing, events, Twig data, logger entries.
 When a question needs something it does not expose (normalising SQL literals to collapse
-`IN (1)`/`IN (2)` into one shape, say), Claude is expected to extend the script or write a
+`IN (1)`/`IN (2)` into one shape, say), the agent is expected to extend the script or write a
 throwaway one rather than stop at the available flags.
 
 ## Reporting
@@ -225,7 +228,7 @@ The skill matches its output to the situation rather than always producing a doc
   numbers that matter, not a report.
 - **A written report on request or when it matters** — if you ask for one, or the finding
   is significant enough to deserve attention on its own. Markdown by default, standalone
-  HTML on request or when the result is visual. Written to `.claude/local-trash/` unless
+  HTML on request or when the result is visual. Written to `.ai-dev/local-trash/` unless
   you name a location.
 
 Reports **link to the profiler rather than copy it**. Every profile carries a
@@ -308,7 +311,7 @@ request-scoped. Use Xdebug profiling or explicit timing for those.
 
 | Path | Purpose |
 |---|---|
-| `SKILL.md` | Instructions Claude follows — workflow, interpretation, pitfalls |
+| `SKILL.md` | Instructions the coding agent follows — workflow, interpretation, pitfalls |
 | `references/setup.md` | Enabling and configuring the profiler per application |
 | `scripts/profiler-read.php` | The reader — reduces stored profiles to JSON metrics |
 | `evals/evals.json` | Test prompts used to validate the skill |
@@ -318,23 +321,21 @@ request-scoped. Use Xdebug profiling or explicit timing for those.
 
 The skill works identically wherever it lives. The only thing that matters is whether its
 scripts sit **inside the project directory** — the Docker container mounts only the project,
-so that is all PHP inside it can reach:
+so that is all PHP inside it can reach. `<skill-dir>` below is the path reported as
+`Base directory for this skill:` when the skill loads; substitute the literal absolute path:
 
-- **Inside the project** — a setup install (`.claude/skills/spryker-profiler/`) *or* a
+- **Inside the project** — a copy in the project's own skills folder *or* a
   Composer-vendored plugin (`vendor/spryker-sdk/ai-dev/plugins/…`): run the script in place,
   no copy needed.
-- **Outside the project** — a plugin cache under `~/.claude/plugins/…`: the script is
+- **Outside the project** — a plugin cache in the harness's own storage: the script is
   unreachable from inside the container. Copy it into the project first, then run the copy:
 
 ```bash
-mkdir -p .claude/tmp
-# Source is whichever resolves — never a hardcoded install path:
-#   .claude/skills/spryker-profiler/scripts/profiler-read.php   (setup install)
-#   ${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler/scripts/profiler-read.php  (plugin install)
-cp "${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler/scripts/profiler-read.php" .claude/tmp/
-SCRIPT=.claude/tmp/profiler-read.php
+mkdir -p .ai-dev/tmp
+cp "<skill-dir>/scripts/profiler-read.php" .ai-dev/tmp/
+SCRIPT=.ai-dev/tmp/profiler-read.php
 ```
 
 The copy is disposable — the script locates the project from the working directory, so it
-behaves the same wherever it lands inside the repo. SKILL.md tells Claude to make this
+behaves the same wherever it lands inside the repo. SKILL.md tells the agent to make this
 choice automatically based on the skill's base directory.

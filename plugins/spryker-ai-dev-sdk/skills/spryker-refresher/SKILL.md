@@ -32,10 +32,10 @@ This skill doesn't edit code. It doesn't decide whether changes are *correct*. I
 
 - **Install recipes** under `config/install/*.yml` (and per-region subdirectories) — the canonical sequences of commands the project actually runs. Treat them as the source of truth for command spelling, flags, and ordering. Read them before improvising.
 - **`docker/sdk console list`** — live source of truth for what commands actually exist in the running stack. Use when an install recipe references something but you need to confirm spelling/flags, or when the recipe doesn't cover the command you need.
-- **`searchAlgoliaDocumentation`** (Spryker MCP) or `https://docs.spryker.com/` via WebFetch — fallback when a command's purpose isn't obvious.
-- **Project state** — `Read` / `Grep`, plus `git status` and `git diff --name-only HEAD~1`, to derive the touched-files list when the caller didn't enumerate it.
+- **`searchAlgoliaDocumentation`** (Spryker MCP) or `https://docs.spryker.com/` via the web fetch tool — fallback when a command's purpose isn't obvious.
+- **Project state** — the built-in file read/search tools (not shell), plus `git status` and `git diff --name-only HEAD~1`, to derive the touched-files list when the caller didn't enumerate it.
 
-Claude runs on the host, not in the container. Use these invocation forms:
+Your coding agent runs on the host, not in the container. Use these invocation forms:
 
 - Spryker console commands → `docker/sdk console <command>`
 - Composer → `docker/sdk cli composer <args>`

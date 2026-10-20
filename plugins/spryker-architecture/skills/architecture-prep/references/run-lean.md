@@ -9,19 +9,20 @@ orchestrator retains only compact state.**
 
 Every file this skill produces that is **not** part of the deliverable — logs, the interview capture,
 research findings, the decision log — lives together in one per-run folder, anchored to the project
-root so it's stable regardless of the current working directory:
+root. Run the commands below **from the project root** so the path is stable:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/architecture-prep/<run-id>/
+$(pwd)/.ai-dev/architecture-prep/<run-id>/
 ```
 
 `<run-id>` is a short slug: a JIRA key if the work is ticketed, else a date + brief name (e.g.
-`2026-07-23-marketplace-arch`). Note the project's rule that temporary/draft `.md` go under
-`.claude/local-trash/` — the cache folder above is that spirit; keep **all** scratch here and never
-scatter run files into `architecture/`. Set it once at Step 0:
+`2026-07-23-marketplace-arch`). Note the project's rule that temporary/draft `.md` files belong in a
+scratch folder, never beside the deliverable — the run folder above is that spirit; keep **all**
+scratch here and never scatter run files into `architecture/`. Set it once at Step 0, from the
+project root:
 
 ```bash
-ARCH_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/architecture-prep/<run-id>"
+ARCH_DIR="$(pwd)/.ai-dev/architecture-prep/<run-id>"
 mkdir -p "$ARCH_DIR"
 ARCH_LOG="$ARCH_DIR/run.log"
 ```
@@ -36,8 +37,8 @@ for the whole batch: `intake-<slug>.md` per project, a single shared `research-d
 union of Spryker features, and per-slug research files only for genuinely project-unique topics.
 Each deliverable's output target is its own git worktree, recorded in the State Object per slug.
 
-**Writing under `.claude/` paths:** when a run leaves notes/tracking files anywhere under `.claude/`
-(this cache folder is fine; skill-improvement notes especially), prefer plain ASCII — `->` not a
+**Writing inside the harness's own config folder:** when a run leaves notes or tracking files there
+(this run folder is fine; skill-improvement notes especially), prefer plain ASCII — `->` not a
 typographic arrow, "section 3" not the section sign. The write classifier is stricter there and a
 denial costs a round-trip. Deliverable files under `architecture/` are unaffected.
 
@@ -81,8 +82,8 @@ bulky lives in a file you re-open on demand.
   report.
 - Pointers to `decisions.md` and `run.log`.
 
-If you need detail you dropped (a full research finding, a section's prose), `Read` the file — pull
-the lines you need, don't reload everything.
+If you need detail you dropped (a full research finding, a section's prose), read the file with the
+built-in file read tool (not shell) — pull the lines you need, don't reload everything.
 
 ## The plan task list
 

@@ -5,7 +5,7 @@
  * metrics as JSON. Run inside the application container so the collector
  * classes are autoloadable:
  *
- *   SCRIPT=.claude/skills/spryker-profiler/scripts/profiler-read.php
+ *   SCRIPT=<skill-dir>/scripts/profiler-read.php   # the skill's base directory
  *   docker/sdk cli php $SCRIPT --list
  *   docker/sdk cli php $SCRIPT --url=/en/cart --verbose
  *   docker/sdk cli php $SCRIPT --token=8f4622

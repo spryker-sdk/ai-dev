@@ -10,8 +10,26 @@ const STOP_MAX_BLOCKS = 3;
 const STOP_STATE_FILES = ['.ai-dev/demo-prep.md', '.ai-dev/project-setup.md'];
 const STOP_DONE_STATUSES = ['done', 'skipped', 'n/a', 'not needed'];
 
-/** Emit the Stop-hook decision and exit. */
-function stop_decide(string $decision, string $reason, string $cwd): never
+/**
+ * The exit code each harness reads as "blocked". Claude Code wants 2; Copilot discards the output
+ * of any hook that exits non-zero, so it wants 0. A harness not listed gets 0: a block it ignores
+ * is the behaviour without this hook, where a spurious failure would be noise on every turn.
+ */
+const STOP_BLOCK_EXIT = ['claude' => 2, 'copilot' => 0];
+
+/** How each harness records a question to the person: the user-turn marker, then the tool name. */
+const STOP_QUESTION_FORMATS = [
+    ['"type":"user"', 'AskUserQuestion'],
+    ['"type":"user.message"', 'ask_user'],
+];
+
+/**
+ * Emit the stop decision and exit.
+ *
+ * One object carries every shape: Claude Code reads `hookSpecificOutput.decision`, Copilot a flat
+ * `decision`/`reason`. Only the exit code differs per harness, per STOP_BLOCK_EXIT.
+ */
+function stop_decide(string $decision, string $reason, string $cwd, string $harness = 'unknown'): never
 {
     hook_trace($decision);
     if ($decision === 'block' && $cwd !== '' && is_dir($cwd . '/.ai-dev')) {
@@ -21,14 +39,19 @@ function stop_decide(string $decision, string $reason, string $cwd): never
         exit(0);
     }
     echo json_encode([
+        'decision' => 'block',
+        'reason' => $reason,
         'hookSpecificOutput' => [
             'hookEventName' => 'Stop',
             'decision' => 'block',
             'reason' => $reason,
         ],
     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
-    fwrite(STDERR, $reason . "\n");
-    exit(2);
+    $exit = STOP_BLOCK_EXIT[$harness] ?? 0;
+    if ($exit !== 0) {
+        fwrite(STDERR, $reason . "\n");
+    }
+    exit($exit);
 }
 
 /** Record that the guard stopped blocking, so a silent hand-back is still diagnosable. */
@@ -123,9 +146,11 @@ function stop_is_blocked(string $cwd, string $lastMessage, string $transcriptPat
             fseek($fh, max(0, $size - 200000));
             $tailText = (string) stream_get_contents($fh);
             fclose($fh);
-            $lastUser = strrpos($tailText, '"type":"user"');
-            if ($lastUser !== false && str_contains(substr($tailText, $lastUser), 'AskUserQuestion')) {
-                return 'the turn asked the person a question through AskUserQuestion';
+            foreach (STOP_QUESTION_FORMATS as [$marker, $tool]) {
+                $lastUser = strrpos($tailText, $marker);
+                if ($lastUser !== false && str_contains(substr($tailText, $lastUser), $tool)) {
+                    return 'the turn asked the person a question through ' . $tool;
+                }
             }
         }
     }
@@ -136,7 +161,8 @@ function stop_is_blocked(string $cwd, string $lastMessage, string $transcriptPat
 try {
     $payload = hook_payload();
     $cwd = hook_cwd($payload);
-    $lastMessage = (string) ($payload['last_assistant_message'] ?? '');
+    $harness = hook_harness($payload);
+    $lastMessage = hook_last_assistant_message($payload);
     $counterFile = $cwd . '/.ai-dev/stop-blocks.json';
     $counter = is_file($counterFile) ? (array) json_decode((string) file_get_contents($counterFile), true) : [];
     $reset = static function () use ($counterFile): void {
@@ -149,7 +175,7 @@ try {
         exit(0);
     }
     $claimsCancelled = hook_claims_user_cancelled_work($lastMessage);
-    $blocked = $claimsCancelled ? null : stop_is_blocked($cwd, $lastMessage, (string) ($payload['transcript_path'] ?? ''));
+    $blocked = $claimsCancelled ? null : stop_is_blocked($cwd, $lastMessage, hook_transcript_path($payload));
     if ($blocked !== null) {
         $reset();
         exit(0);
@@ -172,11 +198,11 @@ try {
     @file_put_contents($counterFile, json_encode(['count' => $count + 1, 'hash' => $hash, 'fingerprint' => $fingerprint, 'ts' => time()]));
 
     if ($claimsCancelled) {
-        stop_decide('block', "Stop blocked: this turn reports that the person stopped or cancelled the work, and steps are still open. A sub-agent whose tool call is denied is reported as `Agent \"…\" was stopped by user`; that message does not mean the person withdrew the instruction.\n\nRe-dispatch the work with allowed tools (`csv.php`, the Write tool, `docker/sdk cli` instead of shell assembly), or record the blocked step in the report and continue with the rest. Next open step: {$open[0]}.", $cwd);
+        stop_decide('block', "Stop blocked: this turn reports that the person stopped or cancelled the work, and steps are still open. A sub-agent whose tool call is denied is reported as `Agent \"…\" was stopped by user`; that message does not mean the person withdrew the instruction.\n\nRe-dispatch the work with allowed tools (`csv.php`, the file write tool, `docker/sdk cli` instead of shell assembly), or record the blocked step in the report and continue with the rest. Next open step: {$open[0]}.", $cwd, $harness);
     }
 
     if (hook_stops_on_permissions($lastMessage)) {
-        stop_decide('block', "Stop blocked: this turn ends on a permission or allowlist limit, and {$open[0]} is still open. Record a blocked command in the report and continue:\n  1. Finish every part of the task the allowed tools cover.\n  2. Write the rest to a report (`.ai-dev/verification-report.md` or the step's own report) as a table: what is needed, the exact command a person runs, and why it is blocked.\n  3. State in one line what is unverified, as distinct from what failed.\n\nIf the blocked command was in a sub-agent, first re-dispatch it with allowed tools (the SDK scripts and the Write tool instead of shell assembly).", $cwd);
+        stop_decide('block', "Stop blocked: this turn ends on a permission or allowlist limit, and {$open[0]} is still open. Record a blocked command in the report and continue:\n  1. Finish every part of the task the allowed tools cover.\n  2. Write the rest to a report (`.ai-dev/verification-report.md` or the step's own report) as a table: what is needed, the exact command a person runs, and why it is blocked.\n  3. State in one line what is unverified, as distinct from what failed.\n\nIf the blocked command was in a sub-agent, first re-dispatch it with allowed tools (the SDK scripts and the file write tool instead of shell assembly).", $cwd, $harness);
     }
 
     $next = $open[0];
@@ -187,7 +213,7 @@ try {
         ? "\n\nThis is block #" . ($count + 1) . " on the same set of open steps; the steps table has not changed since the last block. One of these applies:\n  1. The table is out of date: it does not record work you have done. Update the row, with the evidence `done` requires.\n  2. The first open step has a blocker you have not named. Name it in one line and end the turn on that question; this hook lets that through."
         : '';
 
-    stop_decide('block', "Stop blocked: the run mode is `autonomous` and the next unfinished step is **{$next}**{$also}. An autonomous run continues without the person until every step is finished; a progress report does not end the turn.\n\nContinue with {$next} now.{$escalation}\n\nEnd the turn only when every row is `done` or `skipped`, or when you are blocked by something only the person can resolve: end the turn on a question only they can answer, or on a line that starts with `NEEDS YOU:` and names the blocker.", $cwd);
+    stop_decide('block', "Stop blocked: the run mode is `autonomous` and the next unfinished step is **{$next}**{$also}. An autonomous run continues without the person until every step is finished; a progress report does not end the turn.\n\nContinue with {$next} now.{$escalation}\n\nEnd the turn only when every row is `done` or `skipped`, or when you are blocked by something only the person can resolve: end the turn on a question only they can answer, or on a line that starts with `NEEDS YOU:` and names the blocker.", $cwd, $harness);
 } catch (Throwable $e) {
     fwrite(STDERR, 'spryker-ai-dev-sdk stop guard: ' . $e->getMessage() . "\n");
     exit(0);

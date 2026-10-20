@@ -132,7 +132,7 @@ E4. `[optional]` Browser/device support requirements.
 E5. `[optional]` Team size, delivery method (e.g. Scrum, sprint length), release cadence, hard
     deadlines/milestones.
 E6. `[optional]` Coding conventions: PHPStan level, coding standard, branching model. (Defaults
-    pulled from the project's CLAUDE.md if not given.)
+    pulled from the project's own instructions file and rules folder if not given.)
 E7. `[optional]` Who owns integration prerequisites - outbound egress / allow-listing, secret &
     credential management, per-adapter timeout/retry/circuit-breaker policy? (customer side vs Spryker
     Cloud networking) -> feeds sections 07/08 integration-readiness checklist

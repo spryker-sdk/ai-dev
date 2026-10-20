@@ -1,19 +1,20 @@
 ---
 name: ai-dev-setup
-description: "Sets up the Spryker AI Dev SDK in a Spryker project. Covers two related flows: first-time onboarding (installs the Composer package, wires console commands, registers the MCP server, installs `CLAUDE.md` and `.claude/rules/`) and updating (refreshes just `CLAUDE.md` and/or `.claude/rules/` from the latest upstream content, skipping install/wiring). The skill infers which flow the user wants from their request and from project state. Requires Composer and a running `docker/sdk` environment for first-time onboarding; updating only needs network access (or a vendored copy of the package)."
+description: "Sets up the Spryker AI Dev SDK in a Spryker project. Covers three related flows: first-time onboarding (installs the Composer package, wires console commands, registers the MCP server with the coding agent in use, installs the project instructions file and the Spryker coding rules), updating (refreshes just those two artifacts from the latest bundled content, skipping install and wiring), and rules-only (installs or refreshes the coding rules alone, for a project without Composer or a running container stack). The skill first detects which coding agent is running it, then infers which flow the user wants from their request and from project state. Onboarding requires Composer and a running `docker/sdk` environment; updating only needs the bundled content on disk; rules-only needs neither."
 disable-model-invocation: true
 user-invocable: true
-allowed-tools: Bash, Read, Edit, Write, Glob, Grep
 ---
 
 # Spryker AI Dev Setup
 
-You set up the Spryker **AI Dev SDK** (`spryker-sdk/ai-dev`) in a Spryker project. The skill covers two related flows — first-time onboarding and updating bundled artifacts — and infers which one the user wants. When fully onboarded, the project has:
+You set up the Spryker **AI Dev SDK** (`spryker-sdk/ai-dev`) in a Spryker project. The skill covers three related flows — first-time onboarding, updating bundled artifacts, and installing the coding rules alone — and infers which one the user wants. When fully onboarded, the project has:
 
 1. The `spryker-sdk/ai-dev` package installed as a dev dependency.
 2. Two console commands wired in `ConsoleDependencyProvider` (`McpServerConsole`, `AiToolSetupConsole`).
-3. The AI Dev MCP server registered with Claude Code so other Claude sessions in this project can use Spryker-aware tools (transfers, OMS, module map, CSV/ODS, etc.).
-4. (Optional) `CLAUDE.md` at the project root and `.claude/rules/` populated from the bundled package content.
+3. The AI Dev MCP server registered with the coding agent in use, so other sessions in this project can use Spryker-aware tools (transfers, OMS, module map, CSV/ODS, etc.).
+4. (Optional) The project instructions file at the root and the Spryker coding rules in the harness's rules folder — see the artifact table in Step 5 for the per-harness names.
+
+Everything downstream branches on **one** value: which coding agent is running this skill. Step 0 decides it; call it the **harness**.
 
 You do **not** generate prompts. The `ai-dev:generate-prompts` command exists in the package but is outdated — skip it.
 
@@ -21,38 +22,97 @@ You do **not** generate prompts. The `ai-dev:generate-prompts` command exists in
 
 ## Run logging — what, when, how, where
 
-Every run keeps a plain-text trail — the mode decision, which steps ran, what each changed, and what was skipped because it was already in place — in one per-run folder, `$SETUP_DIR = ${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/ai-dev-setup/<UTC timestamp>/`, with `run.log` inside it. It records what the steps do and changes none of them. The folder layout, line format and per-step log files: **[references/run-logging.md](references/run-logging.md)** — read it before creating `$SETUP_DIR`.
+Every run keeps a plain-text trail — the harness decision, the mode decision, which steps ran, what each changed, and what was skipped because it was already in place — in one per-run folder, `$SETUP_DIR = $(pwd)/.ai-dev/ai-dev-setup/<UTC timestamp>/`, with `run.log` inside it. **Run this skill from the project root** so that path resolves consistently regardless of where the harness started. It records what the steps do and changes none of them. The folder layout, line format and per-step log files: **[references/run-logging.md](references/run-logging.md)** — read it before creating `$SETUP_DIR`.
 
 ---
 
-## Mode selection — infer onboarding vs. update before running anything
+## Step 0 — Detect the harness
 
-This skill operates in one of two flows. **Decide which one is appropriate before doing any work.** The decision uses two signals: (a) what the user said when invoking the skill, and (b) the current state of the project. Do not ask the user "which mode?" as a first question — pick the mode yourself and only confirm if genuinely ambiguous.
+**Do this before anything else**, including the mode decision: the mode signals, the MCP registration
+in Step 3, and the artifact names in Step 5 all depend on it. The check is cheap, read-only, and
+ordered — first match wins.
+
+```bash
+if [ -n "${CLAUDECODE:-}" ] || [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    HARNESS="claude";  HARNESS_SIGNAL="CLAUDECODE/CLAUDE_PROJECT_DIR"
+elif [ -n "${COPILOT_HOME:-}" ] || [ -d "$HOME/.copilot" ]; then
+    HARNESS="copilot"; HARNESS_SIGNAL="COPILOT_HOME/~.copilot"
+elif [ "${TERM_PROGRAM:-}" = "vscode" ]; then
+    HARNESS="vscode";  HARNESS_SIGNAL="TERM_PROGRAM=vscode"
+else
+    HARNESS="";        HARNESS_SIGNAL="none"
+fi
+printf 'harness=%s (%s)\n' "${HARNESS:-unknown}" "$HARNESS_SIGNAL"
+```
+
+Read the result in this order, and stop at the first signal that matches:
+
+1. **`CLAUDECODE` or `CLAUDE_PROJECT_DIR` set** → Claude Code (`claude`).
+2. **`COPILOT_HOME` set, or `~/.copilot` exists** → GitHub Copilot CLI (`copilot`).
+3. **`TERM_PROGRAM=vscode`** → VS Code (`vscode`). Treat it as Copilot for artifact purposes unless
+   signal 1 already matched — the ordering above guarantees that.
+4. **Nothing matched** → ask the user a structured multiple-choice question (use your harness's
+   question tool if it has one, otherwise ask in chat and wait for the answer): *"Which coding agent
+   are you running this in?"* with the options **Claude Code**, **GitHub Copilot CLI**,
+   **VS Code Copilot**, **other**. On *other*, ask which one and which artifact layout it expects;
+   if you cannot map it onto one of the three, stop and say so rather than guessing.
+
+**Detection is best-effort, so always confirm before acting on it.** State the result in exactly one
+line — *"Detected harness: GitHub Copilot CLI (COPILOT_HOME set). Correct?"* — and let the user
+correct you. A wrong harness writes the right content to the wrong paths, which is worse than asking.
+
+Record `HARNESS` and `HARNESS_SIGNAL`, plus whether the user confirmed or corrected the guess, and
+write them into `run.log` as the `HARNESS` line as soon as `$SETUP_DIR` exists (see "Run logging").
+
+Use the value everywhere below. `vscode` uses Copilot's artifacts (Step 5) but its own MCP config file
+(Step 3) — where the two differ, this file says so.
+
+---
+
+## Mode selection — infer the flow before running anything
+
+This skill operates in one of three flows. **Decide which one is appropriate before doing any work.** The decision uses two signals: (a) what the user said when invoking the skill, and (b) the current state of the project. Do not ask the user "which mode?" as a first question — pick the mode yourself and only confirm if genuinely ambiguous.
 
 ### Signal A — read the user's invocation
 
 When the user invokes this skill, scan the message they sent (the prompt that triggered the skill, plus any words on the invocation line) for intent:
 
-- Words like *"update"*, *"refresh"*, *"sync"*, *"pull latest"*, *"get newer"*, *"upgrade rules"*, *"refresh CLAUDE.md"* → user wants **update**.
+- Words like *"update"*, *"refresh"*, *"sync"*, *"pull latest"*, *"get newer"*, *"upgrade rules"*, *"refresh the instructions file"* → user wants **update**.
 - Words like *"install"*, *"set up"*, *"onboard"*, *"add"*, *"configure"*, *"first time"*, *"new project"* → user wants **onboarding**.
+- Words like *"just the rules"*, *"only the rules"*, *"coding rules"*, *"no setup"*, *"I don't have docker"* → user wants **rules only**.
 - Bare invocation with no context (just `/spryker-ai-dev-sdk:ai-dev-setup` and nothing else) → ambiguous, use Signal B.
 
 ### Signal B — read the project state
 
-Run cheap read-only checks:
+Run cheap read-only checks. The artifact paths depend on the harness from Step 0 — see the table in
+Step 5:
 
 ```bash
 composer show spryker-sdk/ai-dev 2>/dev/null | head -1     # is the package installed?
-test -f CLAUDE.md && echo "CLAUDE.md present"               # does the user already have CLAUDE.md?
-test -d .claude/rules && ls .claude/rules/ 2>/dev/null | wc -l  # is .claude/rules/ populated?
-claude mcp list 2>/dev/null | grep "^$(basename "$(pwd)"):" # is the MCP server already registered for this project?
+
+# Project instructions file (pick the row for your harness)
+test -f "$INSTRUCTIONS_FILE" && echo "instructions file present"            # per the Step 5 table
+test -f .github/copilot-instructions.md && echo "instructions file present"  # copilot / vscode
+
+# Rules folder — the sync hook records what it installed
+test -f .ai-dev/rules.manifest && echo "rules manifest present"
+test -d "$RULES_DIR" && ls "$RULES_DIR" 2>/dev/null | wc -l                 # per the Step 5 table
+test -d .github/instructions && ls .github/instructions/ 2>/dev/null | wc -l               # copilot / vscode
+
+# MCP server — user-level registration, per harness
+claude mcp list 2>/dev/null | grep "^$(basename "$(pwd)"):"     # claude
+copilot mcp list 2>/dev/null | grep "^$(basename "$(pwd)"):"    # copilot
+
+# MCP server — project-scoped registration, read by both CLIs
+test -f .mcp.json && grep -q 'ai-dev:mcp-server' .mcp.json && echo ".mcp.json present"
 ```
 
-> The MCP grep uses `^<name>:` (anchored start, colon delimiter) — not `-i "<name>"` — because `claude mcp list` formats entries as `<name>: <command> - <status>` and a substring match can false-positive on another entry whose name contains the project's basename (e.g. project `shop` would match an entry named `b2b-shop`).
+> The MCP grep uses `^<name>:` (anchored start, colon delimiter) — not `-i "<name>"` — because both CLIs format entries as `<name>: <command> - <status>` and a substring match can false-positive on another entry whose name contains the project's basename (e.g. project `shop` would match an entry named `b2b-shop`).
 
-- **Package installed + MCP server registered + `CLAUDE.md` present + `.claude/rules/` populated** → almost certainly an **update** request. The user has nothing left to onboard.
+- **Package installed + MCP server registered + instructions file present + rules folder populated** → almost certainly an **update** request. The user has nothing left to onboard.
 - **None of the above present** → onboarding.
-- **Mixed state** (e.g. package installed but no `CLAUDE.md`) → onboarding, but the per-step idempotency pre-checks below will skip what's already in place.
+- **Mixed state** (e.g. package installed but no instructions file) → onboarding, but the per-step idempotency pre-checks below will skip what's already in place.
+- **No `composer` on `PATH`, or no `docker/sdk` in the project** → onboarding is impossible; this is a **rules-only** candidate. Say so and offer it.
 
 ### Decide and proceed
 
@@ -60,30 +120,46 @@ Combine Signals A and B:
 
 - **A says update, B confirms (fully set up)** → run **update flow**.
 - **A says update, B says nothing is installed** → tell the user "this project does not appear to be onboarded — `spryker-sdk/ai-dev` is not installed. Want me to run the full onboarding flow instead?" Wait for confirmation. Do not silently fall through.
-- **A says onboarding, B says fully set up** → tell the user "this project already has the SDK installed and configured. Did you mean to refresh `CLAUDE.md` and `.claude/rules/` instead?" Wait. Do not silently re-run onboarding.
+- **A says onboarding, B says fully set up** → tell the user "this project already has the SDK installed and configured. Did you mean to refresh the instructions file and the coding rules instead?" Wait. Do not silently re-run onboarding.
+- **A says rules only** → run **rules-only flow**, whatever B says.
+- **A says onboarding or update, but B shows no Composer or no `docker/sdk`** → tell the user what is missing and offer **rules-only flow** as the thing that *can* run here. Wait for their answer; do not run a flow whose requirements cannot be met.
 - **A is ambiguous or absent**, B fully set up → assume **update flow**, but state your assumption in one line and let the user redirect.
 - **A is ambiguous or absent**, B nothing installed → assume **onboarding**, state your assumption in one line.
 - **A and B disagree any other way** → state both signals and ask the user which flow they want.
 
 ### Update flow
 
-Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the mode decision before jumping to Step 5.
+Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the harness and mode decisions before jumping to Step 5.
 
 When in update flow, **skip Requirements / Preflight / Step 1 / Step 2 / Step 3 / Step 4 entirely**. Jump straight to Step 5, but apply these overrides:
 
-- The user is **refreshing**, not installing for the first time. Frame the prompts that way. Suggested phrasing for `CLAUDE.md`: *"Refresh `CLAUDE.md` from the bundled content in `vendor/spryker-sdk/ai-dev/data/`? Choose overwrite (replace), merge (append missing sections), or skip."* For rules: *"Refresh `.claude/rules/` from `vendor/spryker-sdk/ai-dev/data/rules/`? Choose overwrite (replace same-named files), merge (only add missing files), or skip."*
+- The user is **refreshing**, not installing for the first time. Frame the prompts that way. Suggested phrasing for the instructions file: *"Refresh the project instructions file from the bundled content in `vendor/spryker-sdk/ai-dev/data/`? Choose overwrite (replace), merge (append missing sections), or skip."* For the rules: *"Refresh the rules folder from the bundled rule set? Choose overwrite (replace same-named files), merge (only add missing files), or skip."*
 - The recommended default in update flow is **overwrite** (the user explicitly asked to refresh). Still ask for confirmation — never overwrite silently. But say "Default: overwrite — confirm with y, or pick merge / skip" rather than the conservative onboarding default of "keep yours".
 - If the user wants the *latest from `master`* rather than what Composer has installed, instruct them to run `composer update spryker-sdk/ai-dev` first; the bundled content under `vendor/spryker-sdk/ai-dev/data/` will then reflect the new version. The skill itself only copies what's on disk — it does not fetch from GitHub.
-- If `CLAUDE.md` does **not** exist when update flow runs, tell the user this looks like a first-time install and ask whether to switch to onboarding. Do not silently install.
-- If `.claude/rules/` does not exist or is empty when update flow runs, same handling.
-- **Artifact 3 is refreshed in update flow too, when `.claude/hooks/spryker-ai-dev-sdk/` exists.** Re-copy `hooks/guard-stop.php` and `hooks/lib.php`, and **diff the `Stop` hook of `hooks/settings.example.json` against the project's `.claude/settings.json`** — report a `Stop` matcher or command that is missing or different in the project, and offer to add it. Any other file in `.claude/hooks/spryker-ai-dev-sdk/`, and any settings hook entry that points at one, is outside this artifact: list them for the person to remove.
-- The Final report in update flow only mentions which of the three artifacts were refreshed (or skipped) and the bundled version copied from (e.g. `from vendor/spryker-sdk/ai-dev 0.5.0`). Skip the "what was installed (package + version)" and "MCP server registered" lines — those steps did not run.
+- If the project instructions file does **not** exist when update flow runs, tell the user this looks like a first-time install and ask whether to switch to onboarding. Do not silently install.
+- If the rules folder does not exist or is empty when update flow runs, same handling.
+- **Artifact 3 is refreshed in update flow too, when the project's own hooks folder for this SDK exists** (a setup install; a plugin install gets the guard from the plugin). Re-copy `hooks/guard-stop.php` and `hooks/lib.php`, and **diff the stop-guard entry of `hooks/settings.example.json` against the project's harness settings file** — report a matcher or command that is missing or different in the project, and offer to add it. Any other file in that folder, and any settings hook entry pointing at one, is outside this artifact: list them for the person to remove.
+- The Final report in update flow only mentions which artifacts were refreshed (or skipped) and the bundled version copied from (e.g. `from vendor/spryker-sdk/ai-dev 0.5.0`). Skip the "what was installed (package + version)" and "MCP server registered" lines — those steps did not run.
 
 After Step 5 completes in update flow, **stop**. Do not run anything else in this file.
 
+### Rules-only flow
+
+For a project that wants the Spryker coding rules without a working Spryker environment — a client who installed the plugin but has no Composer, no container stack, or simply does not want the SDK wired in. It is the right flow when Composer or `docker/sdk` are missing, or when the user asked for the rules alone.
+
+Create `$SETUP_DIR` + `run.log` and record the harness and mode decisions, then run **only** the rules sync:
+
+```bash
+<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <claude|copilot> --force
+```
+
+`<plugin-root>` is the plugin directory holding this skill — the parent of the `skills/` folder in the path reported as `Base directory for this skill:` when this skill loaded. Substitute the literal absolute path. Pass `--harness claude` for Claude Code and `--harness copilot` for Copilot CLI and VS Code. The script prints a one-line summary of what it added, refreshed, and left alone; put that line in `run.log` and in the report.
+
+Then **stop**. No Composer, no Docker, no MCP registration, no console wiring, no Steps 1–5. Report in two or three lines: the harness, the rules folder written, the script's summary line, and the `run.log` path. Mention — once, without pushing — that full onboarding is available later if the user gets a Spryker environment running.
+
 ### Onboarding flow
 
-Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the mode decision before running Requirements.
+Create `$SETUP_DIR` + `run.log` (see "Run logging" above) and record the harness and mode decisions before running Requirements.
 
 Run all the sections below in order: Requirements → Preflight → Step 1 → Step 2 → Step 3 → Step 4 → Step 5. The per-step idempotency pre-checks (defined in the Preflight "Idempotency principle" paragraph) automatically skip work that is already in place, so this is also safe to re-run on a partially-onboarded project — the user does not need to manually pick "onboarding" vs. "update" to handle the partial case.
 
@@ -94,9 +170,9 @@ Run all the sections below in order: Requirements → Preflight → Step 1 → S
 This onboarder **requires both Composer and a running `docker/sdk` environment**. Neither is optional:
 
 - **Composer** is needed to install the `spryker-sdk/ai-dev` package (Step 1) and to inspect what is already installed.
-- **A running `docker/sdk` environment** is needed to generate transfers, list console commands for verification (Step 4), and serve as the MCP server transport (Step 3 registers `docker/sdk console ai-dev:mcp-server` as the command Claude will invoke). If the container stack is not up, the MCP server registration will succeed on disk but the server will fail to start on every Claude session.
+- **A running `docker/sdk` environment** is needed to generate transfers, list console commands for verification (Step 4), and serve as the MCP server transport (Step 3 registers `docker/sdk console ai-dev:mcp-server` as the command the harness will invoke). If the container stack is not up, the MCP server registration will succeed on disk but the server will fail to start on every session.
 
-Before doing anything else, verify both are available and functional. If either is missing or not running, stop the onboarder, tell the user clearly what is missing and ask them to remedy it before you continue. **Do not start the containers or install Composer for the user** — these are state-changing on their machine and outside the scope of "onboard the SDK".
+Before doing anything else, verify both are available and functional. If either is missing or not running, stop the onboarder, tell the user clearly what is missing and ask them to remedy it before you continue — and offer the **rules-only flow**, which needs neither. **Do not start the containers or install Composer for the user** — these are state-changing on their machine and outside the scope of "onboard the SDK".
 
 ### Check Composer
 
@@ -104,7 +180,7 @@ Before doing anything else, verify both are available and functional. If either 
 command -v composer >/dev/null 2>&1 && composer --version
 ```
 
-- If `composer` is not on `PATH`, ask the user: *"Composer is required but not installed (or not on PATH). Please install Composer (https://getcomposer.org/) or activate it in your shell, then re-run me. Should I stop and wait?"* — stop on confirmation.
+- If `composer` is not on `PATH`, ask the user: *"Composer is required for onboarding but is not installed (or not on PATH). Please install Composer (https://getcomposer.org/) or activate it in your shell, then re-run me — or I can install just the Spryker coding rules now, which needs neither Composer nor Docker. Which do you want?"* — stop or switch to rules-only flow on their answer.
 - If `composer --version` runs but reports a version older than Composer 2.x, mention it and ask whether to continue (most Spryker tooling assumes Composer 2). Do not auto-upgrade Composer.
 - If `composer` is the project-internal wrapper invoked via `docker/sdk cli composer`, that is fine — just note it in the one-line preflight report and prefer the `docker/sdk cli composer` form in Step 1.
 
@@ -122,7 +198,7 @@ If the file exists but the command fails (typical signals: "containers are not r
 
 Then stop and wait. Do **not** run `docker/sdk up` yourself — it starts long-running local services and is the user's call.
 
-If `docker/sdk` does not exist at all in the project root, ask the user where their Spryker development environment lives. The onboarder can in principle adapt to a non-`docker/sdk` workflow, but only with explicit guidance — stop and ask rather than guessing.
+If `docker/sdk` does not exist at all in the project root, ask the user where their Spryker development environment lives. The onboarder can in principle adapt to a non-`docker/sdk` workflow, but only with explicit guidance — stop and ask rather than guessing. Offer the rules-only flow as the alternative that works regardless.
 
 Only proceed past this section once both Composer and `docker/sdk` checks pass (or the user has explicitly waived a check with full awareness of the consequences).
 
@@ -134,9 +210,9 @@ Run these checks before changing anything. If any fail, stop and tell the user w
 1. The current working directory must contain `composer.json` with a `spryker/*` dependency.
 2. At least one `ConsoleDependencyProvider` must exist under `src/`. Find candidates with `find src -maxdepth 6 -path "*/Zed/Console/ConsoleDependencyProvider.php" -not -path "*/vendor/*"`. Typical: just `src/Pyz/...`; some projects also have a higher-precedence override (e.g. `src/Acme/Zed/Console/ConsoleDependencyProvider.php`). Step 2 handles the override case explicitly. If none is found at all, the project layout is non-standard — ask the user where console commands are wired before continuing.
 
-(The Composer and `docker/sdk` checks live in the **Requirements** section above and must already have passed before reaching this point.)
+(The harness decision lives in **Step 0**, and the Composer and `docker/sdk` checks in the **Requirements** section above; both must already have happened before reaching this point.)
 
-Use Bash + Read for these checks. Report what you found in one short sentence before proceeding.
+Use the built-in file read/search tools and the shell for these checks. Report what you found in one short sentence before proceeding.
 
 **Idempotency principle (applies to every step below).** Every step in this onboarder MUST first check whether its work is already done correctly. If it is, the agent skips the step, reports the existing state in one line ("already installed: X 1.2.3", "already wired: 2/2 consoles present", "already registered: <name>"), and moves on. If it is partially done, the agent narrates the gap and fills only the gap — never re-runs the full step blindly. The agent should be safe to run repeatedly on the same project without duplicating work, overwriting user changes, or producing different results between runs.
 
@@ -241,39 +317,46 @@ if (class_exists(AiToolSetupConsole::class)) {
 ```
 
 
-## Step 3 — Register the MCP server with Claude Code
+## Step 3 — Register the MCP server with the harness
 
-This is what makes the live Spryker context (transfer structures, OMS transitions, module map) available to Claude inside this project.
+This is what makes the live Spryker context (transfer structures, OMS transitions, module map) available to the assistant inside this project.
 
-**Pre-check (do this first).** Determine whether the MCP server is already registered for this project and whether it actually works:
+Two invariants hold in **every** branch below:
+
+- **The MCP server name is the project root folder name** — the `basename` of the current working directory — so that developers with multiple Spryker checkouts on the same machine do not collide on a single shared entry in the harness's user-level config. Do not hardcode a generic name like `spryker-project`.
+- **The trailing `-q` (quiet) is mandatory.** MCP servers communicate over stdio, and the `docker/sdk console` banner (`--> DEVELOPMENT MODE…`) would otherwise pollute the channel and cause the MCP handshake to fail.
+
+First decide the **scope**, then pick the branch:
+
+- **User-level** (the CLI `mcp add` commands below) — registers for this developer only, on this machine. The default for a solo setup.
+- **Project-scoped** (`.mcp.json` at the project root) — checked into the repository and read by both Claude Code and Copilot CLI. **Recommended when the team shares the repo**, because every developer gets the server without re-running this skill. Offer it whenever the project is a shared checkout, and ask before writing a file that lands in the team's diff.
+
+### Pre-check (do this first, in every branch)
+
+Determine whether the MCP server is already registered for this project and whether it actually works. Use the list command for your harness:
 
 ```bash
-claude mcp list
+claude mcp list      # harness = claude
+copilot mcp list     # harness = copilot
 ```
 
 Parse the output and look for an entry whose name matches `$(basename "$(pwd)")`. Three cases:
 
-- **Entry exists and `claude mcp list` shows it as connected/healthy (✓ or equivalent)** → the MCP server is already registered and working. Skip the `claude mcp add` below. Report: `MCP server <name> already registered and reachable — no changes needed`. Still emit the session-restart reminder at the end of this step, because Claude sessions started *before* this one will not see the existing entry either if they predate its addition.
-- **Entry exists but shows as failed / unreachable / error** → **do not re-register yet.** Failing entries are almost always a downstream symptom of Step 1 (package not installed) or Step 2 (console not wired) not having run yet — both of which the onboarding flow has already addressed by the time you reach Step 3. The fix is usually that `claude mcp list` will report the same entry as `✓ Connected` the next time it's run, with no `mcp remove` / `mcp add` cycle needed. Note the failing entry but defer the decision: report `MCP server <name> exists but failing — will re-verify after Step 4`, skip the `claude mcp add` below, and let Step 4's `claude mcp list` re-check decide. If after Step 4 the entry is *still* failing, surface the error and ask the user about `claude mcp remove <name>` + re-registration. The root cause at that point is usually `docker/sdk` not being runnable or the wiring in Step 2 not having taken effect.
-- **No entry exists for this project** → proceed with the `claude mcp add` instructions below.
+- **Entry exists and the list shows it as connected/healthy (✓ or equivalent)** → the MCP server is already registered and working. Skip the `mcp add` below. Report: `MCP server <name> already registered and reachable — no changes needed`. Still emit the session-restart reminder at the end of this step, because sessions started *before* this one will not see the existing entry either if they predate its addition.
+- **Entry exists but shows as failed / unreachable / error** → **do not re-register yet.** Failing entries are almost always a downstream symptom of Step 1 (package not installed) or Step 2 (console not wired) not having run yet — both of which the onboarding flow has already addressed by the time you reach Step 3. The fix is usually that the list command will report the same entry as `✓ Connected` the next time it's run, with no `mcp remove` / `mcp add` cycle needed. Note the failing entry but defer the decision: report `MCP server <name> exists but failing — will re-verify after Step 4`, skip the `mcp add` below, and let Step 4's re-check decide. If after Step 4 the entry is *still* failing, surface the error and ask the user about `<harness> mcp remove <name>` + re-registration. The root cause at that point is usually `docker/sdk` not being runnable or the wiring in Step 2 not having taken effect.
+- **No entry exists for this project** → proceed with the registration for your harness below.
 
-Also check whether *any* entry in `claude mcp list` already points at this project's `docker/sdk console ai-dev:mcp-server` under a different name (e.g. a stale entry named `spryker-project`). If found, flag it to the user — a stale duplicate may shadow the new entry — and ask whether to remove it.
+Also check whether *any* entry in the list already points at this project's `docker/sdk console ai-dev:mcp-server` under a different name (e.g. a stale `spryker-project` from an older onboarder run). If found, flag it to the user — a stale duplicate may shadow the new entry — and ask whether to remove it. Check `.mcp.json` and `.vscode/mcp.json` for the same kind of duplicate.
 
-**The MCP server name MUST be unique per project** so that developers with multiple Spryker checkouts on the same machine do not collide on a single shared entry in `~/.claude.json`. Use the project's root folder name (the `basename` of the current working directory) as the MCP server name. Do not hardcode a generic name like `spryker-project`.
+### Branch A — Claude Code (harness = `claude`)
 
-Run from the project root, substituting `<project-name>` with the basename of the project root directory (e.g. for `<path>/b2b-demo-marketplace`, use `b2b-demo-marketplace`):
-
-```bash
-claude mcp add <project-name> -- "$(pwd)/docker/sdk" console ai-dev:mcp-server -q
-```
-
-Equivalently, derive it inline so the command is copy-paste safe across projects:
+Run from the project root:
 
 ```bash
 claude mcp add "$(basename "$(pwd)")" -- "$(pwd)/docker/sdk" console ai-dev:mcp-server -q
 ```
 
-The trailing `-q` (quiet) is mandatory: MCP servers communicate over stdio, and the `docker/sdk console` banner (`--> DEVELOPMENT MODE…`) would otherwise pollute the channel and cause the MCP handshake to fail.
+Deriving the name inline keeps the command copy-paste safe across projects; spelled out, for `/Users/alice/work/b2b-demo-marketplace` the server name is `b2b-demo-marketplace`.
 
 Verify with:
 
@@ -281,9 +364,77 @@ Verify with:
 claude mcp list
 ```
 
-The entry whose name matches the project root folder (the `<project-name>` chosen above) should appear. If it does not, capture the output and show it to the user.
+The entry whose name matches the project root folder should appear. If it does not, capture the output and show it to the user.
 
-**Important — session restart required.** `claude mcp add` writes the registration to disk immediately, so `claude mcp list` shows it right away. However, the **currently running Claude Code session loaded its MCP servers at startup and will not pick up the new one**. The Spryker MCP server's tools (transfer lookups, OMS transitions, module map, etc.) will only become available in a **new** Claude Code session started after this step. Explicitly instruct the user to exit and reopen Claude Code (or open a new session in this project directory) before expecting those tools to work. If the new session still shows no Spryker MCP tools, check `claude mcp list` for an error status on the entry and inspect the output of `docker/sdk console ai-dev:mcp-server` for startup failures.
+### Branch B — GitHub Copilot CLI (harness = `copilot`)
+
+Same shape, same name, same mandatory `-q`:
+
+```bash
+copilot mcp add "$(basename "$(pwd)")" -- "$(pwd)/docker/sdk" console ai-dev:mcp-server -q
+```
+
+Verify with:
+
+```bash
+copilot mcp list
+```
+
+Apply the identical pre-checks from above: skip when the entry is present and healthy, defer when it is present and failing, and flag a stale duplicate pointing at the same command under a different name.
+
+### Branch C — project-scoped `.mcp.json` (offered to both, recommended for shared repos)
+
+Write `.mcp.json` at the project root. Both Claude Code and Copilot CLI read it, so one file covers a mixed team:
+
+```json
+{
+  "mcpServers": {
+    "<project-name>": {
+      "type": "stdio",
+      "command": "docker/sdk",
+      "args": ["console", "ai-dev:mcp-server", "-q"]
+    }
+  }
+}
+```
+
+`<project-name>` is the project root folder name, as everywhere else. (`spryker-ai-dev` is an acceptable fixed alternative when the team would rather not depend on the folder each developer clones into — the file is project-scoped, so the two cannot collide across checkouts. Ask the user which they want before writing.)
+
+The relative `command` resolves against the project root, which is what both CLIs use as the working directory. **If it does not resolve** — the harness was started elsewhere, or the file is consumed from a different working directory — use the absolute form `"command": "$(pwd)/docker/sdk"` with the literal expanded path substituted in.
+
+Because this file lands in the team's diff, ask before creating it, and if one already exists, show the user the merge you intend to make rather than replacing the file.
+
+### Branch D — VS Code (harness = `vscode`)
+
+VS Code reads `.vscode/mcp.json`, which uses a **`servers`** key rather than `mcpServers`:
+
+```json
+{
+  "servers": {
+    "<project-name>": {
+      "type": "stdio",
+      "command": "docker/sdk",
+      "args": ["console", "ai-dev:mcp-server", "-q"]
+    }
+  }
+}
+```
+
+**`.vscode/mcp.json` is NOT read by Copilot CLI**, and `.mcp.json` is not read by VS Code. A developer who uses both needs **both** files. Say so explicitly when the harness is `vscode`, and offer to write `.mcp.json` as well.
+
+### Branch E — Copilot cloud agent
+
+MCP servers for the Copilot coding agent are configured in the **repository's Copilot coding agent settings on GitHub**, not on any developer's machine — repository *Settings → Copilot → Coding agent → MCP configuration*. Point the user at it; do **not** try to automate it from here. Note also that the cloud agent has no `docker/sdk` environment of its own, so this server is only useful there if the repository provides one.
+
+### Important — session restart required
+
+The `mcp add` commands write the registration to disk immediately, so the list command shows it right away. However, **the currently running session loaded its MCP servers at startup and will not pick up the new one**. The Spryker MCP server's tools (transfer lookups, OMS transitions, module map, etc.) only become available in a **new** session started after this step. Explicitly instruct the user to restart, in the form their harness needs:
+
+- **Claude Code** — `/exit` and reopen, or open a new session in this project directory.
+- **GitHub Copilot CLI** — quit and restart the CLI in this project directory.
+- **VS Code** — reload the window (*Developer: Reload Window*).
+
+If the new session still shows no Spryker MCP tools, check the harness's `mcp list` for an error status on the entry and inspect the output of `docker/sdk console ai-dev:mcp-server` for startup failures.
 
 
 ## Step 4 — Verify
@@ -296,34 +447,52 @@ docker/sdk cli console | grep ai-dev:
 
 Expected: exactly two `ai-dev:*` commands — `ai-dev:setup` and `ai-dev:mcp-server`. If fewer commands appear, check Step 2 — the corresponding consoles are not wired (or wired behind a `class_exists()` guard that is failing because the class is actually unavailable, which points back to Step 1). If you also see `ai-dev:generate-prompts`, an outdated wiring is still in place — flag it and offer to remove.
 
-```bash
-claude mcp list
-```
+Then re-run the list command for your harness (`claude mcp list`, or `copilot mcp list`). For a project-scoped registration, confirm `.mcp.json` (or `.vscode/mcp.json`) exists, parses as JSON, and names the server — the CLI list commands only show it once a session has loaded the file.
 
-Expected: an entry whose name matches the project root folder (the `<project-name>` chosen in Step 3) is present **and shows as connected/healthy**.
+Expected: an entry whose name matches the project root folder (the name chosen in Step 3) is present **and shows as connected/healthy**.
 
-If Step 3 deferred a previously-failing entry, this is the moment to re-check it: re-run `claude mcp list` and look at the status of that entry specifically.
+If Step 3 deferred a previously-failing entry, this is the moment to re-check it: re-run the list command and look at the status of that entry specifically.
 
 - **Now `✓ Connected`** → success. The earlier failure was a downstream symptom of Step 1/2 not having run yet. Report `MCP server <name> recovered after Step 1+2 completed` and continue.
-- **Still failing** → only now ask the user whether to `claude mcp remove <name>` and re-register. Capture and surface the exact error string from `claude mcp list` so the user can see what's broken. The most common remaining causes are (a) `docker/sdk` not actually running, (b) the consoles in Step 2 wired in a file that isn't the leaf override (see Step 2's "Override detection" block), or (c) an unrelated MCP transport problem.
+- **Still failing** → only now ask the user whether to run the harness's `mcp remove <name>` and re-register. Capture and surface the exact error string from the list output so the user can see what's broken. The most common remaining causes are (a) `docker/sdk` not actually running, (b) the consoles in Step 2 wired in a file that isn't the leaf override (see Step 2's "Override detection" block), or (c) an unrelated MCP transport problem.
 
 A listed-but-failing entry is not a pass — surface the error and stop until the user decides.
 
 
 ## Step 5 — Install artifacts one by one (with user consent per artifact)
 
-The onboarder installs three project-level artifacts: `CLAUDE.md` at the project root, bundled rules under `.claude/rules/`, and the permission rules from the SDK's `hooks/settings.example.json` plus — for a project that does not use the Claude Code plugin — its Stop hook (Artifact 3).
+The onboarder installs up to three project-level artifacts: the **project instructions file** at the project root, the **Spryker coding rules** in the harness's rules folder, and the **permission rules** from the SDK's `hooks/settings.example.json` plus, for a project that does not use the plugin, its **stop guard** (Artifact 3). The first two differ per harness.
 
-**Auto mode does NOT bypass Step 5 prompts.** Each artifact decision is a separate consent. Overwriting an existing custom `CLAUDE.md` or replacing files in `.claude/rules/` is a destructive action; ask even when the harness is otherwise configured for autonomous execution. (Adding a missing `CLAUDE.md` or populating an empty `.claude/rules/` is not destructive — those can proceed on a clear yes/no.)
+### Per-harness artifact table
+
+Authoritative values; they mirror `TOOL_ARTIFACT_MAP` in `src/SprykerSdk/Zed/AiDev/AiDevConfig.php`.
+
+| Harness (Step 0) | Project instructions file | Rules folder and file names | Rule frontmatter |
+|---|---|---|---|
+| `claude` — Claude Code | `CLAUDE.md` at the project root | `.claude/rules/<name>.md` | `paths` kept as-is; `name` and `description` are dropped |
+| `copilot` — GitHub Copilot CLI | `.github/copilot-instructions.md` | `.github/instructions/<name>.instructions.md` | `paths` becomes `applyTo`; `name` and `description` are dropped; unscoped rules get `applyTo: "**"` |
+| `vscode` — VS Code Copilot | `.github/copilot-instructions.md` | `.github/instructions/<name>.instructions.md` | same as `copilot` |
+
+Read the row for the harness from Step 0 and use it for the rest of this step. Everywhere below, "the project instructions file" and "the rules folder" mean that row's values.
+
+**Install with the console or the sync script, never a plain `cp`.** Both rewrite the rule frontmatter per harness and produce identical files:
+
+```bash
+docker/sdk cli console ai-dev:setup
+```
+
+When the console is not available, the fallback is the **sync script** below, for every harness. A plain `cp` keeps fields the console drops, so the sync script sees the copy as locally edited and never refreshes it; under Copilot a `cp`-ed rule with a `paths:` key is also silently ignored — it looks installed and does nothing.
+
+**Auto mode does NOT bypass Step 5 prompts.** Each artifact decision is a separate consent. Overwriting an existing custom instructions file or replacing files in the rules folder is a destructive action; ask even when the harness is otherwise configured for autonomous execution. (Adding a missing instructions file or populating an empty rules folder is not destructive — those can proceed on a clear yes/no.)
 
 ### How the bundled content is delivered
 
-Source-of-truth content for artifacts 1 and 2 lives in the package install at `vendor/spryker-sdk/ai-dev/data/`:
+Source-of-truth content for both artifacts lives in the package install at `vendor/spryker-sdk/ai-dev/`:
 
-- `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md` — bundled agents/CLAUDE file
-- `vendor/spryker-sdk/ai-dev/data/rules/*.md` — bundled rule files
+- `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md` — the bundled project instructions template
+- `vendor/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/rules/*.md` — the bundled rule files, in their untransformed source form
 
-The package also ships an interactive console command — `docker/sdk cli console ai-dev:setup` — that walks through copying these into the project. **Prefer `ai-dev:setup` when it exists** so the package owns the placement logic. Some package versions do not ship a setup command, or ship one that prompts in a way that doesn't fit the agent's per-artifact consent flow. In that case, fall back to a direct `cp` from `vendor/spryker-sdk/ai-dev/data/`.
+The package also ships an interactive console command — `docker/sdk cli console ai-dev:setup` — that walks through copying these into the project. **Prefer `ai-dev:setup` when it exists** so the package owns the placement logic. Some package versions do not ship it, or ship one that prompts in a way that doesn't fit the agent's per-artifact consent flow. Then fall back per the rule above: `cp` for `claude`, the sync script for `copilot` and `vscode`.
 
 ### Resolve the bundled-content source
 
@@ -335,15 +504,21 @@ test -d vendor/spryker-sdk/ai-dev/data && echo "vendor source OK"
 
 # 2. Composer's resolved vendor-dir, in case it's customized
 "$(composer config --absolute vendor-dir 2>/dev/null)/spryker-sdk/ai-dev/data"
-
-# 3. The plugin's install location ($CLAUDE_PLUGIN_ROOT) — only if Step 1 hasn't run yet
-# and you need bundled content from the plugin install (rare; Step 1 should be done by now)
-"${CLAUDE_PLUGIN_ROOT}/data"   # may not exist; the plugin dir is for the skill itself, not for project artifacts
 ```
 
-Use the first path that resolves. **Do not assume `${CLAUDE_PLUGIN_ROOT}` points at this project** — it points at whichever Spryker project Claude Code loaded the plugin from, which may be a *different* project on the same machine. The current project's `vendor/spryker-sdk/ai-dev/data/` is the authoritative source after Step 1 has run.
+Use the first path that resolves. This is the source for the **project instructions file** only.
 
-Skills are out of scope for the onboarder. They load automatically through the Claude Code plugin mechanism (`spryker-ai-dev` plugin) and require no project-level copying.
+Two sources, and they are not interchangeable:
+
+- **The instructions file** comes from the project's own `vendor/spryker-sdk/ai-dev/data/`, resolved
+  above. Never read it from `<plugin-root>`: that directory belongs to whichever project the harness
+  happened to load the plugin from, which may be a *different* project on this machine.
+- **The rules** ship inside the plugin, at `<plugin-root>/rules/`, and
+  are installed by `<plugin-root>/scripts/sync-rules.sh` (Artifact 2). That is the correct source for
+  them, and it is why the rules work before Composer has ever run. `<plugin-root>` is the parent of
+  the `skills/` folder in the path reported as `Base directory for this skill:`.
+
+Skills are out of scope for the onboarder. They load automatically through the plugin mechanism in both harnesses (the `spryker-ai-dev-sdk` plugin) and require no project-level copying.
 
 ### On pinning
 
@@ -353,22 +528,23 @@ Files copied from `vendor/spryker-sdk/ai-dev/data/` are pinned to `composer.lock
 
 Inspect the project so each per-artifact prompt below can include the current state:
 
-- Does `CLAUDE.md` exist at the project root? If so, is it the bundled file (compare first ~10 lines against `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md`) or a custom project file?
-- Does `.claude/rules/` exist and is it populated? Count files with `ls .claude/rules/ 2>/dev/null | wc -l`.
+- Does the project instructions file exist at the project root? If so, is it the bundled file (compare first ~10 lines against `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md`) or a custom project file?
+- Is the rules folder already populated? **Check `.ai-dev/rules.manifest` first** — see Artifact 2.
 
-### Artifact 1 — Agents file (`CLAUDE.md`)
+### Artifact 1 — Project instructions file
 
-Three cases based on the pre-check:
+Three cases based on the pre-check. `<instructions-file>` is the value from the table (`CLAUDE.md`, or `.github/copilot-instructions.md`).
 
-**Case A — `CLAUDE.md` does not exist.** Ask: *"Add `CLAUDE.md` to the project root from the bundled template?"* If yes, copy:
+**Case A — the file does not exist.** Ask: *"Add `<instructions-file>` to the project from the bundled template?"* If yes, copy (creating the parent directory first when the path has one):
 
 ```bash
-cp vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md CLAUDE.md
+mkdir -p "$(dirname "<instructions-file>")"
+cp vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md "<instructions-file>"
 ```
 
-**Case B — `CLAUDE.md` exists and matches the bundled file** (first ~10 lines identical → user previously installed it). Ask: *"`CLAUDE.md` looks like a previous bundled install. Overwrite with the current bundled version, or keep as-is?"* On overwrite, run the `cp` above.
+**Case B — the file exists and matches the bundled file** (first ~10 lines identical → user previously installed it). Ask: *"`<instructions-file>` looks like a previous bundled install. Overwrite with the current bundled version, or keep as-is?"* On overwrite, run the `cp` above.
 
-**Case C — `CLAUDE.md` exists and is custom** (project-specific content not from the bundled template). Offer THREE choices, not two:
+**Case C — the file exists and is custom** (project-specific content not from the bundled template). Offer THREE choices, not two:
 
 1. **Keep mine (skip)** — leave the file untouched.
 2. **Overwrite with bundled** — replace; the user's custom content is lost. Recommend this only when the user explicitly says they want a clean reset.
@@ -376,53 +552,58 @@ cp vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md CLAUDE.md
 
 Typical sections worth appending from the bundled `AGENTS.example.md` that custom project files usually lack: **Commands cheatsheet** (docker/sdk one-liners), **Layer Directory Structures** (Zed/Yves/Glue/Client/Service/Shared trees), **Component Rules** (Transfer Object suffixes, Entity, Entity Manager, Facade, Mapper/Expander/Hydrator, Gateway Controller, Model, Persistence Schema, Provider/Router, Zed Stub, Widget, Theme, Repository, Module Configuration, Layout), **Abstract Classes Reference** tables.
 
-### Artifact 2 — Rules
+### Artifact 2 — Spryker coding rules (may already be installed)
 
-Ask: *"Add the Spryker rules into `.claude/rules/`?"*
-
-If `.claude/rules/` already exists and contains files, additionally ask: *"`.claude/rules/` already has N files. Overwrite same-named files with the bundled versions, merge (add only missing files), or cancel?"* and offer three options:
-
-- **Overwrite** → copy all bundled rules, replacing existing same-named files.
-- **Merge** → copy only the rule files that are missing in the target; keep existing files untouched.
-- **Cancel** → skip this artifact.
-
-Prefer the package's setup command when available:
+**Check before asking.** The plugin ships the rules as plugin data under `<plugin-root>/rules/`. A session-start hook offers to install them once per project but writes nothing by itself, so they are in place only where someone accepted that offer or ran this skill's rules-only flow. An install records what it wrote in `.ai-dev/rules.manifest` — first line `<harness> <plugin-version>`, then one `<sha256> <filename>` line per rule:
 
 ```bash
-# Check if the package ships a non-interactive setup that handles rules:
+head -1 .ai-dev/rules.manifest 2>/dev/null && tail -n +2 .ai-dev/rules.manifest | wc -l
+```
+
+- **Manifest present, its first field matches the harness from Step 0, and the listed files exist in the rules folder** → the rules are installed and current. **Skip this artifact.** Report: `rules: already installed (<N> files in <rules folder>) — skipped`. Do not ask a question the user has nothing to decide.
+- **Manifest present but for a different harness** (e.g. `claude` when Step 0 said `copilot` — a developer who switched) → tell the user, and offer the forced refresh below for the current harness. The old folder is left alone; removing it is the user's call.
+- **No manifest, or listed files missing** → the rules were never installed here: the session-start hook only offers, and this project was never offered (a fresh clone, CI, `.ai-dev/no-rules-sync`) or the offer was declined or ignored. `.ai-dev/rules.suggested` tells the two apart, but it changes nothing you do — offer to install either way, since the person is here asking for setup.
+
+**To install or force a refresh**, run the script — never a plain `cp`, which skips the frontmatter transform:
+
+```bash
+<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <claude|copilot> --force
+```
+
+`<plugin-root>` is the plugin directory holding this skill — the parent of the `skills/` folder in the path reported as `Base directory for this skill:` when this skill loaded. Substitute the literal absolute path. Pass `--harness claude` for Claude Code, `--harness copilot` for both Copilot CLI and VS Code.
+
+What the script guarantees, so you can describe it accurately when asking:
+
+- It **never overwrites a rule file a human has edited** — it compares each file against the sha recorded in the manifest, and files that differ are preserved and reported.
+- `--force` only makes it re-scan a project it would otherwise skip; it still preserves locally
+  edited files. To deliberately replace an edited rule with the bundled version, the user has to ask
+  for it, and the flag is `--discard-local-edits`. Never pass that flag unless they did.
+- It writes exactly what the console writes: `name`/`description` dropped for every harness, plus `paths` → `applyTo` (unscoped rules default to `applyTo: "**"`) for `copilot` and `vscode`.
+- It prints one summary line: how many were added, refreshed, and left untouched. Put that line in `run.log` and in the report.
+
+Ask before running it: *"Install the Spryker coding rules into `<rules folder>`? Locally edited rule files are preserved."* If the user says the rules should not be installed at all, tell them about the per-project opt-out — create `.ai-dev/no-rules-sync` in the project root and the session-start hook stops touching this project.
+
+When the console command is available and the user prefers it, `docker/sdk cli console ai-dev:setup` does the same transform and is equally correct; check what it offers first:
+
+```bash
 docker/sdk cli console ai-dev:setup --help 2>&1 | head -20
 ```
 
-Otherwise fall back to direct copy from the project's vendor:
+### Artifact 3 — Stop guard + permission rules (permissions only on a plugin install)
 
-```bash
-mkdir -p .claude/rules
+**On a plugin install, skip copying the guard but still offer the `permissions` block.** When the `spryker-ai-dev-sdk` plugin is installed (the harness's plugin list names it — `claude plugin list` or `copilot plugin list`), the plugin's own hook files provide the guard without any project file; offer to merge only the `permissions` block of `hooks/settings.example.json` into the harness settings file. On a setup install, offer the whole artifact, and explain what each part does in one line:
 
-# Overwrite mode (replace same-named files)
-cp vendor/spryker-sdk/ai-dev/data/rules/*.md .claude/rules/
+The `permissions` block is Claude Code's format. Under Copilot there is no equivalent project file to merge it into, so on `copilot` or `vscode` state that the guard comes from the plugin and skip the permissions offer.
 
-# Merge mode (only copy missing files)
-for f in vendor/spryker-sdk/ai-dev/data/rules/*.md; do
-  target=".claude/rules/$(basename "$f")"
-  test -f "$target" || cp "$f" "$target"
-done
-
-# Report counts
-echo "rules: $(ls .claude/rules/ | wc -l | tr -d ' ') files total"
-```
-
-### Artifact 3 — Stop hook + permission rules (permissions only on a plugin install)
-
-**On a plugin install, skip copying the hook but still offer the `permissions` block.** When the `spryker-ai-dev-sdk` Claude Code plugin is installed (`claude plugin list` names it, or `~/.claude/plugins/cache/*/spryker-ai-dev-sdk` exists), the plugin's `hooks/hooks.json` provides the Stop hook without any project file; offer to merge only the `permissions` block of `hooks/settings.example.json` into `.claude/settings.json`. On a setup install, offer the whole artifact, and explain what each part does in one line:
-
-- **`Stop` hook (`guard-stop.php`)** — while a wizard state file (`.ai-dev/project-setup.md` or `.ai-dev/demo-prep.md`) has `run_mode: autonomous` and its Steps table still has a row that is not `done`/`skipped`, the agent cannot end its turn; the turn may end on a question only the person can answer, a `NEEDS YOU:` line, or an `AskUserQuestion`.
+- **`Stop` hook (`guard-stop.php`)** — while a wizard state file (`.ai-dev/project-setup.md` or `.ai-dev/demo-prep.md`) has `run_mode: autonomous` and its Steps table still has a row that is not `done`/`skipped`, the agent cannot end its turn; the turn may end on a question only the person can answer, a `NEEDS YOU:` line, or a structured question to the user.
 - **`permissions`** — `deny` for `sudo`/`docker volume rm`/`docker system prune`/`git push`, and no `ask` rules. `rm`, `python3`/`python`, `magick`, the browser JavaScript tools and the rebuild verbs (`docker/sdk reset|clean-data|up`) are under `allow`; the skills state when the agent uses them (delete only files git can restore or that the run created; `validate.php gate` before a rebuild or `data:import`; ask before a rebuild on a project with real data). A blanket `Bash(docker/sdk:*)` allowlist lets an agent consume hours of rebuild time unprompted.
 
-Install = copy `hooks/guard-stop.php` and `hooks/lib.php` from the SDK (source: the plugin checkout, or `vendor/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/hooks/` when vendored) to `.claude/hooks/spryker-ai-dev-sdk/`, and **merge** the `Stop` hook and the `permissions` block of `hooks/settings.example.json` into `.claude/settings.json` — never overwrite an existing settings file (show the diff, append the blocks with the Edit tool). Requires host `php` (the hook exits silently without it). Installed skill copies under `.claude/skills/` are not edited, in this skill or later; a skill improvement goes to `.ai-dev/skill-improvement-log.md`.
+Install = copy `hooks/guard-stop.php` and `hooks/lib.php` from the SDK (source: the plugin checkout, or `vendor/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/hooks/` when vendored) into the harness's project hooks folder under a `spryker-ai-dev-sdk/` subfolder, and **merge** the stop-guard entry and the `permissions` block of `hooks/settings.example.json` into the harness settings file — never overwrite an existing settings file (show the diff, append the blocks with the file edit tool). Requires host `php` (the hook exits silently without it). Installed skill copies in the harness's skills folder are not edited, in this skill or later; a skill improvement goes to `.ai-dev/skill-improvement-log.md`.
 
 ### Rules for running this step as a whole
 - Ask in the order above (agents file → rules → Stop hook + permissions). Do not batch the questions into one combined prompt — each artifact is a separate decision.
 
+- Ask in the order above (instructions file → rules). Do not batch the two questions into one combined prompt — each artifact is a separate decision.
 - Only act on the artifacts the user approved.
 - Each operation must complete cleanly before moving to the next.
 - If a copy fails (permission denied, source missing), surface the actual error verbatim and stop — do not retry, do not auto-recover, do not proceed to the next artifact silently.
@@ -433,18 +614,19 @@ Install = copy `hooks/guard-stop.php` and `hooks/lib.php` from the SDK (source: 
 
 In **3–5 lines** tell the user:
 
+- The harness that was detected or chosen, since every path below depends on it.
 - What was installed (package + version).
 - Which file was edited and how many consoles were added (state the *actual* file edited — Pyz or the project-namespace override).
-- That the MCP server is registered under the project root folder name (state the actual name used).
-- The outcome of Step 5 — list each of the three artifacts (`CLAUDE.md`, rules, Stop hook + permissions) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`.
-- ALWAYS highlight that the user must **restart Claude Code /exit** (or open a new session in this project directory) for the Spryker MCP tools to become available in-session — the running session will not pick them up automatically.
-- Name what **this run** changed, and say it needs nothing from the user: tracked `composer.json`, `composer.lock`, the `ConsoleDependencyProvider.php` actually edited; untracked `CLAUDE.md`, `.claude/rules/`, `.ai-dev/`. **These are expected install artifacts and every skill tolerates them uncommitted — `project-starter-wizard` included, which recognises this exact shape and proceeds.** Committing them is optional housekeeping, not a step: mention it only in passing, and only alongside `.ai-dev/` in `.gitignore` (it is per-run log state). Never imply anything is blocked until they commit.
+- That the MCP server is registered under the project root folder name (state the actual name used) and in which scope (the harness's user-level config, `.mcp.json`, or `.vscode/mcp.json`).
+- The outcome of Step 5 — list each artifact (the project instructions file, the rules, the stop guard + permissions) with one of: `added`, `overwritten`, `merged: <description of what was appended>`, `skipped (user declined)`, `skipped (already present)`, or `failed: <one-line reason>`. Name the actual paths written.
+- ALWAYS highlight that the user must **restart their session** for the Spryker MCP tools to become available — Claude Code: `/exit` and reopen; GitHub Copilot CLI: quit and restart; VS Code: reload the window. The running session will not pick them up automatically.
+- Name what **this run** changed, and say it needs nothing from the user: tracked `composer.json`, `composer.lock`, the `ConsoleDependencyProvider.php` actually edited, plus `.mcp.json` if one was written; untracked project instructions file, rules folder, `.ai-dev/`. **These are expected install artifacts and every skill tolerates them uncommitted — `project-starter-wizard` included, which recognises this exact shape and proceeds.** Committing them is optional housekeeping, not a step: mention it only in passing, and only alongside `.ai-dev/` in `.gitignore` (it is per-run log state). Never imply anything is blocked until they commit.
 - Recommend where to go next, so the entry points are known — name them, never start them. Do **not** invoke, launch, or auto-continue into any of these skills; the user chooses if and when to run one.
   - New project from a demoshop clone → `/spryker-ai-dev-sdk:project-starter-wizard` is the recommended next skill.
   - Feature work on an existing project → `/spryker-ai-dev-sdk:spryker-customization` (from a PRD or acceptance criteria), or `/spryker-ai-dev-sdk:product-requirement-document` first when there is no spec yet.
   - Mention that the Spryker MCP tools only exist after the **session restart** above.
 - Suggest setup improvements:
-  - Setup plugin with Language Server php-lsp@claude-plugins-official https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md
+  - A PHP Language Server plugin for the harness in use — for Claude Code, `php-lsp@claude-plugins-official` (https://github.com/anthropics/claude-plugins-official/blob/main/plugins/php-lsp/README.md); for VS Code, the PHP Intelephense or PHP Tools extension.
   - Setup MCP server for Context7 to work with Spryker documentation https://docs.spryker.com/docs/dg/dev/ai/ai-assistants/context7-mcp-server
 - As the **last line**, the absolute path to the run log (`$SETUP_DIR/run.log`), so the user can audit
   what ran, what was skipped, and why.
@@ -453,6 +635,8 @@ Do **not** print a long summary or restate the steps. The user can read the diff
 
 ## What to refuse / escalate
 
+- If the harness cannot be determined and the user cannot say which one they are using, stop. Do not guess a layout and write files — a wrong guess puts valid content at paths nothing reads.
 - If `composer require` fails due to a version conflict, surface the conflict — do **not** force-install with `--ignore-platform-reqs` or `-W` without asking.
 - If `ConsoleDependencyProvider.php` is missing or has a structure you cannot safely parse, stop and ask the user where to wire the commands. Do not invent a new file.
-- If `claude mcp add` is unavailable (older Claude Code CLI), tell the user and offer the manual JSON snippet for their MCP config file instead of failing silently.
+- If the harness's `mcp add` subcommand is unavailable (an older CLI, or a harness without one), tell the user and offer the project-scoped JSON snippet from Step 3 Branch C for their MCP config file instead of failing silently.
+- If the only thing blocking progress is a missing Composer or a `docker/sdk` environment that is not up, offer the **rules-only flow** rather than stopping flat — it delivers the coding rules without either.

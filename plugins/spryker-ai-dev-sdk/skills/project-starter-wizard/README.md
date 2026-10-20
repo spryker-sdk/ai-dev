@@ -17,8 +17,8 @@ The nine decision sections arrive either way — same fields, same state file:
   `R2` hard-stop acknowledgement. **Every other line is optional — blank means "take the default"**,
   and in `autonomous` mode a blank the wizard must actually resolve becomes a logged decision, not a
   question. Partial fills are first-class.
-- **Be interviewed** — the batched `AskUserQuestion` path, when nothing was supplied. If you'd rather
-  fill the file, the wizard offers that choice before asking anything.
+- **Be interviewed** — the batched structured-question path, when nothing was supplied. If you'd
+  rather fill the file, the wizard offers that choice before asking anything.
 
 A **demo** (`purpose: demo`) takes neither: the demo fast path asks at most five plain questions and
 derives everything technical — and when `demo-prep-wizard` runs it, it asks nothing at all and takes the
@@ -34,10 +34,11 @@ continues from the first step that isn't `done` or `skipped`.
 
 **The gate is "still an unmodified demoshop?", not "un-booted".** A **booted** demoshop is fine (the
 run just needs a `clean-data` + re-boot for the data changes to land), and so is the AI Dev SDK's own
-onboarding delta (`composer.json`/`composer.lock`/`ConsoleDependencyProvider.php`, plus `.ai-dev/`,
-`CLAUDE.md`, `.claude/`) — no commit required. What stops the run is a clone **already customized into
-a project**: tracked changes under `src/`/`data/import/`/`config/`, a registered custom namespace,
-stores already changed, or real business data. That stops with the **"Return to fresh" recipe**, never
+onboarding delta (`composer.json`/`composer.lock`/`ConsoleDependencyProvider.php`, plus `.ai-dev/` and
+whichever instruction and skill files the harness installs) — no commit required. What stops the run
+is a clone **already customized into a project**: tracked changes under
+`src/`/`data/import/`/`config/`, a registered custom namespace, stores already changed, or real
+business data. That stops with the **"Return to fresh" recipe**, never
 a bare refusal.
 
 ## Flow schema
@@ -68,7 +69,7 @@ flowchart TD
     HAND --> Q
     OFFER -- "interview" --> I
 
-    I["Live interview<br/>nine sections, AskUserQuestion<br/>identity · namespace · services ·<br/>stores+region · data mode ·<br/>catalog scope · localization ·<br/>CI · run mode"]
+    I["Live interview<br/>nine sections, structured questions<br/>identity · namespace · services ·<br/>stores+region · data mode ·<br/>catalog scope · localization ·<br/>CI · run mode"]
 
     I --> C
     FILL --> C
@@ -108,7 +109,7 @@ flowchart TD
 |------|------|
 | [`SKILL.md`](SKILL.md) | The spine — pre-flight, the nine steps and their ordering rationale, run modes, hard-stops, resume, abort paths, and the tooling discipline that binds every step. |
 | [`references/questionnaire.md`](references/questionnaire.md) | **The fillable question bank** — every decision as a question carrying its default inline, grouped P/N/S/T/D/C/L/Q + run-config R, with a copy-paste YAML answer block. Fill it to skip the interview; hand it to a colleague who isn't at the keyboard. |
-| [`references/interview.md`](references/interview.md) | **How** to collect the bank — Rule 0 (filled/partial/missing detection + parsing), Rule 1 (offer fill-it-yourself vs interview), AskUserQuestion mechanics, plain-language phrasings for the jargon, the nine sections, and the `.ai-dev/project-setup.md` template. Read **before** the first question. |
+| [`references/interview.md`](references/interview.md) | **How** to collect the bank — Rule 0 (filled/partial/missing detection + parsing), Rule 1 (offer fill-it-yourself vs interview), the mechanics of asking a structured multiple-choice question, plain-language phrasings for the jargon, the nine sections, and the `.ai-dev/project-setup.md` template. Read **before** the first question. |
 | [`references/preflight.md`](references/preflight.md) | The §0 environment checks in full — volume collision and its ranked fix hierarchy, boot-environment probes, the SDK pin, the permission allowlist, `/etc/hosts`. |
 | [`references/steps.md`](references/steps.md) | Detail behind steps 1 and 7 — the robot/acceptance lane decision, a dropped suite's footprint, cypress-migration's ordering and gating. |
 | [`references/hard-stops.md`](references/hard-stops.md) | Detail behind hard-stop (b) and standing approval — the three recoverability preconditions, batching deletions into one gate, the proof a decision-log entry carries. |
@@ -192,9 +193,9 @@ no further *configuration* questions.
 - **Environment limits are not project defects.** No TTY, the tool timeout, shell word-splitting —
   those are limits of how the agent runs. Surface them; never edit project config to work around one.
 - **A closed set of capabilities, one simple command per call.** CSV work goes through the
-  `spryker-import-tools` php tools, file work through Read/Grep/Edit, state changes through
-  `docker/sdk`. Pipes, `&&`, loops and subshells prompt regardless of the allowlist — so they're
-  avoided by shape, not by permission.
+  `spryker-import-tools` php tools, file work through the built-in file read / search / edit tools,
+  state changes through `docker/sdk`. Pipes, `&&`, loops and subshells prompt regardless of the
+  allowlist — so they're avoided by shape, not by permission.
 
 ## Run artifacts
 

@@ -22,17 +22,17 @@ description: >
 
 # Frontend changes
 
-Frontend files are reviewed against the project's frontend rules — pass the matching rule path to the reviewer that owns those files:
+Frontend files are reviewed against the project's frontend rules. The rules ship with this plugin as `<plugin-root>/rules/<name>.md`, where `<plugin-root>` is the parent of the `skills/` folder in the path reported as `Base directory for this skill:`. Where the project has them installed — `.claude/rules/` or `.github/instructions/` — the harness already applies the matching ones and there is nothing to read. Pass the matching rule to the reviewer that owns those files:
 
 | Changed files | Rule |
 |---|---|
-| Yves storefront — `src/*/Yves/*/Theme/**/*.{ts,js,scss,twig}` | `.claude/rules/yves-frontend.md` |
-| Back Office — `src/*/Zed/*/Presentation/**/*.twig` (outside `Components/`, not a `*MerchantPortalGui` module), `src/*/Zed/*/assets/Zed/**/*.{js,scss}`, `config/Zed/navigation.xml` | `.claude/rules/zed-backoffice-frontend.md` |
-| Merchant Portal — `src/*/Zed/*/Presentation/Components/**/*.{ts,html,less}` | `.claude/rules/merchant-portal-angular.md` |
-| Merchant Portal pages — Twig in `src/*/Zed/*MerchantPortalGui/Presentation/**` (outside `Components/`) | both `.claude/rules/zed-backoffice-frontend.md` and `.claude/rules/merchant-portal-angular.md` |
+| Yves storefront — `src/*/Yves/*/Theme/**/*.{ts,js,scss,twig}` | the `yves-frontend` rule |
+| Back Office — `src/*/Zed/*/Presentation/**/*.twig` (outside `Components/`, not a `*MerchantPortalGui` module), `src/*/Zed/*/assets/Zed/**/*.{js,scss}`, `config/Zed/navigation.xml` | the `zed-backoffice-frontend` rule |
+| Merchant Portal — `src/*/Zed/*/Presentation/Components/**/*.{ts,html,less}` | the `merchant-portal-angular` rule |
+| Merchant Portal pages — Twig in `src/*/Zed/*MerchantPortalGui/Presentation/**` (outside `Components/`) | both the `zed-backoffice-frontend` rule and the `merchant-portal-angular` rule |
 
 - Keep a component's files together (its Twig, TS and SCSS/LESS) with one reviewer — the conventions span them.
-- If a rule file is missing from the project, say so in the combined result; do not substitute remembered conventions.
+- If a rule is not available, say so in the combined result; do not substitute remembered conventions.
 - Lint findings are not the reviewer's job: if `static-validation` output for this diff is in context, list it first as **Tool findings** and do not re-derive it. Files that run reported as *not analysed* — every `.twig`, and any eslint "no matching configuration" / "NOT linted" file — get a full manual review, because no tool looked at them.
 - The rules cover translations and accessibility on all three surfaces and XSS for Back Office and Merchant Portal. For **Yves** additionally flag, as a security finding, customer- or merchant-controlled data reaching Twig `|raw` or a TS `innerHTML`/`insertAdjacentHTML` sink — no linter catches it.
 

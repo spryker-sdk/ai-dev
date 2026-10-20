@@ -1,11 +1,12 @@
 # Spryker Upgrade Tooling
 
 Deterministic detectors for the *silent* failure modes of a Spryker module upgrade on a project
-with heavy `src/Pyz` customization. Orchestrated by the `/spryker-upgrade` Claude Code skill
-(`SKILL.md` next to this file); the full **82-row coverage matrix** — including the process-level modes
-these scripts cannot cover (Propel schema merges, glossary keys, behavioural changes) — is in
-[references/coverage-matrix.md](references/coverage-matrix.md). Every script is a standalone CLI,
-usable in CI.
+with heavy `src/Pyz` customization. Orchestrated by the `spryker-upgrade` skill — invoke it with
+its slash command (`/spryker-upgrade`, or `/spryker-ai-dev-sdk:spryker-upgrade` on a plugin
+install); `SKILL.md` sits next to this file. The full **82-row coverage matrix** — including the
+process-level modes these scripts cannot cover (Propel schema merges, glossary keys, behavioural
+changes) — is in [references/coverage-matrix.md](references/coverage-matrix.md). Every script is a
+standalone CLI, usable in CI.
 
 All scripts run on host PHP (reflection or static parsing only, no Spryker bootstrap) and keep their
 snapshots and reports in `.spryker-upgrade/state/` inside the project, created self-gitignoring on
@@ -13,10 +14,11 @@ first use. Two exceptions: `backoffice-smoke.php` needs the booted Back Office, 
 `storage-search-counts.php` runs inside the cli container from a copy in the state directory.
 
 **Where they live and how to call them.** `$UP` in every example below is the scripts directory:
-`.claude/skills/spryker-upgrade/scripts` (setup install) or
-`${CLAUDE_PLUGIN_ROOT}/skills/spryker-upgrade/scripts` (plugin install). Run them **from the project
-root** — the project is discovered by walking up from the working directory, so nothing is derived
-from where the scripts themselves sit. Two overrides exist for CI and for calling from elsewhere:
+`<skill-dir>/scripts`, where `<skill-dir>` is the path reported as `Base directory for this skill:`
+when the skill loads — that line is correct for every install, so substitute the literal absolute
+path. Run them **from the project root** — the project is discovered by walking up from the working
+directory, so nothing is derived from where the scripts themselves sit. Two overrides exist for CI
+and for calling from elsewhere:
 
 ```bash
 SPRYKER_PROJECT_ROOT=/path/to/project        # skip discovery
@@ -310,7 +312,7 @@ so parallel sub-agents can record. `--unreachable` records that the docs could n
 page without fixes becomes `not-checked` with the reason "docs unreachable".
 
 `--decisions` lists the `pending` `M` and `L` fixes without a decision, each with its size, files and
-expected gain: the content of the one AskUserQuestion. `--decide <ID> --decision apply|defer|skip`
+expected gain: the content of the one structured question. `--decide <ID> --decision apply|defer|skip`
 records the developer's answer: `apply` keeps the fix `pending` for the apply-verify-revert procedure,
 `defer` sets `deferred` and `skip` sets `skipped`, both with `--reason`. `deferred` and `skipped` are
 recorded only this way; `--set` and `--import` reject them and any decision. `--decide` rejects an `S`

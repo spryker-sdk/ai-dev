@@ -44,10 +44,10 @@ It replaces fixed, single-base validation scripts with a single flexible engine:
 
 ## The command
 
-**Locate the engine:** `.claude/skills/static-validation/scripts/static-check-diff.sh` (setup install,
-relative to the project cwd) or `${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh`
-(plugin install). `$SCD` below is shorthand for whichever resolves — substitute it inline as a literal
-path; **never set a shell variable and never `cd` to the skill directory**.
+**Locate the engine:** `<skill-dir>/scripts/static-check-diff.sh`, where `<skill-dir>` is the path
+reported as `Base directory for this skill:` when this skill loaded — that line is correct for every
+install. `$SCD` below is shorthand for that path — substitute it inline as a literal path;
+**never set a shell variable and never `cd` to the skill directory**.
 
 **Run it from the Spryker project root** (the directory containing `docker/sdk`), or point it at the
 project with `--repo`. The project to validate comes from your working directory or `--repo` — **never**
@@ -146,8 +146,8 @@ validated** — report it as such, never as passed.
 **What no tool checks** — say so in the report rather than implying coverage: Twig (no linter or
 formatter), accessibility (no axe/pa11y/Lighthouse), TypeScript types, and any file eslint reports as
 *"File ignored because no matching configuration"* (see caveats). Those are reviewed against the
-project's frontend rules (`.claude/rules/yves-frontend.md`, `zed-backoffice-frontend.md`,
-`merchant-portal-angular.md`) by the `code-review` skill.
+project's frontend rules (`yves-frontend`, `zed-backoffice-frontend`, `merchant-portal-angular`)
+by the `code-review` skill.
 
 ## How to use it (agent workflow)
 
