@@ -76,7 +76,7 @@ class RuleInstallerParityTest extends Unit
 
         // Act
         exec(sprintf(
-            'bash %s --target %s --harness %s --force 2>&1',
+            'bash %s --target %s --harness %s 2>&1',
             escapeshellarg(static::PLUGIN_DIR . '/scripts/sync-rules.sh'),
             escapeshellarg($this->projectDir),
             escapeshellarg($harness),

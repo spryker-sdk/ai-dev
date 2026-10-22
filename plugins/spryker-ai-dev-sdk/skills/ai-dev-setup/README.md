@@ -89,7 +89,7 @@ flowchart TD
     ASK1 -- "no" --> STOP([Stop — never silently fall through])
     ASK2 -- "no" --> STOP
 
-    RO["Rules-only flow —<br/>sync-rules.sh --target . --harness X --force"]
+    RO["Rules-only —<br/>one command: sync-rules.sh --target . --harness X"]
     RO --> ROEND(["Stop. No Composer, no Docker,<br/>no MCP, no console wiring"])
 
     U0{"Update flow —<br/>instructions file and rules folder<br/>actually present?"}
@@ -140,9 +140,9 @@ flowchart TD
     A1A --> A2
     A1B --> A2
     A1C --> A2
-    A2{"Artifact 2 — rules:<br/>.ai-dev/rules.manifest already<br/>matches this harness?"}
-    A2 -- "yes" --> A2S["Skip — the session-start hook<br/>already installed them"] --> A3
-    A2 -- "no / stale / other harness" --> A2R["Ask, then sync-rules.sh --force<br/>never a plain cp for Copilot"] --> A3
+    A2{"Artifact 2 — rules:<br/>rules folder already<br/>holds the rule files?"}
+    A2 -- "yes" --> A2S["Skip — already installed"] --> A3
+    A2 -- "no" --> A2R["Ask, then sync-rules.sh<br/>never a plain cp"] --> A3
     A3{"Artifact 3 — stop guard + permissions<br/>plugin install: permissions only"}
     A3 --> FIN(["Final report, 3-5 lines<br/>+ ALWAYS: restart the session<br/>(/exit · restart CLI · reload window)<br/>for the MCP tools to load"])
 
@@ -187,10 +187,9 @@ flags an existing wiring for removal rather than deleting it silently.
 - **Idempotency is a per-step contract.** Every step first checks whether its work is already done
   correctly, and if partially done, narrates the gap and fills only the gap. Running the skill twice
   produces the same result and never duplicates a registration or overwrites your changes.
-- **The rules may already be there.** The plugin ships them as plugin data under `rules/`
-  skill and installs them through a session-start hook, which records what it wrote in
-  `.ai-dev/rules.manifest`. Step 5 reads that manifest and skips the artifact rather than asking a
-  question you have nothing to decide. A forced refresh is the sync script, never a re-run of the hook.
+- **The rules may already be there.** The plugin ships them as plugin data under `rules/`, and a
+  session-start hook offers to install them. Step 5 counts the files in the rules folder and skips
+  the artifact when they are there, rather than asking a question you have nothing to decide.
 - **The console and the sync script transform; `cp` does not.** Both drop `name`/`description`,
   and rewrite `paths` → `applyTo` for Copilot, producing identical files. So there is no `cp`
   fallback for any harness: a copied file looks locally edited to the sync script and is never

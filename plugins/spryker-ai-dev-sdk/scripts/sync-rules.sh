@@ -7,15 +7,15 @@
 #
 # Runs as a session-start hook for Claude Code and GitHub Copilot, and can be run by hand:
 #
-#   scripts/sync-rules.sh --target "$(pwd)" [--harness claude|copilot] [--force]
+#   scripts/sync-rules.sh --target "$(pwd)" --harness claude|copilot
 #
-# As a hook it writes no rule files: it offers once per project, stamps .ai-dev/rules.suggested and
-# is silent from then on. Installing is the caller's move, with --target. A project opts out
-# entirely with .ai-dev/no-rules-sync. The hook also does nothing outside a Spryker project or in CI.
+# By hand it installs or refreshes the rules and prints one summary line. As a hook it writes no
+# rule files: it offers once per project and tool, stamps .ai-dev/rules.<tool>.suggested and is silent
+# from then on. The hook does nothing outside a Spryker project, in CI, or when .ai-dev/no-rules-sync
+# exists.
 #
 # A rule file that differs from what this script last shipped is treated as edited by a human and is
-# never overwritten -- not by the hook, and not by --force, which only re-scans a project the fast
-# path would otherwise skip. Pass --discard-local-edits to overwrite such files deliberately.
+# never overwritten. Pass --discard-local-edits to overwrite such files deliberately.
 
 set -uo pipefail
 
@@ -25,7 +25,6 @@ RULES_DIR="$PLUGIN_ROOT/rules"
 
 TARGET=""
 HARNESS=""
-FORCE=0
 DISCARD_LOCAL=0
 MANUAL=0
 
@@ -33,8 +32,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --target) TARGET="${2:-}"; MANUAL=1; shift 2 ;;
         --harness) HARNESS="${2:-}"; MANUAL=1; shift 2 ;;
-        --force) FORCE=1; MANUAL=1; shift ;;
-        --discard-local-edits) DISCARD_LOCAL=1; FORCE=1; MANUAL=1; shift ;;
+        --discard-local-edits) DISCARD_LOCAL=1; MANUAL=1; shift ;;
         --help|-h)
             sed -n '6,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0 ;;
@@ -101,21 +99,22 @@ if [ $MANUAL -eq 0 ] && [ "${GITHUB_ACTIONS:-}" = "true" ]; then
 fi
 
 # Per-project opt-out.
-[ -e "$TARGET/.ai-dev/no-rules-sync" ] && exit 0
+[ $MANUAL -eq 0 ] && [ -e "$TARGET/.ai-dev/no-rules-sync" ] && exit 0
 
 # Only act inside a Spryker project.
-if [ $FORCE -eq 0 ]; then
+if [ $MANUAL -eq 0 ]; then
     if [ ! -f "$TARGET/composer.json" ] || ! grep -q '"spryker[/-]' "$TARGET/composer.json" 2>/dev/null; then
         exit 0
     fi
 fi
 
-# One row per harness: rules dir | file suffix | frontmatter | hook stdout.
+# One row per harness: rules dir | file suffix | frontmatter | hook stdout | state name.
+# The state name keeps each tool's record and offer apart, so a team using both gets both.
 # Adding a tool is adding a row; an unlisted harness is refused rather than assumed.
 harness_spec() {
     case "$1" in
-        claude)         printf '%s' '.claude/rules|.md|paths|text' ;;
-        copilot|vscode) printf '%s' '.github/instructions|.instructions.md|applyTo|json' ;;
+        claude)         printf '%s' '.claude/rules|.md|paths|text|claude' ;;
+        copilot|vscode) printf '%s' '.github/instructions|.instructions.md|applyTo|json|copilot' ;;
         *)              return 1 ;;
     esac
 }
@@ -124,14 +123,14 @@ SPEC="$(harness_spec "$HARNESS")" || {
     [ $MANUAL -eq 1 ] && printf 'sync-rules.sh: unknown harness "%s"\n' "$HARNESS" >&2
     exit $MANUAL
 }
-IFS='|' read -r RULES_SUBDIR SUFFIX FRONTMATTER STDOUT_FORMAT <<EOF
+IFS='|' read -r RULES_SUBDIR SUFFIX FRONTMATTER STDOUT_FORMAT STATE <<EOF
 $SPEC
 EOF
 RULES_TARGET_DIR="$TARGET/$RULES_SUBDIR"
 
 MANIFEST_DIR="$TARGET/.ai-dev"
-MANIFEST="$MANIFEST_DIR/rules.manifest"
-SUGGESTED="$MANIFEST_DIR/rules.suggested"
+MANIFEST="$MANIFEST_DIR/rules.$STATE.manifest"
+SUGGESTED="$MANIFEST_DIR/rules.$STATE.suggested"
 
 # Escape a message for embedding in a JSON string literal: Copilot parses this script's stdout.
 json_escape() {
@@ -140,9 +139,12 @@ json_escape() {
 
 # --- as a hook, suggest once and write nothing -------------------------------
 if [ $MANUAL -eq 0 ]; then
-    # Already installed, or already offered: nothing to say.
-    [ -f "$MANIFEST" ] && exit 0
+    # Already offered, or this tool's rules folder already holds the rules -- whoever put them
+    # there, including ai-dev:setup, which keeps no manifest: nothing to say.
     [ -e "$SUGGESTED" ] && exit 0
+    for source_file in "$RULES_DIR"/*.md; do
+        [ -f "$RULES_TARGET_DIR/$(basename "$source_file" .md)$SUFFIX" ] && exit 0
+    done
 
     # No stamp means the offer would repeat every session, so stay quiet instead.
     mkdir -p "$MANIFEST_DIR" 2>/dev/null || exit 0
@@ -161,16 +163,6 @@ if [ $MANUAL -eq 0 ]; then
 fi
 PLUGIN_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
 MANIFEST_KEY="$HARNESS ${PLUGIN_VERSION:-unknown}"
-
-# Fast path: same harness, same plugin version, every shipped file still present.
-if [ $FORCE -eq 0 ] && [ -f "$MANIFEST" ] && [ "$(head -1 "$MANIFEST" 2>/dev/null)" = "$MANIFEST_KEY" ]; then
-    STALE=0
-    while IFS=' ' read -r _sha name; do
-        [ -n "${name:-}" ] || continue
-        [ -f "$RULES_TARGET_DIR/$name" ] || { STALE=1; break; }
-    done < <(tail -n +2 "$MANIFEST")
-    [ $STALE -eq 0 ] && exit 0
-fi
 
 sha_of() {
     if command -v shasum >/dev/null 2>&1; then
@@ -244,10 +236,10 @@ for source_file in "$RULES_DIR"/*.md; do
             mv "$temporary" "$destination"
             UPDATED=$((UPDATED + 1))
         else
-            # Edited by a human, or pre-existing and unknown to us. Leave it alone.
+            # Edited by a human, or pre-existing and unknown to us. Leave it alone, and keep recording
+            # what we would ship, so the file never matches the record and stays protected next run.
             rm -f "$temporary"
             PRESERVED=$((PRESERVED + 1))
-            shipped_sha="$current_sha"
         fi
     fi
 
@@ -257,15 +249,20 @@ done
 
 printf '%s\n' "$NEW_MANIFEST" > "$MANIFEST"
 
+# The hook stays quiet when nothing changed; a refresh someone asked for always reports.
 CHANGED=$((ADDED + UPDATED))
-if [ $CHANGED -eq 0 ]; then
+if [ $CHANGED -eq 0 ] && [ $MANUAL -eq 0 ]; then
     exit 0
 fi
 
 RELATIVE_DIR="${RULES_TARGET_DIR#$TARGET/}"
-MESSAGE="Spryker coding rules installed to $RELATIVE_DIR/ ($ADDED added, $UPDATED refreshed"
-[ $PRESERVED -gt 0 ] && MESSAGE="$MESSAGE, $PRESERVED locally edited and left untouched"
-MESSAGE="$MESSAGE). Commit them or add them to .gitignore; opt out with .ai-dev/no-rules-sync."
+KEPT=""
+[ $PRESERVED -gt 0 ] && KEPT="$PRESERVED locally edited and left untouched"
+if [ $CHANGED -eq 0 ]; then
+    MESSAGE="Spryker coding rules in $RELATIVE_DIR/ are already up to date${KEPT:+ ($KEPT)}."
+else
+    MESSAGE="Spryker coding rules installed to $RELATIVE_DIR/ ($ADDED added, $UPDATED refreshed${KEPT:+, $KEPT}). Commit them or add them to .gitignore; opt out with .ai-dev/no-rules-sync."
+fi
 
 if [ "$STDOUT_FORMAT" = "json" ] && [ $MANUAL -eq 0 ]; then
     printf '{"additionalContext":"%s"}\n' "$(json_escape "$MESSAGE")"

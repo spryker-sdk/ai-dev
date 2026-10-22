@@ -7,6 +7,20 @@ user-invocable: true
 
 # Spryker AI Dev Setup
 
+## Only the coding rules? Run one command and stop
+
+If the person asked only for the Spryker coding rules — to install, refresh or check them — run this and nothing else from this skill: no run log, no harness detection, no other steps.
+
+```bash
+<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <copilot|claude>
+```
+
+- `<plugin-root>` is the parent of the `skills/` folder in the path reported as `Base directory for this skill:`. Write the literal absolute path.
+- `--harness copilot` if you are GitHub Copilot (CLI or VS Code), `--harness claude` if you are Claude Code.
+- Run it from the project root, show the person the one line it prints, and stop.
+
+It never overwrites a rule the team has edited. Add `--discard-local-edits` only when the person explicitly asks to replace their edited rules with the shipped ones.
+
 You set up the Spryker **AI Dev SDK** (`spryker-sdk/ai-dev`) in a Spryker project. The skill covers three related flows — first-time onboarding, updating bundled artifacts, and installing the coding rules alone — and infers which one the user wants. When fully onboarded, the project has:
 
 1. The `spryker-sdk/ai-dev` package installed as a dev dependency.
@@ -94,8 +108,7 @@ composer show spryker-sdk/ai-dev 2>/dev/null | head -1     # is the package inst
 test -f "$INSTRUCTIONS_FILE" && echo "instructions file present"            # per the Step 5 table
 test -f .github/copilot-instructions.md && echo "instructions file present"  # copilot / vscode
 
-# Rules folder — the sync hook records what it installed
-test -f .ai-dev/rules.manifest && echo "rules manifest present"
+# Rules folder
 test -d "$RULES_DIR" && ls "$RULES_DIR" 2>/dev/null | wc -l                 # per the Step 5 table
 test -d .github/instructions && ls .github/instructions/ 2>/dev/null | wc -l               # copilot / vscode
 
@@ -145,17 +158,7 @@ After Step 5 completes in update flow, **stop**. Do not run anything else in thi
 
 ### Rules-only flow
 
-For a project that wants the Spryker coding rules without a working Spryker environment — a client who installed the plugin but has no Composer, no container stack, or simply does not want the SDK wired in. It is the right flow when Composer or `docker/sdk` are missing, or when the user asked for the rules alone.
-
-Create `$SETUP_DIR` + `run.log` and record the harness and mode decisions, then run **only** the rules sync:
-
-```bash
-<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <claude|copilot> --force
-```
-
-`<plugin-root>` is the plugin directory holding this skill — the parent of the `skills/` folder in the path reported as `Base directory for this skill:` when this skill loaded. Substitute the literal absolute path. Pass `--harness claude` for Claude Code and `--harness copilot` for Copilot CLI and VS Code. The script prints a one-line summary of what it added, refreshed, and left alone; put that line in `run.log` and in the report.
-
-Then **stop**. No Composer, no Docker, no MCP registration, no console wiring, no Steps 1–5. Report in two or three lines: the harness, the rules folder written, the script's summary line, and the `run.log` path. Mention — once, without pushing — that full onboarding is available later if the user gets a Spryker environment running.
+Run the command in **Only the coding rules?** at the top of this skill, show its line, and stop. It needs neither Composer nor `docker/sdk`. Mention once, without pushing, that full onboarding is available when the project has a running Spryker environment.
 
 ### Onboarding flow
 
@@ -529,7 +532,7 @@ Files copied from `vendor/spryker-sdk/ai-dev/data/` are pinned to `composer.lock
 Inspect the project so each per-artifact prompt below can include the current state:
 
 - Does the project instructions file exist at the project root? If so, is it the bundled file (compare first ~10 lines against `vendor/spryker-sdk/ai-dev/data/agents/AGENTS.example.md`) or a custom project file?
-- Is the rules folder already populated? **Check `.ai-dev/rules.manifest` first** — see Artifact 2.
+- Is the rules folder already populated? See Artifact 2.
 
 ### Artifact 1 — Project instructions file
 
@@ -554,20 +557,15 @@ Typical sections worth appending from the bundled `AGENTS.example.md` that custo
 
 ### Artifact 2 — Spryker coding rules (may already be installed)
 
-**Check before asking.** The plugin ships the rules as plugin data under `<plugin-root>/rules/`. A session-start hook offers to install them once per project but writes nothing by itself, so they are in place only where someone accepted that offer or ran this skill's rules-only flow. An install records what it wrote in `.ai-dev/rules.manifest` — first line `<harness> <plugin-version>`, then one `<sha256> <filename>` line per rule:
+**Check before asking.** The plugin ships the rules as plugin data under `<plugin-root>/rules/`. A session-start hook offers to install them once per project and tool, but writes nothing by itself. Count the rule files in the rules folder from the Step 5 table:
+
+- **The folder already holds the rule files** → the rules are installed. **Skip this artifact.** Report: `rules: already installed (<N> files in <rules folder>) — skipped`. Do not ask a question the user has nothing to decide.
+- **The folder is missing or empty** → offer to install.
+
+**To install or refresh**, run the script — never a plain `cp`, which skips the frontmatter transform:
 
 ```bash
-head -1 .ai-dev/rules.manifest 2>/dev/null && tail -n +2 .ai-dev/rules.manifest | wc -l
-```
-
-- **Manifest present, its first field matches the harness from Step 0, and the listed files exist in the rules folder** → the rules are installed and current. **Skip this artifact.** Report: `rules: already installed (<N> files in <rules folder>) — skipped`. Do not ask a question the user has nothing to decide.
-- **Manifest present but for a different harness** (e.g. `claude` when Step 0 said `copilot` — a developer who switched) → tell the user, and offer the forced refresh below for the current harness. The old folder is left alone; removing it is the user's call.
-- **No manifest, or listed files missing** → the rules were never installed here: the session-start hook only offers, and this project was never offered (a fresh clone, CI, `.ai-dev/no-rules-sync`) or the offer was declined or ignored. `.ai-dev/rules.suggested` tells the two apart, but it changes nothing you do — offer to install either way, since the person is here asking for setup.
-
-**To install or force a refresh**, run the script — never a plain `cp`, which skips the frontmatter transform:
-
-```bash
-<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <claude|copilot> --force
+<plugin-root>/scripts/sync-rules.sh --target "$(pwd)" --harness <claude|copilot>
 ```
 
 `<plugin-root>` is the plugin directory holding this skill — the parent of the `skills/` folder in the path reported as `Base directory for this skill:` when this skill loaded. Substitute the literal absolute path. Pass `--harness claude` for Claude Code, `--harness copilot` for both Copilot CLI and VS Code.
@@ -575,9 +573,8 @@ head -1 .ai-dev/rules.manifest 2>/dev/null && tail -n +2 .ai-dev/rules.manifest 
 What the script guarantees, so you can describe it accurately when asking:
 
 - It **never overwrites a rule file a human has edited** — it compares each file against the sha recorded in the manifest, and files that differ are preserved and reported.
-- `--force` only makes it re-scan a project it would otherwise skip; it still preserves locally
-  edited files. To deliberately replace an edited rule with the bundled version, the user has to ask
-  for it, and the flag is `--discard-local-edits`. Never pass that flag unless they did.
+- To deliberately replace an edited rule with the bundled version, the user has to ask for it, and
+  the flag is `--discard-local-edits`. Never pass that flag unless they did.
 - It writes exactly what the console writes: `name`/`description` dropped for every harness, plus `paths` → `applyTo` (unscoped rules default to `applyTo: "**"`) for `copilot` and `vscode`.
 - It prints one summary line: how many were added, refreshed, and left untouched. Put that line in `run.log` and in the report.
 

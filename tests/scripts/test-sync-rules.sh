@@ -47,7 +47,7 @@ echo "sync-rules.sh"
 project="$(new_project offer)"
 output="$(printf '{"sessionId":"s1","cwd":"%s"}' "$project" | bash "$SYNC")"
 assert_eq "the hook writes no rule files" "$(count_files "$project/.github/instructions")" "0"
-assert_eq "the hook records that it has offered" "$([ -f "$project/.ai-dev/rules.suggested" ] && echo yes || echo no)" "yes"
+assert_eq "the hook records that it has offered" "$([ -f "$project/.ai-dev/rules.copilot.suggested" ] && echo yes || echo no)" "yes"
 assert_eq "the offer names the rule count" "$(printf '%s' "$output" | grep -c "writes $RULE_COUNT rule files")" "1"
 assert_eq "the offer names the project, not the agent's cwd" "$(printf '%s' "$output" | grep -c -- "--target '$project'")" "1"
 assert_eq "copilot wraps the offer in additionalContext JSON" "$(printf '%s' "$output" | grep -c '"additionalContext"')" "1"
@@ -61,6 +61,23 @@ second_offer="$(printf '{"sessionId":"s2","cwd":"%s"}' "$project" | bash "$SYNC"
 assert_eq "the offer is not repeated" "$second_offer" ""
 
 assert_eq "declining leaves the project clean" "$(count_files "$project/.github/instructions")" "0"
+
+# --- Each tool has its own offer and record ----------------------------------
+project="$(new_project mixed-team)"
+accept "$project" copilot
+claude_offer="$(printf '{"hook_event_name":"SessionStart","session_id":"s","cwd":"%s"}' "$project" | bash "$SYNC")"
+assert_eq "a project with Copilot's rules still offers Claude Code its own" "$(printf '%s' "$claude_offer" | grep -c '.claude/rules/')" "1"
+
+project="$(new_project declined-once)"
+printf '{"sessionId":"s","cwd":"%s"}' "$project" | bash "$SYNC" > /dev/null
+claude_offer="$(printf '{"hook_event_name":"SessionStart","session_id":"s","cwd":"%s"}' "$project" | bash "$SYNC")"
+assert_eq "an offer made in Copilot does not silence the one in Claude Code" "$(printf '%s' "$claude_offer" | grep -c 'not installed')" "1"
+
+project="$(new_project console-installed)"
+mkdir -p "$project/.github/instructions"
+cp "$REPO_ROOT/plugins/spryker-ai-dev-sdk/rules/controller.md" "$project/.github/instructions/controller.instructions.md"
+quiet="$(printf '{"sessionId":"s","cwd":"%s"}' "$project" | bash "$SYNC")"
+assert_eq "rules put there by another installer, with no record, get no offer" "$quiet" ""
 
 # --- Copilot: accepting the offer installs transformed rules -----------------
 project="$(new_project copilot)"
@@ -97,14 +114,14 @@ assert_eq "claude drops name" "$(grep -c '^name:' "$rule")" "0"
 assert_eq "claude drops description" "$(grep -c '^description:' "$rule")" "0"
 assert_eq "claude writes no applyTo" "$(grep -c '^applyTo:' "$rule")" "0"
 
-# --- --force must not destroy local edits ------------------------------------
+# --- A re-run must not destroy local edits ------------------------------------
 project="$(new_project force)"
 accept "$project" copilot
 edited="$project/.github/instructions/controller.instructions.md"
 printf '\n# local edit\n' >> "$edited"
 
-bash "$SYNC" --target "$project" --harness copilot --force > /dev/null
-assert_eq "--force preserves a locally edited rule" "$(tail -1 "$edited")" "# local edit"
+bash "$SYNC" --target "$project" --harness copilot > /dev/null
+assert_eq "a re-run preserves a locally edited rule" "$(tail -1 "$edited")" "# local edit"
 
 bash "$SYNC" --target "$project" --harness copilot --discard-local-edits > /dev/null
 if [ "$(tail -1 "$edited")" = "# local edit" ]; then
@@ -112,6 +129,44 @@ if [ "$(tail -1 "$edited")" = "# local edit" ]; then
 else
     pass "--discard-local-edits overwrites a locally edited rule"
 fi
+
+# --- Protection lasts: a kept file is still kept on every later run --------------
+sha() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || sha256sum "$1" | cut -d' ' -f1; }
+bump_version() { sed -i.bak '1s/.*/copilot 0.0.1/' "$1/.ai-dev/rules.copilot.manifest" && rm -f "$1/.ai-dev/rules.copilot.manifest.bak"; }
+
+project="$(new_project team-rule)"
+mkdir -p "$project/.github/instructions"
+printf -- '---\napplyTo: "src/**"\n---\n\nteam rule\n' > "$project/.github/instructions/controller.instructions.md"
+accept "$project" copilot
+bash "$SYNC" --target "$project" --harness copilot > /dev/null
+bump_version "$project"
+accept "$project" copilot
+assert_eq "a same-named team rule survives repeated runs and a plugin update" "$(tail -1 "$project/.github/instructions/controller.instructions.md")" "team rule"
+
+project="$(new_project edited-twice)"
+accept "$project" copilot
+edited="$project/.github/instructions/plugins.instructions.md"
+printf '\n# local edit\n' >> "$edited"
+bash "$SYNC" --target "$project" --harness copilot > /dev/null
+bash "$SYNC" --target "$project" --harness copilot > /dev/null
+bump_version "$project"
+accept "$project" copilot
+assert_eq "an edited rule survives repeated runs and a plugin update" "$(tail -1 "$edited")" "# local edit"
+report="$(bash "$SYNC" --target "$project" --harness copilot)"
+assert_eq "a requested refresh reports the kept edit even when nothing changed" "$(printf '%s' "$report" | grep -c '1 locally edited and left untouched')" "1"
+quiet="$(printf '{"sessionId":"s","cwd":"%s"}' "$project" | bash "$SYNC")"
+assert_eq "the hook stays silent once the rules are installed" "$quiet" ""
+
+# An untouched rule must still be updated: pretend we shipped older content, recorded as ours.
+project="$(new_project refresh)"
+accept "$project" copilot
+stale="$project/.github/instructions/mapper-pattern.instructions.md"
+printf 'old shipped content\n' > "$stale"
+old_sha="$(sha "$stale")"
+sed -i.bak "s/^[0-9a-f]* mapper-pattern.instructions.md$/$old_sha mapper-pattern.instructions.md/" "$project/.ai-dev/rules.copilot.manifest" && rm -f "$project/.ai-dev/rules.copilot.manifest.bak"
+bump_version "$project"
+accept "$project" copilot
+assert_eq "an untouched rule is updated to the shipped version" "$(grep -c 'old shipped content' "$stale")" "0"
 
 # --- Guards ------------------------------------------------------------------
 project="$WORK/not-spryker"
@@ -153,8 +208,16 @@ assert_eq "a payload without cwd writes nothing" "$(count_files "$guard_dir")" "
 # --- Manual invocation -------------------------------------------------------
 project="$WORK/manual"
 mkdir -p "$project"
-bash "$SYNC" --target "$project" --harness copilot --force > /dev/null
-assert_eq "--force installs without a Spryker composer.json" "$(count_files "$project/.github/instructions")" "$RULE_COUNT"
+bash "$SYNC" --target "$project" --harness copilot > /dev/null
+again="$(bash "$SYNC" --target "$project" --harness copilot)"
+assert_eq "a requested run on an up-to-date project still reports" "$(printf '%s' "$again" | grep -c 'already up to date')" "1"
+
+project="$(new_project optout-manual)"
+mkdir -p "$project/.ai-dev"
+touch "$project/.ai-dev/no-rules-sync"
+accept "$project" copilot
+assert_eq "a requested install is not blocked by the hook opt-out" "$(count_files "$project/.github/instructions")" "$RULE_COUNT"
+assert_eq "a requested install works without a Spryker composer.json" "$(count_files "$project/.github/instructions")" "$RULE_COUNT"
 
 echo
 if [ $FAILURES -gt 0 ]; then
