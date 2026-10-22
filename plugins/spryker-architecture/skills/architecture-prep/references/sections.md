@@ -283,6 +283,9 @@ its own test:
 
 - **Risks** — an uncertainty *plus* a plausible negative consequence, with likelihood, impact, and a
   mitigation naming a real Spryker capability (confirmed via docs research, docs page linked).
+  **When research is unavailable**, name the capability and mark it `(unverified)` without a link —
+  never drop the mitigation, never invent a link, and never block the section. An unverified
+  capability the reader can check beats a vague mitigation they cannot.
 
   Two tests every candidate row must pass:
 

@@ -82,6 +82,24 @@ context than the intake carries. Register a Solution Design and put the open que
 Where a topic is architecturally risky — pricing, order management, stock, customer structure,
 multi-store, identity — probe it enough to expose the risk, then leave the design to the SD.
 
+## The document never describes its own making
+
+**Write the architecture as it currently stands. Never how the document came to be written.**
+
+A reader opening this folder in six months needs the architecture, not an account of the exercise
+that produced it. Self-justification feels like honesty while writing and reads as noise afterwards.
+
+Never write: "not covered in this round", "the intake did not ask about this", "deliberately not
+written", "to be addressed in a later session", "derived from the answers", "this run", or any
+reference to levels, phases, or passes of the authoring process.
+
+The honest form of a gap is the gap itself — what is unknown and who can answer it:
+
+> **TODO:** Availability target not set — business owner.
+
+not an explanation of why it is unknown. One line, an owner, no narrative. The same applies to
+diagram comments, table cells and section preambles.
+
 ## Single source of truth — no duplication
 
 Every concept, decision, or diagram lives in **exactly one place**. Don't restate the same

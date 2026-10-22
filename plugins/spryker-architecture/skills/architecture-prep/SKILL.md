@@ -65,6 +65,26 @@ work than one context writing everything sequentially.
   section boundary. Read [references/multi-deliverable.md](references/multi-deliverable.md) at Step 0
   whenever N > 1.
 
+### Never wait on a teammate — poll the filesystem
+
+**Teammates report by writing files, not by messaging you.** Your turn must never end with "waiting
+for the writers to finish".
+
+- After dispatching a batch, **check the output paths on disk** to see what exists. A written file is
+  a finished task, whether or not a report arrived.
+- A teammate that has not produced its file when you need it is **not a reason to stop**. Do its work
+  inline yourself and log `TEAMMATE <id> | no output | completed inline`.
+- Never end a turn, and never block, pending a notification.
+
+A run that stops mid-workflow looks identical to a crash from the outside: no document, no error, no
+way for the user to know a nudge would finish it.
+
+### One writer owns a file
+
+Each file has exactly one writer for the whole run. Two teammates editing the same file lose work or
+force one to abandon its task. When planning the fan-out, **list the files each writer owns** and
+make the ownership explicit in its brief: *write only these paths; read any other file you need.*
+
 Spawn teammates with the `Agent` tool. Prefer `subagent_type: "Explore"` for read-only research and
 document derivation, and `subagent_type: "general-purpose"` (or a `fork`) for section writers
 that must create files. **Exception: multi-deliverable writers must be fresh `general-purpose`
@@ -306,7 +326,18 @@ returning a compact summary:
   industry/volume benchmarks the user referenced. → `research-web.md`
 
 Skip any teammate that has no relevant input (e.g. no external systems → no web teammate). Log each as
-`RESEARCH | <source> | done`. Keep only each teammate's summary in the State Object; the detail stays
+`RESEARCH | <source> | done`.
+
+**Research is best-effort, never a blocker.** It runs in parallel with planning, not ahead of it. If a
+findings file does not exist when the writers need it, start them anyway and log
+`RESEARCH | <source> | unavailable`. The writers then follow the ungrounded-claim rule below rather
+than waiting. Losing a whole run to a hung lookup is far worse than shipping a document whose
+platform claims are marked unverified.
+
+**Ungrounded-claim rule.** When a writer needs a platform fact that research has not confirmed, it
+states the claim with an explicit `(unverified)` marker and carries on — it never asserts the fact
+plainly, and never blocks on it. The reviewer treats an unmarked unverified claim as a defect, and a
+marked one as acceptable. Keep only each teammate's summary in the State Object; the detail stays
 in the file.
 
 ### Step 3 — Plan the section fan-out

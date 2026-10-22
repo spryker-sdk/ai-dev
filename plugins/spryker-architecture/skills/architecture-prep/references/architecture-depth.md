@@ -78,7 +78,10 @@ custom Back Office roles. Order comments → the Comments module. High-volume im
 optimisation and Publish & Sync guidelines. Many stores under one domain → Dynamic Multi-Store.
 External DB access for BI → Data Exchange API.
 
-Verify availability status before citing — never assert it from memory.
+Verify availability status before citing — never assert it from memory. **When research is
+unavailable**, name the capability and mark it `(unverified)`: the reader can then check it. The
+feature names above are examples of the pattern, not a list to copy from — naming one you have not
+confirmed, without the marker, is a fabrication.
 
 ## Release phasing
 

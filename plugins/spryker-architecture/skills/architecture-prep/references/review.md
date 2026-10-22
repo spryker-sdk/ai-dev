@@ -43,6 +43,8 @@ what slipped through.
       diagram is two defects. Keep the one authoritative place, replace the rest with a cross-reference.
 - [ ] **Duplicate diagrams.** Two diagrams showing the same relationships — most commonly a runtime
       diagram restating the context diagram. Cut the redundant one.
+- [ ] **Unverified platform claims are marked.** A capability named without a docs link must carry
+      `(unverified)`. An unmarked unverified claim is a defect; a marked one is acceptable.
 - [ ] **Any trace of the process that produced the document.** Deliberation, self-correction, review
       history, "this was derived from…", notes about what the AI decided or fixed. The document is a
       **snapshot of the current architecture**, not a record of how it was written. Reasoning stays in

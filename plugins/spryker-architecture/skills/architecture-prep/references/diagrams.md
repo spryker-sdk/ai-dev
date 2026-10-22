@@ -28,8 +28,8 @@ reuse its names verbatim.
    | Element | Label |
    |---|---|
    | Actor | `Business Buyer` · `[Person]` · `Orders supplies for their company` |
-   | System under design | `Acme Marketplace` · `[Software System]` · `B2B marketplace for four brands` |
-   | External system | `Epicor M2K` · `[Software System: ERP]` · `Masters orders, stock and pricing` |
+   | System under design | `Acme Commerce` · `[Software System]` · `The platform being designed` |
+   | External system | `Group ERP` · `[Software System: ERP]` · `Masters orders, stock and pricing` |
    | Container | `Storefront` · `[Container: Yves]` · `Customer-facing shop` |
 
    The type is mandatory on every element, and the qualifier after the colon is what tells a reader
