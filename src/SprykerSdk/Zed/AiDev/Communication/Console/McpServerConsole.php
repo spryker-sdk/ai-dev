@@ -7,8 +7,8 @@
 
 namespace SprykerSdk\Zed\AiDev\Communication\Console;
 
-use PhpMcp\Server\Server;
-use PhpMcp\Server\Transports\StdioServerTransport;
+use Mcp\Server;
+use Mcp\Server\Transport\StdioTransport;
 use Spryker\Zed\Kernel\BundleConfigResolverAwareTrait;
 use Spryker\Zed\Kernel\Communication\Console\Console;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolInputSchemaPluginInterface;
@@ -44,14 +44,22 @@ class McpServerConsole extends Console
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
-            $serverBuilder = Server::make()
-                ->withServerInfo(...$this->getFactory()->getConfig()->getMcpServerInfo());
+            $serverBuilder = Server::builder()
+                ->setServerInfo(...$this->getFactory()->getConfig()->getMcpServerInfo());
+
+            $promptClassTargetDirectory = $this->getConfig()->getPromptClassTargetDirectory();
+
+            // Discovery is configured on the builder, before build(). The generated prompt
+            // classes sit flat in one directory, so that directory itself is the only scan path.
+            if (is_dir($promptClassTargetDirectory)) {
+                $serverBuilder->setDiscovery($promptClassTargetDirectory, ['.']);
+            }
 
             foreach ($this->getFactory()->getMcpPromptPlugins() as $promptPlugin) {
-                $serverBuilder->withPrompt(
+                $serverBuilder->addPrompt(
                     [$promptPlugin::class, $promptPlugin->getName()],
                     $promptPlugin->getName(),
-                    $promptPlugin->getDescription(),
+                    description: $promptPlugin->getDescription(),
                 );
             }
 
@@ -60,23 +68,15 @@ class McpServerConsole extends Console
                     ? $toolPlugin->getInputSchema()
                     : null;
 
-                $serverBuilder->withTool(
+                $serverBuilder->addTool(
                     [$toolPlugin::class, $toolPlugin->getName()],
                     $toolPlugin->getName(),
-                    $toolPlugin->getDescription(),
-                    null,
-                    $inputSchema,
+                    description: $toolPlugin->getDescription(),
+                    inputSchema: $inputSchema,
                 );
             }
 
-            $server = $serverBuilder->build();
-
-            if (file_exists($this->getConfig()->getPromptClassTargetDirectory())) {
-                $server->discover($this->getConfig()->getPromptClassTargetDirectory());
-            }
-
-            $transport = new StdioServerTransport();
-            $server->listen($transport);
+            $serverBuilder->build()->run(new StdioTransport());
         } catch (Throwable $e) {
             $this->error($e->getMessage());
 

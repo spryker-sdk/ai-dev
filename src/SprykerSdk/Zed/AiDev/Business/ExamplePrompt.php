@@ -16,7 +16,7 @@ class ExamplePrompt extends AbstractPrompt
     /**
      * @return array<string, string>
      */
-    #[\PhpMcp\Server\Attributes\McpPrompt(name: 'you_are_welcome', description: 'You are welcome!')]
+    #[\Mcp\Capability\Attribute\McpPrompt(name: 'you_are_welcome', description: 'You are welcome!')]
     public function youAreWelcome(string $name, string $role, string $part): array
     {
         $template = <<<END
