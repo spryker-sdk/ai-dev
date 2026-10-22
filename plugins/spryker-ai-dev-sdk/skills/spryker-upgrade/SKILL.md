@@ -196,7 +196,15 @@ writing to `codecept-functional`. The rules:
   test (which class or value a method returns). They stay green whatever the upgrade does.
 - No mocked host-PHP unit tests of models as the default.
 
-Commit the tests on their own, green against the current version, before the upgrade branch diverges.
+Commit the tests on their own branch, green against the current version — that branch becomes **the
+tests pull request**, and the upgrade branch starts from it. With no new tests there is no tests pull
+request; record why (the developer proceeded without them, or the suite already covered the gaps) for
+the handover report.
+
+**Log every defect that already exists on the current release** in `.spryker-upgrade/state/findings.md`
+([references/handover-report.md](references/handover-report.md) § The findings log). A test pins current
+behaviour, wrong or not; the log is how the wrong behaviour reaches the project team. Keep logging in
+every later phase — Phase 0's red tests, the Back Office crawl baseline, the verifier, lane reading.
 
 ## Phase 1 — Target selection (developer gate #2)
 
@@ -403,7 +411,9 @@ Read [references/verification.md](references/verification.md) before the first o
 
 - **Check `git status` after every command** — regeneration deletes tracked migration files and writes
   generated config into unignored paths (matrix #61/#62). Command names differ; read `console list`.
-- A non-empty migration diff goes to the developer before anything touches a database.
+- A non-empty migration diff goes to the developer before anything touches a database. Record each
+  migration for the handover report: what it changes, its data-loss risk, and what its down migration
+  drops or narrows.
 - **Sniffer:** auto-fix the PHP files the upgrade changed first (`-f`), then compare with the sniffer
   baseline. A new violation blocks, like a PHPStan or evaluator regression.
 - Tests: compare per suite with the test baseline, with the pinned invocation.
@@ -439,6 +449,11 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 Fetch each description (`composer show <pkg>` + release notes) and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait)
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
 accepted feature follows its integration guide, in its own commit. REMOVED packages: explain each.
+
+For the handover report, also list what Spryker released after the starting release, up to the target,
+that the project could adopt — from the release notes (`spryker-docs-research`), not only the lock
+diff. Per feature: what it does, what it requires, its third-party costs, and whether it installs with
+little change to project code, needs an outside service, or changes project code.
 
 ## Phase 6.2 — Performance fixes
 
@@ -476,11 +491,20 @@ Console errors, 500s and missing styling are upgrade damage; an unvisited page c
 ## Phase 7 — Report & handoff
 
 `php $UP/check-added-comments.php` and `php $UP/check-performance.php --verify` exit 0 first. Then
-write the report with the sections [references/verification.md](references/verification.md) lists
-(shape: [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red before
-the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
-Separate what is proven from what merely has not failed yet, and name the damage class every skipped
-check would have caught. Ask before committing; suggest one PR per release group.
+write two reports:
+
+- **The developer report** — the sections [references/verification.md](references/verification.md)
+  lists (shape: [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red
+  before the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
+  Separate what is proven from what merely has not failed yet, and name the damage class every
+  skipped check would have caught.
+- **The handover report** for the project team — one HTML file to paste into Confluence,
+  [references/handover-report.md](references/handover-report.md) (shape:
+  [EXAMPLE-HANDOVER-REPORT.md](EXAMPLE-HANDOVER-REPORT.md)).
+
+Deliver two pull requests: the tests pull request first, the upgrade pull request built on it — or the
+upgrade pull request alone when there were no new tests. One upgrade pull request per release group.
+Ask before committing or opening a pull request.
 
 ## Hard rules
 
