@@ -174,8 +174,9 @@ that costs rather than omitting the section.
 
 ## Phase 7 — what the report contains
 
-This is the developer report; the project team gets the handover report
-([handover-report.md](handover-report.md)). [EXAMPLE-UPGRADE-REPORT.md](../EXAMPLE-UPGRADE-REPORT.md)
+This is the developer report; the development team gets the handover report
+([handover-report.md](handover-report.md)). Both reports follow the writing rules in
+[handover-report.md](handover-report.md) § Writing rules. [EXAMPLE-UPGRADE-REPORT.md](../EXAMPLE-UPGRADE-REPORT.md)
 shows the shape. Required sections:
 
 1. **Versions moved** — release before/after, majors highlighted with the Lane 0 migration-guide table

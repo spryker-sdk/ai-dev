@@ -42,7 +42,7 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    exclude, or a detector's exclude list — none of which is ever part of an upgrade's deliverable.
 
 **Plan tracking is mandatory.** At the end of Phase 0, create one `TaskCreate` task each for Phase
-0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5 and 7,
+0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5, 6.8 and 7,
 and drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
 detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
@@ -224,8 +224,16 @@ grep '"spryker-feature/' composer.json    # the intent, for comparison only
 2. Find newer releases (`composer show -a spryker-feature/spryker-core | grep versions`) and ask with
    a structured question — never pick silently: **next release group (recommended)** — the smallest
    reviewable step, repeating the skill per release — or **latest release**, one big jump.
+3. **Read the security release notes** that Spryker published after the starting release
+   (https://docs.spryker.com/docs/about/all/releases/security-releases/). Per issue, add one row to
+   `.spryker-upgrade/state/security-fixes.md`: `| <issue> | <affected modules: fixed version> |
+   <extra steps> | <status> |`. Extra steps are all actions in the note's fix section other than the
+   module update. Offline: say so, and the reports say that the security fixes are not checked.
 
 ## Phase 1.2 — Tooling, Docker SDK and deploy files
+
+Start the release-steps log `.spryker-upgrade/state/release-steps.md` here, and add to it in every
+later phase ([references/release-steps.md](references/release-steps.md) § 1).
 
 The target release also means a Docker SDK version, an image, and the dev tooling its code is checked
 with; the Spryker composer update touches none of them. Align them with the **reference demo shop of
@@ -287,6 +295,13 @@ advisory blocking, and never drop a package to make the tree resolve (Lane 5).
 3. On resolution failure read `composer why-not`, adjust the blocking constraint, retry. Never
    `--ignore-platform-reqs`. Record every constraint the resolver changed — the diff is reviewed.
 4. A tooling step Phase 1.2 deferred runs now, as its own commit, re-baselined before Phase 3.
+5. **Check `security-fixes.md` against `composer.lock`.** Do each extra step that changes project
+   code or configuration, in its own commit. Put each step for the environments (a variable, a
+   command) into the release-steps log. A module below its fixed version: set its constraint to
+   `^<fixed version>` and run `script -q /dev/null docker/sdk cli composer update <module>
+   --with-dependencies`, as its own commit. When that does not resolve, it goes to the developer with
+   the `composer why-not` output. Set the status: `fixed`, `fixed, release step`, `not fixed: <why>`, or `not affected:
+   <why>` (for example, the project does not install the module).
 
 ## Phase 3 — Detection (run all, collect before resolving)
 
@@ -306,6 +321,13 @@ Run `check-typed-members.php` first: typed-member fatals abort `vendor/bin/conso
 composer-merge-plugin, add `vendor/<vendor>/<pkg>/Bundles`). Subtract the Phase 0 baselines and present
 a summary: packages moved (majors highlighted), conflicts per lane, NEW packages, deprecated items.
 PHPStan errors only a database, a search backend or the bootstrap explain are environment gaps (matrix #50).
+
+**Security fixes in project overrides.** For each `fixed` row in `security-fixes.md`, find the
+vendor files that the fix changed (the module's tag diff between the old and the new version). Find
+the project files that replace or extend them: classes in `src/Pyz` and the Twig overrides that
+`twig-shadow-map.php` lists. A vendor update does not reach these files. Do not change them: the fix
+can change the project's behavior. Set the status to `not fixed: project override <file>` and write
+the recommended fix next to it. Lanes 1 and 2 do not port these changes either.
 
 ## Lane 0 — Migration guides (mandatory for every major bump)
 
@@ -488,6 +510,11 @@ breaks. So this phase has two parts, in order:
 
 Console errors, 500s and missing styling are upgrade damage; an unvisited page counts as unverified.
 
+## Phase 6.8 — Release steps verification
+
+Prove the commands that staging and production must run after the normal deployment. Do
+[references/release-steps.md](references/release-steps.md) § 2 exactly, in its order.
+
 ## Phase 7 — Report & handoff
 
 `php $UP/check-added-comments.php` and `php $UP/check-performance.php --verify` exit 0 first. Then
@@ -498,9 +525,12 @@ write two reports:
   before the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
   Separate what is proven from what merely has not failed yet, and name the damage class every
   skipped check would have caught.
-- **The handover report** for the project team — one HTML file to paste into Confluence,
-  [references/handover-report.md](references/handover-report.md) (shape:
+- **The handover report** for the development team — Markdown or HTML for a paste into Confluence;
+  ask the person which one. [references/handover-report.md](references/handover-report.md) (shape:
   [EXAMPLE-HANDOVER-REPORT.md](EXAMPLE-HANDOVER-REPORT.md)).
+
+Write both reports by the writing rules in
+[references/handover-report.md](references/handover-report.md) § Writing rules.
 
 Deliver two pull requests: the tests pull request first, the upgrade pull request built on it — or the
 upgrade pull request alone when there were no new tests. One upgrade pull request per release group.
