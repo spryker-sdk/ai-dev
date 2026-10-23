@@ -123,9 +123,13 @@ SPEC="$(harness_spec "$HARNESS")" || {
     [ $MANUAL -eq 1 ] && printf 'sync-rules.sh: unknown harness "%s"\n' "$HARNESS" >&2
     exit $MANUAL
 }
-IFS='|' read -r RULES_SUBDIR SUFFIX FRONTMATTER STDOUT_FORMAT STATE <<EOF
-$SPEC
-EOF
+# A heredoc needs a temp file, which a sandboxed hook cannot create.
+split_spec() {
+    local IFS='|'
+    set -- $1
+    RULES_SUBDIR=$1 SUFFIX=$2 FRONTMATTER=$3 STDOUT_FORMAT=$4 STATE=$5
+}
+split_spec "$SPEC"
 RULES_TARGET_DIR="$TARGET/$RULES_SUBDIR"
 
 MANIFEST_DIR="$TARGET/.ai-dev"
