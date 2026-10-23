@@ -1,6 +1,6 @@
 ---
 name: demo-prep-wizard
-description: "Use when a demo is coming and the job is to prepare it end to end — 'we have a demo coming up', 'help me prepare a demo for <customer>', 'prepare the demo', 'here is the briefing for the demo', 'what do we need for this demo'. The demo-side parallel of `project-starter-wizard`: that one turns a demoshop clone into a project, this one takes the demo the preparer already has and drives the gathering and shaping of everything it needs — intake, requirements, design reference, harvest, build, rehearsal, run sheet. It orchestrates: every phase is owned by a named skill (`demo-intake`, `match-reference-design`, `harvest-source-materials`, `project-data`, `demo-run-sheet`, …) and this skill never re-implements harvesting, design or data mechanics. Also the resume entry when a prior run left `.ai-dev/demo-prep.md`."
+description: "Use when a demo is coming and the job is to prepare it end to end — 'we have a demo coming up', 'help me prepare a demo for <customer>', 'prepare the demo', 'here is the briefing for the demo', 'what do we need for this demo'. The demo-side parallel of `project-starter-wizard`: that one turns a demoshop clone into a project, this one takes the demo the preparer already has and drives the gathering and shaping of everything it needs — intake, requirements, design reference, harvest, build, rehearsal, handover report. It orchestrates: every phase is owned by a named skill (`demo-intake`, `match-reference-design`, `harvest-source-materials`, `project-data`, `demo-run-sheet`, …) and this skill never re-implements harvesting, design or data mechanics. Also the resume entry when a prior run left `.ai-dev/demo-prep.md`."
 ---
 
 # demo-prep-wizard
@@ -49,7 +49,7 @@ step reports are log lines, not deliverables; project and `.ai-dev/` files are w
 ## The spine: the needs list
 
 **Every later phase keys off the needs list** (phase 2). It is the demo's specification, the harvest's
-shopping list, the rehearsal's checklist and the run sheet's source of beats — so it is derived from
+shopping list, the rehearsal's checklist and the source of the handover report's demo points — so it is derived from
 the supplied demo before anything is gathered, not discovered while building.
 
 It is **derived, never agreed**: the beats come from the brief, and what this skill adds is the list
@@ -59,7 +59,7 @@ class of work each item is, and whether it is in this run — never the demo.
 Two rules:
 
 - **Quoted UI strings are fixed wording from the moment the brief is read.** brand-project, the CMS
-  content pass and the run sheet copy them character for character, out of the brief's own wording.
+  content pass and the handover report copy them character for character, out of the brief's own wording.
   A paraphrased string loses the exact wording, which then has to be asked for again.
 - **Every beat's data needs are written down explicitly.** A beat needing "a range" in a category
   that holds two products, or "show colour options" on a hero product with one colour, is a gap;
@@ -85,7 +85,7 @@ it lives in its `brief:` line, so a resume hours later does not have to ask agai
 | 4 | Harvest | **`harvest-source-materials`** | the gathered material, its coverage record, the gap list | coverage recorded against phase 2; every gap named |
 | 5 | Build | **the project track** — `project-data`, `define-stores`, `translate-content`, `match-reference-design`, `boot-and-verify` | a booted shop carrying the harvested material | `boot-and-verify`'s verdict (`.ai-dev/verifier-report.md`) |
 | 6 | Rehearsal | **this skill** (+ `spryker-verifier` for anything behind a login) | `.ai-dev/rehearsal.md` — pass/gap per beat | every beat passes or is a named, accepted gap |
-| 7 | Run sheet | **`demo-run-sheet`** | the sheet the salesperson presents from | the preparer has the artefact |
+| 7 | Handover report | **`demo-run-sheet`** | the report the presenter works from and the team takes over | the preparer has the report |
 
 ### Before phase 1 — what the machine needs, checked first
 
@@ -120,7 +120,7 @@ then decide how the row reaches the demo:
   `spryker-customization` at the **PoC** quality bar, on this demo clone (phase 5). Say what it will
   look like and roughly how long it takes.
 - **"Left out".** Recommend it only when a working version would cost more than the beat is worth to
-  the story, and offer it as a talking point on the run sheet instead.
+  the story, and offer it as a talking point in the handover report instead.
 
 Show the preparer the table in **their** terms — what they asked for, how it will appear, your
 recommendation — and confirm the routing table with one structured question. The state file's first write
@@ -288,11 +288,11 @@ into something the demo happens to do well.
 `rehearsal` is marked `done`: either step is `done` only with a `.ai-dev/design-acceptance.md` newer
 than both the newest template or style edit and the last rebuild.
 
-### 7 · Run sheet
+### 7 · Handover report
 
-Delegate to `demo-run-sheet`. It takes its beats from the brief, in the brief's order and wording, and
-the output format from `up_front.run_sheet_format`, in every run. Whatever the format, a local copy lands
-in `.ai-dev/demo-run-sheet.html`, `.md` or `.txt`; a connector document is extra, never instead.
+Delegate to `demo-run-sheet`. It takes its demo points from the brief, one per requirement, in the
+brief's order and wording, and the format from `up_front.handover_format`, in every run. The report
+lands in `.ai-dev/demo-handover-report.html` or `.md`.
 
 ---
 
@@ -320,7 +320,7 @@ the final review — nothing in between. After the routing table (phase 2):
    - on an unmodified demoshop, **the demo fast path's questions** — the shop's name; the countries,
      languages and currencies; what happens to the sample products
      (`../project-starter-wizard/references/interview.md` → Demo fast path);
-   - **the run-sheet format** — `demo-run-sheet` §0's question and options, stored as its token;
+   - **the handover report format** — `demo-run-sheet` §0's question and options, stored as its token;
    - **run mode — last**: "Run it through and tell me when it's ready (Recommended)" or "Check in with
      me after each step".
 
@@ -351,7 +351,7 @@ phase failure return control in both.
 After phase 7, one message and one question. Show, per page, the reference next to the result; each
 small working version's screenshots; the gap list with what each gap means for the story; the look we
 matched to and the list of pictures and texts we gathered, both taken as recommended; any decision
-logged mid-run for this review; and the run sheet's path. Ask once: "Does this look
+logged mid-run for this review; and the handover report's path. Ask once: "Does this look
 right, and are these gaps OK?" Record accepted gaps in `gaps_accepted`. Anything they want changed is a
 follow-up pass through the phase that owns it.
 
@@ -410,7 +410,7 @@ The closing checklist. State each line at the close, with its evidence:
 - [ ] **Every gap named and accepted** — each one listed with the needs-list line it breaks and the
       preparer's acceptance recorded in `gaps_accepted`. A beat may be reported as untested; it is
       never reported as passing on a guess.
-- [ ] **The run sheet produced** — by `demo-run-sheet`, in the chosen format, on disk, with its
+- [ ] **The handover report produced** — by `demo-run-sheet`, in the chosen format, on disk, with its
       path given.
 - [ ] **The material recorded with its coverage** — the harvest's coverage record read against the
       phase-2 needs list, with what was not covered stated rather than omitted.
@@ -437,7 +437,7 @@ Format: **signature → cause → fix.**
 
 - **Quoted UI strings from the scope replaced with the agent's own phrasing** → the script was
   summarised instead of quoted → every quoted string is carried character for character out of the
-  brief, and is fixed wording from that moment for brand-project, the CMS pass and the run sheet.
+  brief, and is fixed wording from that moment for brand-project, the CMS pass and the handover report.
 
 - **Content work answered with new features — product hotspots, quick view, a bundle builder slipped into
   the look-and-content work** → a demo-script wish was read as part of the restyle → phase 2's rule:
@@ -454,7 +454,7 @@ Format: **signature → cause → fix.**
 
 - **The first end-to-end walk of the demo is the preparer's, live** → there is no phase
   between "it booted" and "it is ready" → phase 6: every beat is walked, in the browser, as its
-  persona, before the run sheet is written.
+  persona, before the handover report is written.
 
 - **A phase 5 delegation is about to start while `.ai-dev/demo-prep.md` carries no
   `answers_confirmed_at`** → the routing table was never confirmed → do not stamp the file to get past

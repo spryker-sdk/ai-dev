@@ -29,7 +29,7 @@ up_front:                               # the one sitting (SKILL.md, Run modes) 
   shop_name: <name>                     # demo fast path — unmodified demoshop only
   stores: [{ country: DE, languages: [de_DE], currency: EUR }]
   sample_products: keep                 # keep | replace | trim: [<category>, …]
-  run_sheet_format: html                # html | doc | chat | markdown — demo-run-sheet §0's four options
+  handover_format: html                 # html | markdown — demo-run-sheet §0's two options
   harvest_root: ../<customer>-harvest/  # harvest-source-materials §1 — derived, shown at the confirmation
 ---
 ## Steps
@@ -67,8 +67,8 @@ up_front:                               # the one sitting (SKILL.md, Run modes) 
 - **A step is `done` only with its evidence.** `build` → `.ai-dev/verifier-report.md`, and a
   `.ai-dev/design-acceptance.md` newer than the newest template or style edit and the last rebuild;
   `rehearsal` → `.ai-dev/rehearsal.md` with pass/gap lines written after the last rebuild (and the same
-  design-acceptance rule after a template or style fix); `demo-run-sheet` → `.ai-dev/demo-run-sheet.html`,
-  `.md` or `.txt`.
+  design-acceptance rule after a template or style fix); `demo-run-sheet` →
+  `.ai-dev/demo-handover-report.html` or `.md`.
 - **An autonomous run does not end its turn early.** While `run_mode: autonomous` and the Steps table
   has a row that is not `done` or `skipped`, the Stop guard (`hooks/guard-stop.php`,
   [`hooks/README.md`](../../../hooks/README.md)) keeps the turn going; it lets the turn end on a question
