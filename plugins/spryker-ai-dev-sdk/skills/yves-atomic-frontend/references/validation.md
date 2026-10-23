@@ -1,6 +1,6 @@
 # Yves Frontend Validation
 
-Commands and the non-negotiables are in `.claude/rules/yves-frontend.md`. This file holds the mechanics
+Commands and the non-negotiables are in the `yves-frontend` rule. This file holds the mechanics
 behind them. Check `package.json` `scripts` first — `yves:lint:fix` and `yves:stylelint:fix` do not exist.
 
 ## Where checks run

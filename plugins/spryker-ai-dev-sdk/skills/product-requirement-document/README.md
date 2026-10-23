@@ -34,12 +34,12 @@ flowchart TD
     subgraph P0["Phase 0 — Research FIRST 🔬 REQUIRED (code before docs)"]
         R2["Codebase facts — INLINE, always, FIRST<br/>getSprykerModules ·<br/>getSprykerModuleMap ·<br/>getTransferStructureByName<br/>→ form a hypothesis"]
         R2 --> Q1{"Ask: research<br/>official docs?"}
-        Q1 -- "yes" --> R1["Dispatch spryker-docs-research<br/>as subagent(s) via Agent tool,<br/>targeted by the hypothesis,<br/>non-overlapping scopes; merge briefs<br/>(harness forbids subagents →<br/>ask consent, else run inline)"]
+        Q1 -- "yes" --> R1["Dispatch spryker-docs-research<br/>as subagent(s) via the harness's<br/>subagent tool, targeted by the hypothesis,<br/>non-overlapping scopes; merge briefs<br/>(harness forbids subagents →<br/>ask consent, else run inline)"]
         Q1 -- "no" --> MCP
         R1 --> MCP{"Tooling MCP<br/>connected?"}
         MCP -- "no" --> MCPFIX["Start the server<br/>docker/sdk run → ask user<br/>to reload /mcp → wait"]
         MCPFIX --> MCP
-        MCP -- "still down x2" --> FALL["Fall back to grep/Read<br/>and say so explicitly"]
+        MCP -- "still down x2" --> FALL["Fall back to the built-in<br/>file read/search tools<br/>and say so explicitly"]
         MCP -- "yes" --> Q3
         FALL --> Q3{"Extends an existing flow?<br/>Ask: validate against<br/>the running app?"}
         Q3 -- "yes" --> R3["Invoke spryker-runtime<br/>observe today's behavior"]
@@ -47,7 +47,7 @@ flowchart TD
         R3 --> DONE0
     end
 
-    P0 --> P1["Phase 1 — Requirements gathering<br/>AskUserQuestion: problem,<br/>constraints, preliminary goals"]
+    P0 --> P1["Phase 1 — Requirements gathering<br/>structured question: problem,<br/>constraints, preliminary goals"]
     P1 --> P2{"Phase 2 CHECKPOINT<br/>Background + 3–5<br/>measurable Goals approved?"}
     P2 -- "no" --> P1
     P2 -- "yes" --> P3
@@ -89,15 +89,15 @@ endpoint is confirmed at the story checkpoint and merely written down afterwards
 | Phase | Delegates to |
 |---|---|
 | 0 · codebase facts (first, always) | Spryker tooling MCP, inline: `getSprykerModules`, `getSprykerModuleMap`, `getTransferStructureByName` + `deploy.dev.yml` |
-| 0 · docs (opt-in, targeted by the codebase hypothesis) | `Skill(spryker-docs-research)` — dispatched via the **Agent** tool as one or more subagents with non-overlapping scopes; if the harness forbids unrequested subagents, ask consent, else run inline and say so |
-| 0 · running app (opt-in) | `Skill(spryker-runtime)` — validate existing flows, confirm users at `/user` and roles at `/acl` |
-| 1–8 · every checkpoint | `AskUserQuestion` |
+| 0 · docs (opt-in, targeted by the codebase hypothesis) | the `spryker-docs-research` skill — dispatched with your harness's subagent tool as one or more subagents with non-overlapping scopes; if the harness forbids unrequested subagents, ask consent, else run inline and say so |
+| 0 · running app (opt-in) | the `spryker-runtime` skill — validate existing flows, confirm users at `/user` and roles at `/acl` |
+| 1–8 · every checkpoint | a structured multiple-choice question (your harness's question tool if it has one, otherwise asked in chat) |
 
 ## Files
 
 | File | Role |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The spine — the 9 phases, critical requirements, `AskUserQuestion` usage, storage locations, red flags, and the interactive checklist. |
+| [`SKILL.md`](SKILL.md) | The spine — the 9 phases, critical requirements, structured-question usage, storage locations, red flags, and the interactive checklist. |
 | [`workflow.md`](workflow.md) | The detailed phase-by-phase interactive script. |
 | [`actors.md`](actors.md) | The canonical actor set — Back Office user, Customer, Company user (Customer), Agent, Merchant user, Merchant Agent — where each operates, how each authenticates, the Merchant user vs. Merchant Agent scope distinction, and story phrasing. |
 | [`gherkin-guide.md`](gherkin-guide.md) | Strict Gherkin rules: one behavior per scenario, max 3–4 steps, everything quantified, plus common mistakes and a validation checklist. |

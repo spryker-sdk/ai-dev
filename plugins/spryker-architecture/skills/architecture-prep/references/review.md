@@ -14,9 +14,9 @@ that every claim about the platform must be grounded in real Spryker capabilitie
 ## How the reviewer runs
 
 - **Read-only.** The reviewer does not edit `architecture/`. It reports; the orchestrator (Gated) or a
-  targeted fix pass (Autonomous) applies changes. Spawn it as an `Explore` or fresh `general-purpose`
-  subagent on a Claude model, fed: the list of written files, `intake.md`, `research-docs.md`, and
-  this `review.md`.
+  targeted fix pass (Autonomous) applies changes. Spawn it with your harness's subagent tool as a
+  read-only research subagent or a fresh general-purpose subagent on a full-strength model, fed: the
+  list of written files, `intake.md`, `research-docs.md`, and this `review.md`.
 - **Scope = the sections actually written this run.** Don't fault an untouched template section that
   wasn't in scope. Do fault a section that was *supposed* to be written but left as template example
   content (SAP/Akeneo/Auth0 leftovers) — that's the #1 silent failure.

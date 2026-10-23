@@ -108,9 +108,9 @@ flowchart TD
 
 ## Usage
 
-**Locate the engine:** `.claude/skills/static-validation/scripts/static-check-diff.sh` (setup install,
-relative to the project cwd) or `${CLAUDE_PLUGIN_ROOT}/skills/static-validation/scripts/static-check-diff.sh`
-(plugin install). `$SCD` below is shorthand for whichever resolves — substitute it inline as a literal path.
+**Locate the engine:** `<skill-dir>/scripts/static-check-diff.sh`, where `<skill-dir>` is the path
+reported as `Base directory for this skill:` when the skill loads — that line is correct for every
+install. `$SCD` below is shorthand for that path — substitute it inline as a literal path.
 
 **Run from the Spryker project root** (the directory containing `docker/sdk`), or pass `--repo <path>`.
 The project to validate comes from your cwd or `--repo`, never from the skill's install location —

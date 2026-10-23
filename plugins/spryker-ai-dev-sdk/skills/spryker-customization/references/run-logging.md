@@ -5,11 +5,11 @@ than once. The run keeps a written trail so the commit gate is judged on evidenc
 and so a resumed or compacted run can re-orient. This **records** the workflow — it does not change any
 step's behavior, gates, or ordering.
 
-**Where.** One per-run folder, anchored to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`,
-with a `$(pwd)` fallback) so it is stable regardless of the current working directory:
+**Where.** One per-run folder, anchored to the project root — run from there, so the path is stable
+regardless of where a later command is issued:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/spryker-customization/<feature-slug>/
+$(pwd)/.ai-dev/spryker-customization/<feature-slug>/
 ```
 
 `<feature-slug>` is the same slug used for the `ai-customize/<slug>` branch. Keep **all** run files
@@ -28,9 +28,9 @@ Three files, three distinct roles — keep them separate:
 are settled (those answers are the first thing worth recording) and before Step 0c / Intake. Write to
 it continuously from that point on — never reconstruct the log at the end.
 
-Because this skill does file work with **native tools, not `Bash`** (see the SKILL.md "What you do NOT
-do"), create and update these files with `Write` / `Edit` / `Read`, using project-relative paths. The
-shape of a `run.log` line:
+Because this skill does file work with **the built-in file read / write / edit tools, not the shell**
+(see the SKILL.md "What you do NOT do"), create and update these files with those tools, using
+project-relative paths. The shape of a `run.log` line:
 
 ```
 [2026-08-10 14:02:11] STEP 4 — edit | START
@@ -79,7 +79,7 @@ status: in-progress
 
 - **Bulk output goes to a file, not into the log or your context.** A subagent returns a compact
   verdict; its raw output (screenshots list, page text, phpstan report, review findings) belongs in
-  `$BUILD_DIR/<stage>-<n>.log`. Keep the `run.log` line to the outcome plus that filename, and `Read`
+  `$BUILD_DIR/<stage>-<n>.log`. Keep the `run.log` line to the outcome plus that filename, and read
   the file later only if you need specific lines.
 - **Never log a step green that wasn't.** A skipped phase, a blocked verification, or an AC that is
   still red after retries is logged as exactly that. The Step 8 report is built from this log, so its

@@ -13,8 +13,8 @@ the installed ShopUi `Component` does and doesn't have, widget registration and 
 the lint blind spots (ESLint may not cover project TS, `--fix` is ignored, Twig and accessibility are
 unchecked).
 
-The always-loaded companion rule `yves-frontend` (`data/rules/yves-frontend.md`, installed as
-`.claude/rules/yves-frontend.md`) holds the non-negotiables; this skill holds the workflow.
+The companion rule `yves-frontend` (`rules/yves-frontend.md` in this plugin) holds the
+non-negotiables; this skill holds the workflow.
 
 ## When it triggers
 

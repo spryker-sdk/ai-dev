@@ -42,12 +42,12 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    exclude, or a detector's exclude list — none of which is ever part of an upgrade's deliverable.
 
 **Plan tracking is mandatory.** At the end of Phase 0, create one `TaskCreate` task each for Phase
-0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5 and 7,
+0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5, 6.8 and 7,
 and drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
 detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
-**Locate the scripts:** `.claude/skills/spryker-upgrade/scripts/` (setup install) or
-`${CLAUDE_PLUGIN_ROOT}/skills/spryker-upgrade/scripts/` (plugin install). `$UP` below stands for
+**Locate the scripts:** `<skill-dir>/scripts/`, where `<skill-dir>` is the path reported as
+`Base directory for this skill:` when this skill loaded — that line is correct for every install. `$UP` below stands for
 whichever resolves — substitute it inline as a literal path; never set a shell variable and never
 `cd`, both prompt on every call. Run them from the project root: they write every snapshot and report
 into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The twenty-one scripts are listed in
@@ -179,7 +179,7 @@ per `<Layer>/<Module>`) with what the suite touches, and ranks the gaps. Wiring 
 providers. Exit 1 means at least one HIGH-risk module has no test at all.
 
 Report two numbers to the developer — business-logic overrides, and how many sit in modules with no
-test — and ask with AskUserQuestion:
+test — and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait):
 
 - **Write tests for the HIGH-risk gaps first (recommended)** — a test written after the upgrade pins
   whatever the upgrade produced.
@@ -196,7 +196,15 @@ writing to `codecept-functional`. The rules:
   test (which class or value a method returns). They stay green whatever the upgrade does.
 - No mocked host-PHP unit tests of models as the default.
 
-Commit the tests on their own, green against the current version, before the upgrade branch diverges.
+Commit the tests on their own branch, green against the current version — that branch becomes **the
+tests pull request**, and the upgrade branch starts from it. With no new tests there is no tests pull
+request; record why (the developer proceeded without them, or the suite already covered the gaps) for
+the handover report.
+
+**Log every defect that already exists on the current release** in `.spryker-upgrade/state/findings.md`
+([references/handover-report.md](references/handover-report.md) § The findings log). A test pins current
+behaviour, wrong or not; the log is how the wrong behaviour reaches the project team. Keep logging in
+every later phase — Phase 0's red tests, the Back Office crawl baseline, the verifier, lane reading.
 
 ## Phase 1 — Target selection (developer gate #2)
 
@@ -214,10 +222,18 @@ grep '"spryker-feature/' composer.json    # the intent, for comparison only
    file only (matrix row 38: a lock too stale to trust). *Failure signature:* a target chosen from a
    `^x.y` constraint, so the report's "current" release is not the one the lock installed.
 2. Find newer releases (`composer show -a spryker-feature/spryker-core | grep versions`) and ask with
-   AskUserQuestion — never pick silently: **next release group (recommended)** — the smallest
+   a structured question — never pick silently: **next release group (recommended)** — the smallest
    reviewable step, repeating the skill per release — or **latest release**, one big jump.
+3. **Read the security release notes** that Spryker published after the starting release
+   (https://docs.spryker.com/docs/about/all/releases/security-releases/). Per issue, add one row to
+   `.spryker-upgrade/state/security-fixes.md`: `| <issue> | <affected modules: fixed version> |
+   <extra steps> | <status> |`. Extra steps are all actions in the note's fix section other than the
+   module update. Offline: say so, and the reports say that the security fixes are not checked.
 
 ## Phase 1.2 — Tooling, Docker SDK and deploy files
+
+Start the release-steps log `.spryker-upgrade/state/release-steps.md` here, and add to it in every
+later phase ([references/release-steps.md](references/release-steps.md) § 1).
 
 The target release also means a Docker SDK version, an image, and the dev tooling its code is checked
 with; the Spryker composer update touches none of them. Align them with the **reference demo shop of
@@ -279,6 +295,13 @@ advisory blocking, and never drop a package to make the tree resolve (Lane 5).
 3. On resolution failure read `composer why-not`, adjust the blocking constraint, retry. Never
    `--ignore-platform-reqs`. Record every constraint the resolver changed — the diff is reviewed.
 4. A tooling step Phase 1.2 deferred runs now, as its own commit, re-baselined before Phase 3.
+5. **Check `security-fixes.md` against `composer.lock`.** Do each extra step that changes project
+   code or configuration, in its own commit. Put each step for the environments (a variable, a
+   command) into the release-steps log. A module below its fixed version: set its constraint to
+   `^<fixed version>` and run `script -q /dev/null docker/sdk cli composer update <module>
+   --with-dependencies`, as its own commit. When that does not resolve, it goes to the developer with
+   the `composer why-not` output. Set the status: `fixed`, `fixed, release step`, `not fixed: <why>`, or `not affected:
+   <why>` (for example, the project does not install the module).
 
 ## Phase 3 — Detection (run all, collect before resolving)
 
@@ -299,13 +322,20 @@ composer-merge-plugin, add `vendor/<vendor>/<pkg>/Bundles`). Subtract the Phase 
 a summary: packages moved (majors highlighted), conflicts per lane, NEW packages, deprecated items.
 PHPStan errors only a database, a search backend or the bootstrap explain are environment gaps (matrix #50).
 
+**Security fixes in project overrides.** For each `fixed` row in `security-fixes.md`, find the
+vendor files that the fix changed (the module's tag diff between the old and the new version). Find
+the project files that replace or extend them: classes in `src/Pyz` and the Twig overrides that
+`twig-shadow-map.php` lists. A vendor update does not reach these files. Do not change them: the fix
+can change the project's behavior. Set the status to `not fixed: project override <file>` and write
+the recommended fix next to it. Lanes 1 and 2 do not port these changes either.
+
 ## Lane 0 — Migration guides (mandatory for every major bump)
 
 For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.json`:
-1. Locate the guide — the `spryker-docs-research` skill, or WebSearch
+1. Locate the guide — the `spryker-docs-research` skill, or a web search for
    `site:docs.spryker.com upgrade the <Module> module` ("Upgrade the <Module> module" pages under
    `docs.spryker.com/docs/pbc/all/<pbc>/<version>/…/upgrade-modules/`).
-2. WebFetch it and extract the sections for the crossed major boundary only (e.g. 10.x → 11.0).
+2. Fetch it with your harness's web fetch tool and extract the sections for the crossed major boundary only (e.g. 10.x → 11.0).
 3. **Sort the steps into two piles before executing any of them** — guides freely mix them, and the
    distinction is the Scope rule applied:
    - **Required to keep working** — interface swaps, constant→config-method moves, plugin rewiring,
@@ -359,7 +389,7 @@ parents and instantiated classes). Per item, analyse the old item and its replac
 config or data needed, position in the stack); and a recommendation (swap, swap plus config, port, or
 keep for now).
 
-Present the table ([references/lanes.md](references/lanes.md) has the format) with AskUserQuestion
+Present the table ([references/lanes.md](references/lanes.md) has the format) with a structured question
 (multiSelect: apply now / defer / keep) and apply only what the developer chose, one item at a time,
 linting every touched file and running the covering test — a chosen replacement is not a Scope
 violation. Deferred and kept items go into the report with their analysis.
@@ -403,7 +433,9 @@ Read [references/verification.md](references/verification.md) before the first o
 
 - **Check `git status` after every command** — regeneration deletes tracked migration files and writes
   generated config into unignored paths (matrix #61/#62). Command names differ; read `console list`.
-- A non-empty migration diff goes to the developer before anything touches a database.
+- A non-empty migration diff goes to the developer before anything touches a database. Record each
+  migration for the handover report: what it changes, its data-loss risk, and what its down migration
+  drops or narrows.
 - **Sniffer:** auto-fix the PHP files the upgrade changed first (`-f`), then compare with the sniffer
   baseline. A new violation blocks, like a PHPStan or evaluator regression.
 - Tests: compare per suite with the test baseline, with the pinned invocation.
@@ -436,9 +468,14 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 2. **New capabilities inside modules the project already had** — Lane 0's second pile, a
    `class_exists` branch (matrix #64), a new extension point (performance fixes: Phase 6.2, not here).
 
-Fetch each description (`composer show <pkg>` + release notes) and ask with AskUserQuestion
+Fetch each description (`composer show <pkg>` + release notes) and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait)
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
 accepted feature follows its integration guide, in its own commit. REMOVED packages: explain each.
+
+For the handover report, also list what Spryker released after the starting release, up to the target,
+that the project could adopt — from the release notes (`spryker-docs-research`), not only the lock
+diff. Per feature: what it does, what it requires, its third-party costs, and whether it installs with
+little change to project code, needs an outside service, or changes project code.
 
 ## Phase 6.2 — Performance fixes
 
@@ -447,7 +484,7 @@ published today into `.spryker-upgrade/state/spryker-docs` (offline: `--unreacha
 page; read-only sub-agents per page group record its fixes, never from memory, each sized (`S` config value
 or flag, `M` package update or a few files, `L` refactor, schema change or many files) with its files and
 expected gain, or the page's `--no-fix` reason. `S` fixes apply without asking; the `M`/`L` fixes
-(`--decisions`) take one AskUserQuestion — apply now / defer / skip each, recorded with `--decide`. Keep
+(`--decisions`) take one structured question — apply now / defer / skip each, recorded with `--decide`. Keep
 visible behaviour (else `not-applied`); one fix at a time, own commit, checks and a before/after comparison
 per customer type, reverted on failure. `php $UP/check-performance.php --verify` exits 0 before Phase 6.5.
 
@@ -473,14 +510,31 @@ breaks. So this phase has two parts, in order:
 
 Console errors, 500s and missing styling are upgrade damage; an unvisited page counts as unverified.
 
+## Phase 6.8 — Release steps verification
+
+Prove the commands that staging and production must run after the normal deployment. Do
+[references/release-steps.md](references/release-steps.md) § 2 exactly, in its order.
+
 ## Phase 7 — Report & handoff
 
 `php $UP/check-added-comments.php` and `php $UP/check-performance.php --verify` exit 0 first. Then
-write the report with the sections [references/verification.md](references/verification.md) lists
-(shape: [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red before
-the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
-Separate what is proven from what merely has not failed yet, and name the damage class every skipped
-check would have caught. Ask before committing; suggest one PR per release group.
+write two reports:
+
+- **The developer report** — the sections [references/verification.md](references/verification.md)
+  lists (shape: [EXAMPLE-UPGRADE-REPORT.md](EXAMPLE-UPGRADE-REPORT.md)), including **Tests already red
+  before the upgrade** under its own heading, the gate #3 deprecation table and **Performance fixes**.
+  Separate what is proven from what merely has not failed yet, and name the damage class every
+  skipped check would have caught.
+- **The handover report** for the development team — Markdown or HTML for a paste into Confluence;
+  ask the person which one. [references/handover-report.md](references/handover-report.md) (shape:
+  [EXAMPLE-HANDOVER-REPORT.md](EXAMPLE-HANDOVER-REPORT.md)).
+
+Write both reports by the writing rules in
+[references/handover-report.md](references/handover-report.md) § Writing rules.
+
+Deliver two pull requests: the tests pull request first, the upgrade pull request built on it — or the
+upgrade pull request alone when there were no new tests. One upgrade pull request per release group.
+Ask before committing or opening a pull request.
 
 ## Hard rules
 

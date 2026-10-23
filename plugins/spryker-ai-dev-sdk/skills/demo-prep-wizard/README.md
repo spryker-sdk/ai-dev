@@ -1,7 +1,7 @@
 # demo-prep-wizard
 
 Prepare a **customer demo end to end** on the demo clone — intake, requirements, design reference,
-harvest, build, rehearsal and run sheet — as one guided run.
+harvest, build, rehearsal and handover report — as one guided run.
 
 It is the demo-side parallel of [project-starter-wizard](../project-starter-wizard/README.md): that one
 turns a demoshop clone into a project, this one prepares the demo on it. It **orchestrates and owns no
@@ -33,7 +33,7 @@ flowchart TD
     P2 --> C2{"Confirm the table once<br/>'Shown — look and content'<br/>'Shown — a small working version'<br/>'Left out'"}
     C2 -- "changes" --> P2
     C2 -- "confirmed" --> STAMP["Stamp answers_confirmed_at<br/>first write of .ai-dev/demo-prep.md"]
-    STAMP --> SIT["The one sitting<br/>products · intake open questions ·<br/>demo fast path questions · run-sheet format ·<br/>run mode last"]
+    STAMP --> SIT["The one sitting<br/>products · intake open questions ·<br/>demo fast path questions · handover report format ·<br/>run mode last"]
     SIT --> UF["One confirmation of every answer<br/>+ derived value (reference sites, harvest folder)<br/>→ up_front: · stamp up_front_confirmed_at"]
     UF --> NEEDS["Needs list, beat by beat<br/>products · categories · facets · personas ·<br/>blocks (exact wording) · imagery<br/>→ ## Needs, one-line summary shown"]
     NEEDS --> P3["3 · Design reference — match-reference-design<br/>against up_front.reference_sites<br/>spec.md, before harvest: it sizes the editorial imagery"]
@@ -42,12 +42,12 @@ flowchart TD
     G4 -- "gap" --> GAP["Carried forward, named<br/>never closed by substitution"]
     GAP --> P5
     G4 -- "covered" --> P5["5 · Build — the project track<br/>project-data · define-stores · translate-content ·<br/>match-reference-design · boot-and-verify ·<br/>spryker-customization demo preset per PoC row<br/>3rd rebuild: log the reason, continue"]
-    P5 --> P6["6 · Rehearsal<br/>validate.php demo-needs first,<br/>then walk every beat in Claude in Chrome;<br/>logins → spryker-verifier"]
+    P5 --> P6["6 · Rehearsal<br/>validate.php demo-needs first,<br/>then walk every beat in the browser;<br/>logins → spryker-verifier"]
     P6 --> G6{"Every beat pass, or a<br/>named gap?<br/>.ai-dev/rehearsal.md"}
     G6 -- "fixable" --> P5
-    G6 -- "yes" --> P7["7 · Run sheet — demo-run-sheet<br/>format from up_front.run_sheet_format<br/>local copy always on disk"]
+    G6 -- "yes" --> P7["7 · Handover report — demo-run-sheet<br/>format from up_front.handover_format<br/>Markdown or HTML on disk"]
     P7 --> MODE{"run_mode?"}
-    MODE -- "autonomous" --> FR(["One final review<br/>reference next to result · PoC screenshots ·<br/>gaps · the look matched to + the pictures and<br/>texts gathered, taken as recommended ·<br/>run sheet path → gaps_accepted"])
+    MODE -- "autonomous" --> FR(["One final review<br/>reference next to result · PoC screenshots ·<br/>gaps · the look matched to + the pictures and<br/>texts gathered, taken as recommended ·<br/>handover report path → gaps_accepted"])
     MODE -- "collaborative" --> CL(["'Continue to next phase?'<br/>was asked at every boundary"])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
@@ -67,7 +67,7 @@ classes. Class and owner skill per row are recorded in `.ai-dev/demo-prep.md`, n
 |---|---|---|
 | setup · data · design · *already works* | **Shown — look and content** (the default, the bulk of every demo) | the project track, no code |
 | customization | **Shown — a small working version**, with what it looks like and roughly how long it takes | `spryker-customization` at the PoC quality bar |
-| not worth its cost to the story | **Left out**, offered as a talking point on the run sheet | nobody |
+| not worth its cost to the story | **Left out**, offered as a talking point in the handover report | nobody |
 
 The audience (`business`, `consumer` or `both`) comes from the intake and is served by the single
 `b2b-demo-marketplace` clone. A consumer demo always gets two rows of its own. **Guests see prices and can
@@ -88,7 +88,7 @@ are asked in the sitting.
 
 The **needs list** is then derived mechanically from the supplied demo, beat by beat, into
 `## Needs` in the state file. It is the harvest's shopping list, the rehearsal's acceptance criterion
-and the run sheet's source of beats, and its `key: value` shape is what `validate.php demo-needs` parses.
+and the source of the handover report's demo points, and its `key: value` shape is what `validate.php demo-needs` parses.
 
 ## Files
 
@@ -120,13 +120,13 @@ path and the plain-language table) and `autonomous-runs.md`.
 - **Content, look and story questions only.** A question that cannot be phrased without a technical
   term is not the preparer's — it is decided, logged in the decision log, and not asked.
 - **Quoted UI strings are fixed wording from the moment the brief is read** — copied character for
-  character by the content pass and the run sheet.
+  character by the content pass and the handover report.
 - **Design before harvest.** The composition spec decides how much editorial imagery is fetched;
   harvesting first means fetching without the ratios and fetching again.
 - **A gap is named, never filled.** A need the source cannot supply is a gap line; behaviour the platform
   lacks is its own customization row, built only once confirmed.
 - **Rehearsal is its own phase**, so the first end-to-end walk happens before the demo, not during it. The mechanical check runs first; the browser walk proves the story reads well.
-- **The local shop is driven in Claude in Chrome**, never the built-in browser, which prompts on every
+- **The local shop is driven through a browser-automation MCP server**, never a built-in browser pane, which prompts on every
   action for a local host.
 - **What crosses a phase boundary is an artifact** — the intake block, the needs list, `spec.md`, the
   coverage record, `rehearsal.md` — so a resume hours later has the file, not the chat.
@@ -139,17 +139,17 @@ path and the plain-language table) and `autonomous-runs.md`.
   `up_front_confirmed_at`.
 - A step is `done` only with its evidence: `.ai-dev/verifier-report.md` for the build,
   `.ai-dev/design-acceptance.md` after template or style edits, `.ai-dev/rehearsal.md` pass/gap lines
-  written after the last rebuild, and `.ai-dev/demo-run-sheet.html`, `.md` or `.txt` for the run sheet.
+  written after the last rebuild, and `.ai-dev/demo-handover-report.html` or `.md` for the handover report.
 - In an autonomous run the Stop guard (`hooks/guard-stop.php`, [hooks/README.md](../../hooks/README.md))
   keeps the turn going while a step is neither `done` nor `skipped`, unless the turn ends on a question
-  only the preparer can answer, a `NEEDS YOU:` line, or an AskUserQuestion.
+  only the preparer can answer, a `NEEDS YOU:` line, or a structured question.
 
 ## Output
 
 A booted demo shop carrying the harvested material; `.ai-dev/demo-prep.md` with the confirmed routing,
 `up_front:` answers, the needs list, the decision log and accepted gaps; `.ai-dev/rehearsal.md` with
-pass/gap per beat; and the run sheet on disk. The close walks four lines with their evidence — every beat
-rehearsed, every gap named and accepted, the run sheet produced, the material recorded with its coverage.
+pass/gap per beat; and the handover report on disk. The close walks four lines with their evidence — every beat
+rehearsed, every gap named and accepted, the handover report produced, the material recorded with its coverage.
 Anything short of all four is reported as what it is.
 
 ## Packaging note

@@ -209,7 +209,7 @@ three options, all three offered, none ranked in the README:
    to match.
 2. **Change the beat** — the preparer rewrites it so it demonstrates something the source
    supports.
-3. **State the limitation** — the demo shows it as-is and the limitation goes on the run sheet.
+3. **State the limitation** — the demo shows it as-is and the limitation goes into the handover report.
 
 **There is no fourth option:** no invented attribute, no value borrowed from a neighbouring
 product, no category filled out to look fuller. Marking ordinary products with an attribute

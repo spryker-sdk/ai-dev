@@ -24,7 +24,7 @@ It triggers for any Back Office page work: "create a Back Office page", "add an 
 "override a Zed template", "add BO navigation", "add a menu entry", "BO JS/SCSS", "Bootstrap classes in
 Zed", "my Zed override is not picked up", "the new menu item does not show".
 
-The always-loaded companion rule `zed-backoffice-frontend` (`data/rules/zed-backoffice-frontend.md`)
+The companion rule `zed-backoffice-frontend` (`rules/zed-backoffice-frontend.md` in this plugin)
 carries the non-negotiables. This skill carries the procedure.
 
 ## Flow schema

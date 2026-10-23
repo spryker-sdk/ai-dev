@@ -2,15 +2,15 @@
 
 The detail behind `SKILL.md` → Run logging.
 
-Every run keeps a plain-text trail so a completed onboarding can be audited afterwards: what the mode
-decision was, which steps ran, what each one changed, and what was skipped because it was already in
+Every run keeps a plain-text trail so a completed onboarding can be audited afterwards: what the harness and mode
+decisions were, which steps ran, what each one changed, and what was skipped because it was already in
 place. This does **not** change any step's behavior — it records what the steps already do.
 
-**Where.** One per-run folder, anchored to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`,
-with a `$(pwd)` fallback) so it is stable regardless of the current working directory:
+**Where.** One per-run folder under the project root. **Run this skill from the project root** so the
+path below resolves consistently regardless of where the harness started:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.ai-dev/ai-dev-setup/<run-id>/
+$(pwd)/.ai-dev/ai-dev-setup/<run-id>/
 ```
 
 `<run-id>` is the UTC start timestamp (`YYYYMMDD-HHMMSS`). Keep **all** run files inside `$SETUP_DIR` —
@@ -21,7 +21,7 @@ decision is the first thing worth recording), before Requirements / Preflight in
 before Step 5 in update flow.
 
 ```bash
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+PROJECT_DIR="$(pwd)"
 SETUP_DIR="$PROJECT_DIR/.ai-dev/ai-dev-setup/$(date -u '+%Y%m%d-%H%M%S')"
 mkdir -p "$SETUP_DIR"
 SETUP_LOG="$SETUP_DIR/run.log"

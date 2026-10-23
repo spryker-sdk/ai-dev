@@ -72,7 +72,7 @@ pages themselves.
 5. **Check the derivation:** `php $UP/check-performance.php --verify` lists every page still
    `pending`. Derive those before going on.
 6. **The developer's decision:** `php $UP/check-performance.php --decisions` lists the `M` and `L`
-   fixes. Ask once with AskUserQuestion, every fix with its size, files and expected gain, and per fix
+   fixes. Ask once with a structured question, every fix with its size, files and expected gain, and per fix
    apply now / defer / skip; record each answer with `--decide` (§ Size and the developer's decision).
 7. **Apply the `pending` fixes, one at a time** — the `S` fixes and the `M` and `L` fixes the developer
    chose to apply — in this order: packages, then configuration and wiring, then code, then schema
@@ -182,7 +182,7 @@ A fix that fits two sizes takes the larger. Size, touches and gain are recorded 
 is detected; `not-applicable` fixes need none of them.
 
 After the derivation, `--decisions` lists every `pending` `M` and `L` fix with its size, files and
-expected gain. One AskUserQuestion covers them all (multiSelect, or one choice per fix: apply now /
+expected gain. One a structured question covers them all (multiSelect, or one choice per fix: apply now /
 defer / skip). Each answer is recorded:
 
 ```bash
@@ -243,7 +243,7 @@ For a fix whose page names package minimums (`M`, applied after the developer's 
 ## Schema changes
 
 A fix that changes the database schema (an index, a table) is `L` and creates a migration. After the
-`apply` decision, show the developer the `propel:diff` result with AskUserQuestion before it touches a
+`apply` decision, show the developer the `propel:diff` result with a structured question before it touches a
 database; apply it only on their yes, otherwise restore the schema files and record
 `--decide <ID> --decision skip --reason "<the developer's answer>"`, with the diff in the reason. The
 migration file is part of the fix's commit.

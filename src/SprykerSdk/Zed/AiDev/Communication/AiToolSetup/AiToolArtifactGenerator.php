@@ -14,6 +14,14 @@ use SprykerSdk\Zed\AiDev\AiDevConfig;
 
 class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
 {
+    /**
+     * Agent file extensions that must be treated as a single unit when suffixing example artifacts,
+     * so that "x.agent.md" becomes "x-example.agent.md" and not "x.agent-example.md".
+     *
+     * @var array<string>
+     */
+    protected const array COMPOUND_AGENT_EXTENSIONS = ['.agent.md'];
+
     public function __construct(
         protected string $projectRoot,
         protected AiDevConfig $config,
@@ -352,6 +360,14 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
     {
         if ($mode !== ArtifactMode::Example) {
             return $fileName;
+        }
+
+        foreach (static::COMPOUND_AGENT_EXTENSIONS as $compoundExtension) {
+            if (str_ends_with($fileName, $compoundExtension)) {
+                $baseName = substr($fileName, 0, -strlen($compoundExtension));
+
+                return sprintf('%s-example%s', $baseName, $compoundExtension);
+            }
         }
 
         $baseName = pathinfo($fileName, PATHINFO_FILENAME);

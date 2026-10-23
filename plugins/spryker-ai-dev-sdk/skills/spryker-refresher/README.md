@@ -56,7 +56,7 @@ flowchart TD
 ## Touched file → command mapping
 
 The heart of the skill. Each row's trigger is independent — apply **every** row that matches a file in
-the change set. Claude runs on the host, so commands are invoked as `docker/sdk console <command>`
+the change set. Your coding agent runs on the host, so commands are invoked as `docker/sdk console <command>`
 (Composer as `docker/sdk cli composer <args>`).
 
 | Trigger | Commands |

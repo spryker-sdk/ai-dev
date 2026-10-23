@@ -26,7 +26,7 @@ flowchart TD
     A([Invoked]) --> IN["§0 One-line intake<br/>who (store / locale / actor) ·<br/>where (page + viewport) · what must be true after"]
     IN --> GOAL{"Stated fix = the goal,<br/>or a symptom?<br/>measurement vs composition"}
     GOAL --> REF{"Which reference site(s)?<br/>up_front.reference_sites, then project.reference_sites;<br/>ask only outside a demo run — never picked for them"}
-    REF --> CAP["§1 Capture in the browser<br/>reference + current shop, desktop and mobile<br/>local shop in Claude in Chrome"]
+    REF --> CAP["§1 Capture in the browser<br/>reference + current shop, desktop and mobile<br/>local shop via a browser MCP server"]
     CAP --> SPEC["Written spec.md, 6–10 lines<br/>structure only, every value measured<br/>getBoundingClientRect / getComputedStyle"]
     SPEC --> SOK{"run_mode: autonomous?"}
     SOK -- "yes" --> SLOG["Proceed on the spec, one decision line,<br/>pair shown at the final review"]
@@ -102,7 +102,7 @@ re-derived.
 
 ## Rules the agent follows
 
-The local shop is driven in Claude in Chrome, never the built-in browser, which asks the person on every
+The local shop is driven through a browser-automation MCP server, never a built-in browser pane, which asks the person on every
 action for a local host. Gitignored build output is never edited; the source goes under
 `frontend/static/**` or the theme. A design-closing step is `done` only with an evidenced
 `.ai-dev/design-acceptance.md` — no row without evidence, not the same token on every row, and not older

@@ -18,6 +18,7 @@
         "spryker/transfer": ">=3.27.0"
     },
     "require-dev": {
+        "codeception/module-asserts": "^3.3",
         "phpstan/phpstan": ">=1.12.29",
         "spryker-sdk/phpstan-spryker": ">=0.5.1",
         "spryker/code-sniffer": ">=0.17.30",
@@ -40,7 +41,8 @@
         "cs-check": "phpcs -p -s --standard=phpcs.xml src/ tests/",
         "architecture-check": "phpmd src/ text vendor/spryker/development/resources/phpmd/ruleset.xml --minimumpriority 2",
         "cs-fix": "phpcbf -p --standard=phpcs.xml src/ tests/",
-        "stan": "phpstan analyse src"
+        "stan": "phpstan analyse src",
+        "test": "codecept build && codecept run"
     },
     "extra": {
         "branch-alias": {

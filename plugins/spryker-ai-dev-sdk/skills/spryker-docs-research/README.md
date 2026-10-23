@@ -37,7 +37,7 @@ flowchart TD
     G --> H["(b) Docs corpus query<br/>query-docs, libraryId<br/>/spryker/spryker-docs<br/>≤3 specific queries"]
     E --> I
     H --> I{"Snippet enough<br/>to answer the task?"}
-    I -- "no" --> J["Fetch full page<br/>query-docs or WebFetch"]
+    I -- "no" --> J["Fetch full page<br/>query-docs or the<br/>web fetch tool"]
     J --> I
     I -- "yes" --> K["Extract substance:<br/>steps · requirements · options<br/>constraints · config, each<br/>tied to its Source URL"]
 

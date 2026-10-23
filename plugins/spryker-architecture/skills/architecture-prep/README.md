@@ -45,7 +45,7 @@ flowchart TD
     S0 --> S1
 
     S1 -->|"TAD / filled questionnaire"| S2
-    S1 -->|"interview needed"| Q{{"questionnaire.md → AskUserQuestion batches"}}:::web
+    S1 -->|"interview needed"| Q{{"questionnaire.md → batched multiple-choice questions"}}:::web
     Q --> S2
 
     subgraph Research["**Step 2** — Research (parallel teammates, shared once)"]

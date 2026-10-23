@@ -40,6 +40,35 @@ jobs:
             - name: Architecture sniffer checks
               run: composer architecture-check
 
+            - name: Tests
+              run: composer test
+
+    plugins:
+        name: Plugins
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v3
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.5'
+                  extensions: mbstring, intl, bcmath
+                  coverage: none
+
+            - name: Plugin manifests, skills and agents
+              run: php bin/lint-plugins.php
+
+            - name: Rule sync script
+              run: bash tests/scripts/test-sync-rules.sh
+
+            - name: Stop guard, under both harnesses
+              run: php plugins/spryker-ai-dev-sdk/hooks/hooks.test.php
+
+            - name: Both hook files declare the same hooks
+              run: php bin/lint-hook-parity.php
+
     lowest:
         name: Prefer Lowest
         runs-on: ubuntu-latest

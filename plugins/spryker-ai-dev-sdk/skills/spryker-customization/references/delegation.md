@@ -2,20 +2,19 @@
 
 ## Subagent delegation cheatsheet
 
-All of these ship as agent definitions (`.claude/agents/` for a setup install, or the plugin's `agents/` directory). Invoke them with the harness's subagent-spawning tool (commonly `Agent`), passing `subagent_type="<name>"` — never via the `Skill` tool.
+All of these ship as agent definitions — in the plugin's `agents/` directory, or in the harness's project agents folder on a setup install. Delegate to one with your harness's subagent tool, the same mechanism behind a custom agent or agent type, naming the agent below. They are agents, not skills: never invoke one the way you invoke a skill.
 
-**Agent type names are prefixed on a plugin install.** When these agents ship via the
-`spryker-ai-dev-sdk` plugin, the registered type carries the plugin prefix —
-`subagent_type="spryker-ai-dev-sdk:spryker-verifier"`, not the bare `spryker-verifier` (the
-`Agent` tool rejects an unregistered bare name with an "Agent type not found" error that lists
-the valid names). The bare names in this document are shorthand: try the bare name only on a
-setup install (`.claude/agents/`); if it fails to resolve, retry with the
-`spryker-ai-dev-sdk:` prefix before reporting a step blocked.
+**Agent names carry the plugin prefix on a plugin install, and the separator differs by harness.**
+Claude Code registers `spryker-ai-dev-sdk:spryker-verifier`; GitHub Copilot registers
+`spryker-ai-dev-sdk/spryker-verifier`. Either one rejects an unregistered bare name with an error
+that lists the valid names. The bare names in this document are shorthand: try the bare name only
+on a setup install; if it does not resolve, retry with your harness's prefixed form before
+reporting a step blocked.
 
 | Subagent | When to invoke |
 |---|---|
 | `spryker-feature-expert` | Before planning — *"how does this feature work?"*, *"how is X configured in this project?"*, *"what's the extension point for Y?"*. Parallel-invoke for multiple Spryker domains. |
-| *(architect pass)* | Step 3a when the Solution-design phase is on — a **fresh `general-purpose` subagent** briefed per [solution-design.md](solution-design.md). Never a fork and never the implementing context. |
+| *(architect pass)* | Step 3a when the Solution-design phase is on — a **fresh general-purpose subagent** briefed per [solution-design.md](solution-design.md). Never a fork and never the implementing context. |
 | `spryker-verifier` | After refresh — per-AC verification; browser-driving cases one at a time, browser-free cases (API, DB, console) may run together. |
 | `spryker-issue-diagnoser` | When verifier returns red or refresher fails — diagnose root cause before retrying. |
 | `spryker-data-seeder` | When a verification needs test data that doesn't yet exist. |
@@ -26,7 +25,7 @@ setup install (`.claude/agents/`); if it fails to resolve, retry with the
 
 ## Skill delegation cheatsheet
 
-These are **skills** (loaded into the main session), not subagents. Invoke via the `Skill` tool — never via `Agent`.
+These are **skills** (loaded into the main session), not subagents. Invoke each by its slash command (`/spryker-refresher`, or `/spryker-ai-dev-sdk:spryker-refresher` on a plugin install) — never hand one to the subagent tool.
 
 | Skill | When to invoke |
 |---|---|

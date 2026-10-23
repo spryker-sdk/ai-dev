@@ -28,33 +28,28 @@ the container) and always **from the Spryker project root** — the script locat
 project from the working directory, not from its own path.
 
 The container mounts only the project directory, so first set `SCRIPT` based on where
-this skill actually lives. Resolve the base directory in this order — do **not** hardcode
-an install path, since this skill ships as a plugin and its location varies:
+this skill actually lives. `<skill-dir>` below is the path reported as
+`Base directory for this skill:` when this skill loaded — do **not** hardcode an install
+path, since the location varies by harness and install method.
 
-1. `.claude/skills/spryker-profiler` (setup install, relative to the project cwd)
-2. `${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler` (plugin install)
-3. the "Base directory for this skill" line shown when the skill loaded, or failing that
-   the directory containing this SKILL.md
+Then pick the matching case:
 
-Then pick the matching case below:
-
-- **Base directory is inside the project** (e.g. `<project>/.claude/skills/spryker-profiler`):
+- **`<skill-dir>` is inside the project** (a copy under the project's own skills folder):
   use the script in place.
 
   ```bash
-  SCRIPT=.claude/skills/spryker-profiler/scripts/profiler-read.php
+  SCRIPT=<skill-dir>/scripts/profiler-read.php
   ```
 
-- **Base directory is outside the project** (installed as a plugin, e.g. under
-  `~/.claude/plugins/cache/...`): PHP inside the container cannot open that path —
-  running it directly fails with "Could not open input file". Copy the script into the
-  project once and use the copy (it is disposable; recreate it any time):
+- **`<skill-dir>` is outside the project** (installed as a plugin, so it lives in the
+  harness's plugin cache): PHP inside the container cannot open that path — running it
+  directly fails with "Could not open input file". Copy the script into the project once
+  and use the copy (it is disposable; recreate it any time):
 
   ```bash
-  mkdir -p .claude/tmp
-  # <base-directory> = whichever resolved above, e.g. ${CLAUDE_PLUGIN_ROOT}/skills/spryker-profiler
-  cp "<base-directory>/scripts/profiler-read.php" .claude/tmp/
-  SCRIPT=.claude/tmp/profiler-read.php
+  mkdir -p .ai-dev/tmp
+  cp "<skill-dir>/scripts/profiler-read.php" .ai-dev/tmp/
+  SCRIPT=.ai-dev/tmp/profiler-read.php
   ```
 
 Everything else is identical in both cases:
@@ -460,7 +455,7 @@ reasoning matters as much as the numbers.
 Ask which format they want if it is not obvious, and default to Markdown when there is no
 signal — it renders anywhere and diffs cleanly. Use standalone HTML when the user asks for
 HTML, or when the result is visual enough (comparison tables, before/after) that styling
-helps. Write it to `.claude/local-trash/` unless the user names a location.
+helps. Write it to `.ai-dev/local-trash/` unless the user names a location.
 
 ### Link to the profiler, do not copy it
 
@@ -497,7 +492,8 @@ inline as well.
 ## Interpreting findings
 
 Report the metric, the number, and the rule it violates — the project's performance
-rules live in `.claude/rules/performance.md` and are the reference for what "too many"
+rules live in the harness's rules folder (the `performance` rule for Claude Code,
+`.github/instructions/` for GitHub Copilot) and are the reference for what "too many"
 means. In short: per-item work inside a loop is the core anti-pattern, whether that is
 a query, a storage read, or an HTTP call.
 

@@ -174,7 +174,10 @@ that costs rather than omitting the section.
 
 ## Phase 7 — what the report contains
 
-[EXAMPLE-UPGRADE-REPORT.md](../EXAMPLE-UPGRADE-REPORT.md) shows the shape. Required sections:
+This is the developer report; the development team gets the handover report
+([handover-report.md](handover-report.md)). Both reports follow the writing rules in
+[handover-report.md](handover-report.md) § Writing rules. [EXAMPLE-UPGRADE-REPORT.md](../EXAMPLE-UPGRADE-REPORT.md)
+shows the shape. Required sections:
 
 1. **Versions moved** — release before/after, majors highlighted with the Lane 0 migration-guide table
    (guide URL or "none published", steps applied, steps deliberately not applied as new capabilities,
@@ -210,4 +213,4 @@ that costs rather than omitting the section.
     the container" and "the suite passes" are different statements). For every check that did not run,
     name it and the matrix row it would have caught.
 
-Ask before committing; suggest one PR per release group.
+Ask before committing; the pull requests to deliver are in SKILL.md § Phase 7.

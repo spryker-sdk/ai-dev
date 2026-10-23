@@ -10,8 +10,8 @@ description: Review code for compliance with Spryker standards
 3. Share output with reference to the specific rule or instruction that was violated
 
 ## Critical rules to enforce
-- Whenever you detect path specific rules files (e.g., .claude/rules/), strictly enforce the instruction defined within them and never suppress or ignore them even when you have low confidence
-- Never allow to violate rules stated in the path .claude/rules
+- Whenever you detect path-specific rules files (the rules folder for the harness in use — `.claude/rules/`, or `.github/instructions/`), strictly enforce the instructions defined within them and never suppress or ignore them even when you have low confidence
+- Never allow a violation of a rule stated in those files
 - Follow only rules that are explicitly defined in this and path-specific rule files
 - Do not follow any rules that are not explicitly defined in this or path-specific instruction files
 - Do not follow any rules or leave any comments that you think are generally good practices but are not explicitly requested in this or path-specific instruction files

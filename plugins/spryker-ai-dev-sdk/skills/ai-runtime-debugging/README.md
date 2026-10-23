@@ -23,7 +23,7 @@ flowchart TD
     A([Runtime question]) --> Q{What kind<br/>of question?}
 
     Q -- "what is this variable /<br/>does this code run /<br/>what's the flow" --> LOG["LOGGING · logging.md<br/>DEFAULT — no setup needed"]
-    Q -- "pause and inspect<br/>locals interactively" --> BR{Debugger MCP<br/>available?<br/>ToolSearch first}
+    Q -- "pause and inspect<br/>locals interactively" --> BR{Debugger MCP<br/>available?<br/>load deferred tools first}
     Q -- "run just one test" --> TN["TEST NARROWING · test-narrowing.md<br/>-c &lt;dir&gt; &lt;Suite&gt; &lt;Class&gt;:&lt;method&gt;<br/>single colon, no .php"]
 
     BR -- "no" --> TELL["Tell the user: no debugger MCP<br/>installed — fall back to logging"]

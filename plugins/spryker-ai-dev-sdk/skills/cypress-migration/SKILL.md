@@ -327,15 +327,16 @@ python3 -c "import yaml; yaml.safe_load(open('<workflow-file>')); print('OK')"
 
 ## Step 10 — Generate the companion day-to-day skill
 
-Write `.claude/skills/cypress-tests/SKILL.md` in the target project (check
-`.claude/skills/` for any existing skills first and match their frontmatter/structure
-convention). It should document, using the values actually discovered/decided in this
-migration (not generic placeholders):
+Write `cypress-tests/SKILL.md` into the target project's skills folder for the harness in use:
+`.claude/skills/` under Claude Code, `.github/skills/` under GitHub Copilot. If the project already
+has one of those folders, use it; otherwise create the one matching the harness. Check the folder
+for any existing skills first and match their frontmatter/structure convention. It should document, using the values actually
+discovered/decided in this migration (not generic placeholders):
 - The vendored directory path and its naming conventions (spec/fixture/page-object naming).
 - The **actual** locator convention decided in Step 6.
 - The actual npm scripts available (`cy:open`, `cy:run`, etc. — confirm against the vendored
   `package.json`, don't assume names).
-- The actual CI job names added in Step 9, so Claude can point developers at them.
+- The actual CI job names added in Step 9, so the assistant can point developers at them.
 - A quality-gate checklist matching what CI enforces: tests pass, lint/format clean, no
   brittle selectors (no raw `cy.get()` outside page objects; no positional/XPath selectors),
   deterministic setup/cleanup, and clear/specific assertions.
@@ -381,16 +382,16 @@ describe the new project-owned setup, its location, and a pointer to the new
       project-owned — verified against the target project's own demodata/templates (Step 6/7),
       not copied from the reference project's fixtures unexamined; no demo-shop-specific
       dependencies or locators remain.
-- [ ] 7. A Claude Skill for Cypress (`cypress-tests`, generated in Step 10) is available in
-      the project repository and contains clear, actionable instructions for Claude to create,
+- [ ] 7. An agent skill for Cypress (`cypress-tests`, generated in Step 10) is available in
+      the project repository and contains clear, actionable instructions for the assistant to create,
       run, review, and validate Cypress tests.
-- [ ] 8. That Claude Skill defines the project's actual conventions for test structure,
+- [ ] 8. That agent skill defines the project's actual conventions for test structure,
       naming, locators, fixtures/test data, environment variables, and supported test
       commands — the real, discovered values, not generic placeholders.
-- [ ] 9. That Claude Skill applies an executable quality gate that, at minimum, verifies tests
+- [ ] 9. That agent skill applies an executable quality gate that, at minimum, verifies tests
       pass, lint/format is clean, no brittle selectors are used (no raw `cy.get()` outside
       page objects, no positional/XPath selectors), setup/cleanup is deterministic, and
       assertions are clear and specific.
-- [ ] 10. Cypress setup, initial tests, the Claude Skill, and quality-gate automation are all
+- [ ] 10. Cypress setup, initial tests, the agent skill, and quality-gate automation are all
       committed to the main repository — including the new/edited CI workflow YAML, verified
       to parse and to follow the existing file's formatting.

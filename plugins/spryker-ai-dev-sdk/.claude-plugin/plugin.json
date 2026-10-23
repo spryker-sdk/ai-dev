@@ -1,7 +1,7 @@
 {
     "name": "spryker-ai-dev-sdk",
-    "version": "0.7.1",
-    "description": "Set of setup tools and skills for Spryker project development.",
+    "version": "0.8.0",
+    "description": "Set of setup tools, skills and agents for Spryker project development. Works with Claude Code and GitHub Copilot.",
     "author": {
         "name": "Spryker Systems GmbH",
         "email": "support@spryker.com"
@@ -13,6 +13,9 @@
         "spryker",
         "ai-dev",
         "mcp",
-        "development"
+        "development",
+        "copilot",
+        "claude-code",
+        "agent-skills"
     ]
 }

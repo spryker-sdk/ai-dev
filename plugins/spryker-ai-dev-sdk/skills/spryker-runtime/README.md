@@ -27,7 +27,7 @@ flowchart TD
 
     Q -- "does data/command exist" --> M1["Mode 1 — Console CLI<br/>docker/sdk cli console …<br/>+ mariadb / redis-cli / rabbitmqadmin"]
     Q -- "what does an endpoint return" --> M2["Mode 2 — HTTP/API<br/>curl with cookie session<br/>or Glue bearer token"]
-    Q -- "rendered UI, JS, real login" --> M3["Mode 3 — Chrome<br/>ToolSearch the MCP tools first"]
+    Q -- "rendered UI, JS, real login" --> M3["Mode 3 — Browser<br/>needs a browser MCP server"]
     Q -- "many requests / CSRF flow" --> M4["Mode 4 — Browser-seeded curl<br/>log in once, harvest the REAL<br/>request, replay in the shell"]
 
     M3 --> L["Pick the actor + its OWN login URL<br/>password change123 for all demo accounts"]
@@ -71,7 +71,7 @@ flowchart TD
 |------|-----------|------|
 | **1 · Console (CLI)** | Does the data/command exist, run a console command, inspect DB / Redis / queues. `console list` prints the full catalogue — find the real command name instead of guessing. | Cheapest |
 | **2 · HTTP / API** | Exactly what an endpoint returns. Cookie session for Yves/Back Office (**cookie name = the resolved host with `.` → `-`**), bearer token from `/access-tokens` for Glue. | Cheap |
-| **3 · Browser (Chrome)** | Rendered UI, client JS, establishing a login session. Chrome MCP tools are deferred — `ToolSearch` them first. | Expensive |
+| **3 · Browser** | Rendered UI, client JS, establishing a login session. Needs a browser-automation MCP server; see the Browser tool map in SKILL.md. | Expensive |
 | **4 · Browser-seeded curl** | Multi-step, CSRF-protected, or repeated scenarios. Log in **once**, perform the action once and read the request it *actually* sent, then replay scriptably. | Fast after setup |
 | **5 · Page-context fetch** | A CSRF/session endpoint whose token the harness won't let you read, or proving the server when a UI control is dead. Runs the page's own `fetch` — the cookie attaches implicitly, the secret is never printed. | Fallback |
 

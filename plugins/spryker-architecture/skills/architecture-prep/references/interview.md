@@ -40,7 +40,8 @@ A line saying "unknown"/"TBD"/"n/a" = ANSWERED (an honest gap), not a question t
 ## Rule 1b — Offer "fill the list yourself" vs "interview me"
 
 When no filled questionnaire and no TAD exist, don't just launch into questions. First offer the user
-both paths (a single `AskUserQuestion` is fine):
+both paths — ask the user a structured multiple-choice question (use your harness's question tool if
+it has one, otherwise ask in chat and wait for the answer); a single question is fine here:
 
 > "I can either (a) hand you the intake questionnaire to fill in at your own pace and then run with no
 > interview, or (b) interview you now in a few batched question sets. Which do you prefer?"
@@ -72,9 +73,9 @@ plainly for it and read everything they give you:
 
 ## Rule 2 — Batch the questions (the "multi-tab" intake)
 
-Use `AskUserQuestion` with up to 4 questions per call, several calls back-to-back, so the user gets a
-carefully structured interview in one pass rather than a slow drip. Group questions by theme so each
-call reads like a coherent "tab" of the interview. Only ask about themes relevant to the **selected**
+Ask the user structured multiple-choice questions with up to 4 questions per batch, several batches
+back-to-back, so the user gets a carefully structured interview in one pass rather than a slow drip.
+Group questions by theme so each batch reads like a coherent "tab" of the interview. Only ask about themes relevant to the **selected**
 sections — don't interview about deployment if section 7 wasn't chosen.
 
 Prefer multi-select and give sensible default options with a "(Recommended)" first option where a
@@ -91,18 +92,18 @@ The questions themselves are the groups **A–J (+ run-config R)** in
 **decision-grade depth** (see [architecture-depth.md](architecture-depth.md)) — release phasing,
 per-phase volumes, components/connectors, multi-store split, document governance, and org/tenant model.
 
-Turn the questionnaire groups into `AskUserQuestion` batches like this:
-- **One `AskUserQuestion` call per group** (A, B, C, …) reads like a coherent "tab". Each group maps
+Turn the questionnaire groups into multiple-choice batches like this:
+- **One batch per group** (A, B, C, …) reads like a coherent "tab". Each group maps
   cleanly: A→01, B→01/03/05/12, C→02/03/06/11, D→01+SD, E→02/07/08, F→10, G→06/07/08, H→04/09/11,
   I→01 header, J→03/05/08/11, R→run config.
 - **Pull only groups relevant to the SELECTED sections** — don't ask group F (volumes → section 10)
   if section 10 wasn't chosen. Always ask group A, group I (governance), and the run-config R. Skip
   group J entirely for a flat single-tenant B2C shop with no org hierarchy.
 - **Group C repeats per external system** — collect it as a small table (one row per system) rather
-  than one `AskUserQuestion` per system; C4 (widget-vs-backend classification) and C7 (auth) are the
+  than one batch per system; C4 (widget-vs-backend classification) and C7 (auth) are the
   required per-system fields.
-- **Ask `[REQUIRED]` first**, `[optional]` only if the group has room (≤4 questions per call). If a
-  group has more than 4 questions, split across two back-to-back calls rather than dropping any.
+- **Ask `[REQUIRED]` first**, `[optional]` only if the group has room (≤4 questions per batch). If a
+  group has more than 4 questions, split across two back-to-back batches rather than dropping any.
 - Prefer multi-select with a "(Recommended)" default first option, and an "Other / let me type"
   escape for open-ended answers (volumes, integration specifics). An answer the user can't give
   becomes a `TODO`, not a fabricated value.

@@ -11,7 +11,7 @@ This document provides the detailed phase-by-phase breakdown of the interactive 
 
 ### Phase 0: Research FIRST 🔬 REQUIRED (before any requirement)
 
-Ground everything in real Spryker before drafting — **code first, then docs**: the codebase facts are cheap inline calls that settle most questions and target the expensive docs research. Codebase facts (Step 0.1) are always gathered; docs research (Step 0.2) and running-app validation (Step 0.3) are **opt-in — ask the user with `AskUserQuestion` before running each**.
+Ground everything in real Spryker before drafting — **code first, then docs**: the codebase facts are cheap inline calls that settle most questions and target the expensive docs research. Codebase facts (Step 0.1) are always gathered; docs research (Step 0.2) and running-app validation (Step 0.3) are **opt-in — ask the user a structured multiple-choice question before running each** (use your harness's question tool if it has one, otherwise ask in chat and wait for the answer).
 
 **Step 0.1 — Codebase facts (inline, first, Spryker tooling MCP server)**
 Establish against the real install what exists and pin exact names — match tools by tool name (server names vary by install):
@@ -19,11 +19,11 @@ Establish against the real install what exists and pin exact names — match too
 - `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.) **Take vendor paths from the map's output — never guess `Business/...` sub-paths.**
 - `getTransferStructureByName` — real transfer field names/types. Never invent fields.
 - **Project-overlap sweep:** grep the project namespace for the feature's nouns and read the registered plugin stacks in the touched modules' project DependencyProviders — what has *this project* already built that overlaps? Anything found becomes a story input.
-**If the tooling MCP server is not connected / not running** (tool unavailable or `/mcp` reconnect failed): **start the underlying server first** — it backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up — then **ask the user to reload the MCP connection** (run `/mcp` to reconnect) and wait for confirmation before continuing. Don't guess names; if the reconnect keeps failing, fall back to reading the codebase directly (grep/Read) and say so.
+**If the tooling MCP server is not connected / not running** (tool unavailable or `/mcp` reconnect failed): **start the underlying server first** — it backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up — then **ask the user to reload the MCP connection** (run `/mcp` to reconnect) and wait for confirmation before continuing. Don't guess names; if the reconnect keeps failing, fall back to reading the codebase directly with the built-in file read/search tools (not shell) and say so.
 From these facts, **form a hypothesis** about the feature's shape — the docs research below confirms or refutes it instead of sweeping blind.
 
 **Step 0.2 — Public documentation research (one folded question; run as subagent[s] or inline per the user's choice)**
-Ask one research-depth question via `AskUserQuestion`: *(a) docs research via subagents (recommended)*, *(b) docs research inline* (for a harness that forbids unrequested subagents), *(c) skip*. Some features are project-specific or already settled by Step 0.1 and need none. On **(a)**, dispatch **subagent(s) via the Agent tool**, each prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only) and naming the Step 0.1 hypothesis/concepts to confirm — this keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** one subagent per concept/PBC/actor-area in a single message, **each given an explicit non-overlap boundary** ("agent B covers Product Lists — don't"); a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs. On **(b)**, run the skill inline and say so. Docs are **not trusted for identifier spellings** — real field/route names come from Step 0.1.
+Ask one research-depth question — structured multiple choice: *(a) docs research via subagents (recommended)*, *(b) docs research inline* (for a harness that forbids unrequested subagents), *(c) skip*. Some features are project-specific or already settled by Step 0.1 and need none. On **(a)**, dispatch **subagent(s) with your harness's subagent tool**, each prompt telling it to invoke the **`spryker-docs-research`** skill (docs-only) and naming the Step 0.1 hypothesis/concepts to confirm — this keeps the large doc-fetch output out of the PRD-drafting context; only the distilled brief comes back. **Fan out for multi-concept features:** one subagent per concept/PBC/actor-area in a single message, **each given an explicit non-overlap boundary** ("agent B covers Product Lists — don't"); a single subagent for a narrow feature. Each returns the relevant documentation content + source links plus a short brief: feature/PBC name, supported actors, documented behavior/constraints, and any documented endpoints. Merge the briefs. On **(b)**, run the skill inline and say so. Docs are **not trusted for identifier spellings** — real field/route names come from Step 0.1.
 - If a subagent reports a missing MCP tool, tell the user and suggest enabling it before continuing.
 
 **Step 0.3 — Validate existing flows (ASK FIRST; only when the behavior already exists)**
@@ -38,7 +38,7 @@ Keep what you gathered: real module/transfer names always; documented behavior (
 
 **Step 1.1: Feature Description**
 
-Use `AskUserQuestion` to gather initial context:
+Ask the user a structured question to gather initial context:
 
 ```
 Question 1: "What problem or opportunity does this feature address?"
@@ -58,7 +58,7 @@ Question 3: "What are your preliminary goals for this feature?"
 - What user behavior should change?
 ```
 
-**Example AskUserQuestion:**
+**Example question block:**
 ```json
 {
   "questions": [
@@ -111,7 +111,7 @@ Present the draft to user and ask:
 Does this accurately capture the WHY and the measurable objectives?"
 ```
 
-Use `AskUserQuestion`:
+Ask the user to choose between:
 ```json
 {
   "questions": [

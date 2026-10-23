@@ -48,7 +48,7 @@ Skip this only when the diagnosis is **synchronous** (HTTP request, console comm
 
 ### Debug-tool URLs — discover from the active deploy file's `services:` section
 
-Spryker's docker SDK ships with infrastructure UIs you can drive via Claude-in-Chrome to inspect runtime state. **Never guess these URLs.** Read the active deploy file (identify it from `git status` / `docker/sdk` output, or ask) and look at its **`services:` block** (separate from `groups → applications`). Each service has an `endpoints:` map giving a hostname; use the deploy file's `docker.ssl.enabled` flag to pick `http://` (false) or `https://` (true).
+Spryker's docker SDK ships with infrastructure UIs you can drive in the browser to inspect runtime state. **Never guess these URLs.** Read the active deploy file (identify it from `git status` / `docker/sdk` output, or ask) and look at its **`services:` block** (separate from `groups → applications`). Each service has an `endpoints:` map giving a hostname; use the deploy file's `docker.ssl.enabled` flag to pick `http://` (false) or `https://` (true).
 
 | Service in deploy file | Engine (typical) | What it's for | How to use |
 |---|---|---|---|
@@ -82,9 +82,9 @@ Confirm the directory structure with `ls data/logs/` first — projects sometime
 - Do **not** run raw SQL via `Bash`, `docker/sdk cli`, `docker exec ... psql/mysql/mariadb`, PHP PDO/Doctrine in heredocs, or any other bypass — regardless of MCP availability.
 - **Fallback when the Spryker MCP is unavailable:** include this exact suggestion in your report so the user knows how to fix the cause (not just the symptom):
 
-  > *"The Spryker MCP server isn't available in this session. To enable `executeDatabaseQuery` and the other MCP tools, run `Skill(ai-dev-setup)` from the project root — it verifies the package and console wiring, then registers the server under this project's folder name; background in [the Spryker AI Dev MCP Server setup doc](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html). Meanwhile I'll continue with logs and ask you to run any DB queries I need."*
+  > *"The Spryker MCP server isn't available in this session. To enable `executeDatabaseQuery` and the other MCP tools, run the `ai-dev-setup` skill from the project root — it verifies the package and console wiring, then registers the server under this project's folder name; background in [the Spryker AI Dev MCP Server setup doc](https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-mcp-server.html). Meanwhile I'll continue with logs and ask you to run any DB queries I need."*
 
-  **Never quote a `claude mcp add` line from memory into that report** — `Skill(ai-dev-setup)` § Step 3 owns the exact form, so it cannot drift.
+  **Never quote an MCP registration command from memory into that report** — the `ai-dev-setup` skill § Step 3 owns the exact form for each harness, so it cannot drift.
 
   Then proceed with the best-effort path: (a) work from logs alone where they're sufficient; (b) ask the user to run a specific SQL query and paste the result; (c) if neither is possible, report *"DB MCP not available — diagnosis limited to logs and observable state"* and continue with what you can.
 
@@ -128,15 +128,15 @@ When the symptom points at a surface not listed above (Search Elasticsearch indi
 
 ### Console probes (read-only)
 
-When direct DB inspection isn't enough, you may run read-only console commands via `docker/sdk console <command>` (Claude runs on the host). Verify the command exists via `docker/sdk console list` first — never invent commands. Limit yourself to commands that don't change state; if you're unsure whether a command is read-only, don't run it.
+When direct DB inspection isn't enough, you may run read-only console commands via `docker/sdk console <command>` (you run on the host). Verify the command exists via `docker/sdk console list` first — never invent commands. Limit yourself to commands that don't change state; if you're unsure whether a command is read-only, don't run it.
 
 ### Browser-side diagnosis
 
-For UI failures, use Claude-in-Chrome tools to read what the browser saw:
+For UI failures, drive the browser through the `spryker-runtime` skill (see its Browser tool map for the tool names in your setup) to read what the browser saw:
 
 - `read_console_messages` — JS errors, deprecation warnings, application logs
 - `read_network_requests` — failed requests, slow requests, unexpected payloads
-- `read_page` / `javascript_tool` — DOM state, attribute values
+- read the page / run JavaScript — DOM state, attribute values
 
 **User permission as a symptom (rule out FIRST for UI-action failures).** When the symptom is *"X action fails / 403 / AJAX error / button does nothing"* and the failure is reproducible only for a specific user, **check that user's permissions before diagnosing code**. Spryker gates many actions behind company-role permission plugins:
 
@@ -184,7 +184,7 @@ If the symptom disappears after this, there's **no Spryker bug to diagnose** —
 
 ### Spryker docs (known-issue lookup)
 
-When a symptom rings familiar, use `searchAlgoliaDocumentation` (or WebFetch against https://docs.spryker.com/ / https://github.com/spryker/spryker-docs) to check whether the issue is documented (especially "Troubleshooting" sections and migration guides).
+When a symptom rings familiar, use `searchAlgoliaDocumentation` (or the web fetch tool against https://docs.spryker.com/ / https://github.com/spryker/spryker-docs) to check whether the issue is documented (especially "Troubleshooting" sections and migration guides).
 
 ### Local code (for cross-reference, not for editing)
 

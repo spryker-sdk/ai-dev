@@ -149,11 +149,13 @@ off, the workflow **skips its subagents entirely**.
 
 ## Stage → skill map
 
-Subagents ship as agent definitions (`.claude/agents/` on a setup install, or the plugin's
-`agents/` directory) and are invoked via the **`Agent`** tool with `subagent_type="<name>"` —
-on a plugin install the registered type is prefixed (`spryker-ai-dev-sdk:spryker-verifier`),
-and the bare names below are shorthand for that form. Skills are loaded into the main session
-via the **`Skill`** tool. The two are never swapped.
+Subagents ship as agent definitions (the harness's project agents folder on a setup install, or the
+plugin's `agents/` directory) and are delegated to with the harness's subagent tool, naming the agent.
+On a plugin install the registered name carries the plugin prefix, with a separator that differs by
+harness — `spryker-ai-dev-sdk:spryker-verifier` under Claude Code,
+`spryker-ai-dev-sdk/spryker-verifier` under GitHub Copilot. Retry with that form if a bare name does
+not resolve. Skills are loaded into the main session by their slash
+command. The two are never swapped.
 
 | Step | Delegates to | Kind |
 |---|---|---|
@@ -220,7 +222,7 @@ via the **`Skill`** tool. The two are never swapped.
   diagnoser — rather than spending minutes on results that don't reflect a working feature.
 - **Never drive the browser from the main loop.** Verification belongs to `spryker-verifier`, capture
   to `spryker-screenshot-collector`. When a result looks wrong the answer is a sharper re-invocation,
-  not loading `mcp__claude-in-chrome__*` into the main session for a "quick check".
+  not loading browser-automation tools into the main session for a "quick check".
 - **Staging is the user's decision.** Files stay unstaged until the user says yes at the commit gate;
   on no, the report lists them with the commands to review, stage and commit.
 
