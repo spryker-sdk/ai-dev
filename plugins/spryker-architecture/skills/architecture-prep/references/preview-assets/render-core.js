@@ -12,8 +12,11 @@ window.ARCH_CORE = (function(){
     const base=m?parseInt(m[1],10):99; const sub=/\/(sd|adr)-\d/.test(s)?1:0;
     return String(base*10+sub).padStart(4,"0")+"_"+s; }
   function renderable(p){ if(!p.endsWith(".md")) return false;
-    const b=p.split("/").pop().toLowerCase();
-    return b!=="readme.md" && b!=="public-doc-guideline.md" && !/-000-template\.md$/.test(b); }
+    const s=p.toLowerCase(); const b=s.split("/").pop();
+    // a NN-*/README.md (04 Solution Designs, 09 ADRs) IS content: it carries the candidate list.
+    // Only the folder-root README and the guideline are chrome.
+    if(b==="readme.md") return /(?:^|\/)\d\d[-\w]*\//.test(s);
+    return b!=="public-doc-guideline.md" && !/-000-template\.md$/.test(b); }
   function cleanMermaid(t){ const L=t.replace(/\r/g,"").split("\n"); let i=0;
     while(i<L.length && (/^\s*%%/.test(L[i])||/^\s*$/.test(L[i]))) i++;
     return L.slice(i).join("\n").replace(/;/g,",").trim(); }
@@ -56,6 +59,8 @@ window.ARCH_CORE = (function(){
     for(let n=1;n<=20;n++){ const nn=String(n).padStart(2,"0");
       for(const s of SLUGS){ const f=nn+"-"+s+".md"; if(await exists("./"+f)){ out.push({path:f,text:await grab("./"+f)}); break; } } }
     for(const [dir,re] of [["04-solution-designs/",/^sd-.*\.md$/],["09-architecture-decisions/",/^adr-.*\.md$/]]){
+      // the folder README is itself content (it carries the SD/ADR candidate list), so render it too
+      if(await exists(dir+"README.md")) out.push({path:dir+"README.md",text:await grab(dir+"README.md")});
       for(const f of await listByReadme(dir,re)){ if(await exists(dir+f)) out.push({path:dir+f,text:await grab(dir+f)}); } }
     // diagrams referenced by the docs are fetched lazily inside render() via byMmd? No — prefetch them:
     const mmdRefs=new Set();

@@ -2,17 +2,16 @@
 name: architecture-prep
 description: >
   Establish or fill in a Spryker project's version-controlled architecture record — the
-  `architecture/` folder as arc42 sections + C4/sequence diagrams, ADRs, and Solution Designs.
-  Interviews the user, researches Spryker docs/web/the running system, and writes each section to
-  decision-grade depth (release-phased scope, components/connectors tables, per-phase volume planning,
-  multi-store strategy). Runs in ANY Spryker project/demoshop and scaffolds the
+  `architecture/` folder as arc42 sections + C4/sequence diagrams, with stubs for the Solution Designs
+  and decisions that need designing later. Interviews the user, researches Spryker docs and the web,
+  and writes the smallest document that communicates the architecture clearly — components and
+  connectors, release-phased scope, volumes, and architectural risk. Runs in ANY Spryker project/demoshop and scaffolds the
   mandatory `architecture/` folder if missing — for greenfield, an existing build (onboarding), or
-  turning a business brief into an architecture doc that feeds a PRD. Accepts a Spryker TAD (Target
-  Architecture Definition Confluence page) or similar structured brief as the complete intake — no
-  interview — and handles batch runs: N TADs/briefs → N architecture docs → N PRs, one git worktree
+  turning a business brief into an architecture doc that feeds a PRD. Accepts a target architecture
+  document or similar structured brief as the complete intake — no interview — and handles batch runs: N TADs/briefs → N architecture docs → N PRs, one git worktree
   per deliverable. Trigger on "prepare/fill in the architecture", "set up the architecture folder",
   "do the arc42/C4 docs", "document the system context / building blocks / runtime flows", "capture
-  this as an ADR/solution design", or "turn this TAD / these TADs into architecture docs (as PRs)" —
+  this as an ADR/solution design", or "turn this architecture document into arc42 docs (as PRs)" —
   even without saying "arc42" or "C4". Do NOT use to write a PRD (product-requirement-document),
   build from a PRD (prd-development-local), or fix a bug (spryker-bugfix).
 ---
@@ -37,7 +36,7 @@ doesn't have it yet, the skill **scaffolds it** (Step 0) rather than refusing �
 project without an architecture folder is a gap to fix, not a blocker.
 
 The value is in the **control flow**: collect a lot of information up front, ground it in real
-Spryker documentation and (for existing projects) the real codebase/runtime, then fan the writing
+Spryker documentation, then fan the writing
 out to teammate subagents so the orchestrator stays lean and the sections stay consistent and
 cross-linked.
 
@@ -52,7 +51,7 @@ Two reasons to push heavy work into subagents (the "teammates" the user asked fo
 stays small and survives long runs, and independent teammates produce more thorough, less anchored
 work than one context writing everything sequentially.
 
-- **Research** runs in parallel teammates (docs / web / current-state), each writing findings to a
+- **Research** runs in parallel teammates (docs / web), each writing findings to a
   file and returning a compact summary — never raw dumps.
 - **Section writing** runs as **one teammate per selected arc42 section**, in parallel, each fed the
   interview answers + shared research and told exactly which file(s) and diagram(s) to produce.
@@ -66,8 +65,28 @@ work than one context writing everything sequentially.
   section boundary. Read [references/multi-deliverable.md](references/multi-deliverable.md) at Step 0
   whenever N > 1.
 
+### Never wait on a teammate — poll the filesystem
+
+**Teammates report by writing files, not by messaging you.** Your turn must never end with "waiting
+for the writers to finish".
+
+- After dispatching a batch, **check the output paths on disk** to see what exists. A written file is
+  a finished task, whether or not a report arrived.
+- A teammate that has not produced its file when you need it is **not a reason to stop**. Do its work
+  inline yourself and log `TEAMMATE <id> | no output | completed inline`.
+- Never end a turn, and never block, pending a notification.
+
+A run that stops mid-workflow looks identical to a crash from the outside: no document, no error, no
+way for the user to know a nudge would finish it.
+
+### One writer owns a file
+
+Each file has exactly one writer for the whole run. Two teammates editing the same file lose work or
+force one to abandon its task. When planning the fan-out, **list the files each writer owns** and
+make the ownership explicit in its brief: *write only these paths; read any other file you need.*
+
 Spawn teammates with your harness's subagent tool — the same mechanism behind a custom agent or agent
-type. Prefer **a read-only research subagent** for research and current-state investigation, and **a
+type. Prefer **a read-only research subagent** for research and document derivation, and **a
 general-purpose subagent** (or a fork of the current context) for section writers that must create
 files. **Exception: multi-deliverable writers must be fresh general-purpose subagents, never forks** —
 a fork inherits the orchestrator's full context (including the other projects' intakes), which defeats
@@ -90,22 +109,38 @@ the step that needs it, not all up front:
 - [references/run-lean.md](references/run-lean.md) — the run directory, the **State Object**, the
   **logging** discipline (bugfix-style `run.log`), the **decision log**, and the plan task list.
   **Read once at the start of every run, before Step 0.**
-- [references/questionnaire.md](references/questionnaire.md) — the **canonical fillable question list**
-  (groups A–H + run-config R; each question tagged `[REQUIRED]`/`[optional]` and mapped to an arc42
-  section). Users can pre-fill it to skip the interview, or partly fill it to shorten it. **This is the
-  single source of what to ask.** Read alongside interview.md before Step 1.
+- [references/architect-persona.md](references/architect-persona.md) — **who you are while doing
+  this**: the Senior Enterprise Solution Architect role, the rule that **source material is evidence
+  to extract architecture from, not content to preserve**, **strict definitions** of quality goal /
+  constraint / risk / technical debt / open question / decision, where architecture stops and a
+  Solution Design begins, and the no-duplication and hygiene rules. **Read by the orchestrator at the
+  start of every run, and by every section-writer teammate before it writes.**
+- [references/questionnaire.md](references/questionnaire.md) — the **canonical fillable question list**,
+  organised as progressive levels **L1 (9) → L2 (21) → L3 (21) → L4 (2)** = 53 questions. Each is typed
+  (`pick`/`table`/`confirm`/`document`/`shorttext`) and most carry a **condition** naming the earlier
+  answer that opens them — a simple single-market project legitimately skips most of L3. Depth is
+  chosen **per topic, not once for the project**. Run-configuration is NOT in the bank: it's asked in
+  the Step 0 opening batch below. Users can pre-fill the bank to skip the interview, or partly fill it
+  to shorten it. **This is the single source of what to ask.** Read alongside interview.md before Step 1.
+- [references/prefill.md](references/prefill.md) — **Step 0b**: derive answers from the documents the
+  user provided *before* asking anything, show them in one batch for correction, then interview only
+  the genuine gaps. **Read at Step 0b whenever any document was provided; skip the step entirely
+  when none was.**
 - [references/interview.md](references/interview.md) — **how** to collect the questionnaire: detect a
   pre-filled/partial questionnaire (ask only the blanks), offer "fill the list yourself vs interview
   me", group the questions into batched multiple-choice question sets, ask for existing docs first, and **always
   write every answer to `intake.md`**. **Read before Step 1 — unless a TAD/structured brief was
   provided (then tad-mapping.md replaces it).**
-- [references/tad-mapping.md](references/tad-mapping.md) — the **TAD fast-path**: when a Spryker TAD
+- [references/tad-mapping.md](references/tad-mapping.md) — the **fast-path**: when a target architecture document
   (or similar structured brief) is the input, it IS the intake — the TAD-section → arc42-section
   mapping, diagram harvesting, and what TADs typically leave open. **Read at Step 0 whenever the
   intake includes a structured architecture doc.**
 - [references/multi-deliverable.md](references/multi-deliverable.md) — batch runs: N inputs → N
   worktrees/branches → N PRs, one isolated writer per deliverable, research shared once, push-ready
   handoff. **Read at Step 0 whenever there is more than one deliverable.**
+- [references/diagrams.md](references/diagrams.md) — **C4 notation rules** (one box per system, level
+  discipline, no protocol boxes, consistent naming), sequence-diagram scope, Mermaid format and the
+  colour scheme. **Read by every writer that draws a diagram.**
 - [references/sections.md](references/sections.md) — per-arc42-section writer guidance (what goes in
   each of the 12 files, which diagrams pair with which section, the diagram color/style convention,
   and the ADR / Solution Design sub-workflow). **Each section-writer teammate reads the § for its
@@ -118,7 +153,7 @@ the step that needs it, not all up front:
   not a thin template fill.**
 - [references/review.md](references/review.md) — the **Spryker-specific self-review checklist**: the
   Step 6 quality gate run by an independent reviewer subagent (grounding & no fabrication, depth-bar
-  met, the build-ready five, arc42 structure & cross-consistency), returning a per-section verdict +
+  met, section-purpose compliance, arc42 structure & cross-consistency), returning a per-section verdict +
   ranked defect list. **Read by the orchestrator before Step 6, and by the reviewer subagent as its
   brief.**
 - [references/preview.md](references/preview.md) — the **two browser previews + PDF export**, both
@@ -131,23 +166,25 @@ the step that needs it, not all up front:
 
 ## Operating principles
 
-- **Aim for decision-grade depth, expressed as code — then make it build-ready.** The bar (see
-  [references/architecture-depth.md](references/architecture-depth.md)) is release-phased scope, a
-  Components + Connectors rationale pair beside every architecture diagram, a rich per-phase volume
-  table, multi-store strategy, and risk mitigations that cite real Spryker features — all delivered as
-  version-controlled arc42 + Mermaid (`.mmd`) diagrams. Beyond that, the review-proven build-ready additions:
-  t-shirt sizing per custom module + first-pass infra sizing, SD data models drafted (never a bare
-  TODO), launch-blocking unknowns promoted to decision gates with owners/dates, and load tests
-  anchored by explicit interim assumptions. Thin template-filling is the thing to avoid; "sequences
-  but doesn't size" is the second thing to avoid.
+- **You are a Senior Enterprise Solution Architect, not a scribe.** Read
+  [references/architect-persona.md](references/architect-persona.md) before Step 0 and hold it for
+  the whole run: challenge inconsistencies rather than agreeing by default, separate fact from
+  assumption, never invent scope, keep every concept in exactly one place, and keep client Q&A out
+  of the deliverable. Every section-writer teammate gets this file too.
+- **The smallest document that communicates the architecture clearly.** The bar (see
+  [references/architecture-depth.md](references/architecture-depth.md)): components and connectors
+  beside the context diagram, release-phased scope, the volumes given, and architectural risk —
+  delivered as version-controlled arc42 + Mermaid (`.mmd`). Write what the intake supports and
+  nothing more; a missing answer is a one-line gap, never a derivation. Where real depth is left on
+  the table, return it as a **depth candidate** for the user to request, rather than writing it.
 - **Collect first, write second.** The single biggest failure mode is writing thin, generic sections
   because the interview was shallow. Front-load information gathering — ask for real documents, then a
   broad batched interview, then research — and only start writing once you have substance. A section
-  you can't ground in a real answer, a doc, a doc-research finding, or the codebase should be flagged
+  you can't ground in a real answer, a provided doc, or a doc-research finding should be flagged
   as a gap, not filled with plausible-sounding filler.
 - **Ground every claim.** Spryker behavior goes through `spryker-docs-research`, never from memory.
-  Claims about *this* project's current system (for existing projects) go through the codebase /
-  `spryker-runtime`, never assumed. External/industry facts go through web research. If a fact has no
+  External/industry facts go through web research. Facts about *this* project come from the intake —
+  an answer, a provided document, a TAD, or any source the user pointed you at. If a fact has no
   source, say so in the doc rather than asserting it.
 - **Respect the template, replace the examples.** The template's example content (SAP, Akeneo, Auth0,
   the volume table, the diagram color scheme) is illustrative. Keep the *structure* and the *style*;
@@ -166,14 +203,14 @@ the step that needs it, not all up front:
 
 ---
 
-## The workflow (Steps 0–7)
+## The workflow (Steps 0–7, plus 0b)
 
 Read [references/run-lean.md](references/run-lean.md) now, then begin.
 
 ### Step 0 — Intake & mode
 
 0. **Classify the intake shape first** — it decides how the rest of Step 0/1 runs:
-   - **Structured brief(s) provided** (a Spryker TAD Confluence page or equivalent): read
+   - **Structured brief(s) provided** (a target architecture document or equivalent): read
      [references/tad-mapping.md](references/tad-mapping.md). The document replaces the interview;
      from the opening batch below, ask only what neither the doc nor the user's request already
      states (typically: sections, mode, output target) — and if the request states those too, ask
@@ -191,27 +228,28 @@ Read [references/run-lean.md](references/run-lean.md) now, then begin.
    current project's root. If no local source is reachable, recreate the structure from the section
    list below and the templates described in `sections.md`. Never invent a different structure — the
    arc42 + C4 layout is the standard. Tell the user you scaffolded it and from where.
-2. **Ask the opening batch** — ask the user a structured multiple-choice question (use your harness's
-   question tool if it has one, otherwise ask in chat and wait for the answer), in one or more batches;
-   this is the "multi-tab section in the beginning" the user wants. Cover at minimum, in this order of
-   priority:
-   - **Existing documents first.** "Can you share any business requirements, briefs, RFPs, discovery
-     notes, slide decks, existing diagrams, or tickets? Paste text or give file paths." This is the
-     highest-value input — ask for it before anything else and read everything provided.
-   - **Project stage:** greenfield / new, or an existing project with code (this repo is existing).
-     This decides whether current-state investigation is offered.
-   - **Which arc42 sections** to produce this run (multi-select — see the list below). Default-suggest
-     the template's recommended path (1, 3, 10, then 5, 2) but let the user pick.
-   - **Autonomy mode:** Gated (confirm before writing each section batch) or Autonomous (interview
-     once, then write everything, logging decisions).
-   - **Current-state grounding** (existing projects only): may I read the codebase / run
-     `spryker-runtime` to ground sections about the actual system?
-   - **ADRs / Solution Designs:** any decisions already made to capture as ADRs, or areas to explore
-     as Solution Designs?
-   See [references/interview.md](references/interview.md) for the full question bank and how to group
-   it into tabs. Batch aggressively (up to 4 questions per batch, several batches back-to-back) so the
-   user is interviewed carefully but in one pass, not drip-fed.
-3. **Set up the run.** Create the run directory, the `run.log`, the decision log, and the State Object
+2. **Ask the opening batch** — structured multiple-choice questions (use your harness's question
+   tool if it has one, otherwise ask in chat and wait), in one or more batches. **Ask in the user's language, not
+   arc42's** — never make them choose "arc42 sections". Which sections get written follows from what
+   they can tell you. Cover, in this order:
+   - **Existing material first.** "Can you share anything that already exists — a requirements
+     document, an RFP or tender response, a target architecture document, discovery notes, slide
+     decks, existing diagrams, or tickets? Paste the text or give me file paths." Highest-value
+     input; read everything provided before asking anything else.
+   - **Your role**, which decides how the document addresses people and who is named as its author:
+     `I work for the company that will run this platform` · `I work for Spryker` · `I work for an
+     implementation partner or agency` · `Other`. Use it to phrase gaps as "ask your customer" vs
+     "ask your team", and record the answer as the document's author. Never take an author name from
+     a provided document.
+   - **What you want covered this run** — offer plain-language areas, not section numbers:
+     `The whole picture (recommended)` · `Just the essentials — goals, context, integrations` ·
+     `A specific area I'll name`. Map the answer to arc42 sections yourself, and say which sections
+     that means in one line so the mapping is visible.
+   - **Autonomy mode:** Gated (confirm before writing each batch) or Autonomous (ask once, then write).
+
+   Batch aggressively (up to 4 questions per batch) so the user is interviewed in one
+   pass, not drip-fed. Do **not** ask here about ADRs or Solution Designs — those emerge as
+   candidates from the intake.3. **Set up the run.** Create the run directory, the `run.log`, the decision log, and the State Object
    per run-lean.md. Record: template path, output target (default `architecture/` in place), chosen
    sections, mode, project stage, grounding permission. Log the Step 0 config as one line.
 
@@ -223,7 +261,7 @@ The 12 arc42 sections (offer as the multi-select):
 | 02 | `02-constraints.md` | Technical / organizational / convention constraints |
 | 03 | `03-system-scope-and-context.md` | Boundaries, external systems, integrations (+ C1) |
 | 04 | `04-solution-designs/` | RFC-style exploration docs (on request) |
-| 05 | `05-building-block-view.md` | Decomposition, containers, components (+ C2/C3) |
+| 05 | `05-building-block-view.md` | Decomposition, containers (+ C2) |
 | 06 | `06-runtime-view.md` | Runtime scenarios (+ sequence diagrams) |
 | 07 | `07-deployment-view.md` | Infrastructure & topology |
 | 08 | `08-crosscutting-concepts.md` | Cross-cutting patterns |
@@ -231,6 +269,24 @@ The 12 arc42 sections (offer as the multi-select):
 | 10 | `10-quality-requirements.md` | Volume planning, testing strategy, quality scenarios |
 | 11 | `11-risks-and-technical-debt.md` | Risks & debt |
 | 12 | `12-glossary.md` | Domain & technical terms |
+
+### Step 0b — Pre-fill from the provided documents
+
+**Only if the user provided documents at the opening batch** (and the intake is not a TAD, which
+takes the fast-path instead). Read [references/prefill.md](references/prefill.md).
+
+Spawn one `Explore` teammate to read the provided material against
+[references/questionnaire.md](references/questionnaire.md) and return a derivation table — question
+ID, proposed answer, the quote or location backing it, and `high`/`low` confidence. Show the whole
+table to the user in **one** confirmation pass, take their corrections, and carry the result into
+Step 1 as pre-answered questions.
+
+High-confidence rows the user doesn't contest count as accepted; low-confidence rows stay
+`derived (unconfirmed)` unless explicitly confirmed. In Autonomous mode nothing is asked — log the
+low-confidence rows as CRITICAL DECISIONs instead.
+
+If no documents were provided, skip this step and say so in one line. Log `PREFILL | <n> derived,
+<m> confirmed` or `PREFILL | SKIP (no documents)`.
 
 ### Step 1 — Deep interview (batched, up front) — or the TAD fast-path
 
@@ -243,6 +299,10 @@ A TAD is usually richer than a live interview; interviewing on top of it wastes 
 partly), follow interview.md Rule 0b: a fully-filled questionnaire skips the interview
 (`INTERVIEW | SKIP (questionnaire pre-filled)`); a partial one means you ask ONLY the still-blank
 questions. Either way copy the provided answers verbatim into `intake.md`.
+
+**If Step 0b derived answers**, treat them exactly like a partly pre-filled questionnaire
+(interview.md Rule 0b): **re-evaluate the gates first** — a derived answer can close a gate and drop
+questions from the run — then ask only what is still blank.
 
 Otherwise run the intake interview per [references/interview.md](references/interview.md), driving the
 questions from [references/questionnaire.md](references/questionnaire.md). First (unless fully
@@ -273,13 +333,20 @@ returning a compact summary:
 - **Web research teammate** — via the web search and web fetch tools: external systems named in the interview
   (the real ERP/PIM/CIAM/PSP products), standards (arc42, C4, GDPR, protocol specs), and any
   industry/volume benchmarks the user referenced. → `research-web.md`
-- **Current-state teammate** *(existing projects, only if grounding was permitted)* — via
-  the `spryker-runtime` skill and reading the codebase: which stores/locales/currencies exist, installed
-  modules, deployment files (`deploy.*.yml`), real integrations, actors at `/user`. Grounds sections
-  3/5/7 in what's actually there. → `research-current-state.md`
 
 Skip any teammate that has no relevant input (e.g. no external systems → no web teammate). Log each as
-`RESEARCH | <source> | done`. Keep only each teammate's summary in the State Object; the detail stays
+`RESEARCH | <source> | done`.
+
+**Research is best-effort, never a blocker.** It runs in parallel with planning, not ahead of it. If a
+findings file does not exist when the writers need it, start them anyway and log
+`RESEARCH | <source> | unavailable`. The writers then follow the ungrounded-claim rule below rather
+than waiting. Losing a whole run to a hung lookup is far worse than shipping a document whose
+platform claims are marked unverified.
+
+**Ungrounded-claim rule.** When a writer needs a platform fact that research has not confirmed, it
+states the claim with an explicit `(unverified)` marker and carries on — it never asserts the fact
+plainly, and never blocks on it. The reviewer treats an unmarked unverified claim as a defect, and a
+marked one as acceptable. Keep only each teammate's summary in the State Object; the detail stays
 in the file.
 
 ### Step 3 — Plan the section fan-out
@@ -298,15 +365,32 @@ writes all of its project's selected sections in its own worktree, following the
 guidance below, and finishes with its own Step 5 cross-link pass (see
 [references/multi-deliverable.md](references/multi-deliverable.md)).
 
+**One writer owns every system name in the document.** When they are selected, **§03 System Scope
+and Context, §05 Building Block View and §08 Cross-Cutting Concepts go to a single writer**, which
+also produces the C1 and C2 diagrams. These are the sections that name systems and their subsystems;
+split across parallel writers they drift, and a system named in prose but absent from the diagrams is
+the defect readers notice first. Accept the lost parallelism — naming consistency is worth more than
+the minutes.
+
+Every other writer **reuses those names verbatim** and introduces no system the diagrams do not
+show. If a writer needs a system that is not on a diagram, that is a finding to report, not a name to
+invent.
+
 Otherwise spawn **one teammate per selected section**, in parallel. Each teammate:
+- reads [references/architect-persona.md](references/architect-persona.md) **first** — it is a peer
+  architect writing this section, bound by the never-invent, no-duplication, and
+  documentation-hygiene rules, not a template-filler;
 - reads **its own §** in [references/sections.md](references/sections.md), the shared `intake.md`, and
-  the research file(s) relevant to it;
+  the research file(s) relevant to it — plus [references/diagrams.md](references/diagrams.md) if it
+  draws anything;
 - reads the **current template file** it's replacing (to keep the structure/heading style);
 - fills the section with project-specific content, replacing example content, and marks any
   unfillable part with a `> **TODO:** …` note naming what's missing;
 - produces the paired **diagram file(s)** as Mermaid/PlantUML following the color/style convention;
-- edits the real file(s) under the output target and returns a compact "done + what I wrote + open
-  TODOs" summary.
+- edits the real file(s) under the output target and returns a compact summary: files written, 2–3
+  lines on what went in, open TODOs, **and its top 1–3 depth candidates** (one line each, ranked —
+  see [architecture-depth.md](architecture-depth.md)). The candidates are a list for the orchestrator
+  to offer at Step 7; the writer never writes that content itself.
 
 Sections 04 (Solution Designs) and 09 (ADRs), if selected, follow their dedicated sub-workflow in
 sections.md (they create numbered `sd-XXX` / `adr-XXX` files from the templates, not the section body).
@@ -321,7 +405,7 @@ This is the one step the orchestrator does itself, because it needs all sections
 light. (Exception: in a multi-deliverable run each deliverable teammate already ran this pass for
 its own document — the orchestrator only spot-checks each: README indexes list the SDs/ADRs, "See
 diagram" links resolve, TODO counts match the teammate's report.) Read the written sections and:
-- fix cross-references (section 3 → C1, section 5 → C2/C3, section 6 → sequences, the "See diagram"
+- fix cross-references (section 3 → C1, section 5 → C2, section 6 → sequences, the "See diagram"
   links must point at files that exist);
 - reconcile terminology against section 12 (every domain/tech/Spryker term used should be defined);
 - ensure external systems named in section 3 match those in 2/6/11 and the diagrams;
@@ -356,9 +440,9 @@ mandatory, not optional, in both modes.** Route each finding to a fix:
   `research-docs.md`. Small mechanical fixes (a broken cross-link, a stray template label) the
   orchestrator may apply inline.
 - A finding is resolved in exactly one of two honest ways: **fixed**, or **converted to a triaged
-  owned gap** (client-owned TODO / decision gate / stated interim assumption per
+  owned gap** (an owner-named TODO, or an open question, per
   [architecture-depth.md](references/architecture-depth.md)) — never silently dropped. "Can't fix from
-  the inputs" means *convert to a decision gate or TODO with an owner*, not leave the defect standing.
+  the inputs" means *convert to an owner-named TODO*, not leave the defect standing.
 - Log each fix as a decision: `FIX | round <n> | <file> | <finding> → <fixed|gated|todo>`.
 
 **6c — Re-verify.** After a fix pass, **spawn a fresh reviewer again** (a new independent context —
@@ -389,7 +473,33 @@ human-judgment artifact, so in Gated mode the user's review remains the final si
 
 ### Step 7 — Handoff
 
-State plainly that the architecture folder is filled and ready to feed a **PRD** (point at the
+**Never report "all done".** A run that was not interrupted still ran on incomplete information.
+Before anything else, ask the user to review how the content landed, and name the **big gaps** —
+whole topics the intake never covered, in L1-then-L2 priority order:
+
+```
+Worth reviewing before this goes further. The document is built from what we had, and
+these areas are essentially blank:
+
+  Pricing        — nothing on structure, sources or update frequency
+  Ordering       — the order process is not described anywhere
+  Volumes        — no figures for catalogue size or load
+```
+
+Name topics, not question IDs, and do not enumerate counts — a thematic gap tells the user something;
+"22 of 53 unanswered" does not. Skip anything whose gate was legitimately closed.
+
+Then offer, as a multiple-choice question:
+`Go through the open areas now` · `Send the remaining tables as homework files` ·
+`Leave them as owned TODOs and finish here`
+
+**Offer the depth candidates.** Each section writer returned its top 1–3 candidates for deeper
+treatment (see [architecture-depth.md](architecture-depth.md)). Present them in tiers, most valuable
+first: all rank-1 candidates, then rank-2, then rank-3. One line each, grouped by section. The user
+picks any subset, or none; only what they pick gets written. **Never write a candidate unasked** —
+the lean document is the deliverable, and this offer is what makes leanness safe.
+
+Then state that the architecture folder is ready to feed a **PRD** (point at the
 `product-requirement-document` skill) and then development (`prd-development-local`). Do **not** commit
 automatically — architecture docs are reviewed via pull request (per the template's own guidance);
 suggest the branch/commit and let the user run it, unless they explicitly asked you to commit. List the
@@ -447,7 +557,6 @@ block for the user to run themselves (as a copy-paste-ready shell block), then f
 | Ticket / doc intake | filled [questionnaire.md](references/questionnaire.md) → ask only blanks; batched multiple-choice questions per [interview.md](references/interview.md) + read provided files; TAD → [tad-mapping.md](references/tad-mapping.md) fast-path, no interview |
 | Spryker feature/behavior research | the `spryker-docs-research` skill (in a read-only research or general-purpose subagent) — once per run, shared across deliverables |
 | External systems / standards research | web search / web fetch teammate |
-| Current-state grounding (existing project) | the `spryker-runtime` skill + codebase read teammate |
 | Section writing (single deliverable) | one general-purpose (or fork) teammate per section |
 | Multi-deliverable writing | one isolated teammate per deliverable, own worktree ([multi-deliverable.md](references/multi-deliverable.md)) |
 | Cross-link & consistency | orchestrator, inline (multi-deliverable: each writer, orchestrator spot-checks) |

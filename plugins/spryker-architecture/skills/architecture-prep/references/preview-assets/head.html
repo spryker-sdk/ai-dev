@@ -32,9 +32,25 @@
   .banner{background:rgba(21,88,176,.08);border:1px solid var(--line);padding:10px 16px;border-radius:6px;margin-bottom:24px;font-size:14px;}
   .err{color:#b00;font-size:13px;border:1px dashed #b00;padding:10px;border-radius:6px;}
   @page{margin:14mm;}
-  @media print{#sidebar{display:none;}#content{max-width:none;padding:0;}.banner{display:none;}
-    a{color:#1558b0 !important;}.section{break-inside:auto;border-bottom:none;page-break-after:always;}
-    .mermaid,svg,tr,img{break-inside:avoid;}}
+  @media print{
+    #sidebar{display:none;}
+    /* the flex row must collapse, or #content keeps the sidebar's track width and overflows */
+    #layout{display:block;}
+    #content{max-width:none;width:auto;padding:0;margin:0;}
+    .banner{display:none;}
+    a{color:#1558b0 !important;}
+    .section{break-inside:auto;border-bottom:none;page-break-after:always;}
+    /* scroll containers can't scroll on paper — let wide content wrap and shrink instead */
+    table{display:table;width:100%;table-layout:fixed;overflow-x:visible;}
+    th,td{word-wrap:break-word;overflow-wrap:anywhere;font-size:11px;padding:4px 6px;}
+    pre,pre code{overflow-x:visible;white-space:pre-wrap;word-wrap:break-word;font-size:11px;}
+    code{overflow-wrap:anywhere;}
+    /* Mermaid emits inline width/height that can exceed the page box */
+    .mermaid{max-width:100%;}
+    .mermaid svg{max-width:100% !important;width:auto !important;height:auto !important;}
+    img{max-width:100%;height:auto;}
+    .mermaid,svg,tr,img{break-inside:avoid;}
+  }
 </style>
 </head>
 <body>

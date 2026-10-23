@@ -1,9 +1,8 @@
 # TAD fast-path — a structured architecture brief IS the intake
 
-A Spryker **Target Architecture Definition (TAD)** — the structured Confluence page shape used by
-Spryker Professional Services — already contains, in a fixed structure,
-essentially every answer the Step 1 interview seeks. The same is true of any comparably structured
-architecture brief a client or partner provides. Running the interview on top of one is redundant
+A **Target Architecture Definition (TAD)** — a structured target-architecture write-up — already
+contains, in a fixed structure, essentially every answer the Step 1 interview seeks. The same is true
+of any comparably structured architecture brief a client or partner provides. Running the interview on top of one is redundant
 work for the user and pure token cost for the run — and when the user has asked for no questions,
 it's impossible.
 
@@ -52,5 +51,5 @@ drift from what the architect already drew. Note in the diagram file header wher
 Know the typical gaps so you mark them as TODOs (with owners) instead of hunting or inventing:
 effort/estimates and team capacity, concurrent-user counts, per-adapter timeout/retry policy,
 PHPStan level / team conventions, environment sizing, historical-migration record counts. These are
-exactly the items the depth bar (architecture-depth.md) says to handle with interim assumptions,
-spikes, or owner-named TODOs.
+exactly the items the depth bar (architecture-depth.md) says to record as owner-named gaps — never to
+derive, estimate, or plan around.
