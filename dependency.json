@@ -3,6 +3,7 @@
         "spryker/transfer": "Provides transfer objects definition with strict types and `::get*OrFail()` functionality."
     },
     "include-dev": {
+        "codeception/module-asserts": "Provides the Asserts module that codeception.yml enables for the test suites.",
         "spryker-sdk/phpstan-spryker": "Provides Spryker specific rules for PHPStan.",
         "spryker/development": "Provides rules for architecture and code style checks."
     }
