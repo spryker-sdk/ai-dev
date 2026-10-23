@@ -20,9 +20,9 @@ Derive from the material the user supplied, in this order:
 
 With no documents provided, **skip this step** and go straight to the interview.
 
-## How it runs — one Explore teammate
+## How it runs — one read-only teammate
 
-Spawn a single `subagent_type: "Explore"` teammate. It reads the provided material and the question
+Spawn a single read-only research subagent. It reads the provided material and the question
 bank, and returns **only** a compact derivation table — never the documents' contents.
 
 Its brief:
