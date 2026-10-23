@@ -211,6 +211,11 @@ check('an unknown harness still emits a usable decision', $d === 'block' && ($ra
 check('an unknown harness exits 0, never 2', $exit === 0);
 @unlink($proj . '/.ai-dev/stop-blocks.json');
 
+// Copilot exports CLAUDE_PLUGIN_ROOT too, so that variable alone must not mean Claude Code.
+[, , , $exit] = run_hook('guard-stop.php', ['cwd' => $proj, 'someOtherTool' => 'x'], ['CLAUDE_PLUGIN_ROOT' => $pluginRoot, 'PATH' => getenv('PATH')]);
+check('CLAUDE_PLUGIN_ROOT alone does not get the Claude Code exit code', $exit === 0);
+@unlink($proj . '/.ai-dev/stop-blocks.json');
+
 [, , , $exitClaude] = run_hook('guard-stop.php', $stopPayload('Progress report C.'));
 check('claude code still blocks with exit 2', $exitClaude === 2);
 @unlink($proj . '/.ai-dev/stop-blocks.json');

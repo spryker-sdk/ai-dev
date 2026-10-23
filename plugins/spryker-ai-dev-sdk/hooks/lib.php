@@ -28,9 +28,10 @@ function hook_cwd(array $payload): string
 /**
  * One row per harness: the payload keys it is known by, then the environment it exports.
  * Adding a tool is adding a row; nothing matching returns 'unknown' rather than a guess.
+ * CLAUDE_PLUGIN_ROOT is no signal: Copilot exports it too.
  */
 const HOOK_HARNESS_SIGNALS = [
-    'claude' => ['keys' => ['session_id', 'hook_event_name'], 'env' => ['CLAUDECODE', 'CLAUDE_PLUGIN_ROOT']],
+    'claude' => ['keys' => ['session_id', 'hook_event_name'], 'env' => ['CLAUDECODE']],
     'copilot' => ['keys' => ['sessionId', 'transcriptPath'], 'env' => ['COPILOT_HOME']],
 ];
 
@@ -61,6 +62,23 @@ function hook_transcript_path(array $payload): string
     return (string) ($payload['transcript_path'] ?? $payload['transcriptPath'] ?? '');
 }
 
+/** The last 400 KB of the transcript, read once per hook run. */
+function hook_transcript_tail(string $path): string
+{
+    static $tails = [];
+    if (isset($tails[$path])) {
+        return $tails[$path];
+    }
+    $tail = '';
+    if ($path !== '' && is_file($path) && ($fh = fopen($path, 'rb')) !== false) {
+        fseek($fh, max(0, (filesize($path) ?: 0) - 400000));
+        $tail = (string) stream_get_contents($fh);
+        fclose($fh);
+    }
+
+    return $tails[$path] = $tail;
+}
+
 /** The text of the turn that is ending; Copilot sends none, so it is read off the transcript. */
 function hook_last_assistant_message(array $payload): string
 {
@@ -68,21 +86,8 @@ function hook_last_assistant_message(array $payload): string
     if ($direct !== '') {
         return $direct;
     }
-    $path = hook_transcript_path($payload);
-    if ($path === '' || !is_file($path)) {
-        return '';
-    }
-    $size = filesize($path) ?: 0;
-    $fh = fopen($path, 'rb');
-    if ($fh === false) {
-        return '';
-    }
-    fseek($fh, max(0, $size - 400000));
-    $tail = (string) stream_get_contents($fh);
-    fclose($fh);
-
     $message = '';
-    foreach (preg_split('/\R/', $tail) ?: [] as $line) {
+    foreach (preg_split('/\R/', hook_transcript_tail(hook_transcript_path($payload))) ?: [] as $line) {
         if (!str_contains($line, '"assistant.message"')) {
             continue;
         }

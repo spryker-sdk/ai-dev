@@ -49,7 +49,7 @@ output="$(printf '{"sessionId":"s1","cwd":"%s"}' "$project" | bash "$SYNC")"
 assert_eq "the hook writes no rule files" "$(count_files "$project/.github/instructions")" "0"
 assert_eq "the hook records that it has offered" "$([ -f "$project/.ai-dev/rules.copilot.suggested" ] && echo yes || echo no)" "yes"
 assert_eq "the offer names the rule count" "$(printf '%s' "$output" | grep -c "writes $RULE_COUNT rule files")" "1"
-assert_eq "the offer names the project, not the agent's cwd" "$(printf '%s' "$output" | grep -c -- "--target '$project'")" "1"
+assert_eq "the offer names the project, not the agent's cwd" "$(printf '%s' "$output" | grep -c -- "--target $project ")" "1"
 assert_eq "copilot wraps the offer in additionalContext JSON" "$(printf '%s' "$output" | grep -c '"additionalContext"')" "1"
 if printf '%s' "$output" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
     pass "the offer is valid JSON for copilot"
@@ -61,6 +61,13 @@ second_offer="$(printf '{"sessionId":"s2","cwd":"%s"}' "$project" | bash "$SYNC"
 assert_eq "the offer is not repeated" "$second_offer" ""
 
 assert_eq "declining leaves the project clean" "$(count_files "$project/.github/instructions")" "0"
+
+# The offered command must run as given, also from a path with a space or a quote in it.
+project="$(new_project "it's a project")"
+offer="$(printf '{"hook_event_name":"SessionStart","session_id":"s","cwd":"%s"}' "$project" | bash "$SYNC")"
+command="$(printf '%s' "$offer" | sed -n 's/.*To accept, run: \(.*--harness claude\)\..*/\1/p')"
+eval "$command" > /dev/null
+assert_eq "the offered command works for a path with a space and a quote" "$(count_files "$project/.claude/rules")" "$RULE_COUNT"
 
 # --- Each tool has its own offer and record ----------------------------------
 project="$(new_project mixed-team)"

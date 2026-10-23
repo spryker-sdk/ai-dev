@@ -139,19 +139,11 @@ function stop_is_blocked(string $cwd, string $lastMessage, string $transcriptPat
     if (preg_match('~NEEDS YOU:|ACTION NEEDED|awaiting your|waiting for you|your call on~i', $lastMessage) === 1) {
         return 'the turn is explicitly waiting on the person';
     }
-    if ($transcriptPath !== '' && is_file($transcriptPath)) {
-        $size = filesize($transcriptPath) ?: 0;
-        $fh = fopen($transcriptPath, 'rb');
-        if ($fh !== false) {
-            fseek($fh, max(0, $size - 200000));
-            $tailText = (string) stream_get_contents($fh);
-            fclose($fh);
-            foreach (STOP_QUESTION_FORMATS as [$marker, $tool]) {
-                $lastUser = strrpos($tailText, $marker);
-                if ($lastUser !== false && str_contains(substr($tailText, $lastUser), $tool)) {
-                    return 'the turn asked the person a question through ' . $tool;
-                }
-            }
+    $tailText = substr(hook_transcript_tail($transcriptPath), -200000);
+    foreach (STOP_QUESTION_FORMATS as [$marker, $tool]) {
+        $lastUser = strrpos($tailText, $marker);
+        if ($lastUser !== false && str_contains(substr($tailText, $lastUser), $tool)) {
+            return 'the turn asked the person a question through ' . $tool;
         }
     }
 

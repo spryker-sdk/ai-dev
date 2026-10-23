@@ -20,7 +20,7 @@ class AiToolArtifactGenerator implements AiToolArtifactGeneratorInterface
      *
      * @var array<string>
      */
-    protected const COMPOUND_AGENT_EXTENSIONS = ['.agent.md'];
+    protected const array COMPOUND_AGENT_EXTENSIONS = ['.agent.md'];
 
     public function __construct(
         protected string $projectRoot,

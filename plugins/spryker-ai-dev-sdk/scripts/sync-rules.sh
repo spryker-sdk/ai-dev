@@ -79,7 +79,7 @@ if [ -z "$HARNESS" ]; then
         HARNESS="claude"
     elif [ -n "$(json_string sessionId)" ]; then
         HARNESS="copilot"
-    elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] || [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+    elif [ -n "${CLAUDECODE:-}" ]; then
         HARNESS="claude"
     elif [ -n "${COPILOT_HOME:-}" ]; then
         HARNESS="copilot"
@@ -138,7 +138,7 @@ SUGGESTED="$MANIFEST_DIR/rules.$STATE.suggested"
 
 # Escape a message for embedding in a JSON string literal: Copilot parses this script's stdout.
 json_escape() {
-    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+    printf '%s' "$1" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 # --- as a hook, suggest once and write nothing -------------------------------
@@ -156,7 +156,7 @@ if [ $MANUAL -eq 0 ]; then
 
     RULE_COUNT="$(find "$RULES_DIR" -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
     RELATIVE_DIR="${RULES_TARGET_DIR#$TARGET/}"
-    OFFER="This is a Spryker project and the Spryker coding rules are not installed in it. Offer the person the choice, once, and do not raise it again: installing writes ${RULE_COUNT} rule files to ${RELATIVE_DIR}/, which the harness then applies on its own to the files each rule governs. To accept, run: ${SCRIPT_DIR}/sync-rules.sh --target '${TARGET}' --harness ${HARNESS}. If they decline or say nothing, carry on with the task; the rules can still be read one at a time from the plugin's own rules directory without installing anything."
+    OFFER="This is a Spryker project and the Spryker coding rules are not installed in it. Offer the person the choice, once, and do not raise it again: installing writes ${RULE_COUNT} rule files to ${RELATIVE_DIR}/, which the harness then applies on its own to the files each rule governs. To accept, run: $(printf '%q' "$SCRIPT_DIR/sync-rules.sh") --target $(printf '%q' "$TARGET") --harness ${HARNESS}. If they decline or say nothing, carry on with the task; the rules can still be read one at a time from the plugin's own rules directory without installing anything."
 
     if [ "$STDOUT_FORMAT" = "json" ]; then
         printf '{"additionalContext":"%s"}\n' "$(json_escape "$OFFER")"

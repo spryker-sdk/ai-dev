@@ -28,10 +28,10 @@ queues are empty after each reset and after the deployment.
 
 | # | Do | State |
 |---|---|---|
-| 1 | Commit or stash all changes. Check out the production branch. | |
+| 1 | Commit all changes on the upgrade branch. Check out the production branch. | |
 | 2 | `docker/sdk reset` | production today |
 | 3 | Check out the upgrade branch. | |
-| 4 | Run only the normal deployment commands. | |
+| 4 | Build the images and assets as the pipeline does, without data: `docker/sdk up --build --assets`. Then run only the normal deployment commands. | |
 | 5 | Dump the database, Redis and the search engine (documents, mappings, index settings). | **deployed** |
 | 6 | `docker/sdk reset` | |
 | 7 | Dump the same set as in step 5. | **fresh** |
