@@ -14,29 +14,17 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class AgentsFileGenerationStep implements AiToolSetupStepInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface $generator
-     * @param \SprykerSdk\Zed\AiDev\AiDevConfig $config
-     */
     public function __construct(
         protected AiToolArtifactGeneratorInterface $generator,
         protected AiDevConfig $config,
     ) {
     }
 
-    /**
-     * @return string
-     */
     public function getLabel(): string
     {
         return 'Generate agents/context file';
     }
 
-    /**
-     * @param string $tool
-     *
-     * @return bool
-     */
     public function canExecuteForTool(string $tool): bool
     {
         return true;
@@ -50,18 +38,12 @@ class AgentsFileGenerationStep implements AiToolSetupStepInterface
         return [];
     }
 
-    /**
-     * @return bool
-     */
     public function supportsExampleMode(): bool
     {
         return true;
     }
 
     /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     public function listTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
@@ -70,12 +52,7 @@ class AgentsFileGenerationStep implements AiToolSetupStepInterface
     }
 
     /**
-     * @param string $tool
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
-     * @return void
      */
     public function execute(string $tool, OutputInterface $output, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): void
     {

@@ -68,7 +68,9 @@ Q5 actors, Q9 quality goals, Q24 migration).
 ## § 02 — Constraints
 
 **File:** `02-constraints.md`. **Inputs:** intake (Q27 inherited limitations, Q43 fixed technical
-choices, Q44 legal obligations, Q10 hosting).
+choices, Q44 legal obligations, Q10 hosting); conventions from the project's own instructions file
+and rules folder where relevant — `CLAUDE.md` + `.claude/rules/` under Claude Code,
+`.github/copilot-instructions.md` + `.github/instructions/` under GitHub Copilot.
 
 **Answers one question: what removes the architect's freedom?**
 

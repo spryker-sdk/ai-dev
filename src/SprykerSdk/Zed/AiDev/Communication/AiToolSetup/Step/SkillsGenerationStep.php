@@ -13,26 +13,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class SkillsGenerationStep implements AiToolSetupStepInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface $generator
-     */
     public function __construct(protected AiToolArtifactGeneratorInterface $generator)
     {
     }
 
-    /**
-     * @return string
-     */
     public function getLabel(): string
     {
         return 'Generate skills';
     }
 
-    /**
-     * @param string $tool
-     *
-     * @return bool
-     */
     public function canExecuteForTool(string $tool): bool
     {
         return true;
@@ -46,18 +35,12 @@ class SkillsGenerationStep implements AiToolSetupStepInterface
         return [];
     }
 
-    /**
-     * @return bool
-     */
     public function supportsExampleMode(): bool
     {
         return true;
     }
 
     /**
-     * @param string $tool
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
      * @return array<string>
      */
     public function listTargetPaths(string $tool, ArtifactMode $mode = ArtifactMode::Real): array
@@ -66,12 +49,7 @@ class SkillsGenerationStep implements AiToolSetupStepInterface
     }
 
     /**
-     * @param string $tool
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
      * @param array<string> $skipPaths
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode $mode
-     *
-     * @return void
      */
     public function execute(string $tool, OutputInterface $output, array $skipPaths = [], ArtifactMode $mode = ArtifactMode::Real): void
     {

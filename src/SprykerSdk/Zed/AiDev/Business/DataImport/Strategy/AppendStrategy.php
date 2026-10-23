@@ -11,19 +11,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\CsvConstants;
 
 class AppendStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_APPEND;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array
@@ -35,10 +28,7 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
-     *
-     * @return void
      */
     protected function writeResults(TransformContext $context, array $result): void
     {
@@ -54,10 +44,7 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
-     *
-     * @return void
      */
     protected function writeWithChangedHeaders(TransformContext $context, array $result): void
     {
@@ -70,7 +57,6 @@ class AppendStrategy extends AbstractTransformStrategy
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
      * @param array<string, mixed> $result
      *
      * @return array<string, mixed>

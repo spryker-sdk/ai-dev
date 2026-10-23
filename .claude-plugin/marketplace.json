@@ -1,7 +1,7 @@
 {
     "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
     "name": "spryker-plugins-official",
-    "description": "Directory of plugins maintained by Spryker Systems GmbH.",
+    "description": "Directory of plugins maintained by Spryker Systems GmbH. Works with Claude Code and GitHub Copilot (CLI, VS Code, cloud agent).",
     "owner": {
         "name": "Spryker Systems GmbH",
         "email": "support@spryker.com"
@@ -9,25 +9,42 @@
     "plugins": [
         {
             "name": "spryker-ai-dev-sdk",
-            "description": "Set of setup tools and skills for Spryker project development.",
+            "description": "Set of setup tools, skills and agents for Spryker project development.",
+            "version": "0.8.0",
             "author": {
                 "name": "Spryker Systems GmbH",
                 "email": "support@spryker.com"
             },
             "category": "development",
+            "keywords": [
+                "spryker",
+                "ai-dev",
+                "mcp",
+                "copilot",
+                "claude-code"
+            ],
             "source": "./plugins/spryker-ai-dev-sdk",
-            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-claude-code-plugin"
+            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev"
         },
         {
             "name": "spryker-architecture",
             "description": "Architecture documentation tooling for Spryker projects — arc42/C4 records, ADRs, and Solution Designs.",
+            "version": "0.2.0",
             "author": {
                 "name": "Spryker Systems GmbH",
                 "email": "support@spryker.com"
             },
             "category": "development",
+            "keywords": [
+                "spryker",
+                "architecture",
+                "arc42",
+                "c4",
+                "copilot",
+                "claude-code"
+            ],
             "source": "./plugins/spryker-architecture",
-            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev-claude-code-plugin"
+            "homepage": "https://docs.spryker.com/docs/dg/dev/ai/ai-dev/ai-dev"
         }
     ]
 }

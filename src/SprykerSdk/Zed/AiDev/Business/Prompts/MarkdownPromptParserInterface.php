@@ -19,11 +19,6 @@ interface MarkdownPromptParserInterface
      * - Extracts frontmatter metadata (title, description, when_to_use).
      * - Extracts body content.
      * - Returns prompt transfer object.
-     *
-     * @param string $content
-     * @param string $filename
-     *
-     * @return \Generated\Shared\Transfer\AiDevGitHubPromptTransfer
      */
     public function parsePromptFile(string $content, string $filename): AiDevGitHubPromptTransfer;
 }

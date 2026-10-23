@@ -1,6 +1,14 @@
 ---
 name: spryker-qa-coverage
-description: QA and functional-test a Spryker feature by exercising the RUNNING application — turn a PRD or feature description into a test checklist and concrete test cases (happy path, negative, authorization, and corner/edge cases), then execute them against the live app and report pass/fail with real evidence. Use this at ANY point — when a feature is done, MID-development to check work-in-progress as you go, or as a quick SMOKE TEST after a refactor to confirm nothing broke. Trigger whenever the user wants to QA, test, or verify that a feature actually works end-to-end, manually test a flow, build or run a test checklist or test cases, smoke-test after refactoring or a change, sanity-check work in progress, find edge/corner cases that could break a feature, check that data lands in the database/Redis/queue after an action, or hands over a PRD and asks whether it is correctly implemented — even phrased loosely as "test this", "does this still work", "did my refactor break anything", or "make sure it works in the back office". It drives the app through the `spryker-runtime` skill (Back Office and storefront in Chrome, console/CLI commands, HTTP/API calls, storage checks), picking the lightest mode per case. This is hands-on QA against a real environment: it does NOT write automated test code (use codecept-functional or cypress-e2e-test), does NOT run static analysis or CI (use spryker-ci, static-validation, or phpstan), and does NOT fix code — it observes and reports.
+description: >
+  Hands-on QA of a Spryker feature against the running application: turns a PRD or feature
+  description into a checklist and test cases (happy path, negative, authorization, edge
+  cases), runs them through spryker-runtime (Back Office and storefront in the browser, CLI,
+  HTTP/API, database/Redis/queue checks) and reports pass/fail with evidence. Use when a
+  feature is done, mid-development, or as a smoke test after a refactor — "test this", "does
+  this still work", "did my refactor break anything", "make sure it works in the back office",
+  or a PRD with "is this implemented correctly?". Does not write automated tests
+  (codecept-functional, cypress-tests), run static analysis (static-validation) or fix code.
 ---
 
 # Spryker QA & Testing (from PRD → checklist → execute → report)
@@ -22,7 +30,7 @@ When you fall back, **state which layer you actually exercised** and keep the UI
 
 ### Investigate the code when the PRD or a criterion is unclear
 
-This skill is behavior-first, but reading the implementation to **understand what to test and how to drive it** is encouraged — it is not the same as judging code quality (which stays out of scope). When a PRD is vague, a Gherkin step is ambiguous, the real module/config slug differs from the PRD's wording, or you need the exact endpoint path, selector, config object name, toggle key, or DB table to write or execute a case — **read the code** (or delegate a scoped `Explore` pass). Ground the test cases in what's actually built: the controller/action and route, the feature-toggle key, the JS entry/config object the UI reads, the transfers, and the storage tables a result lands in. Note in the report when a criterion had to be interpreted from code rather than the PRD.
+This skill is behavior-first, but reading the implementation to **understand what to test and how to drive it** is encouraged — it is not the same as judging code quality (which stays out of scope). When a PRD is vague, a Gherkin step is ambiguous, the real module/config slug differs from the PRD's wording, or you need the exact endpoint path, selector, config object name, toggle key, or DB table to write or execute a case — **read the code** (or delegate a scoped pass to a read-only research subagent). Ground the test cases in what's actually built: the controller/action and route, the feature-toggle key, the JS entry/config object the UI reads, the transfers, and the storage tables a result lands in. Note in the report when a criterion had to be interpreted from code rather than the PRD.
 
 It deliberately stays in the QA lane:
 - **No static analysis.** Never run phpstan/phpcs/`spryker-ci`/`validation.sh`. QA here is about runtime behavior, not code style or types. If asked to "check the code", clarify that this skill tests behavior; static checks live in other skills.
@@ -76,12 +84,13 @@ When in doubt, run inline — losing context is a worse failure than a slightly 
 
 ### Step 1 — Build the test checklist and test cases
 
-For each user story / acceptance criterion, derive test cases from these four buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
+For each user story / acceptance criterion, derive test cases from these five buckets — but scale the count to the story's risk rather than forcing one of each. Always cover the happy path; add negative, authorization, and corner cases where *this* story actually carries that risk, so corner cases aren't an afterthought without padding every story into a fixed matrix (more cases = a slower pass):
 
 - **Happy path** — the documented behavior works for the intended actor.
 - **Negative / validation** — missing or malformed input, wrong values, empty state, "no results".
 - **Authorization** — a *different* actor (or one lacking the ACL role) is correctly denied. Spryker is actor-heavy; test the boundary, e.g. a Customer hitting a Back Office endpoint, or a Merchant user reaching another merchant's data.
 - **Corner / edge** — boundaries and the things that actually break Spryker features: empty collection, single vs. many (bulk of 1 vs 100), very long strings, special characters/HTML in text fields, concurrent/duplicate submit, CSRF token missing/expired, multi-store / multi-locale, multi-currency, pagination limits, stale cache vs. published storage (Redis/Elasticsearch), and idempotency on retry.
+- **Scale / NFR** — when the caller supplies a scale envelope (data volumes + NFR numbers, e.g. from `spryker-customization` Step 0d), verify the feature against it with measurements, not opinions: the **query-count delta** on the primary flow (ES/DB round trips before vs after — a feature once silently doubled ES queries on every one-word search), the **per-document index/KV size delta** multiplied out against the envelope, and a **timing statement for any synchronous work inside imports** at envelope scale. No load-testing infra needed — counts, sizes, and arithmetic. *All functional cases green + NFRs unmeasured is an incomplete verdict, not a pass.* No envelope supplied → note "Scale/NFR: no envelope provided" in the report rather than skipping silently.
 
 Think explicitly about what could break this *specific* feature — don't just template. If the feature publishes data, a corner case is "does the storefront storage actually reflect it after publish?". If it's a bulk action, "what about a partial failure mid-batch?".
 
@@ -119,11 +128,13 @@ A 200 from a synthetic request and a 200 from a button click are **not** the sam
 
 ### Step 3 — Execute via `spryker-runtime`
 
-Invoke the **`spryker-runtime`** skill to run each case. It handles login per actor (all five roles + the DB-fallback/ask-user rule), the four modes, host resolution from `deploy.dev.yml` (or a user-specified target), and the Chrome safety rules. Follow its "Manual testing / QA" guidance.
+Invoke the **`spryker-runtime`** skill to run each case. It handles login per actor (all five roles + the DB-fallback/ask-user rule), the four modes, host resolution from `deploy.dev.yml` (or a user-specified target), and the Chrome safety rules. It also carries the **Browser tool map** — use it for the browser tool names in your setup. Follow its "Manual testing / QA" guidance.
 
 Execution order: run the cheap CLI/API/storage cases first (fast, no browser), then the Chrome flows. Reuse one login session across cases where possible (hand the harvested cookie from Chrome to curl — Mode 4) instead of logging in repeatedly.
 
-Capture **concrete evidence** for every case as you go: HTTP status + key response fields, the DB row / Redis key / queue message you checked, console output, console errors (`read_console_messages`), the rendered result, and a `gif_creator` recording for notable UI flows. Evidence is what makes a QA report trustworthy — record what you actually observed, never paraphrase or assume.
+Capture **concrete evidence** for every case as you go: HTTP status + key response fields, the DB row / Redis key / queue message you checked, console output, console errors (the console-messages tool — see the Browser tool map in `spryker-runtime`), the rendered result, and a GIF recording for notable UI flows where the setup supports it (`gif_creator`), otherwise a numbered screenshot per step. Evidence is what makes a QA report trustworthy — record what you actually observed, never paraphrase or assume.
+
+**Write-path evidence rule:** a write is verified by reading the written state through a **different mechanism than the one that wrote it**. A tool's own success report is not evidence — a data importer once printed *"Successful, 3 imported DataSets"* with zero rows written. For imports, assert the row delta (`SELECT COUNT(*)` before/after vs the expected count); for publish/sync features, read the index/Redis key back rather than trusting "queues drained".
 
 ### Step 4 — Report
 
@@ -133,7 +144,7 @@ Append results to the QA artifact and give the user a summary using the **Report
 - **FAIL** — observed differs; record expected vs. actual + evidence + a severity (blocker / major / minor) and which actor/endpoint/layer.
 - **BLOCKED** — couldn't run it (env not booted, missing credentials, feature not installed, or the UI path couldn't be driven and no valid workaround applies). Never mark a blocked case as passed; say what's needed (and ask the user for credentials per the `spryker-runtime` rule).
 
-> **Reproduce before you fail it — especially "the button/UI does nothing".** A single bad observation is a hypothesis, not a verdict. Before recording any UI-flow FAIL (and *always* before calling something a **blocker**), reproduce it on **≥3 fresh page loads** (hard reload + at least one navigate-away-and-back), driving the **real control** each time. Front-end bootstrap bugs in Spryker Zed are frequently **intermittent races** (the `DOMContentLoaded` controller-init race — see `spryker-runtime` "Inert Zed JS controller"): the same page is dead on one load and works on the next. If it works on *any* load, it is **not a blocker** — downgrade to a *minor/flaky* finding and say so. Also rule out **your own driver**: `form_input` sets `.value` without firing `input`/`change`; an MCP click can land before init finishes — re-drive with a genuine click and a freshly-primed network monitor before concluding the code is at fault.
+> **Reproduce before you fail it — especially "the button/UI does nothing".** A single bad observation is a hypothesis, not a verdict. Before recording any UI-flow FAIL (and *always* before calling something a **blocker**), reproduce it on **≥3 fresh page loads** (hard reload + at least one navigate-away-and-back), driving the **real control** each time. Front-end bootstrap bugs in Spryker Zed are frequently **intermittent races** (the `DOMContentLoaded` controller-init race — see `spryker-runtime` "Inert Zed JS controller"): the same page is dead on one load and works on the next. If it works on *any* load, it is **not a blocker** — downgrade to a *minor/flaky* finding and say so. Also rule out **your own driver**: the form-fill tool sets `.value` without firing `input`/`change`; an MCP click can land before init finishes — re-drive with a genuine click and a freshly-primed network monitor before concluding the code is at fault.
 >
 > **A Mode 5 (synthetic) green does not close a UI-flow case — and must not end the investigation.** If you reached for the page-context fetch *because* a control looked dead, that 200 proves the server, not the button. It is a companion `PASS (server only)`, never a substitute: you still owe a real button-driven attempt across reloads. The tidy "server works / UI dead" split is a smell — it is the exact shape of a *prematurely-closed* investigation. Keep pushing the real UI to completion before you commit the verdict.
 
@@ -183,7 +194,7 @@ ALWAYS structure the final report like this:
 
 - "I'll just run phpstan/spryker-ci to check it" → NO. This skill never runs static analysis.
 - "I'll write a Codeception test for this" → NO. That's `codecept-functional`. Here you execute against the running app.
-- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all four buckets.
+- "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all five buckets (Scale/NFR when an envelope is supplied — else note its absence).
 - "It probably works" / "the code looks right" → NO. QA reports *observed* behavior with evidence, not inferences from code.
 - "The endpoint returns 200, so the feature works" → NO. A synthetic/endpoint hit is a layer below the UI. If the AC is a user flow, prove it through the real UI (E2E); otherwise mark it `PASS (server only)` and keep the UI-flow case FAIL/BLOCKED. Reading code is fine to *understand what to test* — it is never a substitute for *observing* the running flow.
 - "The button did nothing once, so it's a blocker" → NO. Reproduce on ≥3 fresh loads (hard reload + navigate-back) and rule out your own driver first. Spryker Zed front-end bootstrap bugs are often intermittent races — works-on-some-loads is a *minor/flaky* finding, not a blocker. One dead load is a hypothesis, not a verdict.

@@ -1,7 +1,6 @@
 ---
 name: spryker-runtime
 description: Use to actually RUN the Spryker application and observe real behavior, and to perform manual testing / QA against a real authenticated session — log in to Yves storefront, the Back Office, Merchant Portal, drive the UI in Chrome, run `docker/sdk cli console` commands, and call Yves/Glue endpoints over HTTP. Trigger whenever you need to manually test or QA a feature, walk through a user flow as a specific actor, confirm how an existing flow behaves before writing a PRD/spec/plan, reproduce a bug, verify a fix end-to-end, inspect what an endpoint returns, check which actors/roles exist at /user, or "run the app", "manually test this", "do a QA pass", "log in to backoffice", "call this endpoint", "execute this console command". Reusable building block for the PRD and verification skills.
-allowed-tools: Bash, mcp__claude-in-chrome__*
 ---
 
 # Spryker Local Runtime — Run, Log In, Operate
@@ -151,20 +150,45 @@ curl -s http://<host:glue>/<resource> \
 
 Capture the **HTTP status, response shape, and key fields** — that's what downstream requirements/verification care about.
 
-## Mode 3 — Browser (Chrome)
+## Mode 3 — Browser
 
 Use only when you need rendered UI, JS behavior, or to establish a login session.
 
-**Before any Chrome tool, load it via ToolSearch** (these are deferred MCP tools):
-`ToolSearch "select:mcp__claude-in-chrome__tabs_context_mcp"` (and similarly for `navigate`, `find`, `form_input`, `read_page`, `get_page_text`, `read_network_requests`, `gif_creator`, etc.), then call it.
+### Browser tool map
+
+This mode needs a browser-automation MCP server. Match tools by **capability and tool name**, not by
+server name — server names are install-specific. The two common setups:
+
+| Capability | Claude in Chrome | Playwright MCP |
+|---|---|---|
+| Open a URL | `navigate` | `browser_navigate` |
+| Read page content | `get_page_text`, `read_page`, `find` | `browser_snapshot` |
+| Click | `computer` (`left_click`) | `browser_click` |
+| Type / fill a form | `form_input`, `computer` (`type`) | `browser_type`, `browser_fill_form`, `browser_select_option` |
+| Press a key | `computer` (`key`) | `browser_press_key` |
+| Several actions in one call | `browser_batch` | one call per action |
+| Run JavaScript | `javascript_tool` | `browser_evaluate` |
+| Network requests | `read_network_requests` | `browser_network_requests`, `browser_network_request` |
+| Console messages | `read_console_messages` | `browser_console_messages` |
+| Screenshot | `computer` (`screenshot`) | `browser_take_screenshot` |
+| Animated GIF | `gif_creator` | not available — capture a numbered screenshot per step |
+| Tabs | `tabs_context_mcp`, `tabs_create_mcp` | `browser_tabs` |
+
+The rest of this section names the Claude in Chrome tools. Substitute the equivalent from the column
+that matches your setup. Two practical notes:
+
+- **If your harness defers MCP tools until requested, load the ones you need first.** In Claude Code
+  that means `ToolSearch` with a `select:` query naming the tools.
+- **If no browser MCP server is connected, say so and fall back to Mode 2 or Mode 4** (curl), which
+  proves server behavior without a browser. Do not report a UI assertion you could not actually run.
 
 Session startup:
-1. `tabs_context_mcp` first — see existing tabs. **Do not reuse a tab unless the user asks**; create a fresh one with `tabs_create_mcp`.
-2. `navigate` to the login URL for the target surface.
+1. List tabs first — see what already exists. **Do not reuse a tab unless the user asks**; create a fresh one.
+2. Navigate to the login URL for the target surface.
 3. Fill the credentials and submit **in one atomic sequence** (see the tip below) — do not navigate between filling and submitting.
 4. Verify success: Yves redirects to `/DE/en/customer/overview`; Back Office lands on the dashboard.
 
-> **Chrome forms lose typed values on navigation — fill and submit atomically.** A common failure: setting field values, then `navigate`-ing elsewhere (or letting a batch navigate) before submitting — the page reloads and the form is blank, so you land back on the login page. Type the email + password **and** click submit in a single `browser_batch`, with no `navigate` in between; only navigate *after* you've confirmed login succeeded. Likewise, `form_input`/`find` set or locate values but **do not submit** — you still need an actual click (`computer left_click`) or Enter to submit. Verify with a screenshot or `get_page_text` that you're past the login page before continuing.
+> **Browser forms lose typed values on navigation — fill and submit atomically.** A common failure: setting field values, then navigating elsewhere (or letting a batch navigate) before submitting — the page reloads and the form is blank, so you land back on the login page. Type the email + password **and** click submit without navigating in between; only navigate *after* you've confirmed login succeeded. Where the setup supports batching several actions in one call, put the whole sequence in one batch. Note that setting a field value does **not** submit the form — you still need an actual click or Enter. Verify with a screenshot or a page-text read that you're past the login page before continuing.
 
 Login as a specific actor: use the exact login URL + demo account for that role from the **"Login per role" reference** above (each role has a different login path; the password is `change123` for all). If the default credentials fail, run the DB lookup there and, if still blocked, ask the user.
 
@@ -184,10 +208,8 @@ When a scenario needs **many requests, repeated runs, or auth that's painful to 
 
 **Step 2 — Perform the real action once in the browser, then read the actual request it sent.** This is the reliable way to learn *exactly* which headers/tokens the endpoint requires — guessing them leads to 302-redirects-to-login or 403s.
 
-```
-ToolSearch "select:mcp__claude-in-chrome__read_network_requests"
-```
-Call `read_network_requests` and inspect the matching request for:
+Read the network requests (`read_network_requests`, or `browser_network_requests`) and inspect the
+matching request for:
 - **Method + full URL** (including query string)
 - **`Cookie`** header — the whole thing (session cookie + any others like `last-visit`)
 - **CSRF / form token** — Back Office Zed forms post a `_token` field (or `X-CSRF-Token` header); Glue may need none beyond the bearer token
@@ -233,15 +255,12 @@ curl -s -H "Cookie: $COOKIE" 'http://<host:backoffice>/<...>'
 
 **When NOT to use Mode 4:** if the behavior under test is client-side (JS rendering, in-page validation, redirects the browser follows automatically), curl won't exercise it — stay in Mode 3. Mode 4 tests the *server* response, not the rendered page.
 
-> **Heads-up: the Chrome harness blocks reading `cookie`/`token` from page JS.** `document.cookie` and any DOM read whose key/value touches `token` come back as `[BLOCKED]`. So you often **cannot harvest a CSRF token or session cookie out of the page** to hand to `curl`. When Mode 4 is blocked this way, fall back to **Mode 5** — drive the request from inside the page context, where the browser attaches the cookie and the page already holds the token, without you ever reading the secret.
+> **Heads-up: some browser setups block reading `cookie`/`token` from page JS.** In Claude in Chrome, `document.cookie` and any DOM read whose key/value touches `token` come back as `[BLOCKED]`. So you often **cannot harvest a CSRF token or session cookie out of the page** to hand to `curl`. When Mode 4 is blocked this way, fall back to **Mode 5** — drive the request from inside the page context, where the browser attaches the cookie and the page already holds the token, without you ever reading the secret.
 
 ## Mode 5 — Page-context fetch (when curl can't get the credentials)
 
-Use this when you need to hit a **CSRF-protected / session-bound endpoint** but the harness won't let you read the cookie/token for Mode 4, **or** when a UI control that should call the endpoint is broken (see "Inert Zed JS controller") and you want to verify the *server* independently of the dead button. You run the page's own `fetch` via `javascript_tool`, reusing the live session implicitly.
+Use this when you need to hit a **CSRF-protected / session-bound endpoint** but the setup won't let you read the cookie/token for Mode 4, **or** when a UI control that should call the endpoint is broken (see "Inert Zed JS controller") and you want to verify the *server* independently of the dead button. You run the page's own `fetch` through the run-JavaScript tool (`javascript_tool`, or `browser_evaluate`), reusing the live session implicitly.
 
-```
-ToolSearch "select:mcp__claude-in-chrome__javascript_tool"
-```
 ```js
 // Runs in the logged-in page; cookie is attached automatically, token is read from the page's own config — never printed.
 (async () => {
@@ -273,7 +292,7 @@ For "did clicking X actually fire a request?", don't rely on a `window.fetch` mo
 
 ### ⚠️ ALWAYS hard-reload / clear cache after rebuilding assets
 
-**After ANY frontend asset compilation — `docker/sdk cli npm run zed`, `npm run yves`, `yves:watch`, or any build that regenerates JS/CSS bundles — you MUST hard-reload the browser (cache-bypassing) before testing the UI. Always do this; do not skip it.**
+**After ANY frontend asset compilation — `docker/sdk cli npm run zed`, `npm run yves`, `yves:watch`, `npm run mp:build`, or any build that regenerates JS/CSS bundles — you MUST hard-reload the browser (cache-bypassing) before testing the UI. Always do this; do not skip it.**
 
 Why this bites silently: Spryker serves bundles at a **stable URL** (e.g. `/assets/js/<bundle>.js?v=current` — the `?v=current` does **not** change across builds). So a normal reload keeps serving the **old cached bundle** from the browser's HTTP disk cache, and your JS/CSS change appears to "not take effect" even though the server has the new code. This is the #1 cause of "I rebuilt but nothing changed" — it's stale cache, not a broken build.
 
@@ -306,7 +325,7 @@ When a page 500s, a change "doesn't take effect", navigation/menu looks stale, a
 | --- | --- |
 | General "my change isn't showing" / stale app cache | `docker/sdk cli console cache:empty-all` |
 | Twig template change / new `.twig` not picked up, or template-not-found | `docker/sdk cli console twig:cache:warmer` |
-| Back Office menu / navigation looks wrong or stale | `docker/sdk cli console navigation:cache:remove` |
+| Back Office menu / navigation looks wrong or stale | `docker/sdk cli console navigation:cache:remove` → `navigation:build-cache` |
 | Route 404 / new controller-action URL not resolving (Zed) | `docker/sdk cli console router:cache:warm-up` (regenerate Zed router cache) |
 | Route 404 specifically in Back Office / Merchant Portal / Backend Gateway (each has its OWN router cache — the generic warm-up does not cover them) | `docker/sdk cli console router:cache:warm-up:backoffice` / `router:cache:warm-up:merchant-portal` / `router:cache:warm-up:backend-gateway` |
 | Diagnose a 404: confirm whether a route is actually registered / which one matches a path | `docker/sdk cli console router:match <path>`, or `debug:router` / `router:debug:backoffice` / `router:debug:backend-gateway` to dump registered routes |
@@ -314,7 +333,7 @@ When a page 500s, a change "doesn't take effect", navigation/menu looks stale, a
 | New factory/plugin not picked up, or "method not found" on a resolved class | `docker/sdk cli console cache:class-resolver:build` (after `dump-autoload -o`) |
 | New/changed transfer not available (missing getter, `Generated\…` error) | `docker/sdk cli console transfer:generate` |
 | DB schema change / Propel entity not reflecting a column | `docker/sdk cli console propel:install` |
-| Frontend JS/CSS change not visible | rebuild assets (`npm run zed`/`yves`) **then hard-reload the browser** — see the asset-cache warning in Mode 3 |
+| Frontend JS/CSS change not visible | rebuild assets (`npm run yves` / `zed` / `mp:build`) **then hard-reload the browser** — see the asset-cache warning in Mode 3 |
 | A Zed panel/widget renders but its buttons do nothing (no JS error, no request) | the JS controller was likely **never constructed** — see the inert-controller note below |
 | Published data missing from storefront (Redis/Elasticsearch) | ensure the P&S worker runs: `docker/sdk cli console queue:worker:start` (and/or `publish:trigger-events`) |
 

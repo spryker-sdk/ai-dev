@@ -22,3 +22,10 @@ suites:
         modules:
             enabled:
                 - Asserts
+
+    communication:
+        path: SprykerSdkTest/Zed/AiDev/Communication
+        actor: CommunicationTester
+        modules:
+            enabled:
+                - Asserts

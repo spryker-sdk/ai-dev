@@ -5,7 +5,8 @@ description: >
   service) or a plain bug description to a committed,
   validated, QA-accepted fix on a bugfix branch (autonomous mode adds a pushed Draft PR +
   CI watch). Orchestrates reproduce → root-cause → fix → functional tests → static checks →
-  review → QA → final verification via the project's stage skills. Trigger — "fix this bug",
+  review → QA → Cypress E2E coverage (when warranted) → final verification via the project's stage
+  skills. Trigger — "fix this bug",
   "fix ticket XY-1122", "broken, reproduce and fix it": any bug symptom PLUS the expectation of a
   DELIVERED fix. NOT for a single isolated step (one test, "just run CI"), new features,
   refactors without a symptom, or investigation-only requests ("just find where it goes wrong,
@@ -17,6 +18,8 @@ description: >
 This skill drives a bug from intake to a delivered, validated fix. It is an **orchestrator**: each
 stage delegates to an existing installed skill. Your job is to run the stages in order, carry context
 between them, enforce the verification loop, and respect the operating mode the user picked.
+Invoke a skill with its slash command (`/spryker-runtime`, or `/spryker-ai-dev-sdk:spryker-runtime`
+on a plugin install); delegate to an agent with your harness's subagent tool.
 
 > **Note — the ticket is optional.** The bug can come from a tracker ticket (JIRA, GitHub Issues, or
 > any other service) **or** from a plain free-text description with no ticket at all. A ticket is never
@@ -34,12 +37,11 @@ between them, enforce the verification loop, and respect the operating mode the 
 > first; anything unavailable (or a "no PR" choice) is **skipped with a clear note in the report**, never
 > attempted-and-failed. This never aborts the run — it only changes how far Step 11 goes.
 
-> **Note — Claude-only orchestration.** This skill is built to run on **Claude and the skills/agents
-> already installed in the project** — nothing else. Every stage delegates to a bundled/installed
-> `Skill(...)` or Claude subagent; no third-party MCP server is required for the core flow. The only
-> external touchpoint is the **optional** Step 0 ticket pull (e.g. JIRA via the Atlassian MCP); if the
-> ticket text is pasted or a free-text description is given, the whole workflow runs without any external
-> MCP. Keep every subagent this skill spawns on a Claude model.
+> **Note — self-contained orchestration.** This skill is built to run on **the bundled skills and
+> agents already installed in the project** — nothing else. Every stage delegates to a bundled skill or
+> to a subagent; no third-party MCP server is required for the core flow. The only external touchpoint
+> is the **optional** Step 0 ticket pull (e.g. JIRA via the Atlassian MCP); if the ticket text is pasted
+> or a free-text description is given, the whole workflow runs without any external MCP.
 
 The core lessons this workflow enforces: a bug usually has *multiple* candidate paths, the visible
 symptom is often downstream of the real cause, and a fix is not "done" until the running app proves
@@ -57,20 +59,20 @@ companion files in this directory:
 
 ## Context discipline (summary)
 
-Heavy work (Chrome, XDebug, codecept, phpcs/phpstan, review, final verification, CI logs) runs in
+Heavy work (browser, XDebug, codecept, phpcs/phpstan, review, final verification, CI logs) runs in
 **subagents** that write raw output to files under `$BUGFIX_DIR`
-(`$CLAUDE_PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
+(`.ai-dev/spryker-bugfix/<bugfix-id>/` under the project root) and return only compact verdicts.
 The orchestrator retains only the **State Object**: mode/base/branch/attempt, extra expectations, repro
 summary, root-cause `file:line`, diff stat, per-gate verdicts (≤5 actionable items each), and log-file
 pointers. Details: [reference.md](reference.md) § Run lean / § The run directory / § The State Object.
 
 ## Plan tracking (summary)
 
-At the end of Step 0, **arrange the plan as a task list** with `TaskCreate` — one task per stage
-(Steps 1–12) — and drive it with `TaskUpdate` as the run proceeds: mark a stage `in_progress` when you
-enter it and `completed` when its gate is green; on a loopback, reopen the affected gate task(s) and add
-a fresh attempt task. `TaskList` is the live, at-a-glance checklist a human (or a resumed run) can read
-to see where the run stands — it **survives compaction and scheduled wake-ups**, complementing the
+At the end of Step 0, **arrange the plan as a task list** in your harness's task list — one task per
+stage (Steps 1–12) — and drive it as the run proceeds: mark a stage `in_progress` when you enter it and
+`completed` when its gate is green; on a loopback, reopen the affected gate task(s) and add a fresh
+attempt task. The task list is the live, at-a-glance checklist a human (or a resumed run) can read to
+see where the run stands — it **survives compaction and scheduled wake-ups**, complementing the
 append-only `run.log` timeline (the log is the history; the task list is the current state). This is the
 same pattern the PRD workflow uses. Details: [stages.md](stages.md) § Step 0 (plan task list) and
 [reference.md](reference.md) § Plan task list.
@@ -79,39 +81,47 @@ same pattern the PRD workflow uses. Details: [stages.md](stages.md) § Step 0 (p
 
 The bug is the contract — the fix is proven only when the user-visible symptom no longer reproduces,
 with evidence. Carry context forward between stages; confirm the real executing path before fixing;
-never report a stage green that wasn't; honor `.claude/rules/*`. **Autonomous mode never asks after
-Step 0** — decide, proceed, and log a CRITICAL DECISION in `$BUGFIX_DIR/decisions.md`; the only
+never report a stage green that wasn't; honor the project's rules folder. **Autonomous mode never
+asks after Step 0** — decide, proceed, and log a CRITICAL DECISION in `$BUGFIX_DIR/decisions.md`; the only
 Autonomous stops are the stale/dirty base (Step 2) and `attempt > 3`. Maintain the append-only
 decision & question log from Step 0 onward. Details: [reference.md](reference.md) § Operating
 principles and § The decision & question log.
 
 ## Workflow spine
 
-**Step 0 — Choose mode and gather context (ALWAYS FIRST).** One multi-tab `AskUserQuestion`: mode
+**Step 0 — Choose mode and gather context (ALWAYS FIRST).** One up-front intake round (eight
+structured multiple-choice questions, asked in two back-to-back batches of four): mode
 (Autonomous vs Collaborative), the bug context (an **optional** ticket from any tracker **and/or** a
 free-text description), base branch, env freshness, pre-push personal review, **PR delivery** (create a
-PR or not, and via which channel — auto / `gh` / a named forge MCP / push-only), and extra expectations
+PR or not, and via which channel — auto / `gh` / a named forge MCP / push-only), **Cypress E2E
+coverage** (auto / always / skip — gates Step 9b), and extra expectations
 beyond the default scope. Then create `$BUGFIX_DIR` + `run.log` step logger, **probe `PR_CHANNEL`**,
 handle the env-reset decision, and — only if a ticket was given and its tracker is reachable — pull the
 ticket for extra context. Read [stages.md](stages.md) § Step 0 before executing this stage.
 
 **Step 1 — Intake & framing.** Turn the context into a crisp problem statement: verbatim symptom,
-affected actor/surface, environment, provisional module/layer scope. Keep it short — it aligns
+affected actor/surface, environment, provisional module/layer scope, and the diff **`size`**
+(`trivial` ≤~10 lines in 1 file / `normal` / `complex`, re-checked against the real diff after Step 5).
+`size` scales the Step 8 reviewer fan-out and the Step 9 QA scope: **gate weight scales, gate existence
+does not** — every gate still runs on a one-liner and still reports honestly. Keep it short — it aligns
 later stages and subagents. Read [stages.md](stages.md) § Step 1 before executing this stage.
 
 **Step 2 — Create the bugfix branch. ← SAFETY GATE.** Verify a clean tree and an up-to-date base
-first; if dirty/stale, ask (Collaborative) or abort with a report (Autonomous). Branch
+first; if dirty/stale, ask (Collaborative) or abort with a report (Autonomous). If the developer
+**overrides** the clean-tree gate, take the sanctioned dirty-branch path: record the bug's file list as
+`scoped_paths`, scope Steps 8/9/10 to it, and state in the Step 12 report which gates were scoped and to
+what. Branch
 `bugfix/<jira-key>/<brief-kebab-name>` (lowercase; `no-ticket` fallback), then finalize
 `$BUGFIX_DIR`. Read [stages.md](stages.md) § Step 2 before executing this stage.
 
 **Step 3 — Reproduce & understand the bug.** Ensure the env is actually running, then delegate
-reproduction to a subagent using `Skill(spryker-runtime)` (writes `$BUGFIX_DIR/repro-notes.md`,
-returns a summary) and, in parallel, `Skill(spryker-docs-research)` for expected behavior. A bug you
+reproduction to a subagent running the `spryker-runtime` skill (writes `$BUGFIX_DIR/repro-notes.md`,
+returns a summary) and, in parallel, the `spryker-docs-research` skill for expected behavior. A bug you
 couldn't reproduce is a hypothesis. Read [stages.md](stages.md) § Step 3 before executing this stage.
 
 **Step 4 — Root-cause investigation. ← LOOP RE-ENTRY POINT.** The shared `attempt` counter is
-defined here (starts at 1; +1 on every loopback from Steps 8/9/11; **hard stop when `attempt > 3`**).
-Delegate runtime tracing to a subagent (`Skill(ai-runtime-debugging)` + `Skill(spryker-runtime)`)
+defined here (starts at 1; +1 on every loopback from Steps 8/9/9b/10/11; **hard stop when `attempt > 3`**).
+Delegate runtime tracing to a subagent (the `ai-runtime-debugging` + `spryker-runtime` skills)
 that returns the confirmed executing path `file:line` + decisive values. When several candidates
 survive in Autonomous mode, pick the evidence-backed one and log a CRITICAL DECISION.
 Read [stages.md](stages.md) § Step 4 before executing this stage.
@@ -121,30 +131,44 @@ cause; parallel subagents for independent multi-file edits. **Mandatory:** re-ru
 and confirm the symptom is gone with the same evidence. Read [stages.md](stages.md) § Step 5 before
 executing this stage.
 
-**Step 6 — Functional test coverage (subagent).** One subagent with `Skill(codecept-functional)`:
-enter testing mode first, add/update a regression test (ideally fails without the fix, passes with
-it), write the run log to `$BUGFIX_DIR`, return only the pass/fail verdict + test paths. Confirm
-green before moving on. Read [stages.md](stages.md) § Step 6 before executing this stage.
+**Step 6 — Functional test coverage (subagent).** One subagent with the `codecept-functional` skill:
+enter testing mode first, **run the affected suite once as a baseline before authoring** (an
+already-red suite makes "fails before, passes after" meaningless — record it as `pre_existing_rot`,
+report it separately, repair it as its own scoped decision outside the attempt budget), add/update a
+regression test (ideally fails without the fix, passes with
+it), write the run log to `$BUGFIX_DIR`, return only the baseline verdict + pass/fail verdict + test
+paths. Confirm green before moving on. Read [stages.md](stages.md) § Step 6 before executing this stage.
 
-**Step 7 — Static validation (subagent).** Subagent runs `Skill(static-validation)`
+**Step 7 — Static validation (subagent).** Subagent runs the `static-validation` skill
 (phpcbf/phpcs/phpstan on the diff), fixes and re-runs until clean, returns `clean` or the
 remaining violations. Read [stages.md](stages.md) § Step 7 before executing this stage.
 
-**Step 8 — Code review. ← GATE (loops back to Step 4).** Run `Skill(code-review)` (keep
+**Step 8 — Code review. ← GATE (loops back to Step 4).** Run the `code-review` skill (keep
 only ≤5 blocker/major items); fix findings, then re-run static checks (and tests if behavior was
 touched). Only blocker/major findings gate — **nits never loop**. Clean → Step 9; failing →
 `attempt`+1 and return to Step 4 through 5→6→7→8; `attempt > 3` → **STOP and report** (no push, no
 PR). Read [stages.md](stages.md) § Step 8 before executing this stage.
 
-**Step 9 — QA acceptance (independent). ← GATE.** `Skill(spryker-qa-coverage)` in an isolated
+**Step 9 — QA acceptance (independent). ← GATE.** The `spryker-qa-coverage` skill in an isolated
 subagent, handed the full session context (changed files, repro scenarios, env gotchas, regen
 commands already run, ticket/description). QA must confirm the symptom is gone **E2E**. Accepted → continue;
 rejected → treat as a Step 8 failure (loop to Step 4 within the budget).
 Read [stages.md](stages.md) § Step 9 before executing this stage.
 
+**Step 9b — Cypress E2E test coverage (conditional, subagent).** After QA has accepted the fix,
+lock the user-visible behavior in as an automated E2E test. Gated by the Step 0 Cypress preference:
+when the bug is user-visible on an E2E surface (storefront / Back Office / Merchant Portal / Glue)
+and the project's Cypress suite exists, one subagent with the `cypress-tests` skill decides whether to
+**fix** a broken spec, **improve** assertions that would have missed the bug, or **add** a new spec
+— then runs it targeted plus the suite's quality gate, writes the log to `$BUGFIX_DIR`, and returns
+pass/fail/skipped + the action taken + spec paths. A skip is a logged decision, never a silent
+omission. A fail that indicts the fix loops to Step 4 within the budget; a test-authoring fail is
+iterated without consuming an attempt. Read [stages.md](stages.md) § Step 9b before executing this
+stage.
+
 **Step 10 — Final verification before commit.** Re-run the affected functional tests (subagent),
 then perform an **end-to-end final verification of the fix in the running app** (subagent — the
-`spryker-verifier` agent, or `Skill(spryker-runtime)`) as the last gate before commit/push: confirm
+`spryker-verifier` agent, or the `spryker-runtime` skill) as the last gate before commit/push: confirm
 the user-visible symptom is gone with fresh evidence. Returns a PASS/FAIL verdict + evidence; a FAIL
 is treated as a Step 8 failure (loop to Step 4 within the budget).
 Read [stages.md](stages.md) § Step 10 before executing this stage.

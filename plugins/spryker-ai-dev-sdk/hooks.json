@@ -1,0 +1,19 @@
+{
+    "version": 1,
+    "hooks": {
+        "sessionStart": [
+            {
+                "type": "command",
+                "bash": "\"${PLUGIN_ROOT}/scripts/sync-rules.sh\"",
+                "timeoutSec": 15
+            }
+        ],
+        "agentStop": [
+            {
+                "type": "command",
+                "bash": "command -v php >/dev/null 2>&1 && exec php \"${PLUGIN_ROOT}/hooks/guard-stop.php\" || exit 0",
+                "timeoutSec": 20
+            }
+        ]
+    }
+}

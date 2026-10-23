@@ -1,18 +1,16 @@
 ---
 name: static-validation
 description: >
-  Run Spryker static analysis over only the code that changed versus a base branch — PHP
-  (phpcbf, phpcs, phpmd/architecture-sniffer, phpstan) AND frontend (eslint, stylelint, prettier
-  for js/ts/scss/css) — after implementing or editing code, during project development, before
-  commit, or as an interim check while iterating. Trigger on "validate", "lint", "check code",
-  "run static analysis", "fix phpcs/phpstan", "run QA on changes", "static check the diff",
-  "validate my changes", "run static analysis on what I changed", "lint the changed modules",
-  "check js/css/scss I changed", "check code vs master/main", "static-check the branch". Works
-  from any git worktree, auto-detects or takes an explicit base branch (master, main,
-  or any ref), validates only added/changed files (not the all-files globs in
-  package.json), and can group PHP either by individually changed files (files scope) or by every
-  full Spryker MODULE that has a changed file (module scope — detects changed modules, not just
-  files, and validates the whole module).
+  Run Spryker static analysis over only the code that changed versus a base branch — PHP (phpcbf,
+  phpcs, phpmd/architecture-sniffer, phpstan) and frontend (eslint, stylelint, prettier for
+  js/ts/scss/css/less/html across Yves, Back Office and Merchant Portal) — after implementing or
+  editing code, before commit, or as an interim check while iterating. Trigger on "validate", "lint",
+  "check code", "run static analysis", "fix phpcs/phpstan", "run QA on changes", "static check the
+  diff", "lint the changed modules", "check js/css/scss I changed", "lint my Yves/Merchant Portal
+  change", "check code vs master/main", "static-check the branch". Works from any git worktree, auto-
+  detects or takes a base branch (master, main or any ref), validates only added/changed files, and
+  groups PHP by changed files (files scope) or by every Spryker module with a changed file (module
+  scope — validates the whole module).
 ---
 
 # static-validation
@@ -25,8 +23,8 @@ executed inside the container via `docker/sdk cli`.
 It replaces fixed, single-base validation scripts with a single flexible engine:
 
 - **Any base branch** — `--base <ref>`, or auto-detected (`master` → `main` →
-  remote default). Handles the diff via merge-base (`base...HEAD`) plus uncommitted working-tree
-  edits and brand-new untracked files, so in-progress work is fully covered.
+  remote default). Handles the diff via merge-base (`base...HEAD`) plus working-tree changes against
+  `HEAD`, so staged and unstaged in-progress work is covered.
 - **Worktree-aware** — resolves the current worktree's root with `git rev-parse --show-toplevel`
   for file/diff detection, and locates `docker/sdk` in the **main** working tree via
   `git rev-parse --git-common-dir` (a linked worktree doesn't contain the SDK-provided,
@@ -39,31 +37,59 @@ It replaces fixed, single-base validation scripts with a single flexible engine:
   Generated code (`src/Generated`, `src/Orm`) is always skipped.
 - **Frontend, changed-only** — changed files are partitioned by extension and each linter runs on
   just those files (not the `**/*` globs in `package.json`): `.js/.ts` → eslint + prettier,
-  `.scss/.css/.less` → stylelint + prettier, `.json/.html` → prettier. Configs are auto-loaded
-  (`eslint.config.mjs`, `.stylelintrc.js`, `.prettierrc.json`; `.prettierignore` is honoured).
-  `--scope` does not apply to frontend files (they are always validated individually).
+  `.scss/.css/.less` → stylelint + prettier, Merchant Portal component `.html` → eslint + prettier,
+  other `.json/.html` → prettier. Each file is linted with the config **its surface's npm script
+  uses** (see [Frontend surfaces](#frontend-surfaces)). `.twig` has no linter: changed templates are
+  listed as *not analysed*. `--scope` does not apply to frontend files (always individual).
 
 ## The command
 
-The engine is `scripts/static-check-diff.sh` inside this skill directory. Run it from the skill
-directory, or reference it by its full path from the skill's install location.
+**Locate the engine:** `<skill-dir>/scripts/static-check-diff.sh`, where `<skill-dir>` is the path
+reported as `Base directory for this skill:` when this skill loaded — that line is correct for every
+install. `$SCD` below is shorthand for that path — substitute it inline as a literal path;
+**never set a shell variable and never `cd` to the skill directory**.
+
+**Run it from the Spryker project root** (the directory containing `docker/sdk`), or point it at the
+project with `--repo`. The project to validate comes from your working directory or `--repo` — **never**
+from wherever this skill happens to be installed (plugin cache, marketplace install, git clone, or a
+Composer `vendor/` tree). Running with the skill directory as cwd is refused with an actionable error.
 
 ```bash
-# From the skill directory:
-bash scripts/static-check-diff.sh [options]
+# From the project root (preferred):
+bash "$SCD" [options]
+
+# From anywhere, naming the project explicitly:
+bash "$SCD" --repo /path/to/project [options]
 ```
 
 | Option | Meaning |
 |---|---|
+| `-r, --repo <path>` | Project root to validate. Defaults to the current working directory's git repo. Also reads `$STATIC_CHECK_REPO`. |
 | `-b, --base <ref>` | Base branch/ref to diff against. Omit to auto-detect. Also reads `$STATIC_CHECK_BASE`. |
+| `-w, --working-tree` | Validate ONLY uncommitted + untracked changes against `HEAD` — no base ref. **This is the right mode for a fresh branch whose work is not yet committed** (the normal shape mid-build, e.g. `spryker-customization` Step 7b before the commit gate). Mutually exclusive with `--base`; errors on a clean tree instead of passing vacuously; the run output states the mode so the narrower coverage is explicit. |
 | `-s, --scope <mode>` | `files` (default) or `module`. PHP grouping only — frontend files are always individual. |
-| `--tools <list>` | Comma subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier` (default: all). |
-| `--fix` | Autofix where supported: `phpcbf` (always fixes), and `eslint --fix` / `stylelint --fix` / `prettier --write`. Also via `STATIC_CHECK_FIX=1`. |
-| `--include-tests` | Also run phpcs/phpcbf on `/tests/` files (phpmd/phpstan always skip tests + config). |
+| `--tools <list>` | Comma subset of `phpcbf,phpcs,phpmd,phpstan,eslint,stylelint,prettier`. Default is every tool **except `phpcbf`**, which mutates source and is therefore opt-in via `--fix` or by naming it here. |
+| `--fix` | Autofix where supported: adds `phpcbf` to the tool set, and switches `eslint`/`stylelint` to `--fix` and `prettier` to `--write`. **Rewrites files.** Also via `STATIC_CHECK_FIX=1`. |
+| `--include-tests` | Also analyse test files. Applies to phpcs/phpcbf **and** the frontend linters (phpmd/phpstan always skip tests + config). |
 | `--dry-run` | Print the resolved base, scope and per-tool paths; run no tools. |
 | `-h, --help` | Usage. |
 
-Exit code: `0` = clean (or dry-run / nothing changed), `1` = violations found, `2` = usage/env error.
+Exit code: `0` = clean (or dry-run / nothing changed), `1` = **code violations** found, `2` = usage
+error, environment error, **or a tool that failed to run**.
+
+Exit `0` is not full coverage: changed files no tool analysed (Twig, eslint *"no matching configuration"*,
+a surface with no config) are listed under *"Changed files NOT analysed"*, and the verdict then reads
+*"passed for the files it analysed ONLY"*. Report those files as unlinted, never as clean.
+
+**Exit 2 is not a code finding.** If a tool crashes before analysing anything (missing `src/Generated`,
+missing `node_modules`, unresolvable config), the script says so explicitly and names the tool. Do **not**
+report those as violations and do **not** try to "fix" code for them — resolve the environment and re-run:
+`docker/sdk cli console transfer:generate` for `src/Generated`, `docker/sdk cli composer phpstan-setup`
+for `src/Generated/Client/Ide/AutoCompletion.php` (phpstan's bootstrap file — `transfer:generate` alone
+does **not** create it), `docker/sdk cli npm install` for `node_modules`. An unknown `--tools` name and a
+base that resolves to the same commit as `HEAD` are also exit 2 — both would otherwise analyse nothing
+and look like a pass. When that same-commit guard fires and the working tree carries uncommitted or
+untracked changes, the error names the fix: re-run with `--working-tree` to validate exactly those.
 
 ### Environment overrides
 
@@ -78,56 +104,151 @@ Tool config and the base branch can be overridden via env vars (project defaults
 | `STATIC_CHECK_PHPSTAN_CONFIG` | `phpstan.neon` | phpstan config file. |
 | `STATIC_CHECK_PHPSTAN_LEVEL` | `6` | phpstan level (matches `phpstan.neon`). |
 | `STATIC_CHECK_FIX` | `0` | `1` = autofix mode (same as `--fix`). |
+| `STATIC_CHECK_REPO` | cwd's git repo | Project root to validate (same as `--repo`). |
 
 ```bash
-STATIC_CHECK_PHPSTAN_LEVEL=6 bash scripts/static-check-diff.sh --tools phpstan
+STATIC_CHECK_PHPSTAN_LEVEL=6 bash "$SCD" --tools phpstan
 ```
+
+## Frontend surfaces
+
+A project has three frontend surfaces. The script routes each changed file by path and resolves the
+same config the project's npm script would. Two layouts exist: **legacy** (a root
+`eslint.config.{js,mjs,cjs}` / `.stylelintrc.js` covering everything — plain config lookup) and
+**builder** (no root eslint config; `yves:*` / `mp:*` delegate to the lint wrappers packaged in
+`vendor/spryker-shop/shop-ui/…/FrontendBuilder/libs/lint/` and `vendor/spryker/zed-ui/…/FrontendBuilder/libs/lint/`,
+each taking a project-root override first). In the builder layout plain lookup finds nothing and the
+linters crash, which is why the config is passed explicitly.
+
+| Surface (path) | eslint config (override → packaged) | stylelint config | Full-tree npm gate | Rebuild to see the change |
+|---|---|---|---|---|
+| **Yves** `src/*/Yves/*/Theme/**` (`.ts/.js/.scss/.twig`) | `eslint.config.yves.mjs` → ShopUi `eslint.config.mjs` | `.stylelintrc.js` → ShopUi `stylelint.config.mjs` | `yves:lint`, `yves:stylelint`, `formatter` | `npm run yves` (or `yves:watch`) |
+| **Merchant Portal** `src/*/Zed/*/Presentation/Components/**` (`.ts/.html/.less`) | `eslint.config.mp.mjs` → ZedUi `eslint.config.mjs` | `.stylelintrc.mp.js` → ZedUi `stylelint.config.mjs` | `mp:lint`, `mp:stylelint`, `mp:test` (Jest), `formatter` | `npm run mp:build` |
+| **Back Office** `src/*/Zed/*/Presentation/**/*.twig`, `src/*/Zed/*/assets/Zed/**` | none in the builder layout — prettier only | none in the builder layout — prettier only | `formatter` | `npm run zed` for assets |
+
+Run npm scripts wherever `node_modules` lives — `docker/sdk cli npm run <script>` or `npm run <script>`
+on the host. **New or moved Twig** file on any surface: `docker/sdk cli console twig:cache:warmer` (the
+template path cache is on by default); run it too if an edited template still renders stale. After a
+lint-clean change, run the surface's rebuild — it is how the change becomes visible, and a build
+error is not something a linter catches. The Merchant Portal Angular build type-checks; the Yves
+webpack build transpiles TS **without** type-checking and there is no `tsc` gate, so Yves type errors
+surface only at runtime. When Merchant Portal `*.spec.ts` exist for a changed component, also run
+`npm run mp:test` (Jest via `ng test`; the script does not run it). Narrow it to the changed specs with
+`npm run mp:test -- --test-path-patterns=<name>` — that is the option name of the
+`@angular-builders/jest` 22 the lockfile pins; an older install (≤20) calls it `--test-path-pattern`,
+so if the flag is rejected, `npm ci` first. Check the summary that your spec actually ran.
+
+**One file by hand** (e.g. to autofix — the `yves:lint` / `mp:lint` wrappers ignore `-- --fix`):
+`node_modules/.bin/eslint --no-config-lookup --config <config from the table> [--fix] <file>`. Any
+*"File ignored because no matching configuration"* in the output means the file was **not
+validated** — report it as such, never as passed.
+
+**What no tool checks** — say so in the report rather than implying coverage: Twig (no linter or
+formatter), accessibility (no axe/pa11y/Lighthouse), TypeScript types, and any file eslint reports as
+*"File ignored because no matching configuration"* (see caveats). Those are reviewed against the
+project's frontend rules (`yves-frontend`, `zed-backoffice-frontend`, `merchant-portal-angular`)
+by the `code-review` skill.
 
 ## How to use it (agent workflow)
 
 1. **Preview first** with `--dry-run` to confirm the base branch and the exact targets:
    ```bash
-   bash scripts/static-check-diff.sh --scope module --dry-run
+   bash "$SCD" --scope module --dry-run
    ```
-   Report the detected base branch and the module/file list back to the user.
+   Report the detected base branch and the module/file list back to the user. **On a fresh branch
+   whose work is uncommitted** (the same-commit guard fires, or you already know that's the state —
+   e.g. `spryker-customization` Step 7b), add `-w` to the dry-run too: `bash "$SCD" -w --dry-run`.
 
-2. **Run the check.** All tools run by default and validate PHP + frontend changes together.
-   - **Check-only (default for FE)**: `phpcbf` still auto-fixes PHP, but eslint/stylelint/prettier
-     only *report*. Good as a read-only-ish diff check.
-   - **Autofix everything**: add `--fix` — eslint/stylelint fix, prettier writes.
-   - **Fully read-only** (touch nothing, e.g. reviewing someone else's diff): exclude the fixers,
-     e.g. `--tools phpcs,phpmd,phpstan,eslint,stylelint,prettier` and do **not** pass `--fix`
-     (note phpcbf mutates, so drop it: `--tools phpcs,phpmd,phpstan,eslint,stylelint,prettier`).
+2. **Run the check.** The default set validates PHP + frontend changes together and **touches
+   nothing** — `phpcbf` is deliberately excluded from it, so a bare run is safe to point at anyone's
+   diff, including someone else's.
+   - **Check-only (the default)**: `phpcs`/`phpmd`/`phpstan`/`eslint`/`stylelint`/`prettier` only
+     *report*. Nothing is rewritten. This is the right mode for reviewing a diff.
+   - **Autofix everything**: add `--fix` — this pulls in `phpcbf` for PHP and switches
+     eslint/stylelint to `--fix` and prettier to `--write`. **It rewrites files in your working
+     tree**, so run it on a clean or committed tree, and note that `--scope module` widens the blast
+     radius to every file in each changed module.
+   - **Fix PHP only / FE only**: combine `--fix` with `--tools`, e.g. `--fix --tools phpcbf` for PHP
+     formatting alone.
    ```bash
    # Validate every changed PHP module + all changed FE files:
-   bash scripts/static-check-diff.sh --scope module
+   bash "$SCD" --scope module
 
    # Autofix the diff (PHP + FE):
-   bash scripts/static-check-diff.sh --fix
+   bash "$SCD" --fix
    ```
 
 3. **Interpret results.** Report `phpcs`/`phpstan`/`phpmd`/`eslint`/`stylelint`/`prettier` findings
    using the project's absolute clickable-path format. If any autofixer ran, tell the user which
-   files were modified (they appear in `git status`).
+   files were modified (they appear in `git status`). List separately every changed file the run
+   did **not** analyse — Twig, eslint/stylelint "NOT linted" / "no matching configuration" files —
+   so a green exit is never read as coverage it did not have.
+
+   **First check the exit code.** On exit `2` at least one tool could not RUN. Name the failed
+   tool(s) and the remediation the script printed, and do NOT edit code for them — a bootstrap fatal
+   or a missing dependency is never fixed by changing source.
+
+   But exit `2` does **not** invalidate the tools that did run. Report their findings too (the
+   script prints "(Other tools also reported real violations …)" when that applies), then state
+   which tools were blocked and why. Only stop entirely if **every** selected tool failed to run —
+   otherwise one missing generated directory would silence a gate that mostly worked.
 
 4. **Base branch choice.** If the user names a base ("vs main", "against develop"), pass it with
-   `--base`. Otherwise let auto-detect run and state which base it picked.
+   `--base`. Otherwise let auto-detect run and state which base it picked. For uncommitted work on a
+   branch at the same commit as its base, there is no base to pick — use `--working-tree` and say the
+   run covered the working tree only.
+
+5. **Frontend changed? Rebuild the surface** once the linters are clean — `yves`, `zed`, `mp:build`,
+   and `twig:cache:warmer` for new or moved Twig files (see [Frontend surfaces](#frontend-surfaces)). Report a build
+   failure as a finding; the linters cannot see it.
 
 ## Notes & caveats
 
+- **Before pushing, confirm every file the change needs is actually staged.** The analysed set is the
+  merge-base diff (`base...HEAD`), working-tree changes against `HEAD`, **and untracked non-ignored
+  files** — so a brand-new file can be analysed green and still never reach the commit, because it was
+  never `git add`ed. A green run is not evidence the work is complete in git. Check
+  `git status --porcelain` for `??` lines belonging to the change and stage them before you push.
 - Runs against a **running** Spryker environment (`docker/sdk cli`). If containers are down,
-  start them first (see the `spryker-docker-sdk` skill). Frontend tools run via `npx` in-container
-  (host node may be too old / lack `node_modules`).
+  start them first (see the `spryker-docker-sdk` skill).
+- **Frontend tools run wherever `node_modules` actually is.** eslint/stylelint must resolve the plugins
+  their configs `extend`, so the script probes the container (`/data`) first, then falls back to the
+  host, and errors out if neither has them. It invokes the project's own `node_modules/.bin/<tool>` —
+  never bare `npx`, which would silently download a different major from the registry and crash on
+  plugin resolution. Many Spryker projects install `node_modules` on the **host** only, so the host
+  fallback is the normal path, not an edge case.
 - Autofixers **modify files**: `phpcbf` always (whenever included); `eslint`/`stylelint`/`prettier`
   only with `--fix`. For a non-mutating check, drop `phpcbf` from `--tools` and omit `--fix`.
-- Uses the project configs verbatim — `phpcs.xml`, the project architecture ruleset `phpmd.xml`
-  (priority 4), `phpstan.neon` (level 6), plus `eslint.config.mjs`, `.stylelintrc.js`,
-  `.prettierrc.json`/`.prettierignore` — so results match what CI enforces.
-- **phpmd runs the project ruleset, not the core one.** Spryker ships two: `phpmd.xml` (project
-  development, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml`
-  (core/framework development, priority 2). Since this skill validates project code, it defaults to
-  the project ruleset. To check against the core framework rules instead, override both:
-  `STATIC_CHECK_PHPMD_RULESET=vendor/spryker/architecture-sniffer/src/ruleset.xml STATIC_CHECK_PHPMD_PRIORITY=2`.
+- Uses the project configs verbatim — `phpcs.xml`, `phpmd.xml` (priority 4), `phpstan.neon` (level 6),
+  `.prettierrc.json`/`.prettierignore`, and the per-surface eslint/stylelint configs above.
+- **eslint "File ignored because no matching configuration" = NOT linted, never clean.** The file
+  matched no `files:` block of the resolved config (the script counts and flags it). The packaged
+  ShopUi/ZedUi configs' TS/HTML globs are monorepo-shaped (`src/Pyz/*/src/Pyz/…`), so in a builder-
+  layout project changed Yves/Merchant Portal `.ts`/`.html` can come back this way — and
+  `npm run yves:lint` / `mp:lint` then pass without linting them. Report those files as unlinted;
+  fixing the globs is a project (`eslint.config.{yves,mp}.mjs`) or vendor change, not a code fix.
+- **Custom project namespace (`{ProjectNamespace}` = listed first in `KernelConstants::PROJECT_NAMESPACES`,
+  otherwise `Pyz`).** Routing is by path shape (`src/*/…`), so a file in any
+  project namespace lands on the same surface and config as its `Pyz` twin. One extra trap: with an
+  override config that does match it, a Yves `.ts` can fail `Parsing error: … was not found in any of
+  the provided project(s)` — `tsconfig.yves.json` `include` lacks `./src/{ProjectNamespace}/Yves/**/*`
+  (the same entry the build needs; one-time setup in the `configure-codebase` skill). That is a wiring
+  gap, not a violation. Merchant Portal Angular code outside `src/Pyz` is linted but never built — the
+  ZedUi builder only builds `src/Pyz/Zed`.
+- **To autofix eslint, use this script's `--fix`** (it calls eslint directly). `npm run yves:lint -- --fix`
+  and `npm run mp:lint -- --fix` are silently ignored — the wrappers build a fixed argv — and still
+  exit 0. `yves:stylelint` / `mp:stylelint` do accept `-- --fix` and `-- -p <file>`.
+- **Never silence a rule to get green** (`eslint-disable`, `stylelint-disable`, `@ts-expect-error`)
+  unless a comment explains why the rule cannot apply; fix the cause the rule names (a
+  `selector-max-compound-selectors` error means the BEM nesting is too deep, `max-lines` means split
+  the component).
+- **phpmd runs BOTH rulesets, because CI does.** Spryker ships two and they are **disjoint, not
+  nested**: `phpmd.xml` (project, priority 4) and `vendor/spryker/architecture-sniffer/src/ruleset.xml`
+  (core, priority 2, ~26 rules that exist nowhere else — `FacadeReturnValueRule`, `FacadeArgumentsRule`,
+  `SpyEntityUsageRule`, …). Spryker CI typically runs both unconditionally, so checking only the project
+  ruleset lets a green local run coexist with a red CI "Run Architecture rules" step. The script runs the
+  project ruleset, then the core one when that file exists. Pin a single pair with
+  `STATIC_CHECK_PHPMD_RULESET` (+ `STATIC_CHECK_PHPMD_PRIORITY`), which disables the second run.
 - Frontend changed-file detection covers committed, uncommitted, and brand-new untracked files.
   `--scope module` groups **PHP only**; FE files are always validated individually.
 - The script is `bash 3.2` compatible (macOS default) — no `mapfile`/associative arrays.

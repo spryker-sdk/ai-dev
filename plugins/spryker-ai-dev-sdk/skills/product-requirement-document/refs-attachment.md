@@ -60,3 +60,5 @@ Everything code-shaped that you confirmed during research, organized so a planne
 
 ## Rule of thumb
 If a token has a backslash, `::`, parentheses, or a slash-path — it belongs **here**, not in the PRD body. If it's a plain feature/module name or a configuration key referred to by name, it can appear in the PRD.
+
+**Exception: composer package names + version constraints** (`spryker/quote-requests-rest-api`, `^1.2`). The slash is incidental — a package name is a **product identifier** (same category as a module name), not a code reference. It is allowed in the body and **required** in any story whose scope includes adding a dependency (as a "Packages to add" table: package · version constraint · installed-or-not). The FQCNs, plugin interfaces and resource-config constants shipped *inside* those packages still belong here.

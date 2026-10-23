@@ -29,21 +29,12 @@ class AiToolSetupConsole extends Console
 
     protected const bool DEFAULT_NO = false;
 
-    /**
-     * @return void
-     */
     protected function configure(): void
     {
         $this->setName(static::COMMAND_NAME)
             ->setDescription(static::COMMAND_DESCRIPTION);
     }
 
-    /**
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return int
-     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $config = $this->getFactory()->getConfig();
@@ -80,9 +71,6 @@ class AiToolSetupConsole extends Console
 
     /**
      * @param array<string, string> $detectionMap
-     * @param string $toolRequiringConfirmation
-     *
-     * @return string|null
      */
     protected function resolveToolSelection(array $detectionMap, string $toolRequiringConfirmation): ?string
     {
@@ -96,12 +84,6 @@ class AiToolSetupConsole extends Console
         return $detected;
     }
 
-    /**
-     * @param string $detected
-     * @param string $toolRequiringConfirmation
-     *
-     * @return bool
-     */
     protected function isDetectedToolAccepted(string $detected, string $toolRequiringConfirmation): bool
     {
         if ($detected === $toolRequiringConfirmation) {
@@ -111,13 +93,6 @@ class AiToolSetupConsole extends Console
         return $this->confirm(sprintf('%s detected. Proceed with it?', $detected), static::DEFAULT_YES);
     }
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AiToolSetupStepInterface $step
-     * @param string $tool
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return string|null
-     */
     protected function resolveEffectiveToolForStep(AiToolSetupStepInterface $step, string $tool, OutputInterface $output): ?string
     {
         if ($step->canExecuteForTool($tool)) {
@@ -127,13 +102,6 @@ class AiToolSetupConsole extends Console
         return $this->resolveFallbackTool($step, $tool, $output);
     }
 
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AiToolSetupStepInterface $step
-     * @param string $tool
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return string|null
-     */
     protected function resolveFallbackTool(AiToolSetupStepInterface $step, string $tool, OutputInterface $output): ?string
     {
         $artifact = strtolower(trim(str_ireplace('Generate', '', $step->getLabel())));
@@ -155,8 +123,6 @@ class AiToolSetupConsole extends Console
 
     /**
      * @param array<string> $targetPaths
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     * @param \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface $generator
      *
      * @return array<string>
      */
@@ -181,12 +147,6 @@ class AiToolSetupConsole extends Console
         return $existingPaths;
     }
 
-    /**
-     * @param string $tool
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
-     *
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\ArtifactMode
-     */
     protected function resolveExampleMode(string $tool, OutputInterface $output): ArtifactMode
     {
         $artifactConfig = $this->getFactory()->getConfig()->getToolArtifacts($tool);
@@ -203,12 +163,6 @@ class AiToolSetupConsole extends Console
         return $this->confirm('Generate as ready to use?', static::DEFAULT_NO) ? ArtifactMode::Real : ArtifactMode::Example;
     }
 
-    /**
-     * @param string $question
-     * @param bool $isDefaultYes
-     *
-     * @return bool
-     */
     protected function confirm(string $question, bool $isDefaultYes): bool
     {
         $label = $isDefaultYes ? 'Y/n' : 'y/N';

@@ -1,0 +1,10 @@
+<?php
+namespace Pyz\Zed\Foo;
+
+use Spryker\Zed\Foo\FooDependencyProvider as SprykerFooDependencyProvider;
+use Spryker\Zed\Foo\Communication\Plugin\FooPlugin;
+
+class FooDependencyProvider extends SprykerFooDependencyProvider
+{
+    public function getPlugins() {}
+}

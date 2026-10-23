@@ -16,8 +16,6 @@ interface PromptsGeneratorInterface
      * - Fetches prompts from all configured fetchers.
      * - Generates prompt methods from all collected prompts.
      * - Writes the generated prompts class to the target directory.
-     *
-     * @return void
      */
     public function generate(): void;
 }

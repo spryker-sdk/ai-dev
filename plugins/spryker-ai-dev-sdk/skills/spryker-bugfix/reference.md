@@ -11,10 +11,10 @@ every scheduled wake-up. A bloated orchestrator is the #1 failure mode here — 
 working room the later gates need and eventually destabilizes the run.
 
 **The rule: heavy work happens in subagents; the orchestrator holds only compact state.** A "heavy"
-stage is anything that produces bulk output — driving Chrome (screenshots, page text), runtime/XDebug
+stage is anything that produces bulk output — driving the browser (screenshots, page text), runtime/XDebug
 dumps, `codecept run` output, phpcs/phpstan reports, code-review findings, final-verification runs, and
-`gh run view --log-failed`. Run each of those **inside a subagent** (via the `Agent` tool, pointing it
-at the relevant `Skill(...)` or agent `subagent_type`), and require the subagent to:
+`gh run view --log-failed`. Run each of those **inside a subagent** — delegate with your harness's
+subagent tool, pointing it at the relevant bundled skill or agent — and require the subagent to:
 
 - **write its raw output to a file** under the run directory `$BUGFIX_DIR` (e.g.
   `$BUGFIX_DIR/<stage>-attempt<N>.log`), and
@@ -27,11 +27,11 @@ memory the main loop needs; if something isn't in it, it lives in a file you can
 
 Every file this skill produces — logs, decision log, repro notes, per-gate output, the watch handoff —
 lives together in **one per-bugfix folder** so a run is self-contained and easy to find or clean up.
-Anchor it to the project root Claude Code loaded (`$CLAUDE_PROJECT_DIR`, with a `$(pwd)` fallback) so
-it is stable regardless of the current working directory:
+Resolve it once from the project root (run the setup from the project root, so `$(pwd)` is that root)
+and reuse the resolved absolute path, so it is stable regardless of the current working directory:
 
 ```
-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/.cache/spryker-bugfix/<bugfix-id>/
+$(pwd)/.ai-dev/spryker-bugfix/<bugfix-id>/
 ```
 
 `<bugfix-id>` is the ticket key (e.g. a JIRA key `CC-39232` or a GitHub issue number) when there is
@@ -54,18 +54,26 @@ Keep this small block current in your head and mirror it into the step log. Ever
   skipped, not attempted.
 - **Extra expectations** — any Step 0 delta from the standard scope (e.g. "also update JIRA", "fix
   related bugs too", "single module only"), so every later step honors it without re-asking.
+- **`size`** — `trivial` (≤~10 lines, 1 file) / `normal` / `complex`, set at Step 1 and re-checked
+  against the real diff after Step 5. It scales gate **weight** only — Step 8's reviewer count, Step 9's
+  QA scope. **Gate existence never scales.**
+- **`scoped_paths`** — set only when the Step 2 clean-tree gate was **overridden** on a dirty branch: the
+  file list this fix owns. Steps 8/9/10 are scoped to it and Step 12 must state that they were.
+- **`pre_existing_rot`** — the Step 6 baseline result when the affected suite was **already red before
+  the change**: failing test names + the one-line cause. Reported separately from the fix; repairing it
+  is its own scoped decision and never consumes an attempt.
 - **Repro:** 1–3 line scenario summary + path to the full repro notes file.
 - **Root cause:** the `file:line` references + one-sentence defect explanation.
 - **Diff:** `git diff --stat` summary (files + ±lines), not the diff body.
-- **Per-gate verdict:** for tests / static / review / QA / final-verification / remote-CI — `pass|fail`,
+- **Per-gate verdict:** for tests / static / review / QA / Cypress E2E (when run) / final-verification / remote-CI — `pass|fail`,
   a one-line reason, and the path to that gate's output file. For a failing gate, keep **only the ≤5
   actionable items** you must act on (e.g. blocker/major review findings, the failing test name), not
   the surrounding report.
 - Pointers to the **decision log** and **step log** files.
 
-If you ever need detail you dropped (a full stack trace, the complete review report), `Read` the file
-the subagent wrote — pull the specific lines you need, don't reload the whole thing. Pulling 20 lines
-on demand beats carrying 2,000 lines for the whole run.
+If you ever need detail you dropped (a full stack trace, the complete review report), open the file
+the subagent wrote with the built-in file read tool (not shell) — pull the specific lines you need,
+don't reload the whole thing. Pulling 20 lines on demand beats carrying 2,000 lines for the whole run.
 
 ### Plan task list
 
@@ -77,15 +85,23 @@ keep them distinct:
 
 - **`run.log`** — the append-only *timeline* (what happened, when).
 - **`decisions.md`** — the *rationale* (why each fork was resolved a given way).
-- **Task list (`TaskCreate`/`TaskUpdate`/`TaskList`)** — the *current state* (where the run is now).
+- **Task list** — the *current state* (where the run is now).
 
-The task list is the cheapest thing to read to re-orient — a resumed run or the watch loop should check
-`TaskList` first, then `$BUGFIX_DIR/watch-state.md`, before touching the transcript. Because it lives
-outside the conversation, it survives compaction and scheduled wake-ups. Drive it faithfully: never
+The task list is the cheapest thing to read to re-orient — a resumed run or the watch loop should read
+it first, then `$BUGFIX_DIR/watch-state.md`, before touching the transcript. Because it lives outside
+the conversation, it survives compaction and scheduled wake-ups. Drive it faithfully: never
 mark a stage completed whose gate wasn't actually green (the same honesty rule as the step log).
 
 ## Operating principles
 
+- **Skill and agent names carry the plugin prefix on a plugin install.** Every skill this workflow
+  delegates to ships in the `spryker-ai-dev-sdk` plugin. Invoke a skill with its slash command —
+  `/spryker-runtime`, or `/spryker-ai-dev-sdk:spryker-runtime` on a plugin install, in both harnesses.
+  Agent names take the prefix with a separator that differs: `spryker-ai-dev-sdk:spryker-verifier`
+  under Claude Code, `spryker-ai-dev-sdk/spryker-verifier` under GitHub Copilot. The bare names
+  written throughout these documents are shorthand for that prefixed form: if a bare name fails to
+  resolve, retry it with your harness's prefixed form before reporting a stage blocked — a
+  delegation that cannot resolve is a naming problem, not a blocked gate.
 - **The bug is the contract.** Everything is judged against "does the original reported symptom no
   longer reproduce, with evidence". A green test suite is necessary but not sufficient — reproduce
   the *user-visible* symptom and confirm it's gone (see `spryker-qa-coverage`'s E2E-over-workaround rule).
@@ -98,15 +114,17 @@ mark a stage completed whose gate wasn't actually green (the same honesty rule a
 - **The ticket is optional.** The bug context may be an **optional** tracker ticket (JIRA, GitHub
   Issues, any service) **or** a plain free-text description — a ticket is never required. Branch name,
   PR title, and commit message all have a `no-ticket` / `NO-TICKET` fallback.
-- **Claude-only orchestration.** Every stage delegates to a bundled/installed `Skill(...)` or a Claude
-  subagent — no third-party MCP server is required for the core flow. The single **optional** external
+- **Self-contained orchestration.** The flow runs entirely on the bundled skills and agents: every
+  stage delegates to one of them in a subagent, and no third-party MCP server is required for the
+  core flow. The single **optional** external
   touchpoint is the Step 0 ticket pull (e.g. JIRA via the Atlassian MCP, or `gh issue view`); if the
-  ticket text is provided directly, or there's no ticket at all, the run needs no external MCP. Keep
-  every subagent on a Claude model.
-- **Project rules still apply.** Honor the repo's `.claude/rules/*` (php-code-style, no-redundant-docblocks,
-  facade-method-signatures, BC policy, etc.) and `CLAUDE.local.md` file-reference format throughout.
+  ticket text is provided directly, or there's no ticket at all, the run needs no external MCP.
+- **Project rules still apply.** Honor the repo's rule set in the harness's rules folder
+  (`.claude/rules/` for Claude Code, `.github/instructions/` for GitHub Copilot — php-code-style,
+  no-redundant-docblocks, facade-method-signatures, BC policy, etc.) and the project instructions
+  file's local file-reference format throughout.
 - **Autonomous means autonomous (from Step 3 onward).** After the single Step 0 intake, Autonomous
-  mode runs to completion **without any further `AskUserQuestion` or permission stop** — no scope
+  mode runs to completion **without any further question or permission stop** — no scope
   clarifications, no "which fix should I pick", no "is this in scope" pauses. When you hit a fork
   (multiple candidate root causes, ambiguous scope, a second bug discovered, a risky trade-off),
   **decide it yourself using the most reasonable interpretation, proceed, and record it as a
@@ -144,6 +162,15 @@ value) and whenever you make a non-obvious choice — do not wait until the end.
 - "Autonomous means I can also change permissions / delete data / merge the PR" → No. Autonomous
   authorizes the *bugfix-to-Draft-PR* path only; prohibited actions stay prohibited.
 - "Skip QA, the gates are green" → No. Independent QA acceptance is a required stage.
+- "It's a one-line fix, the review fan-out / QA / final verification is overkill" → Half right, and the
+  wrong conclusion. Scale the gate's **weight** via Step 1's `size` (1 reviewer instead of 3–5, QA
+  narrowed to the single affected flow) — never its **existence**. Deviating from a gate because the
+  diff is small is exactly the habit this list exists to prevent.
+- "The suite was already red, so my test proves nothing" → Correct, which is why Step 6 runs the
+  affected suite **before** authoring. "Fails before the fix, passes after" is unverifiable on an
+  already-red baseline, so establish the colour first: record a red baseline as `pre_existing_rot`,
+  report it separately from the fix, and repair it as its own scoped decision — never inside the attempt
+  budget, never counted as a fix-induced failure.
 - "Skip the final verification, tests and QA already passed" → No. Step 10 drives the running app one
   last time before commit and is a required gate; a FAIL loops back to Step 4 within the budget.
 - "In Autonomous mode I should ask the user which fix / whether this is in scope" → No. After Step 0,

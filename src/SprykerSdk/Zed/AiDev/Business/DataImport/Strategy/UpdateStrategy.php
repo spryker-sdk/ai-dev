@@ -12,19 +12,12 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
 
 class UpdateStrategy extends AbstractTransformStrategy
 {
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     public function isApplicable(string $mode): bool
     {
         return $mode === CsvConstants::MODE_UPDATE;
     }
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     public function execute(TransformContext $context): array
@@ -48,7 +41,6 @@ class UpdateStrategy extends AbstractTransformStrategy
 
     /**
      * @param array<int, array<string, mixed>> $rows
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      *
      * @return array<string, mixed>
      */

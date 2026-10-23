@@ -16,8 +16,6 @@ use League\Csv\Statement;
 class CsvReader implements CsvReaderInterface
 {
  /**
-  * @param string $filePath
-  *
   * @return array<string>
   */
     public function getHeaders(string $filePath): array
@@ -28,11 +26,6 @@ class CsvReader implements CsvReaderInterface
         return $csv->getHeader();
     }
 
-    /**
-     * @param string $filePath
-     *
-     * @return int
-     */
     public function getRowCount(string $filePath): int
     {
         $csv = $this->createReader($filePath);
@@ -42,10 +35,6 @@ class CsvReader implements CsvReaderInterface
     }
 
     /**
-     * @param string $filePath
-     * @param int $offset
-     * @param int|null $limit
-     *
      * @return array<array<string, string>>
      */
     public function getRows(string $filePath, int $offset = 0, ?int $limit = null): array
@@ -68,11 +57,6 @@ class CsvReader implements CsvReaderInterface
         return iterator_to_array($records, false);
     }
 
-    /**
-     * @param string $filePath
-     *
-     * @return string
-     */
     public function detectDelimiter(string $filePath): string
     {
         $csv = Reader::from($filePath, 'r');
@@ -92,11 +76,6 @@ class CsvReader implements CsvReaderInterface
         return $delimiter;
     }
 
-    /**
-     * @param string $filePath
-     *
-     * @return \League\Csv\Reader
-     */
     protected function createReader(string $filePath): Reader
     {
         $csv = Reader::from($filePath, 'r');

@@ -6,7 +6,7 @@
 
 namespace Generated\Shared\Prompts;
 
-use PhpMcp\Server\Attributes\McpPrompt;
+use Mcp\Capability\Attribute\McpPrompt;
 use SprykerSdk\Shared\AiDev\AbstractPrompt;
 
 /**

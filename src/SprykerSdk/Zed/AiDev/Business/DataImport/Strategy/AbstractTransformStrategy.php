@@ -15,9 +15,6 @@ use SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig;
 abstract class AbstractTransformStrategy
 {
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvReaderInterface $csvReader
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\CsvWriterInterface $csvWriter
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\FilterEvaluatorInterface $filterEvaluator
      * @param array<\SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowOperationInterface> $rowOperations
      */
     public function __construct(
@@ -28,23 +25,15 @@ abstract class AbstractTransformStrategy
     ) {
     }
 
-    /**
-     * @param string $mode
-     *
-     * @return bool
-     */
     abstract public function isApplicable(string $mode): bool;
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Strategy\TransformContext $context
-     *
      * @return array<string, mixed>
      */
     abstract public function execute(TransformContext $context): array;
 
     /**
      * @param array<int, array<string, mixed>> $rows
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      *
      * @return array<string, mixed>
      */
@@ -77,7 +66,6 @@ abstract class AbstractTransformStrategy
 
     /**
      * @param array<string, mixed> $row
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\RowOperation\RowProcessingConfig $config
      *
      * @return array<string, mixed>
      */

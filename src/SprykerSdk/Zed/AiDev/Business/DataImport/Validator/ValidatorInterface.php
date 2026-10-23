@@ -11,16 +11,9 @@ namespace SprykerSdk\Zed\AiDev\Business\DataImport\Validator;
 
 interface ValidatorInterface
 {
-    /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
-     * @return bool
-     */
     public function isApplicable(ValidationContext $context): bool;
 
     /**
-     * @param \SprykerSdk\Zed\AiDev\Business\DataImport\Validator\ValidationContext $context
-     *
      * @return array<string, mixed>|null
      */
     public function validate(ValidationContext $context): ?array;

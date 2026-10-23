@@ -98,12 +98,18 @@ class AiDevConfig extends AbstractBundleConfig
      * Detection order: indicator path (relative to project root) => tool name.
      * First match wins; .codex requires an extra confirmation step in the command.
      *
+     * GitHub Copilot is detected by a Copilot-specific file rather than by ".github", which exists
+     * in every repository hosted on GitHub and would otherwise claim projects using another tool.
+     *
      * @var array<string, string>
      */
     protected const array TOOL_DETECTION_MAP = [
         '.claude' => self::TOOL_CLAUDE_CODE,
         '.windsurf' => self::TOOL_WINDSURF,
-        '.github' => self::TOOL_COPILOT,
+        '.github/copilot-instructions.md' => self::TOOL_COPILOT,
+        '.github/instructions' => self::TOOL_COPILOT,
+        '.github/agents' => self::TOOL_COPILOT,
+        '.github/skills' => self::TOOL_COPILOT,
         '.cursor' => self::TOOL_CURSOR,
         'opencode.json' => self::TOOL_OPENCODE,
         '.codex' => self::TOOL_CODEX,
@@ -176,8 +182,6 @@ class AiDevConfig extends AbstractBundleConfig
 
     /**
      * @api
-     *
-     * @return string
      */
     public function getPromptClassTargetDirectory(): string
     {
@@ -186,8 +190,6 @@ class AiDevConfig extends AbstractBundleConfig
 
     /**
      * @api
-     *
-     * @return string
      */
     public function getPromptsDirectory(): string
     {
@@ -199,8 +201,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled AGENTS example markdown file.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsExampleFilePath(): string
     {
@@ -212,8 +212,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the project root directory where the generated file will be written.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsFileOutputDirectory(): string
     {
@@ -225,8 +223,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled skill examples directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getSkillsExamplesDirectory(): string
     {
@@ -238,8 +234,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns absolute path to the bundled agent examples directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getAgentsExamplesDirectory(): string
     {
@@ -265,8 +259,6 @@ class AiDevConfig extends AbstractBundleConfig
      *
      * @api
      *
-     * @param string $tool
-     *
      * @return array<string, string|null>
      */
     public function getToolArtifacts(string $tool): array
@@ -279,12 +271,10 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the absolute path to the bundled rules source directory.
      *
      * @api
-     *
-     * @return string
      */
     public function getRulesSourceDirectory(): string
     {
-        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/data/rules';
+        return APPLICATION_VENDOR_DIR . '/spryker-sdk/ai-dev/plugins/spryker-ai-dev-sdk/rules';
     }
 
     /**
@@ -292,8 +282,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns the tool name that requires extra confirmation on detection.
      *
      * @api
-     *
-     * @return string
      */
     public function getToolRequiringConfirmation(): string
     {
@@ -306,8 +294,6 @@ class AiDevConfig extends AbstractBundleConfig
      * - Returns an empty array when no spec is defined for the tool.
      *
      * @api
-     *
-     * @param string $tool
      *
      * @return array<string, mixed>
      */

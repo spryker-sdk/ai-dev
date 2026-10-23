@@ -22,8 +22,6 @@ class AiDevFacade extends AbstractFacade implements AiDevFacadeInterface
      * {@inheritDoc}
      *
      * @api
-     *
-     * @return void
      */
     public function generatePrompts(): void
     {

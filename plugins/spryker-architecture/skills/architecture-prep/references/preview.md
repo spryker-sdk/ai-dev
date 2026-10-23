@@ -56,12 +56,14 @@ HEAD + one shared render core + a one-line loader that is the ONLY difference be
   core + a loader that calls `ARCH_CORE.loadFromIsland()`. The script ends by asserting the
   `ARCH_CORE` block is byte-identical in both (`shasum`) and **fails loudly if they ever diverge**.
 
-Run it (from anywhere) at Step 7; copy the three assets into the run cache or invoke them in place:
+Run it (from anywhere) at Step 7; copy the three assets into the run cache or invoke them in place.
+`<skill-dir>` below is the path reported as `Base directory for this skill:` when this skill loaded —
+substitute the literal absolute path; `<ABS>` is the project root:
 
 ```bash
 ARCH="<ABS>/architecture" \
-ASSETS="<SKILL>/references/preview-assets" \
-bash "<SKILL>/references/preview-assets/build-previews.sh"
+ASSETS="<skill-dir>/references/preview-assets" \
+bash "<skill-dir>/references/preview-assets/build-previews.sh"
 # -> wrote architecture/preview.html and architecture/preview-standalone.html
 # -> OK: shared core identical (<sha1>)
 ```
@@ -132,12 +134,16 @@ source `.mmd` as well (they also fail on GitHub):
 
 Confirm the diagrams and all docs render; don't trust by eye.
 
-- **`preview.html` (http):** serve the folder and render-verify in the browser — this IS reachable by
-  the Chrome automation (`mcp__claude-in-chrome__navigate` to the `http://127.0.0.1:…` URL). Read the
+- **`preview.html` (http):** serve the folder and render-verify in the browser — an
+  `http://127.0.0.1:…` URL IS reachable by browser automation. Drive it with whatever browser MCP
+  server is connected (Claude in Chrome, or Playwright MCP); where the `spryker-ai-dev-sdk` plugin is
+  also installed, its `spryker-runtime` skill carries a **Browser tool map** giving the tool name for
+  each capability under both. With no browser MCP connected, say the render check could not run,
+  report the page's own path so the user can open it, and do not claim the diagrams render. Read the
   sidebar TOC and assert every selected section **plus every SD and ADR** is listed (the classic bug
   is missing SDs/ADRs when discovery falls back to autoindex on a server that has none). Check the
   console for errors.
-- **`preview-standalone.html` (file://):** the Chrome automation extension **refuses `file://` URLs**,
+- **`preview-standalone.html` (file://):** browser automation **refuses `file://` URLs**,
   so render-verify it by **serving it over http temporarily** (byte-identical render logic) OR by
   **static validation**: parse the JSON island back out, confirm it is valid JSON with the expected
   entry count, base64-decode a sample, and confirm each embedded ```` ```mermaid ```` block's first

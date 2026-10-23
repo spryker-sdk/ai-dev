@@ -43,33 +43,21 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
         return $this->getProvidedDependency(AiDevDependencyProvider::PLUGINS_MCP_TOOL);
     }
 
-    /**
-     * @return \Spryker\Zed\ModuleFinder\Business\ModuleFinderFacadeInterface
-     */
     public function getModuleFinderFacade(): ModuleFinderFacadeInterface
     {
         return $this->getProvidedDependency(AiDevDependencyProvider::FACADE_MODULE_FINDER);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolDetectorInterface
-     */
     public function createAiToolDetector(): AiToolDetectorInterface
     {
         return new AiToolDetector(APPLICATION_ROOT_DIR);
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\AiToolArtifactGeneratorInterface
-     */
     public function createAiToolArtifactGenerator(): AiToolArtifactGeneratorInterface
     {
         return new AiToolArtifactGenerator(APPLICATION_ROOT_DIR, $this->getConfig(), $this->createRuleFrontmatterTransformer());
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\RuleFrontmatterTransformerInterface
-     */
     protected function createRuleFrontmatterTransformer(): RuleFrontmatterTransformerInterface
     {
         return new RuleFrontmatterTransformer();
@@ -88,33 +76,21 @@ class AiDevCommunicationFactory extends AbstractCommunicationFactory
         ];
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\RulesGenerationStep
-     */
     protected function createRulesGenerationStep(): RulesGenerationStep
     {
         return new RulesGenerationStep($this->createAiToolArtifactGenerator(), $this->getConfig());
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsFileGenerationStep
-     */
     protected function createAgentsFileGenerationStep(): AgentsFileGenerationStep
     {
         return new AgentsFileGenerationStep($this->createAiToolArtifactGenerator(), $this->getConfig());
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\SkillsGenerationStep
-     */
     protected function createSkillsGenerationStep(): SkillsGenerationStep
     {
         return new SkillsGenerationStep($this->createAiToolArtifactGenerator());
     }
 
-    /**
-     * @return \SprykerSdk\Zed\AiDev\Communication\AiToolSetup\Step\AgentsGenerationStep
-     */
     protected function createAgentsGenerationStep(): AgentsGenerationStep
     {
         return new AgentsGenerationStep($this->createAiToolArtifactGenerator(), $this->getConfig());

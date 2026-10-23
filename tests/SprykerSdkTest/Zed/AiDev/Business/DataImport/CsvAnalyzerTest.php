@@ -24,14 +24,8 @@ class CsvAnalyzerTest extends Unit
 {
     use CsvTestDataTrait;
 
-    /**
-     * @var string
-     */
     protected string $tempDir;
 
-    /**
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,9 +37,6 @@ class CsvAnalyzerTest extends Unit
         mkdir($this->tempDir, 0777, true);
     }
 
-    /**
-     * @return void
-     */
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
@@ -59,9 +50,6 @@ class CsvAnalyzerTest extends Unit
         parent::tearDown();
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsBasicFileStatistics(): void
     {
         // Arrange
@@ -83,9 +71,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertCount(3, $resultData['sample_rows']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeWithColumnAnalysis(): void
     {
         // Arrange
@@ -113,9 +98,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertContains('Nikon', $brandAnalysis['unique_values']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeLargeFileHandling(): void
     {
         // Arrange
@@ -135,9 +117,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertCount(9, $resultData['sample_rows']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsErrorWhenFileNotFound(): void
     {
         // Arrange
@@ -153,9 +132,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertSame(CsvConstants::FILE_NOT_FOUND, $resultData['error_code']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsErrorWhenNoHeaders(): void
     {
         // Arrange
@@ -173,9 +149,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertSame(CsvConstants::INVALID_CSV_FORMAT, $resultData['error_code']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsErrorWhenEmptyFile(): void
     {
         // Arrange
@@ -194,9 +167,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertSame(CsvConstants::EMPTY_FILE, $resultData['error_code']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsErrorWhenInvalidSampleRows(): void
     {
         // Arrange
@@ -215,9 +185,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertSame(CsvConstants::INVALID_CSV_FORMAT, $resultData['error_code']);
     }
 
-    /**
-     * @return void
-     */
     public function testAnalyzeReturnsErrorWhenColumnNotFound(): void
     {
         // Arrange
@@ -236,11 +203,6 @@ class CsvAnalyzerTest extends Unit
         $this->assertSame(CsvConstants::COLUMN_NOT_FOUND, $resultData['error_code']);
     }
 
-    /**
-     * @param int $rowCount
-     *
-     * @return string
-     */
     protected function buildLargeCsvContent(int $rowCount): string
     {
         $lines = [];

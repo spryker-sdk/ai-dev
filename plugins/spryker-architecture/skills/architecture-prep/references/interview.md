@@ -44,8 +44,9 @@ A line saying "unknown"/"TBD"/"n/a" = ANSWERED (an honest gap), not a question t
 
 ## Rule 1b — Offer "fill the list yourself" vs "interview me"
 
-When no filled questionnaire and no structured document exist, don't just launch into questions. First offer the user
-both paths (a single `AskUserQuestion` is fine):
+When no filled questionnaire and no structured document exist, don't just launch into questions. First
+offer the user both paths — ask a structured multiple-choice question (use your harness's question
+tool if it has one, otherwise ask in chat and wait for the answer); a single question is fine here:
 
 > "I can either (a) hand you the intake questionnaire to fill in at your own pace and then run with no
 > interview, or (b) interview you now in a few batched question sets. Which do you prefer?"
@@ -77,9 +78,10 @@ plainly for it and read everything they give you:
 
 ## Rule 2 — Batch the questions (the "multi-tab" intake)
 
-Use `AskUserQuestion` with up to 4 questions per call, several calls back-to-back, so the user gets a
-carefully structured interview in one pass rather than a slow drip. Keep each call within one level so each
-call reads like a coherent "tab" of the interview. Only ask about themes relevant to the **selected**
+Ask the user structured multiple-choice questions with up to 4 questions per batch, several batches
+back-to-back, so the user gets a carefully structured interview in one pass rather than a slow drip.
+Keep each batch within one level so each batch reads like a coherent "tab" of the interview. Only ask
+about themes relevant to the **selected**
 sections — don't interview about deployment if section 7 wasn't chosen.
 
 Prefer multi-select and give sensible default options with a "(Recommended)" first option where a
@@ -109,7 +111,7 @@ for it here and don't invent questionnaire IDs for it.
 **Do not flatten the bank into themed tabs.** The level order is the interview order, because L3
 questions are unanswerable until their gate is known.
 
-1. **Ask L1 first** (2–3 `AskUserQuestion` calls). Q1 — existing documents — leads, per Rule 1.
+1. **Ask L1 first** (2–3 question batches). Q1 — existing documents — leads, per Rule 1.
 2. **Evaluate gates**, then ask L2. Several L2 questions are already suppressed by L1 answers.
 3. **Evaluate gates again**, then ask **only the L3 questions whose gate actually opened.** A single-
    market project answering "standard" to all four capability gates skips almost all of L3 — that is
@@ -139,10 +141,10 @@ user's patience before the questions that matter.
 
 The bank types every question. Map them to the tool honestly:
 
-- **`pick`** → `AskUserQuestion`, options as written. Most picks carry `Other — please describe`, and
+- **`pick`** → a multiple-choice question, options as written. Most picks carry `Other — please describe`, and
   the ones where the answer may genuinely not exist yet also carry `Too complex to decide now —
   needs investigation` and/or `Not decided yet` — **reproduce these exactly, never drop them.** They
-  are load-bearing (see Rule 2c). `AskUserQuestion` always adds its own "Other" escape, so a user is
+  are load-bearing (see Rule 2c). Most question tools add their own "Other" escape, so a user is
   never trapped; but do not *invent* an unknown option on a question the bank didn't give one.
 - **`shorttext` / `number`** → an option like "Let me type it" then collect free text.
 - **`document`** → ask for a path or paste; read everything provided before continuing.
@@ -187,7 +189,6 @@ user plainly that §03 and §10 stay shallow until they come back.
 When only SOME questions are unanswered (per Rule 0b), batch just those, labelling each by its
 questionnaire ID (`Q6`, `Q13`…) — and still evaluate the gates, so you don't ask a blank question
 whose gate turns out to be closed.
-
 ## After the interview — always write answers to the input artifact
 
 **Every answer collected — however it arrived (live interview, a filled/partly-filled questionnaire,

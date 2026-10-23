@@ -14,17 +14,11 @@ interface CsvTransformerInterface
     /**
      * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      *
-     * @param string $sourcePath
-     * @param string $targetPath
      * @param array<string, string> $columnMappings
      * @param array<int, array<string, mixed>> $rowFilters
      * @param array<int, array<string, mixed>> $valueTransformations
      * @param array<string, mixed> $defaultValues
      * @param array<string> $columnsToRemove
-     * @param string $mode
-     * @param bool $createBackup
-     *
-     * @return string
      */
     public function transform(
         string $sourcePath,

@@ -51,7 +51,8 @@ all of its project's sections in its own worktree. Reasons this is the right gra
   heavy for no isolation benefit, since the sections within one coherent TAD don't need independent
   contexts. The projects do.
 
-Spawn deliverable writers as **fresh `general-purpose` agents, never forks** — a fork inherits the
+Spawn deliverable writers with your harness's subagent tool as **fresh general-purpose subagents,
+never forks** — a fork inherits the
 orchestrator's context, including the other projects' intakes, which reintroduces exactly the fact
 bleed the worktree split exists to prevent.
 
@@ -81,8 +82,8 @@ Researching per project multiplies the cost for near-identical answers.
 - Run-directory layout for N deliverables: `intake-<slug>.md` per project, one shared
   `research-docs.md`, per-slug extras only where genuinely unique.
 
-**Fetching docs.spryker.com:** the site is JS-rendered, so `WebFetch` on docs pages returns only a
-nav shell. Pull the page's markdown source from the public `spryker/spryker-docs` GitHub repo
+**Fetching docs.spryker.com:** the site is JS-rendered, so the web fetch tool returns only a
+nav shell for docs pages. Pull the page's markdown source from the public `spryker/spryker-docs` GitHub repo
 instead (raw file or Contents API) — it saves a whole class of failed fetch round-trips.
 
 ## Step 7 for N PRs — prepare push-ready, hand the push to the user
@@ -97,7 +98,7 @@ half the pushes; structure the handoff so a block costs nothing:
    deliverable's report); the command block below references these files.
 2. Attempt the push/PR only if the user explicitly asked for PRs this run. If a push is denied,
    don't retry or work around it — emit the exact, copy-paste-ready command block for the user to
-   run themselves (with the `!` prefix in this harness), one stanza per deliverable:
+   run themselves, one stanza per deliverable:
 
    ```bash
    git -C ../arch-wt-<slug> push -u origin arch/<date>-<slug>
@@ -106,7 +107,7 @@ half the pushes; structure the handoff so a block costs nothing:
    ```
 3. Only after the PRs exist (or the user takes over): worktree cleanup as above.
 
-One more operational note: when writing notes under `.claude/` paths (skill improvements, tracking
-files), prefer plain ASCII (`->` not a typographic arrow, "section 3" not the section sign) — the
+One more operational note: when writing notes inside the harness's own config folder (skill
+improvements, tracking files), prefer plain ASCII (`->` not a typographic arrow, "section 3" not the section sign) — the
 write classifier is stricter there, and a denial costs a round-trip. Deliverable files under
 `architecture/` are unaffected.

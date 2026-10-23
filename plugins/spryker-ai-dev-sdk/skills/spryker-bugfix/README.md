@@ -5,14 +5,16 @@ committed, validated, QA-accepted fix on a `bugfix/*` branch. In Autonomous mode
 a pushed **Draft PR** with a remote-CI watch loop.
 
 This skill is an **orchestrator** — it runs a fixed sequence of stages and delegates the heavy work of
-each stage to an already-installed skill or Claude subagent. It writes no product code itself; it
-coordinates the skills that do.
+each stage to an already-installed skill or a subagent. It writes no product code itself; it
+coordinates the skills that do. Invoke a skill with its slash command (`/spryker-runtime`, or
+`/spryker-ai-dev-sdk:spryker-runtime` on a plugin install); delegate to an agent with your harness's
+subagent tool.
 
 ## Files
 
 | File | Role |
 |------|------|
-| [`SKILL.md`](SKILL.md) | The workflow spine — Steps 0–12, one paragraph each. This is what Claude loads. |
+| [`SKILL.md`](SKILL.md) | The workflow spine — Steps 0–12, one paragraph each. This is what the agent loads. |
 | [`stages.md`](stages.md) | Full, authoritative per-step instructions + the stage→skill quick map. Read the relevant § before each step. |
 | [`reference.md`](reference.md) | Run-lean context discipline (`$BUGFIX_DIR`, State Object), operating principles, decision log, red flags. Read once per run. |
 
@@ -29,18 +31,28 @@ branch name, PR title, and commit message all fall back to `no-ticket` / `NO-TIC
 
 ## Design constraints
 
-- **Claude-only.** Every stage delegates to a bundled/installed `Skill(...)` or a Claude subagent. No
-  third-party MCP is required for the core flow — the **only** external touchpoint is the optional
-  Step 0 ticket pull. Every spawned subagent runs on a Claude model.
-- **Run lean.** Bulk output (Chrome, XDebug, codecept, phpcs/phpstan, review, verification, CI logs)
+- **Self-contained.** Every stage delegates to a bundled skill or a subagent — the flow runs entirely
+  on what this plugin ships plus what is already installed in the project. No third-party MCP server is
+  required for the core flow; the **only** external touchpoint is the optional Step 0 ticket pull.
+- **Run lean.** Bulk output (browser, XDebug, codecept, phpcs/phpstan, review, verification, CI logs)
   runs inside subagents that write raw logs to `$BUGFIX_DIR`
-  (`$CLAUDE_PROJECT_DIR/.claude/.cache/spryker-bugfix/<bugfix-id>/`) and return only compact verdicts.
-- **Plan is a task list.** Step 0 arranges the 12 stages as a `TaskCreate` task list and drives it with
-  `TaskUpdate` (one task `in_progress` at a time; a fresh attempt task per loopback). `TaskList` is the
-  live position — it survives compaction and scheduled wake-ups, so a resumed run or the watch loop
+  (`.ai-dev/spryker-bugfix/<bugfix-id>/` under the project root) and return only compact verdicts.
+- **Plan is a task list.** Step 0 arranges the 12 stages in the harness's task list and drives it as the
+  run proceeds (one task `in_progress` at a time; a fresh attempt task per loopback). The task list is
+  the live position — it survives compaction and scheduled wake-ups, so a resumed run or the watch loop
   re-orients from it. It complements the `run.log` timeline and the `decisions.md` rationale.
 - **The bug is the contract.** A fix is "done" only when the user-visible symptom no longer reproduces
   with evidence **and** every gate is green.
+- **Gate weight scales, gate existence does not.** Step 1 records a diff `size` (`trivial` / `normal` /
+  `complex`) that shrinks the Step 8 reviewer fan-out (1 instead of 3–5) and narrows Step 9's QA scope to
+  the single affected flow — but no gate is ever skipped for a small diff, and each still reports its own
+  verdict honestly. Same rule after a dirty-branch override: the gates are **scoped** to the fix's file
+  list and the report says so.
+- **Cypress E2E coverage is a first-class, conditional stage.** Step 0 asks how to handle it (auto /
+  always / skip); Step 9b — after QA has accepted the fix — delegates to the `cypress-tests` skill to
+  **fix** a spec the bug broke, **improve** assertions that would have missed it, or **add** a new
+  spec — only when the bug is user-visible on an E2E surface and the project's suite exists. A skip
+  is always a logged decision.
 - **PR delivery is chosen + capability-gated.** Step 0 asks **whether to open a PR and via which
   channel**, then probes what's available and records `PR_CHANNEL` — `gh` (native GitHub CLI), `mcp` (a
   connected **forge MCP** for the remote host: GitHub / GitLab / Bitbucket / …), `git-only` (push a
@@ -84,7 +96,10 @@ flowchart TD
     S8 -- "clean" --> S9{"Step 9 — QA GATE<br/>spryker-qa-coverage (E2E)"}
 
     S9 -- "rejected" --> Budget
-    S9 -- "accepted" --> S10{"Step 10 — Final verification<br/>tests + spryker-verifier / spryker-runtime<br/>symptom gone in running app?"}
+    S9 -- "accepted" --> S9b{"Step 9b — Cypress E2E<br/>conditional · cypress-tests<br/>fix / improve / add spec"}
+
+    S9b -- "fail (fix wrong)" --> Budget
+    S9b -- "pass / reasoned skip" --> S10{"Step 10 — Final verification<br/>tests + spryker-verifier / spryker-runtime<br/>symptom gone in running app?"}
 
     S10 -- "FAIL" --> Budget
     S10 -- "PASS" --> S11{"Step 11 — commit always<br/>MODE + PR_CHANNEL gate"}
@@ -111,24 +126,51 @@ flowchart TD
 
 ### The verification loop
 
-Steps 8 (review), 9 (QA), 10 (final verification), and 11 (remote CI) are gates. A failure in any of
+Steps 8 (review), 9 (QA), 10 (final verification), and 11 (remote CI) are gates — and a Step 9b
+Cypress failure that indicts the fix (not the test) joins the same loop. A failure in any of
 them draws from **one shared `attempt` counter** and loops back to **Step 4** to re-investigate, then
 forward through the full chain again. The hard stop is `attempt > 3`: the run STOPs and reports —
 nothing is pushed and no PR is marked ready with a known-broken state.
 
 ## Stage → skill map
 
+Skill names below are shorthand: on a plugin install the slash command carries the plugin prefix,
+e.g. `/spryker-ai-dev-sdk:spryker-runtime`, in both harnesses. Agent names carry it too, but the
+separator differs — `spryker-ai-dev-sdk:spryker-verifier` under Claude Code,
+`spryker-ai-dev-sdk/spryker-verifier` under GitHub Copilot. Retry with that form if a bare name does
+not resolve.
+
 | Step | Delegates to |
 |------|--------------|
-| 0 | `AskUserQuestion`; **optional** ticket pull (Atlassian MCP / `gh issue view` / paste) |
-| 3 | `Skill(spryker-runtime)` + `Skill(spryker-docs-research)` |
-| 4 | `Skill(ai-runtime-debugging)` + `Skill(spryker-runtime)` |
-| 6 | `Skill(codecept-functional)` |
-| 7 | `Skill(static-validation)` |
-| 8 | `Skill(code-review)` |
-| 9 | `Skill(spryker-qa-coverage)` |
-| 10 | `Skill(codecept-functional)` re-run + `spryker-verifier` agent / `Skill(spryker-runtime)` |
-| 11 | `git` / `gh pr create --draft` / `ScheduleWakeup` or `CronCreate` watch loop |
+| 0 | structured multiple-choice intake questions; **optional** ticket pull (Atlassian MCP / `gh issue view` / paste) |
+| 3 | `spryker-runtime` + `spryker-docs-research` |
+| 4 | `ai-runtime-debugging` + `spryker-runtime` |
+| 6 | `codecept-functional` |
+| 7 | `static-validation` |
+| 8 | `code-review` |
+| 9 | `spryker-qa-coverage` |
+| 9b | `cypress-tests` — conditional: fix / improve / add a Cypress E2E spec for the bug |
+| 10 | `codecept-functional` re-run + `spryker-verifier` agent / `spryker-runtime` |
+| 11 | `git` / `gh pr create --draft` / a watch loop on whichever scheduler or monitor tool the harness exposes |
+
+## Run artifacts
+
+Every file the run produces lives in one per-bugfix folder (`$BUGFIX_DIR`), created at Step 0 and
+surviving loopbacks and scheduled wake-ups — which is what lets the watch loop re-hydrate from it:
+
+```
+.ai-dev/spryker-bugfix/<bugfix-id>/     # <bugfix-id> = ticket key, else no-ticket-<brief-name>
+```
+
+| File | Role |
+|------|------|
+| `run.log` | The append-only **timeline** — one line per step boundary, every loopback (`attempt=<n>`), every gate verdict. |
+| `decisions.md` | The **rationale** — CRITICAL DECISIONS plus OPEN QUESTIONS / RISKS; the source for the Step 12 report. |
+| `repro-notes.md` | The reproduction scenario in full; the State Object keeps only a 1–3 line summary + this path. |
+| `<stage>-attempt<N>.log` | **Bulk output** per gate — tests, static analysis, review, verification, CI logs. |
+| `watch-state.md` | The Step 11 handoff the remote-CI watch loop re-reads on each wake-up. |
+
+The Step 12 report's last line is the path to the step log and decision log.
 
 ## Packaging note
 

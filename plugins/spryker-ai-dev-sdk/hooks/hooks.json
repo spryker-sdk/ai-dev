@@ -1,0 +1,28 @@
+{
+    "description": "SessionStart installs the Spryker coding rules into the project as path-scoped rule files. Stop guards project-starter and demo-prep wizard runs: while a state file has run_mode: autonomous and steps are still open, the turn does not end — except on a question only the person can answer, a NEEDS YOU: line, or a structured question to the user.",
+    "hooks": {
+        "SessionStart": [
+            {
+                "matcher": "startup|resume|clear",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/sync-rules.sh\"",
+                        "timeout": 15
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "command -v php >/dev/null 2>&1 && exec php \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-stop.php\" || exit 0",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ]
+    }
+}
