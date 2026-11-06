@@ -2,7 +2,7 @@
 
 Optional storefront step for Spryker feature installs and upgrades. It suggests where a feature's Yves widgets and components belong in the project's own Twig templates and applies only the placements the developer picks.
 
-Integration guides wire a feature's backend (plugins, config, schema) and leave Yves templates to the project. The vendor templates call the feature's widgets, but a project that overrides a vendor template (page layouts, header, footer, product item) renders its own copy, and the call is gone: the widget is registered and renders nothing. In the b2b marketplace demo, 13 registered widgets are called only in vendor templates the project replaced.
+Integration guides wire a feature's backend (plugins, config, schema) and leave Yves templates to the project. The vendor templates call the feature's widgets, but a project that overrides a vendor template (page layouts, header, footer, product item) renders its own copy, and the call is gone: the widget is registered and renders nothing.
 
 ## How it works
 

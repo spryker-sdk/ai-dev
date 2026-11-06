@@ -14,7 +14,7 @@ description: >
 
 # Yves Twig Integration
 
-Integration guides stop at the backend: they register a widget plugin, but they do not place `{% widget 'X' %}` into the project's templates. The vendor templates do place it, and that only reaches the page while the project uses the vendor template. A project that overrides the template (most demo-based projects override the page layouts, the header, the footer, the product item) renders its own copy, and the call is gone. The widget is registered, the feature is "installed", and the shopper sees nothing.
+Integration guides stop at the backend: they register a widget plugin, but they do not place `{% widget 'X' %}` into the project's templates. The vendor templates do place it, and that only reaches the page while the project uses the vendor template. A project that overrides the template (page layouts, the header, the footer and the product item are the usual ones) renders its own copy, and the call is gone. The widget is registered, the feature is "installed", and the shopper sees nothing.
 
 This skill closes that gap **as a suggestion**. A scanner compares the vendor templates with the templates the project actually renders and lists every place where the vendor puts a feature's widget or component and the project's override does not. The developer picks which suggestions to apply; the agent applies each one in the project's design, not the vendor's.
 
@@ -95,7 +95,7 @@ Edit only the project layer (`src/{ProjectNamespace}/Yves/...`). One placement a
 
 - `docker/sdk console twig:cache:warmer` after a Twig change; `docker/sdk cli npm run yves` only when SCSS or TS changed.
 - Render the page that uses the template (the template name usually names it: `page-layout-cart` is the cart, `product-item` appears on catalog and search pages, `footer` on every page), on desktop and mobile widths, with the data the widget needs (a logged-in customer for account widgets, a product with reviews for a review widget).
-- Check that the widget renders, sits where the vendor puts it relative to its neighbours, and looks like the project (spacing, typography, buttons) rather than the vendor demo; measure, do not guess (`match-reference-design` section 7 for how).
+- Check that the widget renders, sits where the vendor puts it relative to its neighbours, and looks like the project (spacing, typography, buttons) rather than the vendor default; measure, do not guess (`match-reference-design` section 7 for how).
 - Hand per-page checks to the `spryker-verifier` agent when the caller uses it.
 - Re-run the scan with the same scope: the applied items read `placed`.
 
