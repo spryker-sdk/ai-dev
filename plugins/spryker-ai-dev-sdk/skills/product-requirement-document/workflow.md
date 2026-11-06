@@ -15,6 +15,7 @@ Ground everything in real Spryker before drafting — **code first, then docs**:
 
 **Step 0.1 — Codebase facts (inline, first, Spryker tooling MCP server)**
 Establish against the real install what exists and pin exact names — match tools by tool name (server names vary by install):
+- `searchSprykerCapabilities` - **first call, before the module tools.** Search the Spryker capability map with the feature's nouns and synonyms (several short queries), then open the top hits with `getSprykerCapability`, to learn whether Spryker already ships the capability and whether the project has it installed. See the `find-existing-capability` skill for queries, per-hit verdicts and the no-MCP fallback. **A PRD for something that ships is framed as "configure / extend / install X", not "build X"** (installed: extend; partially or not installed: install the feature first via `spryker-feature-install`; a `partial` card: only the gap is built).
 - `getSprykerModules` — exact module name(s).
 - `getSprykerModuleMap` — controller+action behind the feature, plugins/extension points, whether it already ships. (Yves routes from `RouteProviderPlugin`s; Glue resource from a `ResourceRoutePlugin`.) **Take vendor paths from the map's output — never guess `Business/...` sub-paths.**
 - `getTransferStructureByName` — real transfer field names/types. Never invent fields.
@@ -32,7 +33,7 @@ If the feature modifies or extends an existing flow, ask the user: *"This extend
 **Step 0.4 — Hold the findings**
 Keep what you gathered: real module/transfer names always; documented behavior (if researched) and observed behavior (if validated) when applicable. They feed Phases 3–5 directly. Do not invent any of these later.
 
-**CHECKPOINT:** Do not draft requirements until codebase facts (incl. the project-overlap sweep) are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
+**CHECKPOINT:** Do not draft requirements until codebase facts (incl. the capability-map search and the project-overlap sweep) are gathered, the opt-in questions (docs / running-app validation) have been asked, and any tool gaps are surfaced to the user.
 
 ### Phase 1: Initial Requirements Gathering 🔄 INTERACTIVE
 
