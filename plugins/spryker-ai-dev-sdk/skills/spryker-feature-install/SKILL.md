@@ -49,6 +49,7 @@ Present one confirmation block and wait for the user's answer. It carries:
 - the feature, the packages `composer require` will add, and any required features that would be installed first;
 - the **version constraint**: match the project's other `spryker-feature/*` constraints and release line in `composer.json` (for example the same `^202xxx.x` style); do not introduce a different style;
 - the **optional integrations** the user wants: Glue API, Storefront API, Back Office, data import with demo data. Default to the project's existing surfaces (an API the project does not expose is not installed);
+- that the **storefront placement** (Step 6b) comes after the backend steps as a suggestion list: the guide registers the feature's widgets but does not place them in the project's Twig templates, and nothing is placed unless the developer picks it then;
 - which guide will be followed and its version line;
 - the branch: work on a dedicated branch (`ai-feature/<slug>` from `HEAD`, as `spryker-customization` does with `ai-customize/<slug>`) when `git status` is clean; if it is not, ask first.
 
@@ -87,7 +88,8 @@ Typical step kinds, and the care each needs:
 | Dependency-provider plugin wiring | **Read the current plugin stack first** and insert at the guide's position; respect the existing order. Follow the project's own pattern for stack overrides (`parent::` plus a positional insert anchored on a named neighbour class, never a numeric index). Skip a plugin the project has already registered. |
 | Transfer definitions (`*.transfer.xml`) | Project layer; check fields with `getTransferStructureByName`. |
 | Propel schema (`*.schema.xml`) | Project layer; follow `propel-schema` conventions. |
-| Navigation (`navigation.xml`), routes, route providers, widgets, module configs | Add the entry; do not reorder existing ones. |
+| Navigation (`navigation.xml`), routes, route providers, module configs | Add the entry; do not reorder existing ones. |
+| Widget plugins (`ShopApplicationDependencyProvider::getGlobalWidgets()`) | Register the widgets the guide lists. Registration alone renders nothing in templates the project overrides; placing them is Step 6b. |
 | Glossary and translations | Add the keys for every configured locale. |
 | Data import (import config, `data/import/**`, demo data) | Set up the importer wiring when the guide requires it. Load **demo data only if the user asked**; otherwise skip and record "demo data skipped". Use `project-data` and the `data-import` skill for CSV and importer work. |
 | Publish and sync, queues, event wiring | Wire as the guide says; queue-worker restarts are project specific, report them. |
@@ -100,6 +102,16 @@ Where a step conflicts with something the project already built (a plugin alread
 Invoke `spryker-refresher` with the list of files you changed; it owns the file-pattern to command mapping (`transfer:generate`, `propel:install`, `cache:class-resolver:build`, router cache warm-up, `navigation:build-cache`, glossary and data import, search setup, cache clears, frontend builds). Do not improvise the command chain, and run Yves/Zed frontend builds only when the guide touches the frontend. Then run the **feature-specific setup commands the guide lists** that the refresher mapping does not cover (for example a search setup or a feature importer), verifying each command exists first with `docker/sdk console list`.
 
 A new `*.schema.xml` triggers `propel:install`, which changes the database schema: say so before it runs. If a command fails, show its output and diagnose before retrying (`spryker-issue-diagnoser`); do not skip a failing guide step to look green.
+
+## Step 6b - Optional: storefront placement (suggested, not applied by default)
+
+Only when the feature has Yves code (a card module under `vendor/spryker-shop/`, or a package with a `src/*/Yves/` directory) and the project has a storefront. Install guides stop at registering widgets; the vendor templates place them, and every vendor template the project overrides has lost those calls.
+
+1. Run the `yves-twig-integration` scanner scoped to the feature's Yves packages (`--package=<vendor/package>,...`). It lists, per widget and component, whether a template the project renders already uses it, and where the vendor places it in templates the project replaced.
+2. Present its suggestion table and ask which placements to apply (all, some, none). `not_registered` items mean a widget from the guide is still unregistered: finish that in Step 5 first.
+3. On a pick, invoke the `yves-twig-integration` skill (`/yves-twig-integration`, or `/spryker-ai-dev-sdk:yves-twig-integration` on a plugin install) with the picked items; it places each one in the project's design and verifies it. On "none", record the suggestions as a follow-up and continue.
+
+Do not apply a placement in an unattended run; the table goes into the report.
 
 ## Step 7 - Verify
 
@@ -120,6 +132,7 @@ Leave the changes **unstaged for review**; never commit or push without the user
 - Checklist:
   - [done] <step> - <file or command>
   - [skipped - <reason>] <step>
+- Storefront placement: <applied placements (widget - project file), declined, or the suggestion table as a follow-up; "no Yves code" when it did not apply>
 - Verification: <what was run, evidence, PASS/FAIL>
 - Follow-ups: <e.g. Glue API integration not done; demo data not loaded; deploy/service change needs docker/sdk up; queue worker restart>
 - Files changed: <list>

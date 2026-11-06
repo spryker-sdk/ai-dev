@@ -37,4 +37,5 @@ These are **skills** (loaded into the main session), not subagents. Invoke each 
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |
 | `cypress-tests` | Step 7a (when the Cypress E2E phase is on) — once all ACs are green, fix / improve / add a Cypress E2E spec locking in the user-visible behavior, run it targeted + the suite's quality gate. |
 | `yves-atomic-frontend` | Step 4 — before the first write to any `.scss` / `.ts` / atomic-component file under `Theme/default/components/`. |
+| `yves-twig-integration` | Step 4 - when the work relies on a core widget or component that the storefront does not render, or after `spryker-feature-install`: suggests where the vendor templates place it in templates the project overrides, and places the picked ones in the project's design. |
 | `static-validation` | Step 7b — lint / phpcs / phpstan over the final diff before commit. |
