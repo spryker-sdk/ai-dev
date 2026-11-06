@@ -8,9 +8,14 @@
 namespace SprykerSdk\Zed\AiDev;
 
 use Spryker\Zed\Kernel\AbstractBundleConfig;
+use SprykerSdk\Shared\AiDev\AiDevConstants;
 
 class AiDevConfig extends AbstractBundleConfig
 {
+    protected const string CAPABILITY_MAP_INDEX_URL = 'https://spryker-capability-map.s3.eu-central-1.amazonaws.com/index.json';
+
+    protected const int CAPABILITY_MAP_CACHE_TTL = 86400;
+
     /**
      * @var array
      */
@@ -326,5 +331,50 @@ class AiDevConfig extends AbstractBundleConfig
             static::TOOL_ARTIFACT_MAP,
             static fn (array $config): bool => ($config['agents_dir'] ?? null) !== null,
         )));
+    }
+
+    /**
+     * Specification:
+     * - Returns the URL of the published capability map index.
+     * - Defaults to the public bucket the Spryker suite publishes on every change to the capability cards.
+     *
+     * @api
+     */
+    public function getCapabilityMapIndexUrl(): string
+    {
+        return $this->get(AiDevConstants::CAPABILITY_MAP_INDEX_URL, static::CAPABILITY_MAP_INDEX_URL);
+    }
+
+    /**
+     * Specification:
+     * - Returns the file the downloaded capability map index is cached in.
+     *
+     * @api
+     */
+    public function getCapabilityMapCacheFilePath(): string
+    {
+        return APPLICATION_ROOT_DIR . '/data/tmp/ai-dev/capability-map/index.json';
+    }
+
+    /**
+     * Specification:
+     * - Returns how long, in seconds, the cached capability map index is used before it is downloaded again.
+     *
+     * @api
+     */
+    public function getCapabilityMapCacheTtl(): int
+    {
+        return static::CAPABILITY_MAP_CACHE_TTL;
+    }
+
+    /**
+     * Specification:
+     * - Returns the project's `composer.lock`, which tells the capability tools what is installed.
+     *
+     * @api
+     */
+    public function getComposerLockFilePath(): string
+    {
+        return APPLICATION_ROOT_DIR . '/composer.lock';
     }
 }
