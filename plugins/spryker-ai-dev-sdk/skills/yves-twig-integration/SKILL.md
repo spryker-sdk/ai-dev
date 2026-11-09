@@ -51,7 +51,9 @@ What it reports per widget or component (statuses, most actionable first):
 
 With `--package`/`--module`, the scope also covers the module's components that another module's vendor template includes (`molecule('x', 'Module')`), reported as `<tier>:<name>@<Module>`. In block chains, a `~` marks a block inside an `{% embed %}`: it belongs to the embedded component, so an override of the outer template cannot drop it.
 
-What it does not see: Twig functions that render content from CMS (`content_banner(...)`, CMS slots), widgets passed in variables, templates of a non-default vendor theme, and whether a vendor template the project does not override is actually reached from a page. Say so when it matters.
+A vendor call counts as placed only when its template is reachable: vendor `views/` and `templates/` are roots (a controller or widget renders them), a component is reachable when a reachable template, or a project template, includes it. A call in a vendor component that only a replaced vendor view included is `missing` with `overrideMode: unreachable` and `projectFile` set to the project template that replaced the including one (`null` when there is none). Twig comments (`{# ... #}`) are not placements. A template nothing references, or one reached only through a variable name (`atom(type)`), cannot be judged: it still counts as before and is listed in the item's `placedUndecided`.
+
+What it does not see: Twig functions that render content from CMS (`content_banner(...)`, CMS slots), widgets passed in variables, templates of a non-default vendor theme, single-argument includes (`atom('x')`), and templates a PHP class renders by name outside `views/` and `templates/`. Say so when it matters.
 
 ## Step 1 - Scope and scan
 

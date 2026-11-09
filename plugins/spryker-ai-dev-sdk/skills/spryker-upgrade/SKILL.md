@@ -101,6 +101,8 @@ sniffer and the tests in the container (`script -q /dev/null docker/sdk cli <cmd
 scripts run on host PHP. Never modify `vendor/`. Read
 [references/environment.md](references/environment.md) before the first boot in Phase 0, in Phase
 4.9, and when a command behaves differently in the container than on the host.
+Before the first `composer` command, run the shared environment preflight in
+[../spryker-feature-install/references/environment-preflight.md](../spryker-feature-install/references/environment-preflight.md).
 
 **Coverage matrix.** Every known failure mode, what detects it and which phase resolves it is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Read it when something turns up that

@@ -39,14 +39,27 @@ Match tools by **tool name** (server names vary by install; some clients namespa
 
 A tool result of `{"error": "..."}` is a failure, not an empty result: report it and use the fallback below.
 
-**If the capability tools are not available** (the Spryker tooling MCP server is not connected): try to start the server the way `product-requirement-document` does - the underlying server backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up - then ask the user to reload the MCP connection (for example `/mcp`) and wait for confirmation. After a second failed reconnect, use the **web fallback**:
+**If the capability tools are not available**, first tell the two causes apart. The server is **not registered** when no `ai-dev:mcp-server` entry exists in the project's MCP config files (`.mcp.json`, `.vscode/mcp.json`) and the harness's MCP server list does not show it. It is **registered but not connected** when an entry exists and the tools are still missing.
+
+- **Not registered:** say so once, in one line - the project has not run `ai-dev-setup` Step 3 (it registers the server; `.mcp.json` is its project-scoped option) - and go straight to the script fallback below. Do not start the stack or ask for a reload: there is nothing to reconnect. Offer `ai-dev-setup` at the end of the report as the way to get the tools in a new session.
+- **Registered but not connected:** try to start the server the way `product-requirement-document` does - the underlying server backs the local app, so `script -q /dev/null docker/sdk run` (or `up`) brings it up - then ask the user to reload the MCP connection (the harness's MCP command) and wait for confirmation. After a second failed reconnect, use the fallback.
+
+**Fallback.** Run the bundled script from the project root. It reads `index.json` (cached 24 h), searches it and prints, per hit, the fields the tool returns (`slug`, `capability`, `status`, `matched`, `installStatus` from `composer.lock`, `features`, `missingPackages`, `missingOptionalPackages`, `composerRequire`, `url`), so the rest of this skill applies unchanged:
+
+```bash
+php <skill dir>/scripts/capability-search.php "wishlist" "shopping list" "budget spending limit" [--limit=10] [--index=<mirror url or local path>] [--lock=<composer.lock>]
+```
+
+Each quoted argument is one query (Step 1). It prints a one-line summary, then one line of JSON; the mirror can also be set with the `CAPABILITY_MAP_INDEX_URL` environment variable. Exit code 2 is a usage error, 3 means the index could not be loaded. In place of `getSprykerCapability`, fetch the hit's `url` (the card).
+
+If PHP is not available or the script cannot load the index, use the **web fallback**:
 
 1. Fetch `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/INDEX.md` with the harness's web fetch tool, or `curl -s`. It has one entry per card with its modules, features and synonyms.
 2. Search it for each term and its synonyms yourself; note the candidate slugs.
 3. Fetch each candidate card from `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md`.
 4. Compare the card's `vendor/spryker/<package>` modules and its `spryker-feature/<name>` against the project's `composer.lock` by hand (the built-in file read/search tools).
 
-Say plainly in the report that you used the fallback and that **ranking is weaker** in that mode (no scoring, no computed install status), so a miss means less.
+Say plainly in the report that you used a fallback and that **ranking is weaker** in that mode (the script scores by title, synonyms, modules and body text, simpler than the tool; the web fallback has no scoring and no computed install status), so a miss means less.
 
 ## Step 1 - Extract the capability nouns
 
@@ -83,6 +96,10 @@ One verdict per capability, driven by the card's `status` and the computed `inst
 
 **One request, several hits.** When two cards cover parts of the request, give each its own verdict and say how they combine. When a hit only partly matches (it does half of what was asked), say which half.
 
+**Installed near-equivalent.** When the main verdict is install or build, and an **installed** card matches the need through its title or synonyms (`shopping-list`, with the synonyms "wish list" and "save for later", for a wishlist request), report it as **"may already cover this"** next to the main verdict, with the synonym that matched and what it would not do. The user may prefer the installed alternative to a new install.
+
+**Leftover project wiring.** Whatever the verdict, grep the project namespace (`src/<Ns>/`, the `psr-4` prefix in `composer.json`; skip `src/Generated` and `src/Orm`) for the card's modules (module names, `Spryker\...\<Module>` namespaces) and its plugin classes, and list what is already wired: plugins in dependency providers, content types, route patterns, widgets. A project can carry wiring for a feature that is not installed (the project once had it, or a demo shop removed it partly), and that changes the install scope.
+
 ## Version drift
 
 The map describes the latest release line. The project may be older. When a capability matters and a module's installed `version` (from the card's `modules[]`) looks old for the feature, read the module's code in `vendor/spryker/<package>` or call `getSprykerModuleMap` before relying on a card detail (an extension point, a Glue resource, a config key). When the project is clearly behind, say so and suggest the `spryker-upgrade` skill instead of working around the gap.
@@ -103,6 +120,8 @@ End with a verdict table and one **Reuse decision** block per capability that ma
 - Capability: <card title>
 - Verdict: extend (installed) | install missing part | install feature then extend | build only the gap | build new (no relevant hit)
 - Evidence: <status, installStatus, matched terms, the card lines that settle it; fallback or stale source if applicable>
+- May already cover this: <installed card matched through its title or synonyms, and what it lacks; omit when none>
+- Existing wiring: <project classes, config and routes already tied to the card's modules and plugins; "none found" when the grep is empty>
 - Next step: <extension points to use / `composerRequire` line + docs guide URL / the gap to build>
 - Card: https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md
 ```

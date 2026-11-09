@@ -6,7 +6,7 @@ Integration guides wire a feature's backend (plugins, config, schema) and leave 
 
 ## How it works
 
-`scripts/yves-integration-scan.php` builds the template tree the project renders - project templates, vendor templates the project does not override, and the vendor blocks an extending override keeps (an `{% embed %}` block counts as the embedded component's) - and reports each widget or component as `placed`, `missing` (with the vendor call sites the project replaced), `not_registered` or `no_reference`. Plain PHP on the host, no Spryker boot; about a second on a demo shop.
+`scripts/yves-integration-scan.php` builds the template tree the project renders - project templates, vendor templates the project does not override, and the vendor blocks an extending override keeps (an `{% embed %}` block counts as the embedded component's), counting a vendor call only when its template is reachable from a view or template the project renders and ignoring Twig comments - and reports each widget or component as `placed`, `missing` (with the vendor call sites the project replaced), `not_registered` or `no_reference`. Plain PHP on the host, no Spryker boot; about a second on a demo shop.
 
 The skill turns the `missing` items into a suggestion table, waits for the developer's pick, and places each picked item at the equivalent spot of the project template: the vendor decides what and where, the project decides how it looks ([references/placement-rules.md](references/placement-rules.md)).
 

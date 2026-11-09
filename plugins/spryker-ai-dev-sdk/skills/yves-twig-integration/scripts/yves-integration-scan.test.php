@@ -168,5 +168,81 @@ check('a call site the update added shows up', item($diff, 'OrphanWidget')['stat
 check('gaps that existed before stay out of the diff', item($diff, 'NewsletterSubscriptionWidget') === null && count($diff['items']) === 1);
 
 exec('rm -rf ' . escapeshellarg($root));
+
+/**
+ * Reachability and comments: a project that replaces the view including a molecule, a widget
+ * mentioned only in a Twig comment, a component of the feature's own module nobody includes.
+ */
+function reachability_project(): string
+{
+    $root = sys_get_temp_dir() . '/yves-scan-reach-' . uniqid();
+    write_file("$root/composer.json", '{}');
+    foreach (['CommentedWidget', 'LiveWidget', 'DeadWidget', 'ReachableWidget', 'SelfWidget', 'DynamicWidget'] as $name) {
+        widget_class($root, 'spryker-shop/' . strtolower($name), $name, $name, $name);
+    }
+
+    // The comment spans lines; LiveWidget on line 5 must keep its line number.
+    vendor_twig($root, 'spryker-shop/shop-ui', 'ShopUi', 'views/home/home.twig', implode("\n", [
+        "{# Old: {% widget 'CommentedWidget' only %}{% endwidget %}",
+        "   molecule('ghost', 'GhostModule')",
+        '#}',
+        '{% block body %}',
+        "    {% widget 'LiveWidget' only %}{% endwidget %}",
+        "    {% include molecule('live-list', 'ShopUi') only %}",
+        "    {% include molecule(data.dynamicName, 'ShopUi') only %}",
+        '{% endblock %}',
+        '',
+    ]));
+    // Reached through a root view that the project does not override.
+    vendor_twig($root, 'spryker-shop/shop-ui', 'ShopUi', 'components/molecules/live-list/live-list.twig', "{% widget 'ReachableWidget' only %}{% endwidget %}\n");
+    // Reached only through a dynamic name in a reachable template.
+    vendor_twig($root, 'spryker-shop/shop-ui', 'ShopUi', 'components/molecules/dynamic-item/dynamic-item.twig', "{% widget 'DynamicWidget' only %}{% endwidget %}\n{% include molecule('anchor', 'ShopUi') only %}\n");
+    vendor_twig($root, 'spryker-shop/shop-ui', 'ShopUi', 'components/molecules/anchor/anchor.twig', "<a></a>\n");
+
+    // The vendor view includes the molecule; the project replaces the view and drops the include.
+    vendor_twig($root, 'spryker-shop/customer-page', 'CustomerPage', 'views/nav/nav.twig', "{% include molecule('nav-list', 'CustomerPage') only %}\n");
+    vendor_twig($root, 'spryker-shop/customer-page', 'CustomerPage', 'components/molecules/nav-list/nav-list.twig', "{% widget 'DeadWidget' only %}{% endwidget %}\n");
+    project_twig($root, 'CustomerPage', 'views/nav/nav.twig', "<nav class=\"project-nav\"></nav>\n");
+
+    // A component of the widget's own module that nothing includes is no placement of that widget.
+    vendor_twig($root, 'spryker-shop/selfwidget', 'SelfWidget', 'components/molecules/self-box/self-box.twig', "{% widget 'SelfWidget' only %}{% endwidget %}\n");
+
+    register_widgets($root, array_map(fn (string $name): string => "SprykerShop\\Yves\\$name\\Widget\\$name", ['CommentedWidget', 'LiveWidget', 'DeadWidget', 'ReachableWidget', 'SelfWidget', 'DynamicWidget']));
+
+    return $root;
+}
+
+echo "comments\n";
+$reach = reachability_project();
+$parsed = yves_scan_parse_twig("$reach/vendor/spryker-shop/shop-ui/src/SprykerShop/Yves/ShopUi/Theme/default/views/home/home.twig");
+$names = array_column($parsed['references'], 'name');
+check('a reference inside a multi-line Twig comment is not parsed', !in_array('CommentedWidget', $names, true) && !in_array('molecule:ghost@GhostModule', $names, true));
+check('line numbers survive the comment', $parsed['references'][0]['name'] === 'LiveWidget' && $parsed['references'][0]['line'] === 5);
+
+echo "reachability\n";
+$reachReport = yves_scan_run($reach, $empty);
+check('a widget named only in a comment has no reference', item($reachReport, 'CommentedWidget')['status'] === YVES_SCAN_STATUS_NO_REFERENCE);
+check('a widget in a root view the project keeps stays placed', item($reachReport, 'LiveWidget')['status'] === YVES_SCAN_STATUS_PLACED);
+check('a widget in a molecule included by a kept view stays placed', item($reachReport, 'ReachableWidget')['status'] === YVES_SCAN_STATUS_PLACED
+    && item($reachReport, 'ReachableWidget')['placedUndecided'] === []);
+$dead = item($reachReport, 'DeadWidget');
+check('a widget in a molecule whose including view the project replaced is missing', $dead['status'] === YVES_SCAN_STATUS_MISSING && $dead['placedAt'] === []);
+check('the suggestion is marked unreachable and names the replacing project file', $dead['suggestions'][0]['overrideMode'] === 'unreachable'
+    && $dead['suggestions'][0]['projectFile'] === 'src/Pyz/Yves/CustomerPage/Theme/default/views/nav/nav.twig');
+check('a component of the widget\'s own module nobody includes is not a placement', item($reachReport, 'SelfWidget')['status'] === YVES_SCAN_STATUS_MISSING
+    && item($reachReport, 'SelfWidget')['suggestions'][0]['projectFile'] === null);
+$dynamicWidget = item($reachReport, 'DynamicWidget');
+check('a dynamic molecule name keeps the old behaviour and is marked undecided', $dynamicWidget['status'] === YVES_SCAN_STATUS_PLACED && count($dynamicWidget['placedUndecided']) === 1);
+$scopedReach = yves_scan_run($reach, ['modules' => [], 'packages' => ['spryker-shop/deadwidget']]);
+check('the scoped scan reports the same unreachable widget', item($scopedReach, 'DeadWidget')['status'] === YVES_SCAN_STATUS_MISSING);
+
+// An extending override of the view keeps the vendor include alive.
+project_twig($reach, 'CustomerPage', 'views/nav/nav.twig', "{% extends template('nav', '@SprykerShop:CustomerPage') %}\n");
+check('an extending view override keeps the vendor include reachable', item(yves_scan_run($reach, $empty), 'DeadWidget')['status'] === YVES_SCAN_STATUS_PLACED);
+// Once the project's own template includes the molecule, it is reachable again.
+write_file("$reach/src/Pyz/Yves/CustomerPage/Theme/default/views/nav/nav.twig", "{% include molecule('nav-list', 'CustomerPage') only %}\n");
+check('a project template that includes the molecule makes it reachable', item(yves_scan_run($reach, $empty), 'DeadWidget')['status'] === YVES_SCAN_STATUS_PLACED);
+
+exec('rm -rf ' . escapeshellarg($reach));
 echo "\n$count checks, $failures failed\n";
 exit($failures === 0 ? 0 : 1);

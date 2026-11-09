@@ -17,7 +17,9 @@ flowchart TD
     A([Feature request / requirement list]) --> B["1 - Capability nouns + synonyms<br/>3-6 short queries per requirement"]
     B --> C["2 - searchSprykerCapabilities<br/>one call per query, merge by slug"]
     C --> T{"Tool available?"}
-    T -- "no" --> T1["Start server, ask for /mcp reload<br/>after two failures: web fallback<br/>INDEX.md + card, compare composer.lock<br/>(weaker ranking, say so)"] --> D
+    T -- "no" --> T0{"Server registered?"}
+    T0 -- "no" --> T2["Say so once, point to ai-dev-setup Step 3<br/>run scripts/capability-search.php<br/>(weaker ranking, say so)"] --> D
+    T0 -- "yes, not connected" --> T1["Start server, ask for an MCP reload<br/>after two failures: the same script<br/>PHP or network fails: INDEX.md + card"] --> D
     T -- "yes" --> D["3 - getSprykerCapability<br/>on the top hits<br/>read What it does, Extend don't duplicate,<br/>Extension points, Install, Related cards"]
     D --> V{"4 - Verdict per hit"}
     V -- "installed" --> V1["Extend it<br/>extension points + getSprykerModuleMap<br/>then spryker-customization"]
@@ -34,11 +36,11 @@ flowchart TD
 
 ## Tools
 
-Matched by tool name (server names are install-specific): `searchSprykerCapabilities`, `getSprykerCapability`, `getSprykerModuleMap`, `getSprykerModules`, `searchAlgoliaDocumentation`. Without the MCP server the skill falls back to fetching `INDEX.md` and `<slug>.md` from `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/` and comparing the card's packages to `composer.lock` by hand.
+Matched by tool name (server names are install-specific): `searchSprykerCapabilities`, `getSprykerCapability`, `getSprykerModuleMap`, `getSprykerModules`, `searchAlgoliaDocumentation`. Without the MCP server the skill first checks whether the server is registered at all (`.mcp.json`, `.vscode/mcp.json`, the harness's list); if not, it points to `ai-dev-setup` Step 3 once and skips the start-and-reload loop. The fallback is the bundled `scripts/capability-search.php`, which reads the published `index.json` (cached 24 h; `--index` or `CAPABILITY_MAP_INDEX_URL` for a mirror or a local file), searches it and prints the same fields as the tool, with `installStatus` computed from `composer.lock`; its ranking is simpler than the tool's. Only when PHP or the network fails does it fetch `INDEX.md` and `<slug>.md` from `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/` and compare the card's packages to `composer.lock` by hand.
 
 ## Output
 
-A verdict table (requirement, capability and card, verdict, next step) and one **Reuse decision** block per capability: capability, verdict, evidence, next step, and the card link `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md`.
+A verdict table (requirement, capability and card, verdict, next step) and one **Reuse decision** block per capability: capability, verdict, evidence, "may already cover this" (an installed card matching through its title or synonyms, e.g. `shopping-list` for a wishlist request), existing project wiring (plugins, routes, widgets already tied to the card's modules), next step, and the card link `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md`.
 
 ## Design decisions baked in
 

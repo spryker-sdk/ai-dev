@@ -11,11 +11,14 @@
  * vendor/<vendor>/<pkg>/src/<VendorNs>/Yves/<Module>/Theme/default/<rel>), so the call is gone.
  *
  * The scanner builds the effective template tree (project files, plus vendor files the project
- * does not shadow, plus the vendor blocks an extending project override keeps) and reports per
+ * does not shadow and that something reaches - see yves_scan_reachable_vendor_keys() - plus the
+ * vendor blocks an extending project override keeps; Twig comments are ignored) and reports per
  * subject:
  *   placed           a template the project renders calls it
- *   missing          vendor templates call it, but only in places the project replaced: each
- *                    vendor call site is a suggestion, with the project file that replaced it
+ *   missing          vendor templates call it, but only in places the project replaced or that
+ *                    no template the project uses includes: each vendor call site is a
+ *                    suggestion, with the project file that replaced it (overrideMode
+ *                    replaces/extends) or that dropped the include (overrideMode unreachable)
  *   not_registered   vendor templates call the widget, but no project dependency provider
  *                    registers its class: the backend step is missing, a placement renders nothing
  *   no_reference     no vendor template calls it: nothing to copy, the developer decides
@@ -205,13 +208,41 @@ function yves_scan_registered_classes(string $root, array $namespaces): array
 }
 
 /**
+ * Blank out Twig comments ({# ... #}, possibly spanning lines) so that nothing inside them is
+ * matched as a reference, an extends or a block tag. Newlines are kept, so line numbers stay valid.
+ */
+function yves_scan_strip_twig_comments(string $code): string
+{
+    return (string)preg_replace_callback('/\{#.*?#\}/s', fn (array $m): string => (string)preg_replace('/[^\n]/', ' ', $m[0]), $code);
+}
+
+/**
+ * Template key a component reference points at ("molecule:x@Module" => "Module/components/molecules/x/x.twig").
+ */
+function yves_scan_reference_key(string $name): ?string
+{
+    if (!preg_match('/^(atom|molecule|organism|template|view):([\w-]+)@(\w+)$/', $name, $m)) {
+        return null;
+    }
+    $directory = ['atom' => 'components/atoms', 'molecule' => 'components/molecules', 'organism' => 'components/organisms', 'template' => 'templates', 'view' => 'views'][$m[1]];
+
+    return $m[3] . '/' . $directory . '/' . $m[2] . '/' . $m[2] . '.twig';
+}
+
+/**
  * Parse a Twig file: references with their enclosing block chain, the blocks it defines, its extends target.
+ * Twig comments are ignored. "dynamic" lists "<tier>:<Module>" for atom/molecule/organism calls whose
+ * template name is a variable: they can reach any component of that tier in that module.
+ * "lines" are the original lines (for snippets); matching runs on the comment-free copy.
  *
- * @return array{references: list<array<string, mixed>>, blocks: array<string, bool>, extends: ?string, lines: list<string>}
+ * @return array{references: list<array<string, mixed>>, blocks: array<string, bool>, extends: ?string, lines: list<string>, dynamic: list<string>}
  */
 function yves_scan_parse_twig(string $file): array
 {
-    $lines = explode("\n", (string)file_get_contents($file));
+    $code = (string)file_get_contents($file);
+    $lines = explode("\n", $code);
+    $matchLines = explode("\n", yves_scan_strip_twig_comments($code));
+    $dynamic = [];
     $stack = [];
     $references = [];
     $blocks = [];
@@ -220,9 +251,19 @@ function yves_scan_parse_twig(string $file): array
     $extends = null;
     $referenceRe = '/\{%-?\s*widget\s+[\'"](\w+)[\'"]|(?:findWidget|widgetExists|widgetGlobalExists|widgetGlobal)\(\s*[\'"](\w+)[\'"]|\b(atom|molecule|organism|template|view)\(\s*[\'"]([\w-]+)[\'"]\s*,\s*[\'"]@?(?:[\w]+:)?(\w+)[\'"]/';
 
-    foreach ($lines as $index => $line) {
+    foreach ($matchLines as $index => $line) {
         if ($extends === null && preg_match('/\{%-?\s*extends\s+(.+?)\s*-?%\}/', $line, $m)) {
             $extends = $m[1];
+        }
+        // A variable as the template name with a literal (or omitted, i.e. ShopUi) module: atom(type),
+        // molecule(data.template, 'Module'). A variable module as well (the generic widget dispatch
+        // templates) names nothing the scanner could narrow down and is left out.
+        if (preg_match_all('/\b(atom|molecule|organism)\(\s*[a-zA-Z_][^,()]*(?:,\s*(?:[\'"]@?(?:\w+:)?(?<module>\w+)[\'"]|(?<variable>[a-zA-Z_])))?/', $line, $dynamicMatches, PREG_SET_ORDER)) {
+            foreach ($dynamicMatches as $dynamicMatch) {
+                if (($dynamicMatch['variable'] ?? '') === '') {
+                    $dynamic[] = $dynamicMatch[1] . ':' . (($dynamicMatch['module'] ?? '') !== '' ? $dynamicMatch['module'] : 'ShopUi');
+                }
+            }
         }
 
         if (preg_match_all($referenceRe, $line, $matches, PREG_SET_ORDER)) {
@@ -254,7 +295,7 @@ function yves_scan_parse_twig(string $file): array
             if (str_starts_with($tag[1], 'endblock')) {
                 $closed = array_pop($stack);
                 if ($closed !== null && !str_starts_with($closed, '~') && isset($blockStarts[$closed])) {
-                    $body = implode("\n", array_slice($lines, $blockStarts[$closed], $index - $blockStarts[$closed] + 1));
+                    $body = implode("\n", array_slice($matchLines, $blockStarts[$closed], $index - $blockStarts[$closed] + 1));
                     $blocks[$closed] = str_contains($body, 'parent()');
                 }
 
@@ -275,7 +316,7 @@ function yves_scan_parse_twig(string $file): array
         }
     }
 
-    return ['references' => $references, 'blocks' => $blocks, 'extends' => $extends, 'lines' => $lines];
+    return ['references' => $references, 'blocks' => $blocks, 'extends' => $extends, 'lines' => $lines, 'dynamic' => array_values(array_unique($dynamic))];
 }
 
 /**
@@ -311,6 +352,141 @@ function yves_scan_override_extends_vendor(?string $extends, string $key): bool
     [$module] = explode('/', $key, 2);
 
     return (bool)preg_match('/[\'"]@(?:Spryker\w*|Spryker):' . preg_quote($module, '/') . '[\'"]/', $extends);
+}
+
+/**
+ * Which vendor templates can actually be rendered, by template key.
+ *
+ * A vendor template renders when the project does not replace it (an override that extends the
+ * vendor template keeps it alive) and something reaches it:
+ *   - roots: vendor views/ and templates/ (controllers and widgets render them), and every vendor
+ *     template that nothing in any scanned template references (its consumer is unknown, so the
+ *     old behaviour holds: it counts, marked 'undecided');
+ *   - components (atoms, molecules, organisms): when a reachable template includes them through a
+ *     reference that survives the project's override of the including template, or the project
+ *     includes them itself;
+ *   - dynamic names (atom(type), molecule(data.template, 'Module')): a reachable template with one
+ *     reaches every component of that tier in that module, marked 'undecided'. Calls with a
+ *     variable module (the generic widget dispatch templates) are ignored.
+ * 'certain' means a chain of literal references from a root or a project template; 'undecided'
+ * means the chain starts at an unreferenced template or goes through a dynamic name.
+ *
+ * @param array<string, array<string, mixed>> $vendorParsed template key => parsed vendor template
+ * @param array<string, array<string, mixed>> $projectParsed template key => parsed project template
+ *
+ * @return array<string, string> template key => 'certain' | 'undecided' (keys of vendor templates not listed are unreachable)
+ */
+function yves_scan_reachable_vendor_keys(array $vendorParsed, array $projectParsed): array
+{
+    $alive = [];
+    foreach ($vendorParsed as $key => $parsed) {
+        $alive[$key] = !isset($projectParsed[$key]) || yves_scan_override_extends_vendor($projectParsed[$key]['extends'], $key);
+    }
+
+    $referenced = [];
+    foreach ([$vendorParsed, $projectParsed] as $templates) {
+        foreach ($templates as $key => $parsed) {
+            foreach ($parsed['references'] as $reference) {
+                $target = $reference['type'] === 'component' ? yves_scan_reference_key($reference['name']) : null;
+                if ($target !== null && $target !== $key) {
+                    $referenced[$target] = true;
+                }
+            }
+        }
+    }
+
+    $state = [];
+    $queue = [];
+    $mark = function (string $key, string $level) use (&$state, &$queue, $vendorParsed): void {
+        if (!isset($vendorParsed[$key]) || ($state[$key] ?? null) === 'certain' || ($state[$key] ?? null) === $level) {
+            return;
+        }
+        $state[$key] = $level;
+        $queue[] = $key;
+    };
+    $dynamicModules = [];
+    $expand = function (string $dynamic) use (&$dynamicModules, $mark, $vendorParsed): void {
+        if (isset($dynamicModules[$dynamic])) {
+            return;
+        }
+        $dynamicModules[$dynamic] = true;
+        [$tier, $module] = explode(':', $dynamic, 2);
+        $prefix = $module . '/components/' . $tier . 's/';
+        foreach (array_keys($vendorParsed) as $key) {
+            if (str_starts_with($key, $prefix)) {
+                $mark($key, 'undecided');
+            }
+        }
+    };
+
+    foreach (array_keys($vendorParsed) as $key) {
+        if (preg_match('#^\w+/(views|templates)/#', $key)) {
+            $mark($key, 'certain');
+        } elseif (!isset($referenced[$key])) {
+            $mark($key, 'undecided');
+        }
+    }
+    foreach ($projectParsed as $parsed) {
+        foreach ($parsed['references'] as $reference) {
+            $target = $reference['type'] === 'component' ? yves_scan_reference_key($reference['name']) : null;
+            if ($target !== null) {
+                $mark($target, 'certain');
+            }
+        }
+        foreach ($parsed['dynamic'] as $module) {
+            $expand($module);
+        }
+    }
+
+    while ($queue !== []) {
+        $key = array_shift($queue);
+        if (!$alive[$key]) {
+            continue;
+        }
+        $parsed = $vendorParsed[$key];
+        $override = $projectParsed[$key] ?? null;
+        foreach ($parsed['dynamic'] as $module) {
+            $expand($module);
+        }
+        foreach ($parsed['references'] as $reference) {
+            $target = $reference['type'] === 'component' ? yves_scan_reference_key($reference['name']) : null;
+            if ($target === null) {
+                continue;
+            }
+            if ($override === null || yves_scan_vendor_site_survives(true, $reference['blocks'], $override['blocks'])) {
+                $mark($target, $state[$key]);
+            }
+        }
+    }
+
+    return $state;
+}
+
+/**
+ * The project template that replaced the nearest ancestor of an unreachable vendor template: the
+ * file the developer would look at to see why the template is no longer included.
+ *
+ * @param array<string, list<string>> $referencers template key => keys of the vendor templates referencing it
+ * @param array<string, string> $projectTemplates template key => project file
+ */
+function yves_scan_replacing_project_file(string $key, array $referencers, array $projectTemplates): ?string
+{
+    $queue = [$key];
+    $seen = [$key => true];
+    while ($queue !== []) {
+        $current = array_shift($queue);
+        if (isset($projectTemplates[$current])) {
+            return $projectTemplates[$current];
+        }
+        foreach ($referencers[$current] ?? [] as $parent) {
+            if (!isset($seen[$parent])) {
+                $seen[$parent] = true;
+                $queue[] = $parent;
+            }
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -408,6 +584,7 @@ function yves_scan_run(string $root, array $filters): array
     }
 
     $effective = [];
+    $undecidedAt = [];
     $vendorSites = [];
     $vendorComponentReferences = [];
     $parsedProject = [];
@@ -417,32 +594,73 @@ function yves_scan_run(string $root, array $filters): array
             $effective[$reference['name']][] = substr($file, strlen($root) + 1) . ':' . $reference['line'];
         }
     }
+    $parsedVendor = [];
+    $referencers = [];
     foreach ($vendorTemplates as $key => $file) {
-        $parsed = yves_scan_parse_twig($file);
+        $parsedVendor[$key] = yves_scan_parse_twig($file);
+        foreach ($parsedVendor[$key]['references'] as $reference) {
+            $target = $reference['type'] === 'component' ? yves_scan_reference_key($reference['name']) : null;
+            if ($target !== null && $target !== $key) {
+                $referencers[$target][] = $key;
+            }
+        }
+    }
+    $reachable = yves_scan_reachable_vendor_keys($parsedVendor, $parsedProject);
+
+    foreach ($parsedVendor as $key => $parsed) {
+        $file = $vendorTemplates[$key];
         $override = $parsedProject[$key] ?? null;
         $overrideExtends = $override !== null && yves_scan_override_extends_vendor($override['extends'], $key);
+        $fromModule = explode('/', $key, 2)[0];
+        $level = $override === null || $overrideExtends ? ($reachable[$key] ?? null) : null;
         foreach ($parsed['references'] as $reference) {
             $relative = substr($file, strlen($root) + 1);
             if ($reference['type'] === 'component') {
-                $vendorComponentReferences[] = $reference + ['fromModule' => explode('/', $key, 2)[0]];
+                $vendorComponentReferences[] = $reference + ['fromModule' => $fromModule];
             }
-            if ($override === null || yves_scan_vendor_site_survives($overrideExtends, $reference['blocks'], $override['blocks'])) {
-                $effective[$reference['name']][] = $relative . ':' . $reference['line'];
+            $survives = $override === null || yves_scan_vendor_site_survives($overrideExtends, $reference['blocks'], $override['blocks']);
+            if ($survives && $level !== null) {
+                // A template nothing references (consumer unknown) counts as before, except for a
+                // component of its own module: that one is no placement of the module's feature.
+                $subjectModule = $reference['type'] === 'widget' ? ($widgetModules[$reference['name']] ?? '') : $reference['module'];
+                if ($level === 'certain') {
+                    $effective[$reference['name']][] = $relative . ':' . $reference['line'];
 
-                continue;
+                    continue;
+                }
+                if ($fromModule !== $subjectModule) {
+                    $effective[$reference['name']][] = $relative . ':' . $reference['line'];
+                    $undecidedAt[$reference['name']][] = $relative . ':' . $reference['line'];
+
+                    continue;
+                }
             }
             $snippet = yves_scan_snippet($parsed['lines'], $reference['line'], $reference['type']);
-            $sharedBlocks = array_values(array_filter($reference['blocks'], fn (string $block): bool => isset($override['blocks'][$block])));
-            $vendorSites[$reference['name']][] = [
+            $site = [
                 'vendorFile' => $relative,
                 'line' => $reference['line'],
                 'kind' => $reference['kind'],
                 'blocks' => $reference['blocks'],
                 'snippet' => $snippet,
                 'context' => yves_scan_context($parsed['lines'], $reference['line'], $snippet),
-                'projectFile' => substr($projectTemplates[$key], strlen($root) + 1),
-                'overrideMode' => $overrideExtends ? 'extends' : 'replaces',
-                'projectBlocks' => $sharedBlocks,
+            ];
+            if (!$survives) {
+                $sharedBlocks = array_values(array_filter($reference['blocks'], fn (string $block): bool => isset($override['blocks'][$block])));
+                $vendorSites[$reference['name']][] = $site + [
+                    'projectFile' => substr($projectTemplates[$key], strlen($root) + 1),
+                    'overrideMode' => $overrideExtends ? 'extends' : 'replaces',
+                    'projectBlocks' => $sharedBlocks,
+                ];
+
+                continue;
+            }
+            // The template is not replaced (or its block survives), but nothing the project renders
+            // includes it: the nearest replaced ancestor is the project file that dropped the include.
+            $replacing = yves_scan_replacing_project_file($key, $referencers, $projectTemplates);
+            $vendorSites[$reference['name']][] = $site + [
+                'projectFile' => $replacing !== null ? substr($replacing, strlen($root) + 1) : null,
+                'overrideMode' => 'unreachable',
+                'projectBlocks' => [],
             ];
         }
     }
@@ -505,6 +723,8 @@ function yves_scan_run(string $root, array $filters): array
             'registeredIn' => $registeredNames[$name] ?? null,
             'status' => $status,
             'placedAt' => $placed,
+            // Subset of placedAt whose template nothing references (reachability undecided).
+            'placedUndecided' => $undecidedAt[$name] ?? [],
             'suggestions' => $status === YVES_SCAN_STATUS_PLACED ? [] : $sites,
         ];
     }
@@ -604,11 +824,19 @@ function yves_scan_print(array $report): void
         }
         printf("\n[%s] %s %s (%s)\n", $item['status'], $item['type'], $item['name'], $item['package'] ?? $item['module']);
         foreach ($item['suggestions'] as $site) {
+            $where = sprintf('  vendor %s:%d%s', $site['vendorFile'], $site['line'], $site['blocks'] !== [] ? ' in block ' . implode(' > ', $site['blocks']) : '');
+            if ($site['overrideMode'] === 'unreachable') {
+                printf(
+                    "%s\n  -> not rendered: no template the project uses includes it%s\n",
+                    $where,
+                    $site['projectFile'] !== null ? '; the including template was replaced by ' . $site['projectFile'] : '',
+                );
+
+                continue;
+            }
             printf(
-                "  vendor %s:%d%s\n  -> project %s (%s%s)\n",
-                $site['vendorFile'],
-                $site['line'],
-                $site['blocks'] !== [] ? ' in block ' . implode(' > ', $site['blocks']) : '',
+                "%s\n  -> project %s (%s%s)\n",
+                $where,
                 $site['projectFile'],
                 $site['overrideMode'],
                 $site['projectBlocks'] !== [] ? '; project redefines ' . implode(', ', $site['projectBlocks']) : '',

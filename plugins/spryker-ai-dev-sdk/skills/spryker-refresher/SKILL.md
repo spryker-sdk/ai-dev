@@ -39,10 +39,13 @@ Your coding agent runs on the host, not in the container. Use these invocation f
 
 - Spryker console commands → `docker/sdk console <command>`
 - Composer → `docker/sdk cli composer <args>`
+- Glue console (`glue`, a separate binary from `console`) → `docker/sdk cli "vendor/bin/glue <command>"`; `docker/sdk console` does not reach it
+
+On macOS, `docker/sdk` needs a pseudo-TTY in a non-interactive shell (seen with `console list`). Wrap the call: `script -q /dev/null docker/sdk console list`.
 
 ## Touched-file → command mapping
 
-Commands below exist in this project (verified via `docker/sdk console list`). Install recipes under `config/install/*.yml` are authoritative for this project's ordering and flags — read them before improvising. The table just narrows the search.
+Commands below exist in this project (verified via `docker/sdk console list`). Install recipes under `config/install/*.yml` are authoritative for this project's ordering and flags — read them before improvising. The table just narrows the search. One exception: which Glue applications exist is resolved from the project, never taken from a recipe (see "Resolve the Glue applications first" below).
 
 Each row's trigger is independent. Apply every row whose trigger matches a file in your change set.
 
@@ -62,18 +65,31 @@ Each row's trigger is independent. Apply every row whose trigger matches a file 
 | Twig file **added, moved, or deleted** in Zed or MP (a new override) | `twig:cache:warmer` (the template path cache otherwise keeps resolving the old file). |
 | `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
 | Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
+| A module's `resources/api/{storefront,backend}/*.resource.yml` added or updated, or a `*RestApi` dependency provider changed, in a project that generates API Platform resources (`src/Generated/Api/<App>` exists) | Per resolved Glue application (see below): `glue api:generate` → `glue cache:clear` → `glue cache:warmup`. Without `api:generate` the new endpoints do not exist; the REST validation-cache row above does not cover them. |
+| `composer.lock` changed (modules added or updated; check `git diff composer.lock` for which) | The chain a new vendor module needs, each part only when the changed modules need it: `transfer:generate`; `propel:install` when a changed module ships `*.schema.xml` (this changes the DB schema - say so in the report); `transfer:entity:generate`; `composer dump-autoload`; `dev:ide-auto-completion:generate` (+ `vendor/bin/phpstan clear-result-cache`); `cache:class-resolver:build`; `glue api:generate` per resolved Glue application when a module ships API resources; `router:cache:warm-up*` when a module ships route providers; `frontend:project:install-dependencies` when a changed module's `package.json` changed. Order them with the steps in "Approach". |
 | `RouteProvider` plugin or route configuration file added / changed / deleted, or a **new Zed controller / action** (a 404 on the new URL) — NOT controller body edits | `router:cache:warm-up` (Zed) and/or the per-application variant — `router:cache:warm-up:backoffice`, `router:cache:warm-up:backend-gateway`, `router:cache:warm-up:merchant-portal` — for the applications the route belongs to |
 | OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
 | Glossary CSV changed (e.g. `data/import/**/glossary*.csv`) | `data:import:glossary` (Yves storefront translations only — does NOT cover Zed BO labels) |
 | Zed translator CSV changed (`src/<Namespace>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` (Zed BO labels — separate pipeline from glossary; verify the command via `docker/sdk console list`) |
 | Search schema / index-map file changed (project-layer JSON under `src/<Namespace>/Shared/Search/Schema/*.json`) | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` |
 | Data import CSV changed (entity-specific) — **rows ADDED only** | `data:import:<entity>` (verify the entity importer exists in `docker/sdk console list`). **Not for a changed VALUE on `product-price`, `product-price-schedule`, `discount-amount` or `cms-block`, and not for a removed row:** those importers look rows up by value, so a re-import duplicates the row or fails on a unique key, and no importer deletes. They follow `project-data`'s reset ladder (`boot-and-verify` §3b) — out of scope here, since this skill runs no `reset`; report the file and hand it over. |
+| Before `frontend:yves:build` (and `frontend:zed:build`, `frontend:mp:build`), after vendor modules were added or updated | Cheap check, no build: every dependency in the changed `vendor/spryker*/**/package.json` files is present in the project's `package-lock.json` / `node_modules` (`docker/sdk cli "ls -d /data/node_modules/<pkg>"`). A gap → run `frontend:project:install-dependencies` first; if the lock itself lacks the package, that needs a lock update the user must approve. |
+| **Failure signature:** `ERR_MODULE_NOT_FOUND: Cannot find package '<x>'` from `vendor/spryker-shop/shop-ui/.../FrontendBuilder` during a frontend build | Stale or incomplete frontend dependencies, not a code defect (seen: `style-dictionary`, required by `spryker-shop/shop-ui` but missing from the project's `package-lock.json`, also on upstream master). Report it as a **pre-existing environment issue**. Fix: `frontend:project:install-dependencies`; if the lock lacks the package, propose a lock update for the user to approve. Do not edit source. |
 | Publisher plugin / queue config changed | Queue workers need a manual restart — project-specific. Document in the report; don't auto-run. |
 | A data import or `publish:trigger-events` ran and the KV/search read model must catch up, in a **DMS (dynamic multi-store)** project | `docker/sdk cli "APPLICATION_STORE=<STORE> vendor/bin/console queue:worker:start --stop-when-empty"` — **once per store** (same `APPLICATION_STORE=<STORE>` prefix on `queue:task:start` and `publish:trigger-events`). In DMS these commands resolve the store from `APPLICATION_STORE`; the bare `docker/sdk console queue:worker:start --stop-when-empty` prints the env banner, exits 0 and processes **nothing**. Assert the drain, don't infer it: discover the broker container via `docker ps --format '{{.Names}}'` (filter for `broker`; it is `<namespace>_broker_1` — never hardcode `spryker_broker_1`) and confirm `docker exec <broker> rabbitmqctl list_queues -p /<project vhost> name messages` fell to 0. **Signature:** worker exits immediately with only the env banner while the queues stay full → missing `APPLICATION_STORE`, not a broken publisher. |
 | BO showing stale template after a clean refresh (rare) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
 | **Stale Yves Twig cache** — a template fix "does nothing": the `.twig` is correct on disk AND in the container (`docker/sdk cli "cat /data/<path>"` shows the new markup), yet the rendered page is the old one | `docker/sdk cli "rm -rf src/Generated/Yves/Twig/codeBucket"` (+ `twig:cache:warmer` for a new override file). Clear it BEFORE concluding "the change had no effect" and writing a second fix — `up --assets` does not clear it. Never `data/cache/Yves/<env>` (the DI container). |
 
 If a command not in the table seems needed, verify it exists in `docker/sdk console list` first.
+
+### Resolve the Glue applications first
+
+Do not take the Glue applications from an install recipe: `config/install/docker.yml` lists steps for `GLUE_STOREFRONT`, `GLUE_BACKEND` and the default application regardless of what the project runs. In the demo shop `GLUE_APPLICATION=GLUE_STOREFRONT ...` makes no sense - `public/GlueStorefront/` holds only `assets/` and no `index.php`, and the deploy file declares only the `Glue` and `GlueBackend` entry points; the storefront API runs in the default `Glue` application.
+
+1. List `public/Glue*/index.php`.
+2. Cross-check `entry-point: Glue*` in the active deploy file.
+3. Run plain `docker/sdk cli "vendor/bin/glue <command>"` for `public/Glue`, `docker/sdk cli "GLUE_APPLICATION=GLUE_BACKEND vendor/bin/glue <command>"` for `public/GlueBackend`, and `GLUE_APPLICATION=GLUE_STOREFRONT` only when `public/GlueStorefront/index.php` exists and an entry point uses it.
+4. Report a recipe step for an application that does not exist as `skipped (no such Glue application)`.
 
 ## Approach
 
@@ -84,16 +100,16 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 3. **Order the resulting commands** (this matches the pattern in `config/install/development.yml` and similar recipes — clear-then-codegen-then-build-then-resolve-then-import-then-frontend):
 
    1. **Cache removes** — `cache:empty-all`, `navigation:cache:remove`, `rest-api:remove-validation-cache`, `search:source-map:remove`, `docker/sdk cli "rm -rf src/Generated/Yves/Twig/codeBucket"` (Twig — never `data/cache/Yves/<env>`, which is the DI container). Clear old cached state before new state is written.
-   2. **Codegen** — `transfer:generate`, `propel:install`.
-   3. **Autoload** — `composer dumpautoload --apcu`.
+   2. **Codegen** — `transfer:generate`, `propel:install`, then `transfer:entity:generate` (after `propel:install`), then `glue api:generate` per resolved Glue application (after `transfer:generate`).
+   3. **Autoload** — `composer dumpautoload --apcu` (`composer dump-autoload` after a `composer.lock` change).
    4. **IDE/locator stubs** — `dev:ide-auto-completion:generate`. After autoload (the stub generator reads the class map), before the class-resolver build.
-   5. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`.
+   5. **Cache builds / warmups** — `twig:cache:warmer`, `navigation:build-cache`, `rest-api:build-request-validation-cache`, `search:setup:source-map`, `search:setup:sources`, `oms:process-cache:warm-up`, `router:cache:warm-up*`, `glue cache:clear` then `glue cache:warmup` per resolved Glue application (after `glue api:generate`).
    6. **Class resolver build** — `cache:class-resolver:build`. Runs after the class layout AND caches are in their final state.
    7. **Data imports** — `data:import:glossary`, `data:import:<entity>`. Spryker translations are looked up at runtime, so glossary import can run after twig warmup safely. In a DMS project, follow an entity import with the **per-store** drain from the table (`APPLICATION_STORE=<STORE> … queue:worker:start --stop-when-empty`) and the broker depth check — the bare worker is a silent no-op there.
-   8. **Frontend builds** — `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
+   8. **Frontend builds** — `frontend:project:install-dependencies` first when a changed module's `package.json` changed (after the dependency-drift check from the table), then `frontend:yves:build`, `frontend:zed:build`, `frontend:mp:build`. Last.
    9. **Stale-analysis cache clear** — `vendor/bin/phpstan clear-result-cache` (via `docker/sdk cli`), whenever step 4 ran. Last, so no later step repopulates a stale entry.
 
-   Each step runs only if its commands appeared in your matched set from step 2. Install recipes (`config/install/*.yml`) are authoritative — if a recipe orders commands differently for this project, defer to the recipe.
+   Each step runs only if its commands appeared in your matched set from step 2. Install recipes (`config/install/*.yml`) are authoritative — if a recipe orders commands differently for this project, defer to the recipe. Exception: the recipe never decides which Glue applications exist; resolve them from `public/Glue*/index.php` and the deploy file.
 
 4. **Run each command separately via Bash** so you capture exit code and tail of output per step.
 
@@ -152,6 +168,6 @@ If a command not in the table seems needed, verify it exists in `docker/sdk cons
 - Do not skip dependents after a failure. Stop, report, let the caller decide.
 - Do not run the entire install chain when only a subset is needed. Be surgical.
 - Do not run commands across multiple stores / regions without the caller specifying which one.
-- Do not skip the install-recipe read. The mapping in this prompt is a starting point; the recipes are the source of truth for this project's command ordering and flags.
+- Do not skip the install-recipe read. The mapping in this prompt is a starting point; the recipes are the source of truth for this project's command ordering and flags - except for the set of Glue applications, which comes from `public/Glue*/index.php` and the deploy file. Do not run a recipe's `GLUE_APPLICATION=GLUE_STOREFRONT` step when that application has no `index.php`.
 - Do not prepend `cd /absolute/path && ...` to any `Bash` command. The harness already runs every `Bash` invocation in the project root — `cd` shifts the command to a different allowlist pattern and causes permission prompts.
 - **Do not omit `cache:class-resolver:build` after any `.php` change under a project namespace directory in `src/`.** Without it, the override file lands in the project layer, but Spryker keeps resolving to the vendor class because the resolver map wasn't rebuilt. Self-correction signal: if your file list contains any `src/<Namespace>/**/*.php` (new or edited) and your command plan doesn't include `docker/sdk console cache:class-resolver:build`, stop and add it before reporting.
