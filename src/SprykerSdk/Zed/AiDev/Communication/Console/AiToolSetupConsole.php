@@ -75,13 +75,25 @@ class AiToolSetupConsole extends Console
     protected function resolveToolSelection(array $detectionMap, string $toolRequiringConfirmation): ?string
     {
         $detected = $this->getFactory()->createAiToolDetector()->detect($detectionMap);
-        $tools = array_values($detectionMap);
+        $tools = $this->getSelectableTools($detectionMap);
 
         if ($detected === null || !$this->isDetectedToolAccepted($detected, $toolRequiringConfirmation)) {
             return $this->select('Select your AI tool:', $tools, $tools[0]);
         }
 
         return $detected;
+    }
+
+    /**
+     * Several indicator paths can detect the same tool, so each tool is offered once.
+     *
+     * @param array<string, string> $detectionMap
+     *
+     * @return list<string>
+     */
+    protected function getSelectableTools(array $detectionMap): array
+    {
+        return array_values(array_unique($detectionMap));
     }
 
     protected function isDetectedToolAccepted(string $detected, string $toolRequiringConfirmation): bool
