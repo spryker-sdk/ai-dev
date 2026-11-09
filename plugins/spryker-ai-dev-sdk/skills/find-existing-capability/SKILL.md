@@ -37,7 +37,7 @@ Match tools by **tool name** (server names vary by install; some clients namespa
 | `getSprykerModules` | Which modules the project has, and the exact module names. |
 | `searchAlgoliaDocumentation` | Official docs search, for the "no relevant hit" cross-check. |
 
-A tool result of `{"error": "..."}` is a failure, not an empty result: report it and use the fallback below.
+A tool error (for example "Unknown capability", "The query needs at least one term", or the map cannot be loaded) is a failure, not an empty result: report its message and use the fallback below.
 
 **If the capability tools are not available**, first tell the two causes apart. The server is **not registered** when no `ai-dev:mcp-server` entry exists in the project's MCP config files (`.mcp.json`, `.vscode/mcp.json`) and the harness's MCP server list does not show it. It is **registered but not connected** when an entry exists and the tools are still missing.
 

@@ -9,6 +9,7 @@ declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Communication\Plugins\AiDevMcpTools;
 
+use Mcp\Exception\ToolCallException;
 use Spryker\Zed\Kernel\Communication\AbstractPlugin;
 use SprykerSdk\Zed\AiDev\Dependency\AiDevMcpToolPluginInterface;
 
@@ -34,11 +35,18 @@ class SearchSprykerCapabilitiesAiDevMcpToolPlugin extends AbstractPlugin impleme
             . 'Open a hit with getSprykerCapability for its extension points, configuration and install guide. No hit is not proof of absence.';
     }
 
+    /**
+     * @throws \Mcp\Exception\ToolCallException
+     */
     public function searchSprykerCapabilities(string $query, int $limit = 10): string
     {
         $result = $this->getBusinessFactory()
             ->createCapabilityMapFinder()
             ->searchCapabilities($query, $limit);
+
+        if (isset($result['error'])) {
+            throw new ToolCallException($result['error']);
+        }
 
         return (string)json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
