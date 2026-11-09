@@ -130,6 +130,7 @@ PHP `src/{ProjectNamespace}/Yves/{Module}/Widget/{Name}Widget.php` + `Theme/defa
 `{Module}Factory` / `{Module}DependencyProvider` when it calls `getFactory()`. Register in
 `src/{ProjectNamespace}/Yves/ShopApplication/ShopApplicationDependencyProvider::getGlobalWidgets()` — unregistered
 widgets render nothing. The tag needs `{% endwidget %}`. Details: `references/components.md`.
+A registered core widget that does not show usually lost its call in a project override of the vendor template that places it: `yves-twig-integration` finds those places and puts the call back in the project's design.
 
 ## Build and verify
 

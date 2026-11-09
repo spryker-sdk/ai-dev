@@ -9,6 +9,8 @@ focused work to the `spryker-*` subagents and skills at the points the workflow 
 are fixed up front — a quality bar (PoC or MVP) and which phases run — and user-facing interaction is
 deliberately compressed into two gates: one consolidated planning round, and the commit.
 
+Work that adds a new capability passes the reuse gate first (`find-existing-capability`): a capability Spryker already ships is extended, and a feature that is not installed is installed through `spryker-feature-install` before any custom code is written.
+
 It **never auto-commits**, never pushes, and never works on the user's current branch.
 
 ## When it triggers

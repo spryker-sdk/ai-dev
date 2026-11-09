@@ -168,6 +168,8 @@ A short ask ("hide this label") still gets a one-line intake before any edit —
 
 ## Step 3: Plan
 
+**Reuse gate - before the solution design, when the work adds a new capability rather than changing an existing one** (a new module, feature or integration area; not a tweak to a behaviour you can already name): run the `find-existing-capability` skill (`/find-existing-capability`, or `/spryker-ai-dev-sdk:find-existing-capability` on a plugin install) on the PRD's capabilities, or reuse its Reuse decision if the PRD step already produced one. A shipped capability is extended, not rebuilt: **installed** means the plan extends it through the card's extension points; **partial** means the plan builds only the gap; **not installed** or **partially installed** means the plan starts with installing the feature through `spryker-feature-install` (after the user agrees), and custom code comes after the feature is in. Only "no relevant hit" after the cross-check lets the plan build from scratch, and the plan says that the check ran. Record the verdict in `decisions.md`.
+
 **Before planning, always invoke `spryker-feature-expert`** for every Spryker domain the PRD touches. The division of labour is **discovery vs confirmation**:
 
 - **Discovery is the expert's, never yours.** *Which* mechanism, *which* extension point, *how does feature X work*, *which fields does this transfer have*, *which modules exist* — sweeping questions where the expert's synthesis beats raw grepping (`getTransferStructureByName`, `getInterfaceMethodsByNamespace`, `getSprykerModules`, docs). If the expert's first answer isn't enough, ask a more specific follow-up — don't fall back to exploratory grep of `vendor/spryker/`.

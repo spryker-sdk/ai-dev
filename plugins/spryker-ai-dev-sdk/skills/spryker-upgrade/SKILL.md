@@ -42,7 +42,7 @@ These five rules apply to every phase and lane; § Hard rules at the end does no
    exclude, or a detector's exclude list — none of which is ever part of an upgrade's deliverable.
 
 **Plan tracking is mandatory.** At the end of Phase 0, create one `TaskCreate` task each for Phase
-0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.2, 6.5, 6.8 and 7,
+0.5, 1, 1.2, 1.5, 2, 3, Lane 0, Lanes 1–4, Lane 5 (if reached), Phase 4.9, 5, 5.5, 6, 6.1, 6.2, 6.5, 6.8 and 7,
 and drive them with `TaskUpdate`: `in_progress` on entry, `completed` only once its checks are green; a
 detector re-run that reopens a lane reopens its task. `TaskList` survives compaction; nothing else does.
 
@@ -101,6 +101,8 @@ sniffer and the tests in the container (`script -q /dev/null docker/sdk cli <cmd
 scripts run on host PHP. Never modify `vendor/`. Read
 [references/environment.md](references/environment.md) before the first boot in Phase 0, in Phase
 4.9, and when a command behaves differently in the container than on the host.
+Before the first `composer` command, run the shared environment preflight in
+[../spryker-feature-install/references/environment-preflight.md](../spryker-feature-install/references/environment-preflight.md).
 
 **Coverage matrix.** Every known failure mode, what detects it and which phase resolves it is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Read it when something turns up that
@@ -127,6 +129,7 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    php $UP/check-test-coverage.php || true     # baseline: is the override surface verifiable at all?
    php $UP/check-vendor-class-replacement.php || true  # baseline: classes declared in vendor namespaces
    php $UP/check-constant-overrides.php --snapshot     # core values under project constants
+   php $YI/yves-integration-scan.php snapshot  # storefront widgets the project already does not render (Phase 6.1)
    cp composer.lock .spryker-upgrade/state/composer.lock.before
    cp $UP/storage-search-counts.php .spryker-upgrade/state/   # publish baseline: drain the queues first
    script -q /dev/null docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
@@ -470,7 +473,27 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
 
 Fetch each description (`composer show <pkg>` + release notes) and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait)
 (multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
-accepted feature follows its integration guide, in its own commit. REMOVED packages: explain each.
+accepted feature follows its integration guide, in its own commit (the `spryker-feature-install` skill
+runs a guide end to end, including its optional storefront placement step). REMOVED packages: explain each.
+
+## Phase 6.1 — Storefront placement (optional, suggested)
+
+Lane 2 merges vendor changes into templates the project shadows, but only into files whose vendor
+version changed. Integration guides never place widgets in Twig. So after the lanes and Phase 6, the
+storefront can still miss widgets the upgrade added: a vendor template gained a widget call in a block
+the project replaced, or a newly registered widget is called only in vendor templates the project
+overrides. Skip this phase when the project has no Yves storefront.
+
+1. `php $YI/yves-integration-scan.php diff` (against the Phase 0 snapshot). It lists only the gaps that
+   are new since Phase 0; the omissions the project lived with before stay out.
+2. Present its suggestion table to the developer: place now / defer / never, per item. This is a
+   suggestion, not damage: a project may leave a new widget out on purpose.
+3. For the picked items, follow the `yves-twig-integration` skill (vendor reference for what and where,
+   the project's design for how), in its own commit; render each changed page.
+4. Unpicked and deferred items go to the handover report (3.5), with their vendor reference.
+
+`$YI` is `<skill-dir>/../yves-twig-integration/scripts/` (the sibling skill shipped in the same plugin),
+substituted inline like `$UP`; it writes to `<project>/.ai-dev/yves-integration/`.
 
 For the handover report, also list what Spryker released after the starting release, up to the target,
 that the project could adopt — from the release notes (`spryker-docs-research`), not only the lock
