@@ -2,159 +2,269 @@
 name: spryker-feature-install
 description: >
   Install a Spryker feature into the project end to end, from a capability card or a feature name:
-  resolve the feature metapackage and its required features, confirm scope with the user, fetch the
-  official install guide, `composer require`, apply the guide's integration steps in the project layer
-  only (config, dependency-provider plugin wiring, transfers, schema, navigation, routes, glossary,
-  data import), run codegen and setup, verify, and report done / skipped steps. Use when the user says
   "install the X feature", "add spryker-feature/x", "integrate feature X", "install the X Glue API",
-  or after `find-existing-capability` proposed installing a feature instead of building one. Always
-  confirms before changing anything; never edits vendor/ or generated code; never auto-commits.
+  after find-existing-capability proposed an install, or a feature that spryker-upgrade Phase 6
+  accepted. Resolves the feature, its required features and the release it needs (moving only the
+  modules it needs); parses the official install guide into a checklist with one row per step;
+  reconciles every row with the reference demo shop (plugin subset and order, merged config, files
+  the guide does not name); applies it in the project layer one guide section at a time; suggests
+  storefront placement; verifies each guide Verification block; and finds and proves the release
+  steps existing environments need (imports, republish, environment variables). Always confirms
+  before changing anything; never edits vendor/ or generated code; never auto-commits.
 ---
 
 # Spryker Feature Install
 
-Take a Spryker feature from "not in the project" to "installed, wired and verified", following the **official install guide** for that feature. The goal is the documented integration, not a lookalike: a feature that ships should be installed, then extended, not rebuilt.
+Take a Spryker feature from "not in the project" to "installed, wired, verified and releasable".
+The goal is the documented integration, not a lookalike: a feature that ships is installed, then
+extended, not rebuilt. Typical entry: `find-existing-capability` returned `not_installed` or
+`partially_installed` and the developer agreed to install.
 
-Typical entry: `find-existing-capability` returned `not_installed` or `partially_installed` for a capability and the user agreed to install it. Also used standalone ("install the Cart feature", "add `spryker-feature/wishlist`").
+## Non-negotiables — read these before Phase 0, re-read them on every compaction
 
-Delegate with your harness's subagent tool; invoke skills by slash command (`/spryker-refresher`, or `/spryker-ai-dev-sdk:spryker-refresher` on a plugin install). **Agent names carry the plugin prefix on a plugin install and the separator differs by harness** (`spryker-ai-dev-sdk:spryker-verifier` or `spryker-ai-dev-sdk/spryker-verifier`); try the bare name only on a setup install, and if it does not resolve retry with your harness's prefixed form (see `../spryker-customization/references/delegation.md`).
+1. **Nothing changes before the developer confirms** the feature, the packages, the release, the
+   optional integrations and the branch (gate #1, Phase 3).
+2. **One feature per run, at the release the feature needs.** A feature that exists at the
+   project's release installs at that release. A feature of a later release may move the modules it
+   needs; it may not move another `spryker-feature/*` package — that is a release upgrade, and the
+   run stops and offers `spryker-upgrade` (Phase 1).
+   *Failure signature:* a `composer require` that moves another `spryker-feature/*` package.
+3. **Every guide step is a checklist row, and every row gets a decision.** The guide is never
+   followed from the prose. A step the parser cannot classify is a row of kind `unknown`, decided by
+   hand. `check-checklist.php` blocks the install while a row has no decision, and the report while a
+   row is open. *Failure signature:* an edit to a project file that no checklist row names.
+4. **Merge into existing config and plugin stacks; never overwrite them.** The guide shows values
+   for a fresh project. A `...` in a guide snippet always means merge.
+   *Failure signature:* a diff line that removes a project value the guide does not name.
+5. **The reference demo shop decides the plugin subset and order; the project decides its existing
+   config.** A guide plugin that the reference does not wire is a question for the developer. A
+   plugin of a capability the project does not have (merchants, company accounts, marketplace
+   offers) is not a step.
+6. **Data rows go to `project-data`.** This skill writes no row in `data/import/**`.
+7. **A command the guide runs locally is a release step until a recipe covers it** (Phase 7).
+8. **Project layer only, and no shortcuts:** never `vendor/`, `src/Generated/`, `src/Orm/` or a
+   hand-edited `composer.lock`; never `dev-*` constraints or `--ignore-platform-reqs`; never a
+   suppression; never `docker/sdk reset` or `clean-data`; never a commit or push without the
+   developer's yes.
+
+**Plan tracking is mandatory.** After Phase 0, create one task per phase in your harness's task
+list, and keep the phase table in `$STATE/state.md`: it survives a compaction.
+
+**Locations.** `$FI` is `<skill-dir>/scripts`, `$UP` is `<skill-dir>/../spryker-upgrade/scripts`,
+`$YI` is `<skill-dir>/../yves-twig-integration/scripts`. `<skill-dir>` is the path reported as
+`Base directory for this skill:` when this skill loaded. `$STATE` is
+`.ai-dev/feature-install/<feature-slug>/` in the project. Substitute each one inline as a literal
+path; never set a shell variable and never `cd`. Run every script from the project root.
+
+**Delegation.** Invoke skills by slash command (`/spryker-refresher`, or
+`/spryker-ai-dev-sdk:spryker-refresher` on a plugin install). Agent names carry the plugin prefix
+on a plugin install, and the separator differs by harness (see
+`../spryker-customization/references/delegation.md`). Siblings: `find-existing-capability`,
+`spryker-docs-research`, `spryker-refresher`, `project-data`, `yves-twig-integration`,
+`boot-and-verify`, `spryker-upgrade`; agents `spryker-verifier` and `spryker-issue-diagnoser`.
 
 ## Tools
 
-Match tools by **tool name** (server names vary by install; some clients namespace them `mcp__<server>__<tool>`).
+Match tools by **tool name** (server names vary by install; some clients namespace them
+`mcp__<server>__<tool>`).
 
 | Tool | Use |
 |---|---|
-| `searchSprykerCapabilities`, `getSprykerCapability` | Resolve the feature and read the card's Install section, modules and `installStatus` (computed from `composer.lock`). |
-| `searchAlgoliaDocumentation` | Find the install guide pages; returns `github_api_url`s for the markdown. |
-| `getSprykerModules`, `getSprykerModuleMap` | What the project has now; exact plugin interfaces and stack positions. |
-| `getTransferStructureByName` | Check transfer fields before editing a transfer XML. |
+| `searchSprykerCapabilities`, `getSprykerCapability` | Resolve the feature; the card's Install section, modules and `installStatus` (from `composer.lock`). |
+| `searchAlgoliaDocumentation` | Find install guide pages; `github_api_url` is the markdown. |
+| `getSprykerModules`, `getSprykerModuleMap` | What the project has now; exact plugin interfaces. |
+| `getTransferStructureByName` | Transfer fields before a transfer XML edit. |
 
-If the capability tools are not connected, start the MCP server and ask for a reload the way `find-existing-capability` describes; after two failed reconnects take the feature name and guide URL from the user, or fetch `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md` with the web fetch tool and compare its packages with `composer.lock` by hand, and say that the install status is then unverified.
+If the capability tools are not connected, start the MCP server and ask for a reload as
+`find-existing-capability` describes. After two failed reconnects, take the feature name and guide
+URL from the developer, or fetch `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md`
+and compare its packages with `composer.lock` by hand; the install status is then unverified.
 
-## Step 0 - Environment preflight
+## Phase 0 — Preflight and baselines
 
-The install needs a running, in-sync stack (composer in the container, codegen, `propel:install`, verification), and the planning steps below do not. Run the checks in [references/environment-preflight.md](references/environment-preflight.md) before Step 2, so a stack that is down, a container that does not see the host files, a `vendor/` behind `composer.lock` or a broken frontend dependency tree is reported as a **pre-existing environment issue** and not mistaken for a feature failure. Reading the card and the guide needs no stack; skip the boot for a plan-only run.
+1. Run the checks in [references/environment-preflight.md](references/environment-preflight.md). A
+   stack that is down, a container that does not see the host files, a `vendor/` behind
+   `composer.lock` or a broken frontend dependency tree is a **pre-existing environment issue**, not
+   a feature failure. A plan-only run (Phases 1–4) needs no stack.
+2. Create `$STATE/state.md` with the phase table (Phase, Status, Evidence). Copy `composer.lock` to
+   `$STATE/composer.lock.before`.
+3. Before the install (Phase 5), record the baselines. The `$UP` scripts write into the directory
+   that `SPRYKER_UPGRADE_STATE_DIR` names:
+   ```bash
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-plugin-usage.php || true
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-config-constants.php || true
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-dead-overrides.php snapshot
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/twig-shadow-map.php snapshot
+   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee $STATE/baseline/phpstan.txt
+   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee $STATE/baseline/sniff.txt
+   script -q /dev/null docker/sdk testing codecept run --no-exit 2>&1 | tee $STATE/baseline/codecept.txt
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline SPRYKER_BACKOFFICE_USER=<user> SPRYKER_BACKOFFICE_PASSWORD=<password> php $UP/backoffice-smoke.php --url <zed base url> --baseline
+   ```
+   For the storage and search counts, copy `$UP/storage-search-counts.php` into `$STATE/baseline/`
+   and run it in the container with `--snapshot before`. A red baseline is not this run's damage:
+   record it in `state.md`.
 
-## Step 1 - Resolve the feature
+## Phase 1 — Resolve the feature and its release
 
-1. From a card: `getSprykerCapability(slug)`. From a name: `searchSprykerCapabilities` with the name and its synonyms, then open the best card. Read the **Install** section; it lists:
-   - `Feature:` the metapackage (`spryker-feature/<name>`) and its docs install guide URL, or "no install guide found" - then search the docs with `searchAlgoliaDocumentation` ("install the <name> feature") and, without a guide, tell the user the integration steps come from the module code and the feature's other guides, not from an official guide;
-   - `Requires features:` other features that must be installed first;
-   - `Glue API:` the guide for the Glue API integration, when one exists;
-   - `Storefront API (when the project exposes it):` the `*-rest-api` / `*-storefront-api` packages.
-2. Read `installStatus`, `features[]` and `missingPackages`. `installed` means there is nothing to install: say so and hand back to `find-existing-capability` (extend it). `partially_installed` means install only what is missing.
-3. **Required features first.** Check each feature in `Requires features:` against `composer.lock` / `getSprykerModules`. For each one that is missing, resolve its card the same way and offer to install it first (recursively). Spryker Core and other base features are usually present already; verify, do not assume.
+1. **The feature.** From a card: `getSprykerCapability(slug)`. From a name: `searchSprykerCapabilities`
+   with the name and its synonyms, then open the best card. Its Install section lists the
+   `spryker-feature/<name>` package and guide URL, `Requires features:`, the Glue API guide and the
+   Storefront API packages. A card with several features offers alternatives: take the one that
+   matches the project.
+2. **What is there.** `installed` → nothing to install: hand back to `find-existing-capability`
+   (extend it). `partially_installed` → install only `missingPackages`.
+3. **Required features first.** Check each one against `composer.lock`. Each one that is missing is
+   its own run, before this one; offer it.
+4. **The project type** in `state.md`: B2B or B2C, with or without marketplace. Phase 4 uses it.
+5. **The install release.** Read the project's release (`spryker-feature/spryker-core` in
+   `composer.lock`) and the releases of the feature (`composer show -a spryker-feature/<x>`):
+   - The feature exists at the project's release → install at that release.
+   - The feature first exists in a later release → dry-run in the container:
+     `composer require spryker-feature/<x>:^<install release> -W --dry-run`. A conflict that names
+     a `spryker/*` module and a minimum version → add `spryker/<module>:^<version>` to the same
+     `require` and dry-run again, until it resolves. Each major bump among the moved modules needs
+     its migration guide, as `spryker-upgrade` Lane 0 describes.
+   - Stop and offer `spryker-upgrade` (`/spryker-upgrade`, or `/spryker-ai-dev-sdk:spryker-upgrade`
+     on a plugin install) when another `spryker-feature/*` package must move, a conflict names a
+     package that is not a `spryker/*` module (a root pin of a Symfony or other third-party
+     package), the same package comes back in a later round, or nothing resolves. Name the
+     blocking packages from the composer output.
+   Record the install release and the added modules in `state.md`.
 
-## Step 2 - Confirm before changing anything
+## Phase 2 — Collect the sources
 
-Present one confirmation block and wait for the user's answer. It carries:
+Read [references/sources.md](references/sources.md) on entry. Put everything in `$STATE/sources/`:
+the install guide (the docs page and the include it wraps, plus `_config.yml`), every prerequisite
+and linked guide, the `spryker-feature/<x>` `composer.json` at the install release, the reference
+demo shop at that release tag, and its history as a bare clone. Record in `state.md` each source that
+was not found.
 
-- the feature, the packages `composer require` will add, and any required features that would be installed first;
-- the **version constraint**: match the project's other `spryker-feature/*` constraints and release line in `composer.json` (for example the same `^202xxx.x` style); do not introduce a different style. For module packages the project pins as `^x.y.z` (the `*-rest-api` entries, for example), the explicit constraint is the resolved version, see Step 4;
-- the **optional integrations** the user wants: Glue API, Storefront API, Back Office, data import with demo data. Default to the project's existing surfaces (an API the project does not expose is not installed);
-- that the **storefront placement** (Step 6b) comes after the backend steps as a suggestion list: the guide registers the feature's widgets but does not place them in the project's Twig templates, and nothing is placed unless the developer picks it then;
-- which guide will be followed and its version line;
-- the **environment**: when the preflight found the stack down or not bootstrapped, propose the bootstrap here (the deploy file, `docker/sdk boot <deploy file>` plus `docker/sdk start` or `docker/sdk up`, port clashes with other running stacks; see the reference) and list any pre-existing environment issue it found; never `reset`;
-- the branch: work on a dedicated branch (`ai-feature/<slug>` from `HEAD`, as `spryker-customization` does with `ai-customize/<slug>`) when `git status` is clean; if it is not, ask first.
+## Phase 3 — Checklist and confirmation (developer gate #1)
 
-No `composer require` and no edit before this answer.
+1. Parse the guide, then append each prerequisite and linked guide:
+   ```bash
+   php $FI/parse-integration-guide.php $STATE/sources/docs/<path of the docs page> --docs-root $STATE/sources/docs --release <install release> --out $STATE/checklist.json
+   php $FI/parse-integration-guide.php <next guide> --docs-root $STATE/sources/docs --out $STATE/checklist.json --append
+   ```
+   Exit 1: open each `unknown` row at its `lines` and set its `kind` by hand.
+2. `php $FI/check-feature-installed.php $STATE/checklist.json --mark` — modules already installed,
+   and wiring rows already present (`already-present`).
+3. Give every data row its `data_class` ([references/data-classes.md](references/data-classes.md)).
+4. **Present one confirmation block and wait for the answer** (your harness's question tool, else
+   in chat). It carries:
+   - the feature, the packages `composer require` adds, the install release, the modules Phase 1
+     added, and required features to install first;
+   - the version constraint in the project's style (`^<release>` for features, `^x.y.z` for
+     modules);
+   - the optional blocks, one choice each: every `optional-scenario:*` tag, the Glue, Storefront and
+     Backend APIs (default: only the APIs the project already exposes), and demo data;
+   - that storefront placement comes after the backend steps, as a suggestion list;
+   - the environment: a bootstrap when the preflight found the stack down; any pre-existing issue;
+   - the branch: `ai-feature/<slug>` from `HEAD` when `git status` is clean; else ask first;
+   - commits: one per guide section (recommended), or none until the report.
 
-## Step 3 - Fetch the install guide
+   Set `skip:<reason>` on every row of a block the developer did not choose.
 
-The Install section gives a docs URL (usually `/latest/` or a versioned path). Read the page by:
+## Phase 4 — Reconcile
 
-- the `spryker-docs-research` skill, or
-- `searchAlgoliaDocumentation` and the markdown at its `github_api_url` (the docs markdown lives in `github.com/spryker/spryker-docs`), or
-- the web fetch tool on the page itself.
+Read [references/reconcile.md](references/reconcile.md) on entry.
 
-**Version match.** When the URL is `/latest/` and the project's release line (from `composer.json` and the installed `spryker/*` versions) is older than the docs' current one, prefer the guide for the project's line if the docs site offers it; if you cannot tell which line a step belongs to, say so and ask rather than apply a step that may not exist in the project's modules. Treat the guide as the source of truth for **steps and order**, but docs are not trusted for exact identifier spellings: confirm class, constant and transfer names against the installed packages in `vendor/` (read-only) or `getSprykerModuleMap` before writing them. Check every plugin the guide names for `@deprecated` in its vendor class: use the named replacement, skip a deprecated plugin that has none, and record each case in the checklist.
+1. Add the files the reference changed for the feature that no row names:
+   ```bash
+   php $FI/find-feature-change.php --repo $STATE/sources/reference-history.git --package spryker-feature/<x> --checklist $STATE/checklist.json --add-rows
+   ```
+   Exit 1: record that no reference change was found; the guide rows are then the only source.
+2. For each row without a decision, compare it with the reference demo shop at the same place. Set
+   `reference` (`same`, `differs`, `absent`, with the path) and `decision` (`apply-guide`,
+   `apply-reference`, `merge`, `already-present`, `skip:<reason>`) by the reconcile rules.
+3. Gate: `php $FI/check-checklist.php $STATE/checklist.json --phase decide` exits 0.
 
-**No guide, or a guide that assumes a base feature that has none** (the marketplace guide assumes the base wishlist wiring; the card says "no install guide found" for the base feature): take the project-layer wiring from a reference project that ships the feature, the suite or the demo shop of the same release line, read through `gh api` or raw GitHub, or from a project on disk. Verify every class against `vendor/`, and record the reference source in the checklist.
+## Phase 5 — Install
 
-Turn the guide into a **checklist** of its steps (install, integrate, verify), grouped as the guide groups them. This checklist is the run's state: every step ends `done` or `skipped (reason)`.
+1. Run the `composer` rows in the container, with the install release and the modules Phase 1
+   added. On a conflict, report it and stop. Then:
+   ```bash
+   php $FI/check-lock-diff.php --before $STATE/composer.lock.before --checklist $STATE/checklist.json
+   ```
+   Exit 1 lists packages that moved outside the feature's dependency tree (a module Phase 1 added is
+   expected), or a dev constraint. The developer accepts each move, or you narrow the update.
+2. When any module moved, check the project's customisations against it:
+   ```bash
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-typed-members.php
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-dead-overrides.php verify
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/twig-shadow-map.php diff
+   ```
+   A finding is damage from the module move: resolve it as `spryker-upgrade` Lanes 1 and 2
+   describe, before the first guide section.
+3. Work through the guide sections in guide order; prerequisite guides first. Per section, by
+   [references/apply-steps.md](references/apply-steps.md):
+   - apply the section's rows by their decision; set `status: done` or `failed` on each;
+   - hand the section's data rows to `project-data` (the hand-off format in
+     [references/data-classes.md](references/data-classes.md));
+   - schema rows: run `propel:diff` and show the migration before `propel:migrate`; the guide's
+     `propel:install` is for a fresh local database only;
+   - codegen and setup: `spryker-refresher` with the changed files, then the section's own setup
+     commands;
+   - re-run `check-plugin-usage.php` and `check-config-constants.php`; a new finding blocks the
+     next section;
+   - commit the section, if the developer chose commits.
+4. Gate: `php $FI/check-feature-installed.php $STATE/checklist.json --wiring` exits 0.
 
-## Step 4 - `composer require`
+## Phase 5b — Storefront placement (optional, suggested)
 
-Run inside the project's PHP environment. On Docker SDK that is `docker/sdk cli composer require <package>:<constraint>`, the form `spryker-refresher` and `spryker-upgrade` use (wrap in `script -q /dev/null` where the command needs a TTY). Without Docker SDK, run `composer require` in the project root.
+Only when the feature has Yves code and the project has a storefront. Install guides register
+widgets; every vendor template the project overrides has lost the vendor's calls to them.
 
-- Pass an explicit `^x.y.z` constraint for every package, matching the project style: for a bare module package use the version the resolver would pick, found with `composer require --dry-run` first and then required as `^<that version>`; a bare `composer require <package>` writes a looser `^x.y` than the project's entries.
-- Require the feature metapackage agreed in Step 2, with the agreed constraint. The card's `composerRequire` names the feature only when the card has exactly one; for a card with several features (alternatives such as `wishlist` and `marketplace-wishlist`) it names the missing module packages, so take the feature the user chose from the Install section instead. Require bare module packages only when the capability has no feature metapackage.
-- Add the API packages only if the user chose that integration.
-- On a resolution conflict, do not loosen constraints or add `--ignore-platform-reqs` on your own. Report the conflict (which package, which constraint) and stop; the cause is often a project behind the feature's release line, which is `spryker-upgrade` territory.
-- Never edit `vendor/`; never hand-edit `composer.lock`.
+1. `php $YI/yves-integration-scan.php --package=<vendor/package>,...` for the feature's Yves
+   packages.
+2. Present its suggestion table; ask which placements to apply (all, some, none). A
+   `not_registered` item is an unfinished `widget` row: finish it in Phase 5 first.
+3. On a pick, invoke `yves-twig-integration` (`/yves-twig-integration`, or
+   `/spryker-ai-dev-sdk:yves-twig-integration`) with the picked items. On "none", record the table as
+   a follow-up. In an unattended run, apply nothing: the table goes into the report.
 
-## Step 5 - Apply the guide's integration steps
+## Phase 6 — Verify (developer gate #2)
 
-Apply the guide's steps in order, **in the project layer only**: under the project's namespace directories in `src/` (find them via `composer.json` `autoload.psr-4`; when there is a custom namespace ahead of `Pyz` in `KernelConstants::PROJECT_NAMESPACES`, new and overriding code goes there, extending the `Pyz` counterpart when one exists), plus `config/` and `data/import/`. Never `vendor/`, never `src/Generated/`, never `src/Orm/`. The `spryker-customization` project-layer rules apply; its `rules/` files (plugins, dependency providers, transfers) define the conventions.
+1. **Authentication first** for every check that needs a login: one fixture customer login through
+   Glue (`POST /access-tokens`) and one through Yves. Test credentials come from
+   `tests/cypress-tests/cypress/fixtures/**` and the project's seed files; never ask for or print
+   real credentials. A failed login makes the logged-in checks **BLOCKED (environment)**: hand it to
+   `spryker-issue-diagnoser`.
+2. Give every `verification` row that is not skipped to the `spryker-verifier` agent as one
+   acceptance criterion, in the guide's words. Record `verdict` PASS, FAIL or BLOCKED with the
+   evidence path. Weigh a FAIL as a hypothesis before acting: browser problems look like feature
+   failures.
+3. Run PHPStan, the sniffer, the tests, the Back Office crawl and the storage and search counts
+   (`--snapshot after`, then `--compare before after`) again, each against its baseline. A new
+   failure is this run's damage.
+4. `getSprykerCapability(slug)` shows `installed` (or `partially_installed` for API packages skipped
+   on purpose).
+5. A FAIL goes to `spryker-issue-diagnoser`; fix its root cause as a checklist row. A FAIL or
+   BLOCKED that stays goes to the developer: fix it, or accept it (`verdict: ACCEPTED` with a
+   `verdict_note`: who and why).
 
-Typical step kinds, and the care each needs:
+## Phase 7 — Release steps
 
-| Guide step | Care |
-|---|---|
-| Config (`config/Shared/config_default.php`, module config, env overrides) | Read the existing file first; add keys in the surrounding style; no real secrets. |
-| Dependency-provider plugin wiring | **Read the current plugin stack first** and insert at the guide's position; respect the existing order. Follow the project's own pattern for stack overrides (`parent::` plus a positional insert anchored on a named neighbour class, never a numeric index). Skip a plugin the project has already registered. |
-| Transfer definitions (`*.transfer.xml`) | Project layer; check fields with `getTransferStructureByName`. |
-| Propel schema (`*.schema.xml`) | Project layer; follow `propel-schema` conventions. |
-| Navigation (`navigation.xml`), routes, route providers, module configs | Add the entry; do not reorder existing ones. |
-| Widget plugins (`ShopApplicationDependencyProvider::getGlobalWidgets()`) | Register the widgets the guide lists. Registration alone renders nothing in templates the project overrides; placing them is Step 6b. |
-| Glossary and translations | Add the keys for every configured locale. Guides often have no glossary step, so run `php <skill-dir>/scripts/glossary-key-check.php --module=<Yves modules of the feature>` from the project root (`<skill-dir>` is the path reported as `Base directory for this skill:`): it lists the `'key' \| trans` keys of those modules that no `data/import/**/glossary*.csv` row defines, per locale. Propose rows from the reference project or the suite glossary, append them to the project's glossary file, and report keys with no source; a missing key renders raw on the page. |
-| Data import (import config, `data/import/**`, demo data) | Set up the importer wiring when the guide requires it. Load **demo data only if the user asked**; otherwise skip and record "demo data skipped". Use `project-data` and the `data-import` skill for CSV and importer work. |
-| Storefront API resources (`resources/api/storefront/*.resource.yml` in a module) | When the module ships them and the project already generates API Platform resources (`src/Generated/Api/Storefront` exists; `config/GlueStorefront` alone is no proof), the guide's `GlueApplicationDependencyProvider` route and relationship plugin steps do not apply: mark them `skipped (API Platform resource)`, keep the attribute-mapper and strategy plugin stacks (the resource mapper reads them through `#[Plugins(dependencyProviderMethod: ...)]`), and rely on code generation in Step 6. |
-| Publish and sync, queues, event wiring | Wire as the guide says; queue-worker restarts are project specific, report them. |
-| New service in `deploy.dev.yml` (search, key-value, broker) | Do not change the deploy file silently; this usually needs a `docker/sdk up`, which is a rebuild. Ask the user. Never run `docker/sdk reset` or `clean-data`. |
+Do [references/release-steps.md](references/release-steps.md) exactly, in its order: list the
+candidates with `php $FI/diff-release-steps.php $STATE/checklist.json`, write each uncovered one into
+`$STATE/release-steps.md`, and prove the log with the comparison procedure, or record why it was not
+proven.
 
-Where a step conflicts with something the project already built (a plugin already registered, a field already present), stop on that step, show the conflict and let the user choose; do not overwrite. Where a step is for an integration the user declined, mark it `skipped (not requested)`.
+## Phase 8 — Report
 
-## Step 6 - Codegen and setup
+1. Gate: `php $FI/check-checklist.php $STATE/checklist.json --phase report` exits 0.
+2. Write `$STATE/report.md` in the shape that
+   [references/release-steps.md](references/release-steps.md) § The report gives: installed,
+   differences from the guide, data, storefront placement, verification, release steps, not verified.
+3. Leave uncommitted changes unstaged for review. Stage only the files you changed, by path, and
+   commit or push only on the developer's yes.
 
-Invoke `spryker-refresher` with the list of files you changed; it owns the file-pattern to command mapping (`transfer:generate`, `propel:install`, `cache:class-resolver:build`, router cache warm-up, `navigation:build-cache`, glossary and data import, search setup, cache clears, frontend builds). Resolve the Glue applications the project really has before any `glue` command: list `public/Glue*/index.php` and cross-check the `entry-point: Glue*` values in the active deploy file, then run `vendor/bin/glue <command>` for `public/Glue` and `GLUE_APPLICATION=GLUE_BACKEND vendor/bin/glue <command>` for `public/GlueBackend`; use `GLUE_APPLICATION=GLUE_STOREFRONT` only when `public/GlueStorefront/index.php` exists and an entry point uses it. A recipe step (`config/install/docker.yml`) for an application that does not exist is `skipped (no such Glue application)`, not run. Do not improvise the command chain, and run Yves/Zed frontend builds only when the guide touches the frontend. Then run the **feature-specific setup commands the guide lists** that the refresher mapping does not cover (for example a search setup or a feature importer), verifying each command exists first with `docker/sdk console list`.
+## Hard rules
 
-A new `*.schema.xml` triggers `propel:install`, which changes the database schema: say so before it runs. If a command fails, show its output and diagnose before retrying (`spryker-issue-diagnoser`); do not skip a failing guide step to look green.
-
-## Step 6b - Optional: storefront placement (suggested, not applied by default)
-
-Only when the feature has Yves code (a card module under `vendor/spryker-shop/`, or a package with a `src/*/Yves/` directory) and the project has a storefront. Install guides stop at registering widgets; the vendor templates place them, and every vendor template the project overrides has lost those calls.
-
-1. Run the `yves-twig-integration` scanner scoped to the feature's Yves packages (`--package=<vendor/package>,...`). It lists, per widget and component, whether a template the project renders already uses it, and where the vendor places it in templates the project replaced.
-2. Present its suggestion table and ask which placements to apply (all, some, none). `not_registered` items mean a widget from the guide is still unregistered: finish that in Step 5 first.
-3. On a pick, invoke the `yves-twig-integration` skill (`/yves-twig-integration`, or `/spryker-ai-dev-sdk:yves-twig-integration` on a plugin install) with the picked items; it places each one in the project's design and verifies it. On "none", record the suggestions as a follow-up and continue.
-
-Do not apply a placement in an unattended run; the table goes into the report.
-
-## Step 7 - Verify
-
-- **Authentication precondition first** for any check that needs a login: one fixture customer login through Glue (`POST /access-tokens`) and one through Yves. Test credentials come from `tests/cypress-tests/cypress/fixtures/**` (customer emails, `defaultPassword`) and the project's seed and fixture files; never ask for or print real credentials. When the login fails, report the logged-in checks as **BLOCKED (environment)** and hand over to `spryker-issue-diagnoser` (a stack problem that predates the install, such as no OAuth token ever issued), instead of failing the feature checks.
-- Run the guide's own **verify** steps (the pages, console commands or API calls it names) and record the evidence.
-- Use `boot-and-verify` for standalone verification of what the feature touches (storefront, Back Office, search, queues); this is a running stack, not a first boot.
-- Hand per-behaviour checks to the `spryker-verifier` agent with the guide's verification steps as acceptance criteria; it only asserts and reports. Weigh a FAIL as a hypothesis before acting (browser reasons look like feature failures).
-- Confirm the feature's modules are now reported as installed (`getSprykerCapability(slug)` should show `installed`, or `partially_installed` when you skipped API packages on purpose).
-
-## Step 8 - Report
-
-Leave the changes **unstaged for review**; never commit or push without the user's explicit confirmation, and stage only the files you changed, by path.
-
-```markdown
-## Feature install report: <feature>
-
-- Installed: <packages and versions; required features installed first>
-- Guide followed: <URL, release line, any version doubt>
-- Checklist:
-  - [done] <step> - <file or command>
-  - [skipped - <reason>] <step>
-- Storefront placement: <applied placements (widget - project file), declined, or the suggestion table as a follow-up; "no Yves code" when it did not apply>
-- Verification: <what was run, evidence, PASS/FAIL>
-- Follow-ups: <e.g. Glue API integration not done; demo data not loaded; deploy/service change needs docker/sdk up; queue worker restart>
-- Files changed: <list>
-```
-
-## What you do not do
-
-- Do not change anything (composer, files) before the Step 2 confirmation.
-- Do not edit `vendor/`, `src/Generated/`, `src/Orm/` or `composer.lock` by hand.
-- Do not loosen version constraints or ignore platform requirements to make a `composer require` pass.
-- Do not install an optional integration (Glue API, Storefront API, demo data) the user did not choose.
-- Do not reorder or overwrite existing plugin stacks, navigation or config; insert at the guide's position.
-- Do not run `docker/sdk reset`, `clean-data` or any environment-destructive command; report when one is needed.
-- Do not mark a guide step done without evidence, and do not drop a failing step silently.
-- Do not commit or push without confirmation.
+- All state lives in `$STATE`. Never commit `$STATE/sources/` or the baselines.
+- Offline, or a source not found → say so, record it in `state.md`, and stop for that source. Never
+  write a step from memory.
+- A step is applied once. A row marked `already-present` is checked, not applied again.
+- Never mark a row done without evidence, and never drop a failing row silently.
+- Never claim "verified" for a row whose verdict is not PASS; an accepted row is reported as
+  accepted, with its note.
