@@ -1,6 +1,6 @@
 # Environment preflight
 
-Shared by `spryker-feature-install` (Step 0) and `spryker-upgrade`. Run it before the first `composer require` or `composer update`, and before any step that needs the stack (codegen, `propel:install`, imports, verification). Reading a guide or planning a checklist needs no stack: skip the preflight for a plan-only run. Everything here is read-only except the bootstrap, which the user confirms first.
+Shared by `spryker-feature-install` (Phase 0) and `spryker-upgrade`. Run it before the first `composer require` or `composer update`, and before any step that needs the stack (codegen, `propel:install`, imports, verification). Reading a guide or planning a checklist needs no stack: skip the preflight for a plan-only run. Everything here is read-only except the bootstrap, which the user confirms first.
 
 Report a failure as a **pre-existing environment issue**, before the confirmation block, and not as a feature or upgrade failure.
 
