@@ -160,6 +160,7 @@ function pig_classify_path(string $path, string $code): string
 {
     $file = basename($path);
     $rules = [
+        ['#^tests/#', 'test'],
         ['/\.transfer\.xml$/', 'transfer'],
         ['/\.schema\.xml$/', str_contains($code, 'name="event"') ? 'event' : 'schema'],
         ['#(^|/)config/Zed/(oms|StateMachine)/#', 'oms'],

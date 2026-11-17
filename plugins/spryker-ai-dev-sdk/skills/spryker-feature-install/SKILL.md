@@ -42,7 +42,10 @@ extended, not rebuilt. Typical entry: `find-existing-capability` returned `not_i
    offers) is not a step.
 6. **Data rows go to `project-data`.** This skill writes no row in `data/import/**`.
 7. **A command the guide runs locally is a release step until a recipe covers it** (Phase 7).
-8. **Project layer only, and no shortcuts:** never `vendor/`, `src/Generated/`, `src/Orm/` or a
+8. **The installed feature is covered by tests** in the suites the project runs (Phase 6b). Without
+   them, the next upgrade has nothing that notices the feature stopped working. Only the developer
+   can waive this, with a reason.
+9. **Project layer only, and no shortcuts:** never `vendor/`, `src/Generated/`, `src/Orm/` or a
    hand-edited `composer.lock`; never `dev-*` constraints or `--ignore-platform-reqs`; never a
    suppression; never `docker/sdk reset` or `clean-data`; never a commit or push without the
    developer's yes.
@@ -177,6 +180,8 @@ was not found.
    - that storefront placement comes after the backend steps, as a suggestion list;
    - the environment: a bootstrap when the preflight found the stack down; any pre-existing issue;
    - the branch: `ai-feature/<slug>` from `HEAD` when `git status` is clean; else ask first;
+   - the tests that will cover the feature (Phase 6b): the suites the project has, and the
+     reference tests to port;
    - commits: one per guide section (recommended), or none until the report.
 
    Set `skip:<reason>` on every row of a block the developer did not choose.
@@ -259,6 +264,37 @@ widgets; every vendor template the project overrides has lost the vendor's calls
    BLOCKED that stays goes to the developer: fix it, or accept it (`verdict: ACCEPTED` with a
    `verdict_note`: who and why).
 
+## Phase 6b — Cover the feature with tests
+
+The tests pin what Phase 6 verified, so the next upgrade notices when the feature stops working.
+Write them after Phase 6 passes, never before: a test written on a broken install pins the damage.
+
+1. **Find what the project runs.** Functional tests: `codeception.yml` and suites under
+   `tests/<Namespace>Test/` (Zed, Client, Yves, Glue). E2E tests: `cypress.config.*` or a
+   `tests/cypress*` directory. Use only the kinds the project already has; do not introduce a
+   framework.
+2. **Start from the reference.** The `test` rows that `find-feature-change.php` added are the
+   reference demo shop's tests for the feature. Port each one into the project's namespace, fixtures
+   and data, or skip it with the reason (a scenario the developer declined, a capability the project
+   lacks).
+3. **Cover what the reference does not.** One test per behaviour the feature adds, not per class:
+   - backend behaviour (a Verification row with a Back Office, API or database result, a plugin
+     stack the feature extends): a functional test through the Facade or the public Client or
+     Service, written with `codecept-functional`;
+   - an API block the developer chose: a Glue API test in the project's Glue suite;
+   - a storefront or Back Office flow, when the project has Cypress: an E2E test with
+     `cypress-tests`.
+
+   The rules of [../spryker-upgrade/references/testing.md](../spryker-upgrade/references/testing.md)
+   apply: no tests for `*Factory`, `*Config` or `*DependencyProvider` classes, no getter or wiring
+   tests, no mocks of the feature's own modules.
+4. **Each test is a checklist row** of kind `test`, with the test file as its `target`. Set
+   `status: done` only after it passes in the booted environment. Run the project's suite again: the
+   new tests must not turn an existing test red.
+5. **A project without any test suite:** ask the developer. Only their answer can set
+   `tests_waived` in `checklist.json` (who and why); the report then names the feature as not
+   covered by tests.
+
 ## Phase 7 — Release steps
 
 Do [references/release-steps.md](references/release-steps.md) exactly, in its order: list the
@@ -271,7 +307,8 @@ proven.
 1. Gate: `php $FI/check-checklist.php $STATE/checklist.json --phase report` exits 0.
 2. Write `$STATE/report.md` in the shape that
    [references/release-steps.md](references/release-steps.md) § The report gives: installed,
-   differences from the guide, data, storefront placement, verification, release steps, not verified.
+   differences from the guide, data, storefront placement, verification, tests, release steps, not
+   verified.
 3. Leave uncommitted changes unstaged for review. Stage only the files you changed, by path, and
    commit or push only on the developer's yes.
 

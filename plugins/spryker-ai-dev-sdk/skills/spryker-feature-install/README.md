@@ -30,7 +30,8 @@ flowchart TD
     R --> I["5 - Install<br/>composer, check-lock-diff, override checks<br/>one guide section at a time, spryker-refresher<br/>gate: check-feature-installed --wiring"]
     I --> Y["5b - Storefront placement<br/>yves-integration-scan suggestions<br/>yves-twig-integration on the developer's pick"]
     Y --> V["6 - Verify<br/>auth precondition, spryker-verifier per<br/>Verification row, baselines compared"]
-    V --> RS["7 - Release steps<br/>diff-release-steps, prove with<br/>deployed vs fresh comparison"]
+    V --> T["6b - Tests<br/>port the reference tests, add functional,<br/>API or Cypress tests the project runs"]
+    T --> RS["7 - Release steps<br/>diff-release-steps, prove with<br/>deployed vs fresh comparison"]
     RS --> RP(["8 - Report<br/>gate: check-checklist report"])
 ```
 
@@ -44,7 +45,7 @@ flowchart TD
 | `parse-integration-guide.php` | 3 | which steps does the guide have, of which kind, in which scenario? |
 | `check-feature-installed.php` | 3 (`--mark`), 5 (`--wiring`) | which modules and wiring does the project have already; is the decided wiring in place; which plugins belong to modules the project does not install? |
 | `find-feature-change.php` | 4 | which pull request brought the feature into the reference demo shop, and which of its files does no row name? |
-| `check-checklist.php` | 4 (`--phase decide`), 8 (`--phase report`) | is every row decided; is every row done and every verification passed? |
+| `check-checklist.php` | 4 (`--phase decide`), 8 (`--phase report`) | is every row decided; is every row done, every verification passed, and the feature covered by a passing test? |
 | `check-lock-diff.php` | 5 | which packages did the install move outside the feature's dependency tree; does a required package have a dev constraint? |
 | `glossary-key-check.php` | 5 | which translation keys of the feature's Yves modules have no glossary row? |
 | `diff-release-steps.php` | 7 | which commands, imports, republishes and variables does the deploy recipe not cover? |
@@ -75,7 +76,7 @@ Everything a run writes is in the project, under `.ai-dev/feature-install/<featu
 | Field | Content |
 |---|---|
 | `id`, `guide`, `section`, `lines` | Where the step comes from |
-| `kind` | `composer`, `config`, `schema`, `event`, `transfer`, `oms`, `navigation`, `glossary`, `data-row`, `data-import`, `plugin`, `route`, `widget`, `queue`, `search-index`, `frontend`, `code`, `recipe`, `deploy`, `console`, `verification`, `linked-guide`, `unknown` |
+| `kind` | `composer`, `config`, `schema`, `event`, `transfer`, `oms`, `navigation`, `glossary`, `data-row`, `data-import`, `plugin`, `route`, `widget`, `queue`, `search-index`, `frontend`, `code`, `recipe`, `deploy`, `console`, `verification`, `test`, `linked-guide`, `unknown` |
 | `tag` | `required`, `optional-scenario:<name>`, `demo-data`, `fresh-install-only` |
 | `data_class` | Data rows only: `feature-data`, `project-content`, `demo-data`, or null until decided |
 | `target` | The file, the command, the plugin class, or the linked page |
@@ -102,6 +103,7 @@ wiring snippet in the guide: the guide lists the plugin and shows nowhere how to
   another feature package or a third-party root pin means an upgrade.
 - **The guide is the source of truth for steps; the installed code for names.**
 - **Project layer only.** Never `vendor/`, `src/Generated/` or `src/Orm/`.
+- **The feature is covered by tests** in the suites the project runs; only the developer can waive it.
 - **Release steps are proven.** A command the guide runs locally is a release step until a recipe
   covers it.
 - **Blocked is not failed.** A failed fixture login makes logged-in checks BLOCKED (environment).

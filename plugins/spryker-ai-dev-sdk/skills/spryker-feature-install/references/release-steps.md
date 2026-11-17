@@ -109,10 +109,13 @@ the file that reads it, and what it holds.
 4. **Data** — the hand-offs, per `data_class`, and the placeholders listed for `curate-golive-data`.
 5. **Storefront placement** — the placements applied (widget, project file), declined, or the
    suggestion table as a follow-up; "no Yves code" when the step did not apply.
-6. **Verification** — each `verification` row: PASS, or ACCEPTED with its note. The baseline
+6. **Tests** — each `test` row: the test file, what behaviour it pins, ported from the reference or
+   new, and its suite. Or the `tests_waived` reason, with the line "the feature is not covered by
+   tests".
+7. **Verification** — each `verification` row: PASS, or ACCEPTED with its note. The baseline
    comparison: PHPStan, sniffer, tests, Back Office crawl, storage and search counts.
-7. **Release steps** — staging first, production after the check on staging passes. Per step: the
+8. **Release steps** — staging first, production after the check on staging passes. Per step: the
    command, the reason, recipe entry or one-time job, and `verified` or `to verify`.
-8. **Not verified** — every check that did not run, and what it would have found.
+9. **Not verified** — every check that did not run, and what it would have found.
 
 Use only `verified` steps as instructions; list the `to verify` steps under their own heading.

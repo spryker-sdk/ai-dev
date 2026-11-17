@@ -10,11 +10,14 @@
  *   --phase decide   after reconcile, before the install: every row has a valid decision, no row
  *                    is `unknown`, every data row that is not skipped has a `data_class`
  *   --phase report   (default) before the report: the decide checks, plus every row is `done` or
- *                    `skipped`, and every verified row has a passing verdict
+ *                    `skipped`, every verified row has a passing verdict, and at least one `test`
+ *                    row is `done`
  *
  * A row's `decision` is one of apply-guide, apply-reference, merge, already-present or
  * skip:<reason>. A `verification` row that is not skipped needs `verdict` PASS, or ACCEPTED with a
- * `verdict_note` that names who accepted it and why.
+ * `verdict_note` that names who accepted it and why. A feature without a passing test is only
+ * accepted when the checklist's `tests_waived` holds the developer's reason: the next upgrade has
+ * nothing else that notices the feature stopped working.
  *
  * Exit codes: 0 clean; 1 problems (listed by row); 2 usage or unreadable checklist.
  */
@@ -73,6 +76,13 @@ function cc_problems(array $checklist, string $phase): array
             } elseif ($verdict === 'ACCEPTED' && trim((string)($row['verdict_note'] ?? '')) === '') {
                 $problems[] = "$where: ACCEPTED without a verdict_note";
             }
+        }
+    }
+
+    if ($phase === 'report') {
+        $coveringTests = array_filter($checklist['rows'], static fn (array $row): bool => ($row['kind'] ?? '') === 'test' && ($row['status'] ?? '') === 'done');
+        if ($coveringTests === [] && trim((string)($checklist['tests_waived'] ?? '')) === '') {
+            $problems[] = 'no test covers the feature: add `test` rows and make them pass (Phase 6b), or set `tests_waived` to the developer\'s reason';
         }
     }
 

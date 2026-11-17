@@ -5,8 +5,9 @@
  * and the files it changed that no guide row names.
  *
  * A guide names the wiring and the config, but the reference change also carries templates,
- * DependencyProviders of neighbouring modules, OMS processes for its own payment methods, and data
- * files. Those files reach the checklist only through the reference change. The finder needs no
+ * DependencyProviders of neighbouring modules, OMS processes for its own payment methods, data files
+ * and the tests that cover the feature (rows of kind `test`, ported in Phase 6b). Those files reach
+ * the checklist only through the reference change. The finder needs no
  * title search: the first commit that added the feature package to composer.json leads to the
  * merge that brought it into the branch.
  *
@@ -27,7 +28,7 @@ require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/parse-integration-guide.php';
 
 /** Files a reference change carries that are never a step for the project. */
-const FFC_NOT_A_STEP = '#^(tests/|src/Orm/|src/Generated/|composer\.(json|lock)$|package-lock\.json$|\.github/|codeception|phpstan|architecture-baseline)#';
+const FFC_NOT_A_STEP = '#^(src/Orm/|src/Generated/|composer\.(json|lock)$|package-lock\.json$|\.github/|codeception|phpstan|architecture-baseline)#';
 
 /**
  * @return array{0: int, 1: string}
@@ -181,7 +182,7 @@ function ffc_main(array $argv): int
         $result = ffc_add_rows($checklist, $files, $merge);
         $checklist['reference_change'] = ['package' => $options['package'], 'pr' => $merge['pr'], 'merge' => $merge['merge'], 'via' => $merge['via']];
         fi_save_checklist((string)$options['checklist'], $checklist);
-        fwrite(STDOUT, sprintf("  %d named by a row already, %d not a step (tests, generated code, lock files), %d reference-only row(s) added.\n", count($result['covered']), count($result['not_a_step']), count($result['added'])));
+        fwrite(STDOUT, sprintf("  %d named by a row already, %d not a step (generated code, lock files, CI), %d reference-only row(s) added.\n", count($result['covered']), count($result['not_a_step']), count($result['added'])));
         foreach ($result['added'] as $file) {
             fwrite(STDOUT, "  + $file\n");
         }

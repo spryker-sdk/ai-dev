@@ -88,7 +88,7 @@ A full bare clone: a shallow or blob-filtered clone cannot search the history.
 `find-feature-change.php` uses it in Phase 4. It takes the first commit that added the feature
 package to `composer.json`, and the merge that brought that commit into the default branch. That
 merge is the reference change: every file it changed is named by a checklist row, added as a
-`reference-only` row, or listed as not a step (tests, generated code, lock files).
+`reference-only` row (its tests as `test` rows), or listed as not a step (generated code, lock files, CI).
 
 No label or link convention ties a pull request to a feature, so a title search can find nothing
 or the wrong pull request. A feature that came through a long-lived branch is found at its merge
