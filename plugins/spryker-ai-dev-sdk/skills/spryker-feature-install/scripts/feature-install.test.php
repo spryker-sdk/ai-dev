@@ -124,6 +124,22 @@ check('module-level composer line', ($glue['rows'][0]['packages']['spryker/multi
 check('three prerequisites', count($glue['guides'][0]['prerequisites']) === 3);
 check('<summary> header names the file', rows_where($glue, static fn (array $r): bool => $r['kind'] === 'plugin')[0]['target'] === 'src/Pyz/Zed/CartsRestApi/CartsRestApiDependencyProvider.php');
 
+echo "parse-integration-guide: optional prerequisites (Recurring Orders)\n";
+$ro = parse_fixture('recurring-orders');
+$prerequisiteState = array_column(array_map(static fn (array $p): array => [$p['name'], $p['optional']], $ro['guides'][0]['prerequisites']), 1, 0);
+check('prerequisites the info box calls optional are optional', $prerequisiteState['Purchasing Control'] === true && $prerequisiteState['SSP Service Management'] === true);
+check('the other prerequisites stay required', $prerequisiteState['Spryker Core'] === false && $prerequisiteState['Company Account'] === false && $prerequisiteState['Checkout'] === false);
+check('no fixture guide gets a false optional prerequisite', array_filter(array_merge($oa['guides'][0]['prerequisites'], $ssp['guides'][0]['prerequisites'], $glue['guides'][0]['prerequisites']), static fn (array $p): bool => $p['optional']) === []);
+$marked = [['name' => 'Cart', 'optional' => false], ['name' => 'Product', 'optional' => false]];
+pig_mark_optional_prerequisites($marked, 'Install Cart first; it is required.');
+check('a line without "optional" marks nothing', $marked[0]['optional'] === false);
+pig_mark_optional_prerequisites($marked, 'The Product feature is optional.');
+check('a line with "optional" marks only the prerequisites it names', $marked[0]['optional'] === false && $marked[1]['optional'] === true);
+$tableDir = temp_dir('optional-cell');
+write_file($tableDir . '/guide.md', "## Install feature core\n\n### Prerequisites\n\n| NAME | VERSION | INSTALLATION GUIDE |\n| --- | --- | --- |\n| Glue API (optional) | 202608.0 | [Install](/docs/x.html) |\n");
+$cellParsed = pig_parse_guide($tableDir . '/guide.md', null, '202608.0');
+check('"(optional)" in the name cell marks it and is removed from the name', $cellParsed['guide']['prerequisites'][0] === ['name' => 'Glue API', 'version' => '202608.0', 'guide' => 'Install', 'url' => '/docs/x.html', 'optional' => true]);
+
 echo "parse-integration-guide: units\n";
 check('header **path**', pig_header_path('**src/Pyz/Zed/Sales/SalesDependencyProvider.php**') === 'src/Pyz/Zed/Sales/SalesDependencyProvider.php');
 check('header with a stray > and leading slash', pig_header_path('**>/data/import/local/full_EU.yml**') === 'data/import/local/full_EU.yml');

@@ -302,6 +302,25 @@ function pig_parse_table(array $tableLines): array
     return ['header' => $header, 'rows' => $rows];
 }
 
+/**
+ * A prerequisites table lists every feature a guide touches; the text below it can say that some of
+ * them are optional ("Both Purchasing Control and SSP Service Management are optional"). A line that
+ * says "optional" marks every prerequisite it names. Without this, an optional feature would be
+ * installed first as a requirement.
+ */
+function pig_mark_optional_prerequisites(array &$prerequisites, string $line): void
+{
+    if (!preg_match('/\boptional\b/i', $line) || preg_match('/^\s*\|/', $line)) {
+        return;
+    }
+    foreach ($prerequisites as $index => $prerequisite) {
+        $name = (string)$prerequisite['name'];
+        if ($name !== '' && preg_match('/\b' . preg_quote($name, '/') . '\b/i', $line)) {
+            $prerequisites[$index]['optional'] = true;
+        }
+    }
+}
+
 function pig_link(string $cell): array
 {
     return preg_match('/\[([^\]]+)\]\(([^)]+)\)/', $cell, $m) ? [$m[1], $m[2]] : [trim($cell), null];
@@ -354,7 +373,10 @@ function pig_parse_guide(string $path, ?string $docsRoot, ?string $release): arr
         } elseif (in_array($header[0] ?? '', ['NAME', 'FEATURE'], true) && in_array('INSTALLATION GUIDE', $header, true)) {
             foreach ($parsed['rows'] as $cells) {
                 [$linkText, $url] = pig_link($cells[2] ?? '');
-                $guide['prerequisites'][] = ['name' => $cells[0] ?? '', 'version' => $cells[1] ?? '', 'guide' => $linkText, 'url' => $url];
+                $name = $cells[0] ?? '';
+                $optional = (bool)preg_match('/\(\s*optional\s*\)/i', $name);
+                $name = trim((string)preg_replace('/\(\s*optional\s*\)/i', '', $name));
+                $guide['prerequisites'][] = ['name' => $name, 'version' => $cells[1] ?? '', 'guide' => $linkText, 'url' => $url, 'optional' => $optional];
             }
         } elseif (($header[0] ?? '') === 'PLUGIN' && in_array('NAMESPACE', $header, true)) {
             $nsColumn = (int)array_search('NAMESPACE', $header, true);
@@ -469,6 +491,9 @@ function pig_parse_guide(string $path, ?string $docsRoot, ?string $release): arr
             $info['text'] .= ' ' . trim($text);
         }
         $inPrerequisites = $stack !== [] && preg_match('/^(prerequisites|features .* depends on|install the required features)/i', end($stack)['title']);
+        if ($inPrerequisites && ($info === null || !$info['verification'])) {
+            pig_mark_optional_prerequisites($guide['prerequisites'], $text);
+        }
         if (($info === null || !$info['verification']) && !$inPrerequisites
             && preg_match_all('/\[([^\]]+)\]\((\/docs\/[^)#\s]+\.html)(?:#[^)]*)?\)/', $text, $links, PREG_SET_ORDER)) {
             foreach ($links as $link) {

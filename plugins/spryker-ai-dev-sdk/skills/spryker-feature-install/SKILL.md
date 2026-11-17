@@ -132,23 +132,36 @@ or a package name.** Record in `state.md` that the search ran through a fallback
    matches the project.
 2. **What is there.** `installed` → nothing to install: hand back to `find-existing-capability`
    (extend it). `partially_installed` → install only `missingPackages`.
-3. **Required features first.** Check each one against `composer.lock`. Each one that is missing is
-   its own run, before this one; offer it.
+3. **Required features first.** The candidates are the card's `Requires features:` and the guide's
+   Prerequisites table. A prerequisite is **optional** when the guide says so (`(optional)` in the
+   table, or the text below the table; the parser records it as `optional: true` in Phase 3) or when
+   the feature package's `composer.json` does not require it. Check each one against
+   `composer.lock`:
+   - a missing required one is its own run, before this one: offer it;
+   - a missing optional one: ask whether to install it first. When the developer declines, the
+     guide rows that need it are `skip:<feature> not installed`; `check-feature-installed.php`
+     reports their classes as not in `vendor/`.
 4. **The project type** in `state.md`: B2B or B2C, with or without marketplace. Phase 4 uses it.
 5. **The install release.** Read the project's release (`spryker-feature/spryker-core` in
-   `composer.lock`) and the releases of the feature (`composer show -a spryker-feature/<x>`):
-   - The feature exists at the project's release → install at that release.
-   - The feature first exists in a later release → dry-run in the container:
-     `composer require spryker-feature/<x>:^<install release> -W --dry-run`. A conflict that names
-     a `spryker/*` module and a minimum version → add `spryker/<module>:^<version>` to the same
-     `require` and dry-run again, until it resolves. Each major bump among the moved modules needs
-     its migration guide, as `spryker-upgrade` Lane 0 describes.
+   `composer.lock`) and the releases of the feature (`composer show -a spryker-feature/<x>`). The
+   feature exists at the project's release → that is the install release. The feature first exists
+   in a later release → that first release is the install release.
+6. **Dry-run the install, always, in the container**, also at the project's own release: the
+   project's modules are often older than the versions the feature needs, so the require moves
+   modules even then. Run it twice and compare:
+   `composer require spryker-feature/<x>:^<install release> -w --dry-run` (direct dependencies only)
+   and the same with `-W` (all dependencies).
+   - A conflict that names a `spryker/*` module and a minimum version → add
+     `spryker/<module>:^<version>` to the same `require` and dry-run again, until it resolves.
+   - Show the developer the result of both: how many packages each installs, updates and removes,
+     every major bump, and every removal. Recommend the one that moves less, unless it does not
+     resolve. Each major bump needs its migration guide, as `spryker-upgrade` Lane 0 describes.
    - Stop and offer `spryker-upgrade` (`/spryker-upgrade`, or `/spryker-ai-dev-sdk:spryker-upgrade`
      on a plugin install) when another `spryker-feature/*` package must move, a conflict names a
      package that is not a `spryker/*` module (a root pin of a Symfony or other third-party
      package), the same package comes back in a later round, or nothing resolves. Name the
      blocking packages from the composer output.
-   Record the install release and the added modules in `state.md`.
+   Record in `state.md` the install release, the added modules, and both dry-run results.
 
 ## Phase 2 — Collect the sources
 
@@ -173,6 +186,8 @@ was not found.
    in chat). It carries:
    - the feature, the packages `composer require` adds, the install release, the modules Phase 1
      added, and required features to install first;
+   - the update mode, `-w` or `-W`, with the moves of each from the Phase 1 dry runs;
+   - each missing optional prerequisite: install it first, or skip the rows that need it;
    - the version constraint in the project's style (`^<release>` for features, `^x.y.z` for
      modules);
    - the optional blocks, one choice each: every `optional-scenario:*` tag, the Glue, Storefront and
@@ -202,8 +217,8 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
 
 ## Phase 5 — Install
 
-1. Run the `composer` rows in the container, with the install release and the modules Phase 1
-   added. On a conflict, report it and stop. Then:
+1. Run the `composer` rows in the container, with the install release, the modules Phase 1 added,
+   and the update mode the developer chose. On a conflict, report it and stop. Then:
    ```bash
    php $FI/check-lock-diff.php --before $STATE/composer.lock.before --checklist $STATE/checklist.json
    ```
