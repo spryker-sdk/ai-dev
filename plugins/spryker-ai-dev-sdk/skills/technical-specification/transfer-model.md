@@ -231,9 +231,12 @@ classDiagram
 
 ### Transfer Definitions
 
-Do not add the transfer `.xml` to the specification. The diagram is the definition. Write only the transfer file path for each module. Use the path of the module in the project, for example:
+Do not add the transfer `.xml` to the specification. The diagram is the definition. Write only the transfer file path for each module. Use the real path of the module in the project, for example:
 
-**ModuleName module** — `src/<Organization>/ModuleName/src/<Organization>/Shared/ModuleName/Transfer/module_name.transfer.xml` (core module) or `src/Pyz/Shared/ModuleName/Transfer/module_name.transfer.xml` (project module)
+- **Core module** (installed with Composer): `vendor/spryker/module-name/src/Spryker/Shared/ModuleName/Transfer/module_name.transfer.xml`
+- **Project module**: `src/Pyz/Shared/ModuleName/Transfer/module_name.transfer.xml`
+
+Do not change files in `vendor/`. To add properties to a core transfer, use the project path. A repository that develops the core modules keeps them in `src/<Organization>/ModuleName/`, not in `vendor/`.
 
 ## Frequent Mistakes
 

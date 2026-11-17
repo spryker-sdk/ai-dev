@@ -11,8 +11,13 @@ implementation.
 
 ## When it triggers
 
-The user asks for a tech spec or a technical design document for a new Spryker feature. The skill has
-`disable-model-invocation: true`, so only the user starts it (`/spryker-ai-dev-sdk:technical-specification`).
+The user asks for a tech spec or a technical design document for a new Spryker feature
+(`/spryker-ai-dev-sdk:technical-specification`). The `spryker-customization` skill also starts it at
+Step 0c (MVP only), when the user wants a reviewed tech spec before the build. The approved tech spec is
+then a design input for the solution design and the build.
+
+Feature path: `product-requirement-document` → `technical-specification` (optional) →
+`spryker-customization`.
 
 **Not for:** business requirements (use `product-requirement-document`), implementation, task
 breakdown, or a build order.

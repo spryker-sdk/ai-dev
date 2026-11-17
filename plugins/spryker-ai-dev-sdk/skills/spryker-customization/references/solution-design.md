@@ -43,6 +43,9 @@ orchestrator's Step 0d call, not the architect's.)
    exists; never block on it, and never assume a convention it would have carried.
 6. **This project's actual wiring**: `ApplicationServices.php` and the DependencyProviders the feature
    will touch — read, never assumed. (A wrong entry there takes every Back Office route down.)
+7. The **approved tech spec** from Step 0c, when there is one. Build on its module dependency graph,
+   ERD, transfer model, flows and module API — do not repeat them, link to them. A deviation from the
+   tech spec goes to the plan gate with its reason, and the tech spec gets the same change.
 
 ## What the plan must contain
 

@@ -2,7 +2,6 @@
 name: technical-specification
 description: Use when the user asks for a technical specification (tech spec) or a technical design document for a new Spryker feature, from a PRD or from business requirements. Creates the spec in steps with the user — a template first, then module dependency graph, ERD, transfer model, flow (sequence) diagrams, module API, test coverage outline, and risks — all as Mermaid diagrams and method signatures, with no implementation code.
 user-invocable: true
-disable-model-invocation: true
 ---
 
 # Create a Technical Specification
@@ -13,7 +12,9 @@ Create a high-level technical specification for a new Spryker feature. Use a PRD
 
 ## Mode
 
-**CRITICAL:** Use planning mode. Create a structured technical specification document.
+**CRITICAL:** Create only the technical specification document. Do not write implementation code.
+
+Do not use the plan mode of your harness. In plan mode, the assistant cannot write or commit files, but this skill writes and commits the spec file.
 
 - Use the template in [technical-spec-template.md](technical-spec-template.md).
 - The user fills the sections with the marker `[User fills: *]`.
@@ -22,6 +23,16 @@ Create a high-level technical specification for a new Spryker feature. Use a PRD
 - Write the document in Markdown.
 - Use Mermaid syntax for all diagrams.
 - Do not repeat information that the PRD or another section already gives.
+
+## Place in the Feature Flow
+
+The feature path is `product-requirement-document` → `technical-specification` (optional) → `spryker-customization`.
+
+When `spryker-customization` starts this skill (its Step 0c):
+
+- Do the full workflow below, including the user review in Step 4.
+- Do not commit the spec. The commit gate of `spryker-customization` commits it in its own commit.
+- After the user approves the spec, go back to `spryker-customization` at its Step 0d.
 
 ## Storage and Delivery
 
