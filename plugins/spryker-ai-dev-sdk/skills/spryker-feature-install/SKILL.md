@@ -75,10 +75,26 @@ Match tools by **tool name** (server names vary by install; some clients namespa
 | `getSprykerModules`, `getSprykerModuleMap` | What the project has now; exact plugin interfaces. |
 | `getTransferStructureByName` | Transfer fields before a transfer XML edit. |
 
-If the capability tools are not connected, start the MCP server and ask for a reload as
-`find-existing-capability` describes. After two failed reconnects, take the feature name and guide
-URL from the developer, or fetch `https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md`
-and compare its packages with `composer.lock` by hand; the install status is then unverified.
+**If the capability tools are not available**, tell the two causes apart, as `find-existing-capability`
+describes:
+
+- **Not registered** (no `ai-dev:mcp-server` entry in `.mcp.json` or `.vscode/mcp.json`, and the
+  harness's MCP server list does not show it): go straight to the script below. There is nothing to
+  reconnect.
+- **Registered but not connected:** start the server and ask the developer for a reload. After two
+  failed reconnects, use the script.
+
+The script searches the same capability map and reads `composer.lock`. Run it from the project root,
+one quoted argument per query (the feature name and its synonyms):
+
+```bash
+php <skill-dir>/../find-existing-capability/scripts/capability-search.php "recurring orders" "subscription order" "scheduled reorder"
+```
+
+Per hit it prints `slug`, `installStatus`, `features`, `missingPackages`, `composerRequire` and
+`url`. In place of `getSprykerCapability`, fetch the hit's `url`: it is the card. Without PHP or
+network, use the web fallback of `find-existing-capability` (`INDEX.md`). **Never guess a card slug
+or a package name.** Record in `state.md` that the search ran through a fallback.
 
 ## Phase 0 — Preflight and baselines
 
@@ -107,7 +123,7 @@ and compare its packages with `composer.lock` by hand; the install status is the
 ## Phase 1 — Resolve the feature and its release
 
 1. **The feature.** From a card: `getSprykerCapability(slug)`. From a name: `searchSprykerCapabilities`
-   with the name and its synonyms, then open the best card. Its Install section lists the
+   (or the search script, § Tools) with the name and its synonyms, then open the best card. Its Install section lists the
    `spryker-feature/<name>` package and guide URL, `Requires features:`, the Glue API guide and the
    Storefront API packages. A card with several features offers alternatives: take the one that
    matches the project.
