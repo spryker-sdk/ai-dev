@@ -515,6 +515,7 @@ OPEN decisions blocking implementation (from Decisions & Accepted Risks):
 - [each OPEN item, verbatim — or "none"]
 
 Next steps:
+- Optionally, design it with the `technical-specification` skill (a tech spec that the team reviews before the build)
 - Build it with the `spryker-customization` skill (it takes this PRD + .refs.md as input and drives plan → build → verify → commit gate)
 - Share with stakeholders for alignment
 - Update as requirements evolve

@@ -30,6 +30,7 @@ These are **skills** (loaded into the main session), not subagents. Invoke each 
 | Skill | When to invoke |
 |---|---|
 | `product-requirement-document` | Step 0c — when the user has no PRD (or wants to create/refresh one) before intake. Creates the business-facing PRD that Step 1 reads. |
+| `technical-specification` | Step 0c (MVP only) — when the user wants to create or update a tech spec before the build. The approved tech spec is a design input for Step 3 and Step 3a. |
 | `spryker-refresher` | Step 5 — post-change commands (composer dumpautoload, codegen, schema, cache clears, frontend builds, cache warmups). Mandatory; the orchestrator must not run `docker/sdk console` / `docker/sdk cli composer` inline during Step 5. |
 | `spryker-qa-coverage` | Step 6 (when the QA-thorough phase is on) — expand the AC list + scale envelope into a 5-bucket test plan before invoking the verifier. |
 | `ai-runtime-debugging` | When you need to see runtime values that aren't surfacing in logs / DB / browser state — during Step 4 build or Step 7 self-correct. Teaches the `[AI-DEBUG]` tagged-log pattern and optional XDebug step-debug. Always paired with a cleanup pass in Step 7b. |

@@ -28,10 +28,13 @@ flowchart TD
     S0B --> S0C{"Step 0c — PRD source"}
     S0C -- "PRD in context" --> S0C1{"Confirm: use it ·<br/>refresh it · new one"}
     S0C -- "no PRD" --> S0C2{"I'll provide one ·<br/>create one · ACs only"}
-    S0C1 -- "refresh / new" --> PRD["Skill: product-requirement-document"] --> S0D
+    S0C1 -- "refresh / new" --> PRD["Skill: product-requirement-document"] --> TS
     S0C2 -- "create" --> PRD
-    S0C1 -- "use it" --> S0D
-    S0C2 -- "provide / ACs only" --> S0D
+    S0C1 -- "use it" --> TS
+    S0C2 -- "provide / ACs only" --> TS
+    TS{"Tech spec source (MVP only)<br/>use · update · create · none"}
+    TS -- "update / create" --> TSS["Skill: technical-specification"] --> S0D
+    TS -- "use it / none / PoC" --> S0D
 
     S0D["Step 0d — Scale envelope<br/>read architecture/§10 first ·<br/>ask only empty rows · baseline<br/>volumes as the floor · forced-output block<br/>(PoC: one caveat line)"] --> S1
 
@@ -160,6 +163,7 @@ command. The two are never swapped.
 | Step | Delegates to | Kind |
 |---|---|---|
 | 0c | `product-requirement-document` | Skill |
+| 0c | `technical-specification` — MVP only, when the user wants a reviewed tech spec before the build | Skill |
 | 3 | `spryker-feature-expert` — always, before planning; parallel per domain | Agent |
 | 4 | `yves-atomic-frontend` / `backoffice-frontend` (hard pre-edit gate for any UI element, per surface) | Skill |
 | 4 / 7 | `ai-runtime-debugging` — when runtime values aren't in logs / DB / browser state | Skill |
