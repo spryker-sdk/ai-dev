@@ -51,11 +51,10 @@ flowchart TD
 | `diff-release-steps.php` | 7 | which commands, imports, republishes and variables does the deploy recipe not cover? |
 | `check-dod.php` | 8 | is the integration DONE? Each of the ten Definition of Done items, met or not, from the evidence in the state directory |
 
-`lib.php` is the shared library. `feature-install.test.php` is the maintainer test suite
-(`php $FI/feature-install.test.php`); its guide fixtures in `fixtures/guides/` are copies of real
-integration guides in both guide styles. It is not part of an install run. The baselines and the
-override checks reuse `../spryker-upgrade/scripts/`; storefront placement uses
-`../yves-twig-integration/scripts/`.
+`lib.php` is the shared library. The baselines and the override checks reuse
+`../spryker-upgrade/scripts/`; storefront placement uses `../yves-twig-integration/scripts/`. The
+maintainer test suite is not part of the plugin: it lives in the plugin repository, in
+`tests/scripts/feature-install/`.
 
 ## State
 

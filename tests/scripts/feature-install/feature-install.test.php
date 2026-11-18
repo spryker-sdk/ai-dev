@@ -2,15 +2,22 @@
 
 declare(strict_types=1);
 
-/** Zero-dependency tests for the spryker-feature-install scripts. Run: php scripts/feature-install.test.php */
+/**
+ * Zero-dependency tests for the spryker-feature-install scripts. Maintainer tooling: it stays out of
+ * the plugin. The guide fixtures are copies of real integration guides.
+ *
+ * Run from the repository root: php tests/scripts/feature-install/feature-install.test.php
+ */
 
-require __DIR__ . '/parse-integration-guide.php';
-require __DIR__ . '/check-checklist.php';
-require __DIR__ . '/check-lock-diff.php';
-require __DIR__ . '/check-feature-installed.php';
-require __DIR__ . '/diff-release-steps.php';
-require __DIR__ . '/find-feature-change.php';
-require __DIR__ . '/check-dod.php';
+const FI_SCRIPTS = __DIR__ . '/../../../plugins/spryker-ai-dev-sdk/skills/spryker-feature-install/scripts';
+
+require FI_SCRIPTS . '/parse-integration-guide.php';
+require FI_SCRIPTS . '/check-checklist.php';
+require FI_SCRIPTS . '/check-lock-diff.php';
+require FI_SCRIPTS . '/check-feature-installed.php';
+require FI_SCRIPTS . '/diff-release-steps.php';
+require FI_SCRIPTS . '/find-feature-change.php';
+require FI_SCRIPTS . '/check-dod.php';
 
 $failures = 0;
 $count = 0;
@@ -30,7 +37,7 @@ function check(string $name, bool $ok): void
 function run_script(string $script, array $args, string $projectDir): array
 {
     $process = proc_open(
-        array_merge([PHP_BINARY, __DIR__ . '/' . $script], $args),
+        array_merge([PHP_BINARY, FI_SCRIPTS . '/' . $script], $args),
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
         $projectDir,
