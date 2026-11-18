@@ -27,13 +27,15 @@ function check(string $name, bool $ok): void
 {
     global $failures, $count;
     $count++;
-    echo ($ok ? "  ok   " : "  FAIL ") . $name . "\n";
+    echo ($ok ? '  ok   ' : '  FAIL ') . $name . "\n";
     if (!$ok) {
         $failures++;
     }
 }
 
 /**
+ * @param list<string> $args
+ *
  * @return array{0: int, 1: string} exit code, combined output
  */
 function run_script(string $script, array $args, string $projectDir): array
@@ -43,7 +45,7 @@ function run_script(string $script, array $args, string $projectDir): array
         [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes,
         $projectDir,
-        array_merge(getenv(), ['SPRYKER_PROJECT_ROOT' => $projectDir])
+        array_merge(getenv(), ['SPRYKER_PROJECT_ROOT' => $projectDir]),
     );
     $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
     fclose($pipes[1]);
@@ -76,6 +78,8 @@ function parse_fixture(string $name): array
 }
 
 /**
+ * @param array<string, mixed> $checklist
+ *
  * @return list<array<string, mixed>>
  */
 function rows_where(array $checklist, callable $filter): array
@@ -162,7 +166,7 @@ check('a header-less key,text,locale block is the glossary', pig_infer_path("a.b
 check('a header-less block with deploy-file keys goes to every deploy file', pig_infer_path("image:\n    environment:\n        X: 1", 'yml') === 'deploy.*.yml' && pig_classify_path('deploy.*.yml', '') === 'deploy');
 check('an html file is frontend', pig_classify_path('public/Yves/push_notification_spa/index.html', '') === 'frontend');
 check('table cells decode HTML entities', pig_parse_table(['| NAME | VERSION |', '|---|---|', '| Mailing &amp; Notifications | 1 |'])['rows'][0][0] === 'Mailing & Notifications');
-check('$config block goes to config_default.php', pig_infer_path("\$config[KernelConstants::X] = 1;", 'php') === 'config/Shared/config_default.php');
+check('$config block goes to config_default.php', pig_infer_path('$config[KernelConstants::X] = 1;', 'php') === 'config/Shared/config_default.php');
 
 $docs = temp_dir('docs');
 write_file($docs . '/_config.yml', "release_version: \"202610.0\"\n");
@@ -256,7 +260,8 @@ echo "diff-release-steps\n";
 $recipeProject = temp_dir('recipe');
 write_file($recipeProject . '/config/install/production.yml', "sections:\n    diff:\n        propel-migrate:\n            command: 'vendor/bin/console propel:migrate -vvv --no-ansi'\n    scheduler-start:\n        queue-setup:\n            command: 'vendor/bin/console queue:setup'\n");
 write_file($recipeProject . '/config/install/docker.yml', "sections:\n    build:\n        generate-transfers:\n            command: 'vendor/bin/console transfer:generate'\n    demodata:\n        import:\n            command: 'vendor/bin/console data:import glossary'\n");
-$releaseChecklist = ['rows' => [
+$releaseChecklist = [
+'rows' => [
     decided_row(['id' => 'R001', 'kind' => 'console', 'target' => 'console transfer:generate']),
     decided_row(['id' => 'R002', 'kind' => 'console', 'target' => 'console propel:install']),
     decided_row(['id' => 'R003', 'kind' => 'glossary', 'target' => 'data/import/glossary.csv', 'data_class' => 'feature-data']),
@@ -343,7 +348,7 @@ $moves = cnm_classify(
         'spryker/x' => ['version' => '1.1.0'],
         'spryker/y' => ['version' => '2.0.0', 'conflict' => ['spryker/x' => '<1.1.0']],
     ]),
-    ['require' => ['spryker-feature/x' => '^202608.0']]
+    ['require' => ['spryker-feature/x' => '^202608.0']],
 );
 check('a move a requirer needs is needed', $moves['spryker/kernel']['verdict'] === 'needed');
 check('a move whose old version satisfies every requirer is not needed', $moves['spryker/mail']['verdict'] === 'not needed' && $moves['spryker/gui']['verdict'] === 'not needed');
@@ -385,7 +390,7 @@ check('a key the package ships only in other locales is missing for the project 
 echo "dump-state\n";
 $dumpDir = temp_dir('dump');
 copy(FI_SCRIPTS . '/dump-state.php', $dumpDir . '/dump-state.php');
-$makeDb = static function (string $file, array $glossary, string $storage) {
+$makeDb = static function (string $file, array $glossary, string $storage): void {
     $pdo = new PDO('sqlite:' . $file);
     $pdo->exec('CREATE TABLE spy_glossary_key (id_glossary_key INTEGER, glossary_key TEXT)');
     $pdo->exec('CREATE TABLE spy_x_storage (id_x_storage INTEGER, data TEXT, updated_at TEXT)');
@@ -492,12 +497,14 @@ write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\
 $writeDod($dodChecklist, $dodEvidence, $provenSteps);
 check('missing wiring fails item 5', $unmetItems() === [5]);
 write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nuse Spryker\\Zed\\X\\XPlugin;\nreturn [new XPlugin()];\n");
-foreach ([
+foreach (
+    [
     'after/phpstan-after.txt' => [' [ERROR] Found 5 errors', 'more PHPStan errors'],
     'after/codecept-after.txt' => ["There were 2 failures:\n1) FooTest: bar\n2) NewTest: broken\nFAILURES!\nTests: 12, Assertions: 24, Failures: 2.", 'a test that passed before fails'],
     'baseline/backoffice-smoke-report.json' => [json_encode(['results' => [['url' => '/b', 'problem' => 'HTTP 500', 'inBaseline' => false]]]), 'a new Back Office failure'],
     'after/yves-build.txt' => ["ERROR in ./src/x.ts\nexit 1", 'a failed build'],
-] as $file => [$contents, $what]) {
+    ] as $file => [$contents, $what]
+) {
     $writeEvidence([$file => $contents]);
     check("$what fails item 6", $unmetItems() === [6]);
 }
