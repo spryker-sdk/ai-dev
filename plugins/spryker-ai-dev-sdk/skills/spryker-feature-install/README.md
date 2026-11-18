@@ -32,7 +32,7 @@ flowchart TD
     Y --> V["6 - Verify<br/>auth precondition, spryker-verifier per<br/>Verification row, baselines compared"]
     V --> T["6b - Tests<br/>port the reference tests, add functional,<br/>API or Cypress tests the project runs"]
     T --> RS["7 - Release steps<br/>diff-release-steps, prove with<br/>deployed vs fresh comparison"]
-    RS --> RP(["8 - Report<br/>gate: check-checklist report"])
+    RS --> RP(["8 - Report<br/>status: check-dod DONE or NOT DONE"])
 ```
 
 ## Scripts
@@ -49,6 +49,7 @@ flowchart TD
 | `check-lock-diff.php` | 5 | which packages did the install move outside the feature's dependency tree; does a required package have a dev constraint? |
 | `glossary-key-check.php` | 5 | which translation keys of the feature's Yves modules have no glossary row? |
 | `diff-release-steps.php` | 7 | which commands, imports, republishes and variables does the deploy recipe not cover? |
+| `check-dod.php` | 8 | is the integration DONE? Each of the ten Definition of Done items, met or not, from the evidence in the state directory |
 
 `lib.php` is the shared library. `feature-install.test.php` is the maintainer test suite
 (`php $FI/feature-install.test.php`); its guide fixtures in `fixtures/guides/` are copies of real
@@ -65,6 +66,7 @@ Everything a run writes is in the project, under `.ai-dev/feature-install/<featu
 | `state.md` | The phase table: phase, status, evidence; the install release and added modules |
 | `sources/` | The guides, the feature `composer.json`, the reference demo shop clone and its history |
 | `checklist.json` | One row per guide step, with its decision, status and verdict |
+| `dod.json` | The Definition of Done evidence no script can measure: scope, baselines, accepted module moves, after-install checks, approved content, accepted unproven release steps |
 | `composer.lock.before` | The lock before the install |
 | `baseline/` | The baselines of the `spryker-upgrade` scripts, PHPStan, sniffer and tests |
 | `data-handoff-<section>.md` | The fixed row lists for `project-data` |
@@ -92,6 +94,7 @@ wiring snippet in the guide: the guide lists the plugin and shows nowhere how to
 
 ## Design decisions baked in
 
+- **The status comes from the Definition of Done.** `check-dod.php` decides DONE or NOT DONE; a blocker stops the run when it is found.
 - **Confirm before changing.** Nothing is required or edited before the developer agrees to the
   feature, release, constraint and optional integrations.
 - **Every step is a row; every row is decided.** The checklist gates block the install and the

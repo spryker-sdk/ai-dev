@@ -48,7 +48,49 @@ extended, not rebuilt. Typical entry: `find-existing-capability` returned `not_i
 9. **Project layer only, and no shortcuts:** never `vendor/`, `src/Generated/`, `src/Orm/` or a
    hand-edited `composer.lock`; never `dev-*` constraints or `--ignore-platform-reqs`; never a
    suppression; never `docker/sdk reset` or `clean-data`; never a commit or push without the
-   developer's yes.
+   developer's yes. Ask first before you write to a database by hand, change a user account, or
+   write content yourself (translations, CMS text).
+10. **The status is `check-dod.php`'s, never yours** (§ Definition of Done). A blocker stops the run
+    when you find it (§ Blockers).
+
+## Definition of Done
+
+A feature integration is **DONE** only when all ten items hold, each one with its evidence in
+`$STATE`. `php $FI/check-dod.php $STATE` decides it from that evidence.
+
+| # | Item | Evidence |
+|---|---|---|
+| 1 | The developer confirmed the scope: feature, install release, update mode, branch. | `dod.json` `scope` (Phase 3) |
+| 2 | Every baseline ran and is valid: PHPStan, sniffer, tests, Back Office crawl, storage and search counts. | `dod.json` `baselines` (Phase 0) |
+| 3 | Only modules the feature needs moved; every other move has a recorded reason. | `composer.lock.before` vs `composer.lock`; `dod.json` `accepted_moves` (Phase 5) |
+| 4 | Every checklist row is decided, and done or skipped with a reason. | `checklist.json` |
+| 5 | The decided wiring is in place. | `checklist.json` and the project's DependencyProviders |
+| 6 | No regression against the baselines, and the Yves, Zed and Merchant Portal builds pass. | `dod.json` `checks` (Phase 6) |
+| 7 | Every verification passed. BLOCKED and FAIL are not done; ACCEPTED counts with the developer's note. | `checklist.json` verdicts (Phase 6) |
+| 8 | Passing tests cover the feature, or the developer waived them with a reason. | `checklist.json` `test` rows, `tests_waived` (Phase 6b) |
+| 9 | Every text you wrote (translations, CMS text) is approved by the developer. | `dod.json` `authored_content` (Phase 5) |
+| 10 | Every release step is verified, or the developer accepted shipping it unproven. | `release-steps.md`; `dod.json` `release_steps_accepted` (Phase 7) |
+
+`dod.json` holds what no script can measure. Its format is in the header of
+`scripts/check-dod.php`. A baseline is `valid`, a check is `pass`; `blocked: <why>` records a
+blocker; only the developer's answer can make a value `waived: <reason>`.
+
+**The report's first line is `check-dod.php`'s first line, word for word.** While it says
+`NOT DONE`, the report opens with the unmet items, and the words "installed", "works", "done" or
+"ready" do not describe the run.
+
+## Blockers
+
+A blocker is anything that stops a Definition of Done item from being met and that the install
+itself cannot fix: a login that fails, a baseline that cannot run, a missing frontend dependency
+tree, a check that needs a decision or data only the developer has.
+
+1. **Stop when you find it**, in the phase where you find it. Do not continue with the next phase
+   and report it at the end.
+2. Record it in `dod.json` (`blocked: <why>`) and in `state.md`.
+3. Ask the developer, in one question: what blocks which item, and the options — fix it (with what
+   you need from them), waive the item with their reason, or stop the run.
+4. Continue only on their answer.
 
 **Plan tracking is mandatory.** After Phase 0, create one task per phase in your harness's task
 list, and keep the phase table in `$STATE/state.md`: it survives a compaction.
@@ -120,8 +162,11 @@ or a package name.** Record in `state.md` that the search ran through a fallback
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline SPRYKER_BACKOFFICE_USER=<user> SPRYKER_BACKOFFICE_PASSWORD=<password> php $UP/backoffice-smoke.php --url <zed base url> --baseline
    ```
    For the storage and search counts, copy `$UP/storage-search-counts.php` into `$STATE/baseline/`
-   and run it in the container with `--snapshot before`. A red baseline is not this run's damage:
-   record it in `state.md`.
+   and run it in the container with `--snapshot before`.
+4. Record each baseline in `$STATE/dod.json` `baselines`. Red tests and existing findings are a
+   **valid** baseline: they are what the project had before. A baseline that did not run, or whose
+   result an environment problem distorts (a failed login makes the crawl and the logged-in tests
+   fail), is `blocked: <why>` — a blocker: stop and ask now (§ Blockers).
 
 ## Phase 1 — Resolve the feature and its release
 
@@ -199,7 +244,9 @@ was not found.
      reference tests to port;
    - commits: one per guide section (recommended), or none until the report.
 
-   Set `skip:<reason>` on every row of a block the developer did not choose.
+   Set `skip:<reason>` on every row of a block the developer did not choose. Record the answer in
+   `dod.json` `scope` (`feature`, `install_release`, `update_mode`, `branch`, and `confirmed`: the
+   developer's answer in their words).
 
 ## Phase 4 — Reconcile
 
@@ -223,7 +270,10 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
    php $FI/check-lock-diff.php --before $STATE/composer.lock.before --checklist $STATE/checklist.json
    ```
    Exit 1 lists packages that moved outside the feature's dependency tree (a module Phase 1 added is
-   expected), or a dev constraint. The developer accepts each move, or you narrow the update.
+   expected), or a dev constraint. Move each one back to its version in `composer.lock.before`
+   (`composer require spryker/<module>:<old version> --update-with-dependencies`, then restore the
+   constraint), unless the feature needs it. A move that stays needs the developer's reason in
+   `dod.json` `accepted_moves`. Accepting the update mode at gate #1 is not a reason for each move.
 2. When any module moved, check the project's customisations against it:
    ```bash
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-typed-members.php
@@ -236,7 +286,11 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
    [references/apply-steps.md](references/apply-steps.md):
    - apply the section's rows by their decision; set `status: done` or `failed` on each;
    - hand the section's data rows to `project-data` (the hand-off format in
-     [references/data-classes.md](references/data-classes.md));
+     [references/data-classes.md](references/data-classes.md)), into the files the project's import
+     manifests read for every environment;
+   - text the guide or the module does not ship (a translation for a project locale, CMS text) is
+     content: ask the developer first (or hand it to `translate-content`), and record it in
+     `dod.json` `authored_content` with their approval;
    - schema rows: run `propel:diff` and show the migration before `propel:migrate`; the guide's
      `propel:install` is for a fresh local database only;
    - codegen and setup: `spryker-refresher` with the changed files, then the section's own setup
@@ -271,8 +325,9 @@ widgets; every vendor template the project overrides has lost the vendor's calls
    evidence path. Weigh a FAIL as a hypothesis before acting: browser problems look like feature
    failures.
 3. Run PHPStan, the sniffer, the tests, the Back Office crawl and the storage and search counts
-   (`--snapshot after`, then `--compare before after`) again, each against its baseline. A new
-   failure is this run's damage.
+   (`--snapshot after`, then `--compare before after`) again, each against its baseline, and the
+   Yves, Zed and Merchant Portal builds. A new failure is this run's damage. Record each result in
+   `dod.json` `checks` (`pass`, or `fail: <what>`; `frontend-build` covers all builds).
 4. `getSprykerCapability(slug)` shows `installed` (or `partially_installed` for API packages skipped
    on purpose).
 5. A FAIL goes to `spryker-issue-diagnoser`; fix its root cause as a checklist row. A FAIL or
@@ -315,16 +370,20 @@ Write them after Phase 6 passes, never before: a test written on a broken instal
 Do [references/release-steps.md](references/release-steps.md) exactly, in its order: list the
 candidates with `php $FI/diff-release-steps.php $STATE/checklist.json`, write each uncovered one into
 `$STATE/release-steps.md`, and prove the log with the comparison procedure, or record why it was not
-proven.
+proven. Each log row ends with its status: `verified`, `not needed`, `covered by recipe`, or
+`to verify`. When the developer does not allow the proof, ask whether they accept shipping the
+unproven steps, and record their reason in `dod.json` `release_steps_accepted`.
 
 ## Phase 8 — Report
 
-1. Gate: `php $FI/check-checklist.php $STATE/checklist.json --phase report` exits 0.
-2. Write `$STATE/report.md` in the shape that
-   [references/release-steps.md](references/release-steps.md) § The report gives: installed,
-   differences from the guide, data, storefront placement, verification, tests, release steps, not
-   verified.
-3. Leave uncommitted changes unstaged for review. Stage only the files you changed, by path, and
+1. Run `php $FI/check-dod.php $STATE`. Its first line is the run's status.
+2. **NOT DONE:** the report opens with that line and the unmet items, each with what the
+   developer can do (fix, waive with a reason, accept). Then stop and ask. Do not describe the run
+   as installed, working, done or ready.
+3. **DONE:** write `$STATE/report.md` in the shape that
+   [references/release-steps.md](references/release-steps.md) § The report gives. Its first line is
+   `check-dod.php`'s first line, word for word.
+4. Leave uncommitted changes unstaged for review. Stage only the files you changed, by path, and
    commit or push only on the developer's yes.
 
 ## Hard rules

@@ -31,8 +31,20 @@ require_once __DIR__ . '/lib.php';
  */
 function cc_problems(array $checklist, string $phase): array
 {
-    $problems = [];
+    return array_merge(...array_values(cc_problems_by_item($checklist, $phase)));
+}
+
+/**
+ * The problems grouped as the Definition of Done counts them: rows (decisions and status),
+ * verification (verdicts) and tests (coverage).
+ *
+ * @return array{rows: list<string>, verification: list<string>, tests: list<string>}
+ */
+function cc_problems_by_item(array $checklist, string $phase): array
+{
+    $byItem = ['rows' => [], 'verification' => [], 'tests' => []];
     foreach ($checklist['rows'] as $row) {
+        $problems = [];
         $id = (string)($row['id'] ?? '?');
         $where = sprintf('%s %s %s', $id, $row['kind'] ?? '?', $row['target'] ?? '');
         $decision = $row['decision'] ?? null;
@@ -60,6 +72,7 @@ function cc_problems(array $checklist, string $phase): array
         }
 
         if ($phase !== 'report') {
+            $byItem['rows'] = array_merge($byItem['rows'], $problems);
             continue;
         }
         if ($status === 'failed') {
@@ -77,16 +90,22 @@ function cc_problems(array $checklist, string $phase): array
                 $problems[] = "$where: ACCEPTED without a verdict_note";
             }
         }
+        $item = match ($row['kind'] ?? '') {
+            'verification' => 'verification',
+            'test' => 'tests',
+            default => 'rows',
+        };
+        $byItem[$item] = array_merge($byItem[$item], $problems);
     }
 
     if ($phase === 'report') {
         $coveringTests = array_filter($checklist['rows'], static fn (array $row): bool => ($row['kind'] ?? '') === 'test' && ($row['status'] ?? '') === 'done');
         if ($coveringTests === [] && trim((string)($checklist['tests_waived'] ?? '')) === '') {
-            $problems[] = 'no test covers the feature: add `test` rows and make them pass (Phase 6b), or set `tests_waived` to the developer\'s reason';
+            $byItem['tests'][] = 'no test covers the feature: add `test` rows and make them pass (Phase 6b), or set `tests_waived` to the developer\'s reason';
         }
     }
 
-    return $problems;
+    return $byItem;
 }
 
 function cc_main(array $argv): int

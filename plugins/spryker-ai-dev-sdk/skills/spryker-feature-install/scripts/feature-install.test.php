@@ -10,6 +10,7 @@ require __DIR__ . '/check-lock-diff.php';
 require __DIR__ . '/check-feature-installed.php';
 require __DIR__ . '/diff-release-steps.php';
 require __DIR__ . '/find-feature-change.php';
+require __DIR__ . '/check-dod.php';
 
 $failures = 0;
 $count = 0;
@@ -310,6 +311,80 @@ check('a test of the reference change is a test row', ($withRef['rows'][2]['kind
 check('composer files are not steps', str_contains($output, '1 not a step'));
 [$exit] = run_script('find-feature-change.php', ['--repo', $repo, '--package', 'spryker-feature/never'], $repo);
 check('a package the reference never required exits 1', $exit === 1);
+
+echo "check-dod\n";
+$dodProject = temp_dir('dod');
+$dodState = $dodProject . '/.ai-dev/feature-install/x';
+$dodLock = static fn (array $packages): string => json_encode(['packages' => array_map(static fn (string $n, array $p): array => ['name' => $n] + $p, array_keys($packages), $packages)]);
+write_file($dodProject . '/composer.json', json_encode(['require' => ['spryker-feature/x' => '^202608.0'], 'autoload' => ['psr-4' => ['Pyz\\' => 'src/Pyz/']]]));
+write_file($dodState . '/composer.lock.before', $dodLock(['spryker/kernel' => ['version' => '3.70.0'], 'spryker/unrelated' => ['version' => '1.0.0']]));
+write_file($dodProject . '/composer.lock', $dodLock([
+    'spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.70']],
+    'spryker/kernel' => ['version' => '3.71.0'],
+    'spryker/unrelated' => ['version' => '1.0.0'],
+]));
+write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nuse Spryker\\Zed\\X\\XPlugin;\nreturn [new XPlugin()];\n");
+$dodChecklist = ['schema' => 1, 'release' => '202608.0', 'guides' => [], 'rows' => [
+    decided_row(['id' => 'R001', 'kind' => 'composer', 'target' => 'composer require spryker-feature/x', 'packages' => ['spryker-feature/x' => '^202608.0']]),
+    decided_row(['id' => 'R002', 'kind' => 'plugin', 'target' => 'src/Pyz/Zed/Cart/CartDependencyProvider.php', 'plugins' => ['Spryker\Zed\X\XPlugin']]),
+    decided_row(['id' => 'R003', 'kind' => 'verification', 'verdict' => 'PASS']),
+    decided_row(['id' => 'R004', 'kind' => 'test', 'target' => 'tests/PyzTest/Zed/X/XFacadeTest.php']),
+]];
+$dodEvidence = [
+    'scope' => ['feature' => 'spryker-feature/x', 'install_release' => '202608.0', 'update_mode' => '-w', 'branch' => 'ai-feature/x', 'confirmed' => 'developer: yes, -w, skip demo data'],
+    'baselines' => array_fill_keys(DOD_BASELINES, 'valid'),
+    'checks' => array_fill_keys(DOD_CHECKS, 'pass'),
+    'authored_content' => [],
+];
+$writeDod = static function (array $checklist, array $evidence, string $releaseSteps) use ($dodState): void {
+    fi_save_checklist($dodState . '/checklist.json', $checklist);
+    write_file($dodState . '/dod.json', json_encode($evidence));
+    write_file($dodState . '/release-steps.md', $releaseSteps);
+};
+$provenSteps = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R010 | verified |\n| queue:setup | new queue | R011 | covered by recipe |\n";
+$unmetItems = static fn (): array => array_keys(array_filter(dod_evaluate($dodProject, $dodState), static fn (array $r): bool => $r !== []));
+$writeDod($dodChecklist, $dodEvidence, $provenSteps);
+[$exit, $output] = run_script('check-dod.php', ['.ai-dev/feature-install/x'], $dodProject);
+check('complete evidence is DONE, exit 0', $exit === 0 && str_starts_with($output, 'DONE'));
+$writeDod($dodChecklist, ['scope' => ['feature' => 'spryker-feature/x']] + $dodEvidence, $provenSteps);
+check('an unconfirmed scope fails item 1', $unmetItems() === [1]);
+$writeDod($dodChecklist, ['baselines' => ['backoffice-crawl' => 'blocked: admin login fails'] + $dodEvidence['baselines']] + $dodEvidence, $provenSteps);
+check('a blocked baseline fails item 2', $unmetItems() === [2]);
+$writeDod($dodChecklist, ['baselines' => ['backoffice-crawl' => 'waived: developer, no Back Office in this project'] + $dodEvidence['baselines']] + $dodEvidence, $provenSteps);
+check('a baseline waived with a reason is met', $unmetItems() === []);
+write_file($dodProject . '/composer.lock', $dodLock(['spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.70']], 'spryker/kernel' => ['version' => '3.71.0'], 'spryker/unrelated' => ['version' => '1.1.0']]));
+$writeDod($dodChecklist, $dodEvidence, $provenSteps);
+check('a module moved outside the feature tree with no reason fails item 3', $unmetItems() === [3]);
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'developer: required by the -w update, patch only']] + $dodEvidence, $provenSteps);
+check('a move with a recorded reason is met', $unmetItems() === []);
+$open = $dodChecklist;
+$open['rows'][0]['status'] = 'open';
+$writeDod($open, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+check('an open row fails item 4', $unmetItems() === [4]);
+write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nreturn [];\n");
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+check('missing wiring fails item 5', $unmetItems() === [5]);
+write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nuse Spryker\\Zed\\X\\XPlugin;\nreturn [new XPlugin()];\n");
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'checks' => ['frontend-build' => 'fail: Zed webpack error'] + $dodEvidence['checks']] + $dodEvidence, $provenSteps);
+check('a failed frontend build fails item 6', $unmetItems() === [6]);
+$blocked = $dodChecklist;
+$blocked['rows'][2]['verdict'] = 'BLOCKED';
+$writeDod($blocked, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+check('a BLOCKED verification fails item 7, and only item 7', $unmetItems() === [7]);
+$untested = $dodChecklist;
+unset($untested['rows'][3]);
+$untested['rows'] = array_values($untested['rows']);
+$writeDod($untested, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+check('no passing test fails item 8', $unmetItems() === [8]);
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'authored_content' => [['file' => 'data/import/local/common/partial_glossary.csv', 'what' => 'fr_FR translations']]] + $dodEvidence, $provenSteps);
+check('text the agent wrote without approval fails item 9', $unmetItems() === [9]);
+$unproven = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R010 | to verify |\n";
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $unproven);
+check('an unproven release step fails item 10', $unmetItems() === [10]);
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'release_steps_accepted' => 'developer: proven on staging instead'] + $dodEvidence, $unproven);
+check('unproven release steps the developer accepted are met', $unmetItems() === []);
+[$exit, $output] = run_script('check-dod.php', ['.ai-dev/feature-install/missing'], $dodProject);
+check('a missing state dir exits 2', $exit === 2);
 
 echo "\n$count checks, $failures failed\n";
 exit($failures === 0 ? 0 : 1);

@@ -100,7 +100,8 @@ the file that reads it, and what it holds.
 
 ## The report
 
-`$STATE/report.md`, in this order:
+`$STATE/report.md`, in this order. Its first line is the first line of `check-dod.php`, word for
+word. A report is written only when that line says `DONE` (SKILL.md Phase 8).
 
 1. **Feature and release** — the feature, the release, the guides used (with their source URLs).
 2. **Installed** — per guide section: the rows applied, with their decision.
