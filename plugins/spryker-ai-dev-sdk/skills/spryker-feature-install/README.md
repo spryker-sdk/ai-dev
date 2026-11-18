@@ -46,9 +46,13 @@ flowchart TD
 | `check-feature-installed.php` | 3 (`--mark`), 5 (`--wiring`) | which modules and wiring does the project have already; is the decided wiring in place; which plugins belong to modules the project does not install? |
 | `find-feature-change.php` | 4 | which pull request brought the feature into the reference demo shop, and which of its files does no row name? |
 | `check-checklist.php` | 4 (`--phase decide`), 8 (`--phase report`) | is every row decided; is every row done, every verification passed, and the feature covered by a passing test? |
-| `check-lock-diff.php` | 5 | which packages did the install move outside the feature's dependency tree; does a required package have a dev constraint? |
-| `glossary-key-check.php` | 5 | which translation keys of the feature's Yves modules have no glossary row? |
+| `check-needed-moves.php` | 5 | which moved packages does the feature need, and which only moved because composer could move them? |
+| `check-lock-diff.php` | 5 | which packages moved outside the feature's dependency tree; does a required package have a dev constraint? |
+| `glossary-key-check.php` | 5 | which translation keys the feature uses (Twig, PHP mail subjects and messages) or ships have no glossary row for a project locale? |
+| `check-data-manifests.php` | 5 | is every data file the install wrote imported by a manifest a deploy recipe runs? |
+| `compare-baselines.php` | 0, 6 | does every baseline hold a result; did PHPStan, the sniffer, the tests, the Back Office crawl, the storage counts or a frontend build regress? |
 | `diff-release-steps.php` | 7 | which commands, imports, republishes and variables does the deploy recipe not cover? |
+| `dump-state.php` | 7 | is a deployed environment the same as a fresh install? Dumps tables and search indices without ids and timestamps, and compares two dumps |
 | `check-dod.php` | 8 | is the integration DONE? Each of the ten Definition of Done items, met or not, from the evidence in the state directory |
 
 `lib.php` is the shared library. The baselines and the override checks reuse
@@ -67,7 +71,8 @@ Everything a run writes is in the project, under `.ai-dev/feature-install/<featu
 | `checklist.json` | One row per guide step, with its decision, status and verdict |
 | `dod.json` | The Definition of Done evidence no script can measure: scope, baselines, accepted module moves, after-install checks, approved content, accepted unproven release steps |
 | `composer.lock.before` | The lock before the install |
-| `baseline/` | The baselines of the `spryker-upgrade` scripts, PHPStan, sniffer and tests |
+| `baseline/` | The tool output before the install (the file names `spryker-upgrade` uses), and the crawl and counts reports |
+| `after/` | The same tools after the install, and the frontend build output with its exit code |
 | `data-handoff-<section>.md` | The fixed row lists for `project-data` |
 | `release-steps.md` | The release-steps log |
 | `report.md` | The install report for colleagues, written only when `check-dod.php` says DONE (`references/report.md`) |

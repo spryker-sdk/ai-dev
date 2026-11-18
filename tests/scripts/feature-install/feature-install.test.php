@@ -18,6 +18,8 @@ require FI_SCRIPTS . '/check-feature-installed.php';
 require FI_SCRIPTS . '/diff-release-steps.php';
 require FI_SCRIPTS . '/find-feature-change.php';
 require FI_SCRIPTS . '/check-dod.php';
+require FI_SCRIPTS . '/glossary-key-check.php';
+require FI_SCRIPTS . '/dump-state.php';
 
 $failures = 0;
 $count = 0;
@@ -319,78 +321,206 @@ check('composer files are not steps', str_contains($output, '1 not a step'));
 [$exit] = run_script('find-feature-change.php', ['--repo', $repo, '--package', 'spryker-feature/never'], $repo);
 check('a package the reference never required exits 1', $exit === 1);
 
+echo "lib: composer constraints\n";
+$constraintCases = [
+    ['1.5.0', '^1.2', true], ['2.0.0', '^1.2', false], ['0.3.1', '^0.3', true], ['0.4.0', '^0.3', false],
+    ['1.2.9', '~1.2.3', true], ['1.3.0', '~1.2.3', false], ['1.9.0', '~1.2', true], ['4.14.0', '^4.15.0', false],
+    ['5.1', '^4.14.0 || ^5.0', true], ['2.1', '>=1.0, <2.0', false], ['1.2.3', '1.2.*', true], ['2.0.1', '1.0 - 2.0', false],
+    ['202610.0', '^202608.0', false], ['1.0.0', 'dev-master as 1.0', null], ['dev-master', '^1.0', null],
+];
+$constraintFailures = array_filter($constraintCases, static fn (array $c): bool => fi_version_satisfies($c[0], $c[1]) !== $c[2]);
+check('version constraints match composer rules (' . count($constraintCases) . ' cases)', $constraintFailures === []);
+
+echo "check-needed-moves\n";
+$needLock = static fn (array $packages): array => array_combine(array_keys($packages), array_map(static fn (string $n, array $p): array => ['name' => $n] + $p, array_keys($packages), $packages));
+$moves = cnm_classify(
+    $needLock(['spryker/kernel' => ['version' => '3.70.0'], 'spryker/mail' => ['version' => '4.14.0'], 'spryker/gui' => ['version' => '5.8.0'], 'spryker/x' => ['version' => '1.0.0']]),
+    $needLock([
+        'spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.71.0', 'spryker/mail' => '^4.0.0']],
+        'spryker/kernel' => ['version' => '3.71.0'],
+        'spryker/mail' => ['version' => '4.15.1'],
+        'spryker/gui' => ['version' => '5.15.0'],
+        'spryker/x' => ['version' => '1.1.0'],
+        'spryker/y' => ['version' => '2.0.0', 'conflict' => ['spryker/x' => '<1.1.0']],
+    ]),
+    ['require' => ['spryker-feature/x' => '^202608.0']]
+);
+check('a move a requirer needs is needed', $moves['spryker/kernel']['verdict'] === 'needed');
+check('a move whose old version satisfies every requirer is not needed', $moves['spryker/mail']['verdict'] === 'not needed' && $moves['spryker/gui']['verdict'] === 'not needed');
+check('a conflict with the old version makes the move needed', $moves['spryker/x']['verdict'] === 'needed');
+check('new packages are listed, not judged', $moves['spryker/y']['verdict'] === 'new');
+check('accepted moves are not open', array_keys(cnm_open($moves, ['spryker/gui' => 'developer: needed for the new Back Office assets'])) === ['spryker/mail']);
+
+echo "compare-baselines\n";
+check('PHPStan error count', cb_phpstan_errors('[ERROR] Found 12 errors') === 12 && cb_phpstan_errors(' [OK] No errors') === 0);
+check('sniffer total', cb_sniff_findings('A TOTAL OF 3 ERRORS AND 2 WARNINGS WERE FOUND') === 5 && cb_sniff_findings("FOUND 2 ERRORS AFFECTING 2 LINES\nFOUND 1 ERROR AND 1 WARNING AFFECTING 2 LINES") === 4);
+check('codecept failing tests are named', cb_codecept("There were 2 failures:\n1) FooTest: bar\n2) BazTest: qux\nFAILURES!\nTests: 10, Assertions: 20, Failures: 2.")['failing'] === ['FooTest: bar', 'BazTest: qux']);
+
+echo "check-data-manifests\n";
+$manifestProject = temp_dir('manifests');
+write_file($manifestProject . '/composer.json', '{}');
+write_file($manifestProject . '/config/install/docker.yml', "sections:\n    demodata:\n        import:\n            command: 'vendor/bin/console data:import --config=data/import/local/full_\${SPRYKER_REGION}.yml'\n");
+write_file($manifestProject . '/data/import/local/full_EU.yml', "version: 0\nactions:\n    - data_entity: glossary\n      source: data/import/local/common/partial_glossary.csv\n");
+write_file($manifestProject . '/data/import/local/common/partial_glossary.csv', "key,translation,locale\n");
+write_file($manifestProject . '/data/import/common/common/glossary.csv', "key,translation,locale\n");
+check('manifests come from the recipes, with the region variable matched', cdm_manifests($manifestProject) === ['data/import/local/full_EU.yml']);
+$byFile = cdm_evaluate($manifestProject, ['data/import/local/common/partial_glossary.csv', 'data/import/common/common/glossary.csv']);
+check('a file a recipe manifest imports is found', $byFile['data/import/local/common/partial_glossary.csv'] === ['data/import/local/full_EU.yml']);
+check('a file no recipe manifest imports is reported', $byFile['data/import/common/common/glossary.csv'] === []);
+
+echo "glossary-key-check\n";
+$glossaryProject = temp_dir('glossary');
+write_file($glossaryProject . '/composer.json', '{}');
+mkdir($glossaryProject . '/src', 0777, true);
+write_file($glossaryProject . '/vendor/spryker-feature/x/src/SprykerFeature/Zed/X/Mapper.php', "<?php\nclass Mapper {\n    protected const string MAIL_SUBJECT_KEY = 'x.mail.subject';\n    protected const OTHER = 'x.not.a.key';\n    public function map(\$m) { \$m->setSubject(static::OTHER); \$m->addErrorMessage('x.error'); }\n}\n");
+write_file($glossaryProject . '/vendor/spryker-feature/x/src/SprykerFeature/Yves/X/Theme/default/views/x.twig', "{{ 'x.title' | trans }}\n");
+write_file($glossaryProject . '/vendor/spryker-feature/x/data/import/glossary.csv', "key,translation,locale\nx.shipped,Shipped,en_US\nx.shipped,Geliefert,de_DE\n");
+write_file($glossaryProject . '/data/import/local/common/partial_glossary.csv', "key,translation,locale\nx.title,Titre,fr_FR\nx.mail.subject,Sujet,fr_FR\nx.error,Erreur,fr_FR\nx.not.a.key,Clé,fr_FR\n");
+check('PHP keys: a typed SUBJECT constant, a constant passed to setSubject, a literal message', glossary_check_keys_in_php($glossaryProject . '/vendor/spryker-feature/x/src/SprykerFeature/Zed/X/Mapper.php') === ['x.mail.subject', 'x.not.a.key', 'x.error']);
+[$exit, $output] = run_script('glossary-key-check.php', ['--package=spryker-feature/x', '--locales=fr_FR'], $glossaryProject);
+$glossaryResult = json_decode((string)strtok($output, "\n"), true);
+check('a partial_glossary file counts as glossary', !in_array('x.title', $glossaryResult['missing']['fr_FR'] ?? ['x.title'], true));
+check('a key the package ships only in other locales is missing for the project locale', $exit === 1 && ($glossaryResult['missing']['fr_FR'] ?? []) === ['x.shipped']);
+
+echo "dump-state\n";
+$dumpDir = temp_dir('dump');
+copy(FI_SCRIPTS . '/dump-state.php', $dumpDir . '/dump-state.php');
+$makeDb = static function (string $file, array $glossary, string $storage) {
+    $pdo = new PDO('sqlite:' . $file);
+    $pdo->exec('CREATE TABLE spy_glossary_key (id_glossary_key INTEGER, glossary_key TEXT)');
+    $pdo->exec('CREATE TABLE spy_x_storage (id_x_storage INTEGER, data TEXT, updated_at TEXT)');
+    $pdo->exec('CREATE TABLE spy_session_data (value TEXT)');
+    foreach ($glossary as $id => $key) {
+        $pdo->prepare('INSERT INTO spy_glossary_key VALUES (?, ?)')->execute([$id, $key]);
+    }
+    $pdo->prepare('INSERT INTO spy_x_storage VALUES (1, ?, ?)')->execute([$storage, date('c')]);
+    $pdo->exec("INSERT INTO spy_session_data VALUES ('" . bin2hex(random_bytes(4)) . "')");
+};
+$makeDb($dumpDir . '/deployed.db', [1 => 'a.b', 2 => 'c.d'], '{"idX":5,"name":"n"}');
+$makeDb($dumpDir . '/fresh.db', [7 => 'c.d', 8 => 'a.b'], '{"name":"n","idX":99}');
+$makeDb($dumpDir . '/short.db', [1 => 'a.b'], '{"idX":5,"name":"changed"}');
+$copyRun = static function (array $args) use ($dumpDir): array {
+    $process = proc_open(array_merge([PHP_BINARY, $dumpDir . '/dump-state.php'], $args), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $dumpDir);
+    $output = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return [proc_close($process), (string)$output];
+};
+foreach (['deployed', 'fresh', 'short'] as $label) {
+    $copyRun(['--dump', $label, '--dsn', 'sqlite:' . $dumpDir . '/' . $label . '.db']);
+}
+check('dumps are written next to the copied script', is_file($dumpDir . '/state-deployed.json') && !is_file(FI_SCRIPTS . '/state-deployed.json'));
+[$exit, $output] = $copyRun(['--compare', 'deployed', 'fresh']);
+check('the same data under other ids, order and timestamps is equal; session tables are left out', $exit === 0 && str_starts_with($output, 'EQUAL'));
+[$exit, $output] = $copyRun(['--compare', 'deployed', 'short']);
+check('a missing row and changed storage content are named', $exit === 1 && str_contains($output, 'spy_glossary_key: 2 rows vs 1 rows') && str_contains($output, 'spy_x_storage: same row count (1), different content'));
+
 echo "check-dod\n";
 $dodProject = temp_dir('dod');
 $dodState = $dodProject . '/.ai-dev/feature-install/x';
 $dodLock = static fn (array $packages): string => json_encode(['packages' => array_map(static fn (string $n, array $p): array => ['name' => $n] + $p, array_keys($packages), $packages)]);
 write_file($dodProject . '/composer.json', json_encode(['require' => ['spryker-feature/x' => '^202608.0'], 'autoload' => ['psr-4' => ['Pyz\\' => 'src/Pyz/']]]));
 write_file($dodState . '/composer.lock.before', $dodLock(['spryker/kernel' => ['version' => '3.70.0'], 'spryker/unrelated' => ['version' => '1.0.0']]));
-write_file($dodProject . '/composer.lock', $dodLock([
-    'spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.70']],
-    'spryker/kernel' => ['version' => '3.71.0'],
-    'spryker/unrelated' => ['version' => '1.0.0'],
-]));
+$afterLock = ['spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.71.0']], 'spryker/kernel' => ['version' => '3.71.0'], 'spryker/unrelated' => ['version' => '1.0.0']];
+write_file($dodProject . '/composer.lock', $dodLock($afterLock));
 write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nuse Spryker\\Zed\\X\\XPlugin;\nreturn [new XPlugin()];\n");
+write_file($dodProject . '/tests/PyzTest/Zed/X/XFacadeTest.php', "<?php\n");
+write_file($dodProject . '/config/install/docker.yml', "sections:\n    demodata:\n        import:\n            command: 'vendor/bin/console data:import --config=data/import/local/full_EU.yml'\n");
+write_file($dodProject . '/data/import/local/full_EU.yml', "actions:\n    - data_entity: glossary\n      source: data/import/local/common/glossary.csv\n");
+write_file($dodProject . '/data/import/local/common/glossary.csv', "key,translation,locale\n");
+$baselineFiles = [
+    'baseline/phpstan-baseline-run.txt' => " [ERROR] Found 3 errors\n",
+    'baseline/sniff-baseline.txt' => "FOUND 2 ERRORS AFFECTING 2 LINES\nTime: 1s\n",
+    'baseline/codecept-baseline.txt' => "There was 1 failure:\n1) FooTest: bar\nFAILURES!\nTests: 10, Assertions: 20, Failures: 1.\n",
+    'baseline/backoffice-smoke-baseline.json' => json_encode(['results' => [['url' => '/a', 'problem' => 'HTTP 500']]]),
+    'baseline/storage-search-counts-before.json' => json_encode(['tables' => ['spy_x_storage' => 5], 'totalRows' => 5]),
+    'after/phpstan-after.txt' => " [ERROR] Found 3 errors\n",
+    'after/sniff-after.txt' => "FOUND 2 ERRORS AFFECTING 2 LINES\nTime: 1s\n",
+    'after/codecept-after.txt' => "There was 1 failure:\n1) FooTest: bar\nFAILURES!\nTests: 12, Assertions: 24, Failures: 1.\n",
+    'baseline/backoffice-smoke-report.json' => json_encode(['results' => [['url' => '/a', 'problem' => 'HTTP 500', 'inBaseline' => true], ['url' => '/b', 'problem' => null]]]),
+    'baseline/storage-search-counts-report.json' => json_encode(['rows' => [['table' => 'spy_x_storage', 'failing' => false]]]),
+    'after/yves-build.txt' => "webpack compiled successfully\nexit 0\n",
+];
+$writeEvidence = static function (array $overrides = []) use ($dodState, $baselineFiles): void {
+    foreach (array_merge($baselineFiles, $overrides) as $file => $contents) {
+        write_file($dodState . '/' . $file, $contents);
+    }
+};
 $dodChecklist = ['schema' => 1, 'release' => '202608.0', 'guides' => [], 'rows' => [
     decided_row(['id' => 'R001', 'kind' => 'composer', 'target' => 'composer require spryker-feature/x', 'packages' => ['spryker-feature/x' => '^202608.0']]),
     decided_row(['id' => 'R002', 'kind' => 'plugin', 'target' => 'src/Pyz/Zed/Cart/CartDependencyProvider.php', 'plugins' => ['Spryker\Zed\X\XPlugin']]),
     decided_row(['id' => 'R003', 'kind' => 'verification', 'verdict' => 'PASS']),
     decided_row(['id' => 'R004', 'kind' => 'test', 'target' => 'tests/PyzTest/Zed/X/XFacadeTest.php']),
+    decided_row(['id' => 'R005', 'kind' => 'glossary', 'target' => 'data/import/glossary.csv', 'data_class' => 'feature-data']),
 ]];
 $dodEvidence = [
     'scope' => ['feature' => 'spryker-feature/x', 'install_release' => '202608.0', 'update_mode' => '-w', 'branch' => 'ai-feature/x', 'confirmed' => 'developer: yes, -w, skip demo data'],
-    'baselines' => array_fill_keys(DOD_BASELINES, 'valid'),
-    'checks' => array_fill_keys(DOD_CHECKS, 'pass'),
+    'data_files' => ['data/import/local/common/glossary.csv'],
     'authored_content' => [],
 ];
+$provenSteps = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R005 | verified |\n| queue:setup | new queue | R011 | covered by recipe |\n";
 $writeDod = static function (array $checklist, array $evidence, string $releaseSteps) use ($dodState): void {
     fi_save_checklist($dodState . '/checklist.json', $checklist);
     write_file($dodState . '/dod.json', json_encode($evidence));
     write_file($dodState . '/release-steps.md', $releaseSteps);
 };
-$provenSteps = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R010 | verified |\n| queue:setup | new queue | R011 | covered by recipe |\n";
 $unmetItems = static fn (): array => array_keys(array_filter(dod_evaluate($dodProject, $dodState), static fn (array $r): bool => $r !== []));
+$writeEvidence();
 $writeDod($dodChecklist, $dodEvidence, $provenSteps);
 [$exit, $output] = run_script('check-dod.php', ['.ai-dev/feature-install/x'], $dodProject);
 check('complete evidence is DONE, exit 0', $exit === 0 && str_starts_with($output, 'DONE'));
 $writeDod($dodChecklist, ['scope' => ['feature' => 'spryker-feature/x']] + $dodEvidence, $provenSteps);
 check('an unconfirmed scope fails item 1', $unmetItems() === [1]);
-$writeDod($dodChecklist, ['baselines' => ['backoffice-crawl' => 'blocked: admin login fails'] + $dodEvidence['baselines']] + $dodEvidence, $provenSteps);
-check('a blocked baseline fails item 2', $unmetItems() === [2]);
-$writeDod($dodChecklist, ['baselines' => ['backoffice-crawl' => 'waived: developer, no Back Office in this project'] + $dodEvidence['baselines']] + $dodEvidence, $provenSteps);
-check('a baseline waived with a reason is met', $unmetItems() === []);
-write_file($dodProject . '/composer.lock', $dodLock(['spryker-feature/x' => ['version' => '202608.0', 'require' => ['spryker/kernel' => '^3.70']], 'spryker/kernel' => ['version' => '3.71.0'], 'spryker/unrelated' => ['version' => '1.1.0']]));
 $writeDod($dodChecklist, $dodEvidence, $provenSteps);
-check('a module moved outside the feature tree with no reason fails item 3', $unmetItems() === [3]);
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'developer: required by the -w update, patch only']] + $dodEvidence, $provenSteps);
-check('a move with a recorded reason is met', $unmetItems() === []);
+$writeEvidence(['baseline/codecept-baseline.txt' => "Could not open input file: vendor/bin/codecept\n"]);
+check('a baseline without a result fails item 2 (and the test comparison of item 6)', $unmetItems() === [2, 6]);
+$writeDod($dodChecklist, ['waived' => ['baseline:tests' => 'developer: suite broken before', 'check:tests' => 'developer: suite broken before']] + $dodEvidence, $provenSteps);
+check('a baseline and check the developer waived are met', $unmetItems() === []);
+$writeEvidence();
+write_file($dodProject . '/composer.lock', $dodLock(['spryker/unrelated' => ['version' => '1.1.0']] + $afterLock));
+$writeDod($dodChecklist, $dodEvidence, $provenSteps);
+check('a module moved that nothing needs fails item 3, the needed move does not', $unmetItems() === [3] && str_contains(implode("\n", dod_evaluate($dodProject, $dodState)[3]), 'spryker/unrelated 1.0.0 -> 1.1.0: not needed'));
+$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'developer: security fix']] + $dodEvidence, $provenSteps);
+check('a move with the developer\'s reason is met', $unmetItems() === []);
+write_file($dodProject . '/composer.lock', $dodLock($afterLock));
 $open = $dodChecklist;
 $open['rows'][0]['status'] = 'open';
-$writeDod($open, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+$writeDod($open, $dodEvidence, $provenSteps);
 check('an open row fails item 4', $unmetItems() === [4]);
 write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nreturn [];\n");
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
+$writeDod($dodChecklist, $dodEvidence, $provenSteps);
 check('missing wiring fails item 5', $unmetItems() === [5]);
 write_file($dodProject . '/src/Pyz/Zed/Cart/CartDependencyProvider.php', "<?php\nuse Spryker\\Zed\\X\\XPlugin;\nreturn [new XPlugin()];\n");
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'checks' => ['frontend-build' => 'fail: Zed webpack error'] + $dodEvidence['checks']] + $dodEvidence, $provenSteps);
-check('a failed frontend build fails item 6', $unmetItems() === [6]);
+foreach ([
+    'after/phpstan-after.txt' => [' [ERROR] Found 5 errors', 'more PHPStan errors'],
+    'after/codecept-after.txt' => ["There were 2 failures:\n1) FooTest: bar\n2) NewTest: broken\nFAILURES!\nTests: 12, Assertions: 24, Failures: 2.", 'a test that passed before fails'],
+    'baseline/backoffice-smoke-report.json' => [json_encode(['results' => [['url' => '/b', 'problem' => 'HTTP 500', 'inBaseline' => false]]]), 'a new Back Office failure'],
+    'after/yves-build.txt' => ["ERROR in ./src/x.ts\nexit 1", 'a failed build'],
+] as $file => [$contents, $what]) {
+    $writeEvidence([$file => $contents]);
+    check("$what fails item 6", $unmetItems() === [6]);
+}
+$writeEvidence();
+unlink($dodProject . '/tests/PyzTest/Zed/X/XFacadeTest.php');
+check('a done test row whose file does not exist fails item 8', $unmetItems() === [8]);
+write_file($dodProject . '/tests/PyzTest/Zed/X/XFacadeTest.php', "<?php\n");
+$writeDod($dodChecklist, ['data_files' => ['data/import/common/common/glossary.csv']] + $dodEvidence, $provenSteps);
+check('a data file no recipe manifest imports fails item 9', $unmetItems() === [9]);
+$writeDod($dodChecklist, ['data_files' => []] + $dodEvidence, $provenSteps);
+check('done data rows without the files the hand-off wrote fail item 9', $unmetItems() === [9]);
+$writeDod($dodChecklist, ['authored_content' => [['file' => 'data/import/local/common/glossary.csv', 'what' => 'fr_FR translations']]] + $dodEvidence, $provenSteps);
+check('text the agent wrote without approval fails item 9', $unmetItems() === [9]);
 $blocked = $dodChecklist;
 $blocked['rows'][2]['verdict'] = 'BLOCKED';
-$writeDod($blocked, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
-check('a BLOCKED verification fails item 7, and only item 7', $unmetItems() === [7]);
-$untested = $dodChecklist;
-unset($untested['rows'][3]);
-$untested['rows'] = array_values($untested['rows']);
-$writeDod($untested, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $provenSteps);
-check('no passing test fails item 8', $unmetItems() === [8]);
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'authored_content' => [['file' => 'data/import/local/common/partial_glossary.csv', 'what' => 'fr_FR translations']]] + $dodEvidence, $provenSteps);
-check('text the agent wrote without approval fails item 9', $unmetItems() === [9]);
-$unproven = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R010 | to verify |\n";
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only']] + $dodEvidence, $unproven);
+$writeDod($blocked, $dodEvidence, $provenSteps);
+check('a BLOCKED verification fails item 7', $unmetItems() === [7]);
+$unproven = "| action | why | rows | status |\n|---|---|---|---|\n| data:import glossary | feature-data | R005 | to verify |\n";
+$writeDod($dodChecklist, $dodEvidence, $unproven);
 check('an unproven release step fails item 10', $unmetItems() === [10]);
-$writeDod($dodChecklist, ['accepted_moves' => ['spryker/unrelated' => 'patch only'], 'release_steps_accepted' => 'developer: proven on staging instead'] + $dodEvidence, $unproven);
+$writeDod($dodChecklist, ['release_steps_accepted' => 'developer: proven on staging instead'] + $dodEvidence, $unproven);
 check('unproven release steps the developer accepted are met', $unmetItems() === []);
-[$exit, $output] = run_script('check-dod.php', ['.ai-dev/feature-install/missing'], $dodProject);
+[$exit] = run_script('check-dod.php', ['.ai-dev/feature-install/missing'], $dodProject);
 check('a missing state dir exits 2', $exit === 2);
 
 echo "\n$count checks, $failures failed\n";

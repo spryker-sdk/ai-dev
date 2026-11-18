@@ -18,7 +18,7 @@ files (plugins, dependency providers, transfers) define the conventions.
 | `transfer` | Project layer; check fields with `getTransferStructureByName`. |
 | `schema`, `event` | Project layer; follow the `propel-schema` conventions. |
 | `navigation`, `route` | Add the entry; do not reorder existing ones. |
-| `glossary` | Add the keys for every configured locale (through the `project-data` hand-off). Guides often have no glossary step, so also run `php $FI/glossary-key-check.php --module=<Yves modules of the feature>`: it lists the `'key' \| trans` keys of those modules that no `data/import/**/glossary*.csv` row defines, per locale. Add a `glossary` row with `data_class: feature-data` for each missing key; a missing key renders raw on the page. |
+| `glossary` | Add the keys for every configured locale (through the `project-data` hand-off). Guides often have no glossary step, so also run `php $FI/glossary-key-check.php --package=<feature package> --locales=<project locales>`: it lists the keys the feature uses (Twig, PHP mail subjects and messages) or ships that no glossary row of the project defines, per locale. Add a `glossary` row with `data_class: feature-data` for each missing key; a missing key renders raw on the page. |
 | `data-row`, `data-import` | Through the `project-data` hand-off ([data-classes.md](data-classes.md)). The importer plugin and console command registration stays here. |
 | `deploy` | A new service or environment variable in a deploy file usually needs `docker/sdk up`, which is a rebuild: ask the developer. Never `docker/sdk reset` or `clean-data`. |
 | `console` | Through `spryker-refresher` and the guide's own setup commands (below). |

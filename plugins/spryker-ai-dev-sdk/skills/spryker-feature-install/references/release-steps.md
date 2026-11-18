@@ -61,10 +61,10 @@ are empty after each reset and after the deployment.
 | 2 | `docker/sdk reset` | production today |
 | 3 | Check out the feature branch. | |
 | 4 | Build the images and assets as the pipeline does, without data: `docker/sdk up --build --assets`. Then run only the normal deployment commands. | |
-| 5 | Dump the database, Redis and the search engine (documents, mappings, index settings). | **deployed** |
+| 5 | Copy `$FI/dump-state.php` into `$STATE/`, then `docker/sdk cli php $STATE/dump-state.php --dump deployed`: every table (row count and content, without ids and timestamps) and every search index (document count). | **deployed** |
 | 6 | `docker/sdk reset` | |
-| 7 | Dump the same set as in step 5. | **fresh** |
-| 8 | Compare **deployed** with **fresh**. Ignore IDs, UUIDs and timestamps. | |
+| 7 | `docker/sdk cli php $STATE/dump-state.php --dump fresh` | **fresh** |
+| 8 | `php $STATE/dump-state.php --compare deployed fresh`: `EQUAL`, or each table and index that differs. | |
 
 **For each difference:**
 

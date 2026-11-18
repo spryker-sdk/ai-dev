@@ -4,35 +4,31 @@
  * Definition of Done: is the feature integration finished — DONE or NOT DONE, item by item.
  *
  * A run can install a feature, see most checks pass and still not be finished: a blocked
- * verification, a baseline that never ran, a module that moved without a reason, no test, release
- * steps nobody proved. This script decides the status from evidence, so the report cannot claim
- * more than the evidence shows. Its first output line is the report's first line, word for word.
+ * verification, a baseline that never ran, a module that moved without being needed, no test, a data
+ * file no environment imports, release steps nobody proved. This script decides the status from
+ * evidence — tool output, lock files, the checklist, the project files — so a status cannot claim
+ * more than the evidence shows. Its first output line is the run's status.
  *
  * Usage (from the project root, or set SPRYKER_PROJECT_ROOT):
  *   php check-dod.php <state dir>        e.g. .ai-dev/feature-install/recurring-orders
  *
- * Evidence it reads from the state dir:
- *   checklist.json        rows, verdicts, `test` rows, `tests_waived` (items 4, 5, 7, 8, 9)
- *   dod.json              scope, baselines, accepted module moves, after-install checks, authored
- *                         content, accepted unproven release steps (items 1, 2, 3, 6, 9, 10)
- *   composer.lock.before  with the project's composer.lock and composer.json (item 3)
+ * Evidence it reads:
+ *   baseline/, after/     the tool outputs compare-baselines.php reads (items 2, 6)
+ *   composer.lock.before  with composer.lock and composer.json: check-needed-moves.php (item 3)
+ *   checklist.json        rows, wiring, verdicts, `test` rows and their files, `tests_waived`
+ *                         (items 4, 5, 7, 8)
  *   release-steps.md      the release-steps log (item 10): a row is met when its status starts
  *                         with `verified`, `not needed` or `covered`
- *
- * dod.json:
+ *   dod.json              what no file shows (items 1, 3, 9, 10, and waivers for 2 and 6):
  *   {
  *     "scope": {"feature": "...", "install_release": "...", "update_mode": "-w", "branch": "...",
  *               "confirmed": "<the developer's answer>"},
- *     "baselines": {"phpstan": "valid", "sniffer": "valid", "tests": "valid",
- *                   "backoffice-crawl": "valid", "storage-counts": "valid"},
- *     "accepted_moves": {"spryker/<module>": "<why the move stays>"},
- *     "checks": {"phpstan": "pass", "sniffer": "pass", "tests": "pass", "backoffice-crawl": "pass",
- *                "storage-counts": "pass", "frontend-build": "pass"},
+ *     "accepted_moves": {"spryker/<module>": "<the developer's reason to keep the move>"},
+ *     "data_files": ["data/import/..."],
  *     "authored_content": [{"file": "...", "what": "...", "approved": "<who approved, when>"}],
- *     "release_steps_accepted": "<the developer's reason to ship with unproven steps>"
+ *     "release_steps_accepted": "<the developer's reason to ship with unproven steps>",
+ *     "waived": {"baseline:backoffice-crawl": "<the developer's reason>", "check:frontend-build": "..."}
  *   }
- *   A baseline is `valid`; a check is `pass`. Anything else is unmet, except `waived: <the
- *   developer's reason>`. `blocked: <why>` records a blocker, and a blocker is unmet.
  *
  * Exit codes: 0 DONE; 1 NOT DONE (each unmet item listed); 2 usage or unreadable state.
  */
@@ -43,9 +39,9 @@ require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/check-checklist.php';
 require_once __DIR__ . '/check-lock-diff.php';
 require_once __DIR__ . '/check-feature-installed.php';
-
-const DOD_BASELINES = ['phpstan', 'sniffer', 'tests', 'backoffice-crawl', 'storage-counts'];
-const DOD_CHECKS = ['phpstan', 'sniffer', 'tests', 'backoffice-crawl', 'storage-counts', 'frontend-build'];
+require_once __DIR__ . '/check-needed-moves.php';
+require_once __DIR__ . '/compare-baselines.php';
+require_once __DIR__ . '/check-data-manifests.php';
 
 const DOD_ITEMS = [
     1 => 'the developer confirmed the scope',
@@ -56,27 +52,19 @@ const DOD_ITEMS = [
     6 => 'no regression against the baselines, and the frontend builds pass',
     7 => 'every verification passed',
     8 => 'passing tests cover the feature',
-    9 => 'every text the agent wrote is approved',
+    9 => 'every data file reaches an environment, and every text the agent wrote is approved',
     10 => 'the release steps are proven',
 ];
 
-function dod_waived(string $value): bool
-{
-    return (bool)preg_match('/^waived:\s*\S/', $value);
-}
-
 /**
- * @return list<string> unmet entries of a baselines or checks map
+ * @return list<string> unmet reasons of a measured group, minus the ones the developer waived
  */
-function dod_unmet_map(array $map, array $required, string $passValue): array
+function dod_unwaived(array $measured, array $waived, string $prefix): array
 {
     $unmet = [];
-    foreach ($required as $name) {
-        $value = trim((string)($map[$name] ?? ''));
-        if ($value === '') {
-            $unmet[] = "$name: not recorded";
-        } elseif ($value !== $passValue && !dod_waived($value)) {
-            $unmet[] = "$name: $value";
+    foreach ($measured as $name => $problem) {
+        if ($problem !== null && trim((string)($waived["$prefix:$name"] ?? '')) === '') {
+            $unmet[] = "$name: $problem";
         }
     }
 
@@ -84,7 +72,7 @@ function dod_unmet_map(array $map, array $required, string $passValue): array
 }
 
 /**
- * @return list<string> release-steps log rows whose status is not verified or not needed
+ * @return list<string> release-steps log rows whose status is not verified, not needed or covered
  */
 function dod_unproven_release_steps(string $file): array
 {
@@ -121,6 +109,7 @@ function dod_evaluate(string $root, string $stateDir): array
     $checklist = fi_load_checklist($stateDir . '/checklist.json');
     $dod = json_decode((string)@file_get_contents($stateDir . '/dod.json'), true);
     $dod = is_array($dod) ? $dod : [];
+    $waived = (array)($dod['waived'] ?? []);
     $result = array_fill_keys(array_keys(DOD_ITEMS), []);
 
     $scope = $dod['scope'] ?? [];
@@ -130,37 +119,41 @@ function dod_evaluate(string $root, string $stateDir): array
         }
     }
 
-    $result[2] = dod_unmet_map($dod['baselines'] ?? [], DOD_BASELINES, 'valid');
+    $measured = cb_evaluate($stateDir);
+    $result[2] = dod_unwaived($measured['baselines'], $waived, 'baseline');
+    $result[6] = dod_unwaived($measured['checks'], $waived, 'check');
 
     $before = $stateDir . '/composer.lock.before';
-    if ($checklist === null || !is_file($before) || !is_file($root . '/composer.lock')) {
-        $result[3][] = 'cannot compare: checklist.json, composer.lock.before or composer.lock is missing';
+    if (!is_file($before) || !is_file($root . '/composer.lock')) {
+        $result[3][] = 'cannot compare: composer.lock.before or composer.lock is missing';
     } else {
-        $after = fi_lock_packages($root . '/composer.lock');
-        $features = cld_features_from_checklist($checklist);
-        $outside = array_diff_key(cld_moved(fi_lock_packages($before), $after), cld_tree($after, $features));
-        foreach ($outside as $package => $versions) {
-            if (trim((string)($dod['accepted_moves'][$package] ?? '')) === '') {
-                $result[3][] = sprintf('%s %s -> %s moved outside the feature tree with no reason', $package, $versions['before'] ?? '(new)', $versions['after'] ?? '(removed)');
-            }
-        }
         $composerJson = (array)json_decode((string)@file_get_contents($root . '/composer.json'), true);
+        $classified = cnm_classify(fi_lock_packages($before), fi_lock_packages($root . '/composer.lock'), $composerJson);
+        foreach (cnm_open($classified, (array)($dod['accepted_moves'] ?? [])) as $package => $move) {
+            $result[3][] = sprintf('%s %s -> %s: %s, and no reason recorded', $package, $move['before'], $move['after'], $move['verdict']);
+        }
+        $features = $checklist !== null ? array_map('strtolower', cld_features_from_checklist($checklist)) : [];
         foreach (cld_dev_constraints($composerJson) as $package => $constraint) {
-            if (in_array(strtolower($package), array_map('strtolower', $features), true)) {
+            if (in_array(strtolower($package), $features, true)) {
                 $result[3][] = "$package has the dev constraint $constraint";
             }
         }
     }
 
     if ($checklist === null) {
-        $result[4][] = 'checklist.json is missing or unreadable';
-        $result[7][] = 'checklist.json is missing or unreadable';
-        $result[8][] = 'checklist.json is missing or unreadable';
+        foreach ([4, 5, 7, 8] as $item) {
+            $result[$item][] = 'checklist.json is missing or unreadable';
+        }
     } else {
         $byItem = cc_problems_by_item($checklist, 'report');
         $result[4] = $byItem['rows'];
         $result[7] = $byItem['verification'];
         $result[8] = $byItem['tests'];
+        foreach ($checklist['rows'] as $row) {
+            if (($row['kind'] ?? '') === 'test' && ($row['status'] ?? '') === 'done' && !is_file($root . '/' . ltrim((string)($row['target'] ?? ''), '/'))) {
+                $result[8][] = sprintf('%s: the test file %s does not exist', $row['id'] ?? '?', $row['target'] ?? '');
+            }
+        }
 
         $namespaces = cfi_project_namespaces($root);
         $providers = cfi_dependency_providers($root, $namespaces);
@@ -174,9 +167,20 @@ function dod_evaluate(string $root, string $stateDir): array
                 $result[5][] = sprintf('%s %s: %s', $row['id'] ?? '?', $row['target'] ?? '', $state['state']);
             }
         }
-    }
 
-    $result[6] = dod_unmet_map($dod['checks'] ?? [], DOD_CHECKS, 'pass');
+        $dataRowsDone = array_filter($checklist['rows'], static fn (array $row): bool => in_array($row['kind'] ?? '', FI_DATA_KINDS, true) && ($row['status'] ?? '') === 'done');
+        $dataFiles = array_values(array_filter((array)($dod['data_files'] ?? []), 'is_string'));
+        if ($dataRowsDone !== [] && $dataFiles === []) {
+            $result[9][] = 'data rows are done, but dod.json data_files does not list the files the hand-off wrote';
+        }
+        if ($dataFiles !== []) {
+            foreach (cdm_evaluate($root, $dataFiles) as $file => $importedBy) {
+                if ($importedBy === []) {
+                    $result[9][] = "$file is imported by no manifest a recipe runs";
+                }
+            }
+        }
+    }
 
     foreach ($dod['authored_content'] ?? [] as $content) {
         if (trim((string)($content['approved'] ?? '')) === '') {

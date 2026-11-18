@@ -61,19 +61,21 @@ A feature integration is **DONE** only when all ten items hold, each one with it
 | # | Item | Evidence |
 |---|---|---|
 | 1 | The developer confirmed the scope: feature, install release, update mode, branch. | `dod.json` `scope` (Phase 3) |
-| 2 | Every baseline ran and is valid: PHPStan, sniffer, tests, Back Office crawl, storage and search counts. | `dod.json` `baselines` (Phase 0) |
-| 3 | Only modules the feature needs moved; every other move has a recorded reason. | `composer.lock.before` vs `composer.lock`; `dod.json` `accepted_moves` (Phase 5) |
+| 2 | Every baseline ran and holds a result: PHPStan, sniffer, tests, Back Office crawl, storage and search counts. | `baseline/` tool output, `compare-baselines.php` (Phase 0) |
+| 3 | Only modules the feature needs moved; every other move has the developer's reason. | `composer.lock.before` vs `composer.lock`, `check-needed-moves.php`; `dod.json` `accepted_moves` (Phase 5) |
 | 4 | Every checklist row is decided, and done or skipped with a reason. | `checklist.json` |
 | 5 | The decided wiring is in place. | `checklist.json` and the project's DependencyProviders |
-| 6 | No regression against the baselines, and the Yves, Zed and Merchant Portal builds pass. | `dod.json` `checks` (Phase 6) |
+| 6 | No regression against the baselines, and the Yves, Zed and Merchant Portal builds pass. | `after/` tool output, `compare-baselines.php` (Phase 6) |
 | 7 | Every verification passed. BLOCKED and FAIL are not done; ACCEPTED counts with the developer's note. | `checklist.json` verdicts (Phase 6) |
-| 8 | Passing tests cover the feature, or the developer waived them with a reason. | `checklist.json` `test` rows, `tests_waived` (Phase 6b) |
-| 9 | Every text you wrote (translations, CMS text) is approved by the developer. | `dod.json` `authored_content` (Phase 5) |
+| 8 | Passing tests cover the feature, or the developer waived them with a reason. | `checklist.json` `test` rows and their files, `tests_waived` (Phase 6b) |
+| 9 | Every data file the install wrote is imported by a manifest a recipe runs, and every text you wrote is approved. | `dod.json` `data_files`, `check-data-manifests.php`; `dod.json` `authored_content` (Phase 5) |
 | 10 | Every release step is verified, or the developer accepted shipping it unproven. | `release-steps.md`; `dod.json` `release_steps_accepted` (Phase 7) |
 
-`dod.json` holds what no script can measure. Its format is in the header of
-`scripts/check-dod.php`. A baseline is `valid`, a check is `pass`; `blocked: <why>` records a
-blocker; only the developer's answer can make a value `waived: <reason>`.
+Items 2, 3, 5, 6, 8 and 9 are measured from files, not from what you write down. `dod.json` holds
+only what no file shows: the scope, the developer's reasons and approvals, the data files the
+hand-off wrote, and waivers (`"waived": {"baseline:<name>": "<reason>"}`, `"check:<name>"`). Its
+format is in the header of `scripts/check-dod.php`. Only the developer's answer can make a waiver or
+a reason.
 
 **The status is `check-dod.php`'s first line.** While it says `NOT DONE`, every message to the
 developer opens with that line and the unmet items, the words "installed", "works", "done" or
@@ -157,17 +159,17 @@ or a package name.** Record in `state.md` that the search ran through a fallback
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-config-constants.php || true
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-dead-overrides.php snapshot
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/twig-shadow-map.php snapshot
-   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee $STATE/baseline/phpstan.txt
-   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee $STATE/baseline/sniff.txt
-   script -q /dev/null docker/sdk testing codecept run --no-exit 2>&1 | tee $STATE/baseline/codecept.txt
+   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee $STATE/baseline/phpstan-baseline-run.txt
+   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee $STATE/baseline/sniff-baseline.txt
+   script -q /dev/null docker/sdk testing codecept run --no-exit 2>&1 | tee $STATE/baseline/codecept-baseline.txt
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline SPRYKER_BACKOFFICE_USER=<user> SPRYKER_BACKOFFICE_PASSWORD=<password> php $UP/backoffice-smoke.php --url <zed base url> --baseline
    ```
    For the storage and search counts, copy `$UP/storage-search-counts.php` into `$STATE/baseline/`
    and run it in the container with `--snapshot before`.
-4. Record each baseline in `$STATE/dod.json` `baselines`. Red tests and existing findings are a
-   **valid** baseline: they are what the project had before. A baseline that did not run, or whose
-   result an environment problem distorts (a failed login makes the crawl and the logged-in tests
-   fail), is `blocked: <why>` — a blocker: stop and ask now (§ Blockers).
+4. Check the baselines: `php $FI/compare-baselines.php $STATE` — every line under "Baselines" is
+   `ok`. Red tests and existing findings are a valid baseline: they are what the project had before.
+   A baseline that did not run, or that an environment problem made fail (a failed login writes no
+   crawl baseline), is a blocker: stop and ask now (§ Blockers). Only the developer can waive it.
 
 ## Phase 1 — Resolve the feature and its release
 
@@ -268,13 +270,14 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
 1. Run the `composer` rows in the container, with the install release, the modules Phase 1 added,
    and the update mode the developer chose. On a conflict, report it and stop. Then:
    ```bash
-   php $FI/check-lock-diff.php --before $STATE/composer.lock.before --checklist $STATE/checklist.json
+   php $FI/check-needed-moves.php --before $STATE/composer.lock.before --accepted $STATE/dod.json
    ```
-   Exit 1 lists packages that moved outside the feature's dependency tree (a module Phase 1 added is
-   expected), or a dev constraint. Move each one back to its version in `composer.lock.before`
-   (`composer require spryker/<module>:<old version> --update-with-dependencies`, then restore the
-   constraint), unless the feature needs it. A move that stays needs the developer's reason in
-   `dod.json` `accepted_moves`. Accepting the update mode at gate #1 is not a reason for each move.
+   It judges every moved package: `needed` (a requirer or a conflict rules out its old version),
+   `not needed` (its old version satisfies every requirer), or `unknown`. Move each `not needed`
+   package back to its version in `composer.lock.before` (`composer require <package>:<old version>`,
+   then restore the constraint), and run the check again until only `needed` moves are left. A move
+   that stays without being needed needs the developer's reason in `dod.json` `accepted_moves`;
+   accepting the update mode at gate #1 is not a reason for each move.
 2. When any module moved, check the project's customisations against it:
    ```bash
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-typed-members.php
@@ -287,8 +290,11 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
    [references/apply-steps.md](references/apply-steps.md):
    - apply the section's rows by their decision; set `status: done` or `failed` on each;
    - hand the section's data rows to `project-data` (the hand-off format in
-     [references/data-classes.md](references/data-classes.md)), into the files the project's import
-     manifests read for every environment;
+     [references/data-classes.md](references/data-classes.md)). Record the files it wrote in
+     `dod.json` `data_files`, then `php $FI/check-data-manifests.php <file>...`: each file must be
+     imported by a manifest that a deploy recipe runs, for every environment that needs the rows;
+   - glossary: `php $FI/glossary-key-check.php --package=<feature package> --locales=<project
+     locales>` lists the keys the feature uses or ships that have no row for a project locale;
    - text the guide or the module does not ship (a translation for a project locale, CMS text) is
      content: ask the developer first (or hand it to `translate-content`), and record it in
      `dod.json` `authored_content` with their approval;
@@ -325,10 +331,14 @@ widgets; every vendor template the project overrides has lost the vendor's calls
    acceptance criterion, in the guide's words. Record `verdict` PASS, FAIL or BLOCKED with the
    evidence path. Weigh a FAIL as a hypothesis before acting: browser problems look like feature
    failures.
-3. Run PHPStan, the sniffer, the tests, the Back Office crawl and the storage and search counts
-   (`--snapshot after`, then `--compare before after`) again, each against its baseline, and the
-   Yves, Zed and Merchant Portal builds. A new failure is this run's damage. Record each result in
-   `dod.json` `checks` (`pass`, or `fail: <what>`; `frontend-build` covers all builds).
+3. Run the baseline tools again, into `$STATE/after/` with the same commands as in Phase 0:
+   `phpstan-after.txt`, `sniff-after.txt`, `codecept-after.txt`; the Back Office crawl without
+   `--baseline` (same `SPRYKER_UPGRADE_STATE_DIR`: it marks each failure that is in the baseline);
+   the storage and search counts with `--snapshot after`, then `--compare before after`. Run each
+   frontend build the project has into `after/yves-build.txt`, `after/zed-build.txt`,
+   `after/mp-build.txt`, each ending with its exit code
+   (`… 2>&1 | tee <file>; echo "exit ${PIPESTATUS[0]}" >> <file>`). Then
+   `php $FI/compare-baselines.php $STATE`: every line is `ok`. A new failure is this run's damage.
 4. `getSprykerCapability(slug)` shows `installed` (or `partially_installed` for API packages skipped
    on purpose).
 5. A FAIL goes to `spryker-issue-diagnoser`; fix its root cause as a checklist row. A FAIL or
