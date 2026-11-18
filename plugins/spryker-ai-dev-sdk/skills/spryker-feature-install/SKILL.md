@@ -75,9 +75,10 @@ A feature integration is **DONE** only when all ten items hold, each one with it
 `scripts/check-dod.php`. A baseline is `valid`, a check is `pass`; `blocked: <why>` records a
 blocker; only the developer's answer can make a value `waived: <reason>`.
 
-**The report's first line is `check-dod.php`'s first line, word for word.** While it says
-`NOT DONE`, the report opens with the unmet items, and the words "installed", "works", "done" or
-"ready" do not describe the run.
+**The status is `check-dod.php`'s first line.** While it says `NOT DONE`, every message to the
+developer opens with that line and the unmet items, the words "installed", "works", "done" or
+"ready" do not describe the run, and nothing is offered for review. The install report
+([references/report.md](references/report.md)) is written only after `DONE`.
 
 ## Blockers
 
@@ -380,9 +381,9 @@ unproven steps, and record their reason in `dod.json` `release_steps_accepted`.
 2. **NOT DONE:** the report opens with that line and the unmet items, each with what the
    developer can do (fix, waive with a reason, accept). Then stop and ask. Do not describe the run
    as installed, working, done or ready.
-3. **DONE:** write `$STATE/report.md` in the shape that
-   [references/release-steps.md](references/release-steps.md) § The report gives. Its first line is
-   `check-dod.php`'s first line, word for word.
+3. **DONE:** write `$STATE/report.md` with the template and rules in
+   [references/report.md](references/report.md). Problems found in the project that this install
+   did not cause go to the developer as ticket candidates, not into the report.
 4. Leave uncommitted changes unstaged for review. Stage only the files you changed, by path, and
    commit or push only on the developer's yes.
 

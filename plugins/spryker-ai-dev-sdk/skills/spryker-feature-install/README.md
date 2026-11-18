@@ -70,7 +70,7 @@ Everything a run writes is in the project, under `.ai-dev/feature-install/<featu
 | `baseline/` | The baselines of the `spryker-upgrade` scripts, PHPStan, sniffer and tests |
 | `data-handoff-<section>.md` | The fixed row lists for `project-data` |
 | `release-steps.md` | The release-steps log |
-| `report.md` | The report |
+| `report.md` | The install report for colleagues, written only when `check-dod.php` says DONE (`references/report.md`) |
 
 ## The checklist row
 

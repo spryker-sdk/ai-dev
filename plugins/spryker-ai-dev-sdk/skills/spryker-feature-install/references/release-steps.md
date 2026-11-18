@@ -98,25 +98,8 @@ For each verified step, recommend one of these:
 Environment variables: the team sets them in each environment before the deploy. Name the variable,
 the file that reads it, and what it holds.
 
-## The report
+## In the report
 
-`$STATE/report.md`, in this order. Its first line is the first line of `check-dod.php`, word for
-word. A report is written only when that line says `DONE` (SKILL.md Phase 8).
-
-1. **Feature and release** — the feature, the release, the guides used (with their source URLs).
-2. **Installed** — per guide section: the rows applied, with their decision.
-3. **Differences from the guide** — every row with `apply-reference`, `merge` or `skip:<reason>`,
-   with the reason.
-4. **Data** — the hand-offs, per `data_class`, and the placeholders listed for `curate-golive-data`.
-5. **Storefront placement** — the placements applied (widget, project file), declined, or the
-   suggestion table as a follow-up; "no Yves code" when the step did not apply.
-6. **Tests** — each `test` row: the test file, what behaviour it pins, ported from the reference or
-   new, and its suite. Or the `tests_waived` reason, with the line "the feature is not covered by
-   tests".
-7. **Verification** — each `verification` row: PASS, or ACCEPTED with its note. The baseline
-   comparison: PHPStan, sniffer, tests, Back Office crawl, storage and search counts.
-8. **Release steps** — staging first, production after the check on staging passes. Per step: the
-   command, the reason, recipe entry or one-time job, and `verified` or `to verify`.
-9. **Not verified** — every check that did not run, and what it would have found.
-
-Use only `verified` steps as instructions; list the `to verify` steps under their own heading.
+The report ([report.md](report.md)) lists only `verified` steps, under "Steps after the deploy".
+A run with steps still `to verify` is not DONE, unless the developer accepted them
+(`dod.json` `release_steps_accepted`).
