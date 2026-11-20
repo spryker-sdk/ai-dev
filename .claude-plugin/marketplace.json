@@ -10,7 +10,7 @@
         {
             "name": "spryker-ai-dev-sdk",
             "description": "Set of setup tools, skills and agents for Spryker project development.",
-            "version": "0.8.0",
+            "version": "0.10.0",
             "author": {
                 "name": "Spryker Systems GmbH",
                 "email": "support@spryker.com"

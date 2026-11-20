@@ -56,6 +56,8 @@ When a structured Spryker MCP tool can answer a question, **use it — do not** 
 
 | Tool | Use For |
 |------|---------|
+| `searchSprykerCapabilities` | **First call for "which module / feature does X?" questions.** Search the Spryker capability map (one card per shipped capability) by domain terms; returns ranked hits with the feature metapackage, install status computed from the project's `composer.lock`, and the card's "Extend, don't duplicate" line. Run several short queries (noun plus synonyms). |
+| `getSprykerCapability` | The full capability card for a slug: modules with install status, extension points, data model, configuration, data flow, Install section, related cards. Open the top hits of the search. |
 | `getSprykerModules` | Discover which modules belong to a feature |
 | `getSprykerModuleMap` | Module structure: facades, plugins, factories, key classes |
 | `getTransferStructureByName` | Transfer objects the feature uses |
@@ -90,7 +92,7 @@ Spryker transfer XMLs, schema XMLs, and config PHP files are small enough that `
 ## Approach
 
 1. **Run the mandatory checklist** above. State its key outputs (applicable primitives, reinvention flags, scope confirmation) at the top of your answer.
-2. **Identify the feature / problem class.** Use the `spryker-docs-research` skill to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
+2. **Identify the feature / problem class.** For "which module / feature does X", "does Spryker already do X" and "how do I build X" questions, **start with `searchSprykerCapabilities`** (then `getSprykerCapability` on the top hits) and follow the `find-existing-capability` skill's verdicts: a capability that ships is extended or installed (`spryker-feature-install`), and a hit counts toward the reinvention flags in the checklist above. A miss is not proof of absence; cross-check with docs and `getSprykerModules` before saying Spryker has no X. If the tools are not connected, `find-existing-capability` describes the web fallback. Then use the `spryker-docs-research` skill to confirm the concept and scope. **For enumerating the modules involved, use `getSprykerModules` (reads project + vendor directly) — not docs.** Docs may list modules that aren't installed in this project. If MCP is unavailable, fall back to `composer.json` / `composer.lock` and direct inspection of `vendor/spryker/` and each project-namespace directory under `src/`. Docs are for *concepts*; project + vendor are for *what's actually here*.
 3. **Build the explanation at the depth the question requires.** Cover:
    - What the feature does — capabilities, types, behaviour.
    - Key concepts and terminology.

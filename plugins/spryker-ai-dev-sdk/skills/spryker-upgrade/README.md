@@ -51,6 +51,8 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 | `storage-search-counts.php` | 0 (`--snapshot before`), 4.9/5.5 (`--snapshot after`, `--compare`) | did any `*_storage` / `*_search` table lose rows after the same import? |
 | `check-performance.php` | 3, Lane 2, 6.2, 7 | which pages do Spryker's performance guidelines have today, has every page its fixes or a no-fix reason, every fix a size and a final status and every M/L fix the developer's decision, which fixes are deferred, and did shop-ui 1.103.0 remove product group rendering the project relies on? |
 
+Phase 0 (`snapshot`) and Phase 6.1 (`diff`) also run `yves-integration-scan.php` from the sibling `yves-twig-integration` skill: which widgets the upgrade added that no template the project renders calls. Its findings are suggestions for the developer, not upgrade damage.
+
 `bootstrap.php` is the shared library the scripts load. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
 upgrade run.

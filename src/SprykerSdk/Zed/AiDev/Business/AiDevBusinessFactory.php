@@ -9,9 +9,21 @@ declare(strict_types = 1);
 
 namespace SprykerSdk\Zed\AiDev\Business;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\ClientInterface;
 use Spryker\Zed\Kernel\Business\AbstractBusinessFactory;
 use Spryker\Zed\Oms\Business\OmsFacadeInterface;
 use SprykerSdk\Zed\AiDev\AiDevDependencyProvider;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityInstallStatusResolver;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityInstallStatusResolverInterface;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityMapFinder;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityMapFinderInterface;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityMapReader;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilityMapReaderInterface;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilitySearcher;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\CapabilitySearcherInterface;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\ComposerLockReader;
+use SprykerSdk\Zed\AiDev\Business\CapabilityMap\ComposerLockReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReader;
 use SprykerSdk\Zed\AiDev\Business\Database\Reader\DatabaseQueryReaderInterface;
 use SprykerSdk\Zed\AiDev\Business\DataImport\CsvAnalyzer;
@@ -300,5 +312,47 @@ class AiDevBusinessFactory extends AbstractBusinessFactory
     public function createColumnRemovalValidator(): ValidatorInterface
     {
         return new ColumnRemovalValidator();
+    }
+
+    public function createCapabilityMapFinder(): CapabilityMapFinderInterface
+    {
+        return new CapabilityMapFinder(
+            $this->createCapabilityMapReader(),
+            $this->createCapabilitySearcher(),
+            $this->createCapabilityInstallStatusResolver(),
+            $this->createComposerLockReader(),
+        );
+    }
+
+    public function createCapabilityMapReader(): CapabilityMapReaderInterface
+    {
+        return new CapabilityMapReader(
+            $this->createHttpClient(),
+            $this->getConfig()->getCapabilityMapIndexUrl(),
+            $this->getConfig()->getCapabilityMapCacheFilePath(),
+            $this->getConfig()->getCapabilityMapCacheTtl(),
+        );
+    }
+
+    public function createCapabilitySearcher(): CapabilitySearcherInterface
+    {
+        return new CapabilitySearcher();
+    }
+
+    public function createCapabilityInstallStatusResolver(): CapabilityInstallStatusResolverInterface
+    {
+        return new CapabilityInstallStatusResolver();
+    }
+
+    public function createComposerLockReader(): ComposerLockReaderInterface
+    {
+        return new ComposerLockReader(
+            $this->getConfig()->getComposerLockFilePath(),
+        );
+    }
+
+    public function createHttpClient(): ClientInterface
+    {
+        return new Client();
     }
 }

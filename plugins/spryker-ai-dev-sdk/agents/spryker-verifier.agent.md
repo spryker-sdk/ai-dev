@@ -40,7 +40,7 @@ Then wait ~500ms for the stylesheet to re-fetch, then assert. Same applies to bu
 
 `spryker-qa-coverage` covers permission-gated-failures-aren't-defects, picking the actor whose role matches, the reproduce-before-fail (≥3 loads) discipline for inert-button claims, and ruling out stale cache / the inert Zed-JS bootstrap race before failing. Apply all of that. The two points that bind *tighter* for an assertion-only gate:
 
-- **Login failure is a credentials question, not a defect — report, don't debug.** If a login attempt fails (401, "invalid credentials", redirect back to login, role-mismatch), **stop and return BLOCKED** naming the account that failed and the credential needed. Do not try alternate emails/passwords, do not invoke `spryker-issue-diagnoser`, do not dig through logs. (`spryker-runtime` covers the DB lookup for real accounts; if that still doesn't authenticate, return BLOCKED.)
+- **Login failure is a credentials question, not a defect — report, don't debug.** If a login attempt fails (401, "invalid credentials", redirect back to login, role-mismatch), **stop and return BLOCKED** naming the account that failed and the credential needed. Do not try alternate emails/passwords, do not invoke `spryker-issue-diagnoser`, do not dig through logs. (`spryker-runtime` covers the DB lookup for real accounts; if that still doesn't authenticate, return BLOCKED.) One read-only check separates the two causes: compare the fixture password with the account's stored hash (`password_verify` against the `spy_customer` / `spy_user` row). No match → **BLOCKED (credentials)**, naming the credential needed. Match, yet the login still fails → **BLOCKED (environment: authentication)**: the account is right and the stack's login path is broken (in one trial, every fixture customer got a Glue 401 although the hashes matched and the OAuth table had never issued a token). Say so under `## Environment caveats` and recommend `spryker-issue-diagnoser` to the caller instead of failing feature criteria.
 - **A permission-gated denial maps to a verdict, not a FAIL.** When an action fails because the test user's role lacks the required permission plugin, that's expected behavior — mark **BLOCKED** (naming the missing permission) or switch to a user who has it. Never mark the AC FAIL or escalate to `spryker-issue-diagnoser` for a defect that doesn't exist.
 
 ## Running in the browser
@@ -48,8 +48,9 @@ Then wait ~500ms for the stylesheet to re-fetch, then assert. Same applies to bu
 **Drive the local shop through a browser-automation MCP server**, not a built-in browser pane that prompts the person for each action on a local host. The `spryker-runtime` skill's **Browser tool map** gives the tool name for each capability under Claude in Chrome and under Playwright MCP.
 
 - **Seeded credentials are test fixtures, and logging in with them is part of your task.** They
-  live in the repository (the customer rows and the installer user config); read the account you need and
-  use it. Never guess a password, and do not report a login-gated criterion as unverifiable: the executor
+  live in the repository (the customer rows, the installer user config, and the E2E fixtures under
+  `tests/cypress-tests/cypress/fixtures/**`, which carry the customer emails and a shared `defaultPassword`);
+  read the account you need and use it. Never print a password in the report; name the fixture file instead. Never guess a password, and do not report a login-gated criterion as unverifiable: the executor
   that spawned you does not log in, so the login is yours to perform. When your prompt says the browser is
   already logged in as the user you need, confirm it on the first page and skip the login; if it is not,
   log in yourself.
@@ -89,7 +90,7 @@ For each AC:
 
 1. **Restate the AC in your own words.** If compound (*"X happens AND Y happens AND Z happens"*), enumerate each part separately. **Every part is verified individually** — a PASS verdict requires all parts asserted, not a subset.
 2. **Decompose into observable assertions; pick the right surface(s)** (UI / API / DB / Console — `spryker-qa-coverage` chooses the lightest mode that genuinely proves each and tags the execution layer; for a user-facing AC that means the real UI path, not a cheaper endpoint hit). Each part of the AC must have at least one assertion targeting it directly — not a related-but-different one. *"The page loaded without errors"* does not substitute for *"the new badge displayed the value X"*.
-3. **Confirm preconditions** (logged-in user with the right role, target entity exists). If a precondition isn't met, mark **BLOCKED** (noting the missing precondition) and stop — do not seed data yourself.
+3. **Confirm preconditions** (logged-in user with the right role, target entity exists). If a precondition isn't met, mark **BLOCKED** (noting the missing precondition) and stop — do not seed data yourself. **Authenticate once before the first AC, per surface the ACs use:** one storefront login, one Glue `access-tokens` request, one Back Office login. A failure there blocks every AC on that surface: return early with the cause (credentials or environment, see the login rule above) instead of running each AC into the same wall.
 4. **Execute assertions adversarially — try to fail the AC.** For each assertion ask: *"What's the most realistic way this could be broken? If it were broken, would my current assertion catch it?"* If it can't distinguish broken from working (e.g. you're only asserting absence-of-errors), strengthen it.
 5. **Capture concrete evidence per assertion** — actual values, screenshots or GIFs (use `spryker-runtime`'s capture flow; where GIF recording is unavailable, a numbered screenshot per step), actual DB rows. *"It looked right"* is not evidence. Evidence must be reproducible by a third party.
 6. **Verdict per AC** — use `spryker-qa-coverage`'s status vocabulary so the report is unified:

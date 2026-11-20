@@ -179,7 +179,9 @@ release, which ones were fixed and in which pull request, and a pointer to Part 
   are not verified, and list the candidates.
 - **3.5 Not done in this upgrade** — each item with the reason it was not done: deprecations deferred
   or kept, features left for later, security fixes that a project override blocks (with the
-  recommended fix), and topics that a reader can expect but that were out of scope.
+  recommended fix), storefront placements from Phase 6.1 the developer deferred or declined (widget,
+  vendor template and block, project file), and topics that a reader can expect but that were out of
+  scope.
 
 ### 4. Existing issues observed
 

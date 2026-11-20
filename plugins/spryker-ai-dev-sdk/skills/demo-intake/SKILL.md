@@ -101,6 +101,8 @@ work and add customization files that were not requested. A brief that spans cla
 before anything starts; the adjacent class is never done silently (work-classes.md, "when one request spans
 several classes").
 
+When unsure whether the platform already offers a briefing item (*already works* versus customization), the capability map answers it: `find-existing-capability` maps a requirement to what Spryker ships and what the project has installed. Intake itself stays read-only; name the item as a question for the owner skill rather than running that search here.
+
 ## 3. Source fidelity — a gap is reported, never closed
 
 Attributes, prices, copy and imagery come from the **source** (the supplied export, the customer's site).

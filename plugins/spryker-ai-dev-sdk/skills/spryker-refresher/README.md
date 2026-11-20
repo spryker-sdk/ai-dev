@@ -71,6 +71,9 @@ the change set. Your coding agent runs on the host, so commands are invoked as `
 | Twig file added / moved / deleted (new override) | `twig:cache:warmer` — edits to an existing Twig file need nothing |
 | `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
 | Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
+| API Platform resource (`resources/api/{storefront,backend}/*.resource.yml`) added/updated, or `*RestApi` dependency provider changed, in a project with `src/Generated/Api/<App>` | `glue api:generate` → `glue cache:clear` → `glue cache:warmup`, per Glue application resolved from `public/Glue*/index.php` and the deploy file (never from the install recipe) |
+| `composer.lock` changed (modules added/updated) | `transfer:generate`, `propel:install` (module ships `*.schema.xml`), `transfer:entity:generate`, `composer dump-autoload`, `dev:ide-auto-completion:generate` + phpstan cache clear, `cache:class-resolver:build`, `glue api:generate` (API resources), `router:cache:warm-up*` (route providers), `frontend:project:install-dependencies` (changed `package.json`) |
+| Before a frontend build after vendor changes / `ERR_MODULE_NOT_FOUND: Cannot find package` | Check vendor `package.json` dependencies against `package-lock.json` / `node_modules`; the error is a pre-existing environment issue - fix with `frontend:project:install-dependencies` (lock update needs user approval), not code |
 | `RouteProvider` plugin or route config added/changed/deleted, or a new Zed controller/action | `router:cache:warm-up` and/or `:backoffice` / `:backend-gateway` / `:merchant-portal` |
 | OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
 | Glossary CSV changed | `data:import:glossary` (Yves translations only — not Zed BO labels) |
@@ -102,6 +105,7 @@ storefront hard refresh.
 
 - **Recipes over memory.** The mapping table narrows the search; `config/install/*.yml` is authoritative
   for this project's ordering and flags.
+- **Exception: Glue applications come from the project.** Install recipes list steps for applications the project may not run (the demo shop has no `GlueStorefront` entry point; the storefront API runs in `Glue`). The skill lists `public/Glue*/index.php`, cross-checks the deploy file's `entry-point: Glue*` and reports other steps as `skipped (no such Glue application)`. `glue` runs via `docker/sdk cli`, not `docker/sdk console`.
 - **Surgical, never the full chain.** Only the commands the actual file list demands.
 - **One command per Bash call.** So every step's exit code and output tail is captured individually.
 - **Stop on the first failure.** Dependents are not skipped-over — the run stops and the caller decides
