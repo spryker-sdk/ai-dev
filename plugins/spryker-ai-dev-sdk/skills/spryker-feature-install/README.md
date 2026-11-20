@@ -69,7 +69,7 @@ Everything a run writes is in the project, under `.ai-dev/feature-install/<featu
 | `state.md` | The phase table: phase, status, evidence; the install release and added modules |
 | `sources/` | The guides, the feature `composer.json`, the reference demo shop clone and its history |
 | `checklist.json` | One row per guide step, with its decision, status and verdict |
-| `dod.json` | The Definition of Done evidence no script can measure: scope, baselines, accepted module moves, after-install checks, approved content, accepted unproven release steps |
+| `dod.json` | The Definition of Done evidence no script can measure: scope, baselines, accepted module moves, after-install checks, texts the agent wrote (listed for review), accepted unproven release steps |
 | `composer.lock.before` | The lock before the install |
 | `baseline/` | The tool output before the install (the file names `spryker-upgrade` uses), and the crawl and counts reports |
 | `after/` | The same tools after the install, and the frontend build output with its exit code |

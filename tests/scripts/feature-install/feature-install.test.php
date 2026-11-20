@@ -517,7 +517,11 @@ check('a data file no recipe manifest imports fails item 9', $unmetItems() === [
 $writeDod($dodChecklist, ['data_files' => []] + $dodEvidence, $provenSteps);
 check('done data rows without the files the hand-off wrote fail item 9', $unmetItems() === [9]);
 $writeDod($dodChecklist, ['authored_content' => [['file' => 'data/import/local/common/glossary.csv', 'what' => 'fr_FR translations']]] + $dodEvidence, $provenSteps);
-check('text the agent wrote without approval fails item 9', $unmetItems() === [9]);
+check('text the agent wrote, recorded for review, is met without an approval', $unmetItems() === []);
+$writeDod($dodChecklist, ['authored_content' => [['file' => 'data/import/local/common/glossary.csv']]] + $dodEvidence, $provenSteps);
+check('a text entry without what it is fails item 9', $unmetItems() === [9]);
+$writeDod($dodChecklist, ['authored_content' => [['file' => 'data/import/local/common/missing.csv', 'what' => 'fr_FR translations']]] + $dodEvidence, $provenSteps);
+check('a text entry naming a file that does not exist fails item 9', $unmetItems() === [9]);
 $blocked = $dodChecklist;
 $blocked['rows'][2]['verdict'] = 'BLOCKED';
 $writeDod($blocked, $dodEvidence, $provenSteps);

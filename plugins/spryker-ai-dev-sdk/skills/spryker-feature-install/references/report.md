@@ -68,7 +68,7 @@ The install guide also contains steps that connect <Feature> with other Spryker 
 | Code quality | PHPStan level <n>, code sniffer | no new findings |
 | Existing behaviour | full Codecept suite (compared with a run before the install); crawl of <n> Back Office pages | no new test failures |
 | Steps after the deploy | local comparison of a deployed environment with a fresh install | equal after the <n> imports |
-| <texts written for the project> | <who reviewed them> | <result> |
+| <texts written for the project, for example French texts> | not validated | need a review by <who: a French speaker> |
 
 ## Upgrading the project to release <latest release>
 

@@ -48,8 +48,9 @@ extended, not rebuilt. Typical entry: `find-existing-capability` returned `not_i
 9. **Project layer only, and no shortcuts:** never `vendor/`, `src/Generated/`, `src/Orm/` or a
    hand-edited `composer.lock`; never `dev-*` constraints or `--ignore-platform-reqs`; never a
    suppression; never `docker/sdk reset` or `clean-data`; never a commit or push without the
-   developer's yes. Ask first before you write to a database by hand, change a user account, or
-   write content yourself (translations, CMS text).
+   developer's yes. Ask first before you write to a database by hand or change a user account.
+   Content you write yourself (translations, CMS text) is recorded, and the report lists it for
+   review.
 10. **The status is `check-dod.php`'s, never yours** (§ Definition of Done). A blocker stops the run
     when you find it (§ Blockers).
 
@@ -68,11 +69,11 @@ A feature integration is **DONE** only when all ten items hold, each one with it
 | 6 | No regression against the baselines, and the Yves, Zed and Merchant Portal builds pass. | `after/` tool output, `compare-baselines.php` (Phase 6) |
 | 7 | Every verification passed. BLOCKED and FAIL are not done; ACCEPTED counts with the developer's note. | `checklist.json` verdicts (Phase 6) |
 | 8 | Passing tests cover the feature, or the developer waived them with a reason. | `checklist.json` `test` rows and their files, `tests_waived` (Phase 6b) |
-| 9 | Every data file the install wrote is imported by a manifest a recipe runs, and every text you wrote is approved. | `dod.json` `data_files`, `check-data-manifests.php`; `dod.json` `authored_content` (Phase 5) |
+| 9 | Every data file the install wrote is imported by a manifest a recipe runs, and every text you wrote is recorded for review. | `dod.json` `data_files`, `check-data-manifests.php`; `dod.json` `authored_content` (Phase 5) |
 | 10 | Every release step is verified, or the developer accepted shipping it unproven. | `release-steps.md`; `dod.json` `release_steps_accepted` (Phase 7) |
 
 Items 2, 3, 5, 6, 8 and 9 are measured from files, not from what you write down. `dod.json` holds
-only what no file shows: the scope, the developer's reasons and approvals, the data files the
+only what no file shows: the scope, the developer's reasons, the texts you wrote, the data files the
 hand-off wrote, and waivers (`"waived": {"baseline:<name>": "<reason>"}`, `"check:<name>"`). Its
 format is in the header of `scripts/check-dod.php`. Only the developer's answer can make a waiver or
 a reason.
@@ -296,8 +297,9 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
    - glossary: `php $FI/glossary-key-check.php --package=<feature package> --locales=<project
      locales>` lists the keys the feature uses or ships that have no row for a project locale;
    - text the guide or the module does not ship (a translation for a project locale, CMS text) is
-     content: ask the developer first (or hand it to `translate-content`), and record it in
-     `dod.json` `authored_content` with their approval;
+     content you write (or hand to `translate-content`): record each file in `dod.json`
+     `authored_content` (`file`, `what`). The report lists it under "What was validated and how"
+     as "not validated — needs a review", like any code you wrote;
    - schema rows: run `propel:diff` and show the migration before `propel:migrate`; the guide's
      `propel:install` is for a fresh local database only;
    - codegen and setup: `spryker-refresher` with the changed files, then the section's own setup

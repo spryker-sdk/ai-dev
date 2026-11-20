@@ -25,7 +25,7 @@
  *               "confirmed": "<the developer's answer>"},
  *     "accepted_moves": {"spryker/<module>": "<the developer's reason to keep the move>"},
  *     "data_files": ["data/import/..."],
- *     "authored_content": [{"file": "...", "what": "...", "approved": "<who approved, when>"}],
+ *     "authored_content": [{"file": "...", "what": "<the texts the agent wrote, for example fr_FR translations>"}],
  *     "release_steps_accepted": "<the developer's reason to ship with unproven steps>",
  *     "waived": {"baseline:backoffice-crawl": "<the developer's reason>", "check:frontend-build": "..."}
  *   }
@@ -52,7 +52,7 @@ const DOD_ITEMS = [
     6 => 'no regression against the baselines, and the frontend builds pass',
     7 => 'every verification passed',
     8 => 'passing tests cover the feature',
-    9 => 'every data file reaches an environment, and every text the agent wrote is approved',
+    9 => 'every data file reaches an environment, and every text the agent wrote is recorded for review',
     10 => 'the release steps are proven',
 ];
 
@@ -182,9 +182,12 @@ function dod_evaluate(string $root, string $stateDir): array
         }
     }
 
-    foreach ($dod['authored_content'] ?? [] as $content) {
-        if (trim((string)($content['approved'] ?? '')) === '') {
-            $result[9][] = sprintf('%s (%s) is not approved', $content['file'] ?? '?', $content['what'] ?? 'text the agent wrote');
+    foreach ($dod['authored_content'] ?? [] as $index => $content) {
+        $file = trim((string)($content['file'] ?? ''));
+        if ($file === '' || trim((string)($content['what'] ?? '')) === '') {
+            $result[9][] = sprintf('authored_content entry %d needs both `file` and `what`, so the report can list it for review', $index + 1);
+        } elseif (!is_file($root . '/' . ltrim($file, '/'))) {
+            $result[9][] = "authored_content names $file, which does not exist";
         }
     }
 
