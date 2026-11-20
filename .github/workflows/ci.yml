@@ -63,6 +63,9 @@ jobs:
             - name: Rule sync script
               run: bash tests/scripts/test-sync-rules.sh
 
+            - name: Feature install scripts
+              run: php tests/scripts/feature-install/feature-install.test.php
+
             - name: Stop guard, under both harnesses
               run: php plugins/spryker-ai-dev-sdk/hooks/hooks.test.php
 

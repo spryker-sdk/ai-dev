@@ -102,7 +102,7 @@ One verdict per capability, driven by the card's `status` and the computed `inst
 
 ## Version drift
 
-The map describes the latest release line. The project may be older. When a capability matters and a module's installed `version` (from the card's `modules[]`) looks old for the feature, read the module's code in `vendor/spryker/<package>` or call `getSprykerModuleMap` before relying on a card detail (an extension point, a Glue resource, a config key). When the project is clearly behind, say so and suggest the `spryker-upgrade` skill instead of working around the gap.
+The map describes the latest release line. The project may be older. When a capability matters and a module's installed `version` (from the card's `modules[]`) looks old for the feature, read the module's code in `vendor/spryker/<package>` or call `getSprykerModuleMap` before relying on a card detail (an extension point, a Glue resource, a config key). When the verdict is an install, say that the project is older than the map, and hand it to `spryker-feature-install` anyway: its Phase 1 finds the release the feature needs and decides whether that takes an upgrade. Do not propose `spryker-upgrade` from this skill.
 
 ## Step 5 - Report
 

@@ -472,9 +472,9 @@ Two kinds of "new" need this gate, and only the first is visible in the lock dif
    `class_exists` branch (matrix #64), a new extension point (performance fixes: Phase 6.2, not here).
 
 Fetch each description (`composer show <pkg>` + release notes) and ask the user a structured question (use your harness's question tool if it has one, otherwise ask in chat and wait)
-(multiSelect): integrate now / defer / never. Nothing new is wired without an explicit yes; each
-accepted feature follows its integration guide, in its own commit (the `spryker-feature-install` skill
-runs a guide end to end, including its optional storefront placement step). REMOVED packages: explain each.
+(multiSelect): integrate now / defer / never. Nothing new is wired in the upgrade branch: each accepted
+feature goes to `spryker-feature-install` after the upgrade pull request, one feature per run, on its
+own branch (it includes the optional storefront placement step). REMOVED packages: explain each.
 
 ## Phase 6.1 — Storefront placement (optional, suggested)
 
