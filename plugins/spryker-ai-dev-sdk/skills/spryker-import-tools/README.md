@@ -63,7 +63,7 @@ flowchart TD
 
 | File | Role |
 |------|------|
-| [`SKILL.md`](SKILL.md) | Command reference for both scripts, the **authoritative** invocation & command-discipline rules, and the flag cookbook (one worked example per command). |
+| [`SKILL.md`](SKILL.md) | The **authoritative** invocation & command-discipline rules and the rules that apply to every run; the full command reference and one worked example per command are in `--help <command>` of each script. |
 | [`scripts/csv.php`](scripts/csv.php) | RFC-4180 CSV manipulation. Header-name access only, atomic writes, idempotent where sensible. |
 | [`scripts/validate.php`](scripts/validate.php) | Pre-boot consistency checks. Own CSV reader — no dependency on `csv.php`. |
 | [`scripts/csv.test.php`](scripts/csv.test.php) | Test suite for `csv.php`. |

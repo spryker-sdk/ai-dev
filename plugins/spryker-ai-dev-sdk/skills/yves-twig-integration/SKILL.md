@@ -1,15 +1,6 @@
 ---
 name: yves-twig-integration
-description: >
-  Optional storefront step after a Spryker feature install or upgrade: suggests where the
-  feature's Yves widgets and components belong in the project's own Twig templates, using the
-  vendor templates as the reference for what goes where and the project's design for how it looks,
-  and applies only the placements the developer picks. Integration guides wire the backend
-  (plugins, config, schema) but leave Yves templates to the project, and a project that overrides a
-  vendor template loses every widget call inside it, so a registered widget renders nothing. Use
-  when spryker-feature-install or spryker-upgrade offers the storefront step, or when the user asks
-  "place the X widget", "why is widget X not shown", "integrate the feature into our storefront",
-  "which widgets does our shop not render". Never applies anything without the developer's choice.
+description: "Suggests where a feature's Yves widgets belong in the project's own Twig templates and applies the placements the developer picks. Use after a feature install or when a widget is not shown."
 ---
 
 # Yves Twig Integration
@@ -117,8 +108,6 @@ Leave the changes unstaged for review; never commit without the developer's conf
 
 ## What you do not do
 
-- Do not apply a placement the developer did not pick, and do not treat a `missing` item as a defect.
-- Do not paste vendor markup or vendor classes into a project template; reuse the project's patterns.
 - Do not place by line number, and do not replace a project override with a fresh copy of the vendor template.
+- Do not treat a `missing` item as a defect.
 - Do not edit `vendor/`, `src/Generated/` or build output.
-- Do not place a `not_registered` widget before its registration exists.

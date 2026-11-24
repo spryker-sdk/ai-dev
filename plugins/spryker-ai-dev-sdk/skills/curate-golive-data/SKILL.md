@@ -1,6 +1,6 @@
 ---
 name: curate-golive-data
-description: "Use before go-live to make the data a Spryker project is keeping production-safe — real tax rates instead of placeholders, the customer's own imagery instead of Spryker-CDN URLs, demo accounts/passwords removed or rotated, remaining demo leftovers cleared, integrity re-verified. A late, standalone checklist on a project that already boots green; resolves the go-live warnings project-data and boot-and-verify surface. Not infra/deploy hardening, not code."
+description: "Makes kept project data production-safe before go-live: real tax rates, own imagery, demo accounts removed, demo leftovers cleared. Use late, on a project that already boots green."
 ---
 
 # curate-golive-data

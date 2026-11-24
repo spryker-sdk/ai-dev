@@ -1,9 +1,11 @@
 ---
 name: project-starter-wizard
-description: "Use at the very start of a new customer project, on an unmodified (booted or not) clone of a Spryker b2b/b2b-marketplace demoshop — 'turn this demoshop into our project', 'start the project setup', 'run the project starter'. Also the trigger for 'give me the setup questionnaire' / 'here are my filled setup answers — run it autonomously', and the resume entry when a prior run left .ai-dev/project-setup.md. Collects the nine setup decisions either from a pre-filled questionnaire (references/questionnaire.md — no interview) or a live batched interview, then orchestrates the other project-start skills in autonomous or collaborative mode. Boundary: it owns SETUP only — the catalogue, CMS and other `data/import/**` rows belong to `project-data`, the shop's look to `match-reference-design`, and any change to how the shop behaves to `spryker-customization`."
+description: "Turns an unmodified Spryker b2b demoshop clone into a customer project from nine setup decisions, by questionnaire or interview. Use to start the project setup or resume a setup run."
 ---
 
 # Project Starter — Wizard
+
+Boundary: it owns SETUP only — the catalogue, CMS and other `data/import/**` rows belong to `project-data`, the shop's look to `match-reference-design`, and any change to how the shop behaves to `spryker-customization`.
 
 You turn an **unmodified** clone of a Spryker b2b / b2b-marketplace demoshop into the customer's project. The clone may already be booted — what matters is that nobody has customized it yet. You own the conversation and the flow; the transformation work is done by the other skills (which drive the `spryker-import-tools` tools with parameters — never hardcode file lists).
 

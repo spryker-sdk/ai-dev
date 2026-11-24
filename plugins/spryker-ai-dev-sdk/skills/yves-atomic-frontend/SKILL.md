@@ -1,17 +1,11 @@
 ---
 name: yves-atomic-frontend
-description: >
-  Use when creating, extending, or overriding Spryker Yves storefront frontend code in a project — atomic
-  components, templates, views, Widgets — and their Twig, SCSS, and TypeScript. Triggers: "create a new
-  molecule", "override the product item", "extend the cart item component", "create a widget", "style this
-  component", "why isn't my style applied", "the component isn't initializing", fixing Yves lint errors.
-  Also for diagnosis: "my change did not show up", a Twig/SCSS edit with no visible effect, stale styles or
-  a cached template, verifying a UI fix by measuring the rendered page. Always use for any Yves Theme/
-  work; not for linting a diff (static-validation) or rebrands (brand-project). Which change a page needs
-  belongs to `match-reference-design`, the rows a component renders to `project-data`.
+description: "Creates, extends or overrides Yves storefront components, templates, views and widgets (Twig, SCSS, TypeScript). Use for any Yves theme work or a frontend change that does not show up."
 ---
 
 # Spryker Yves Atomic Frontend
+
+Boundary: not for linting a diff (`static-validation`) or rebrands (`brand-project`). Which change a page needs belongs to `match-reference-design`, the rows a component renders to `project-data`.
 
 Non-negotiables live in the `yves-frontend` rule — read it from `<plugin-root>/rules/yves-frontend.md`, or skip it where the project has the rules installed and the harness is already applying them. This skill is the workflow.
 `{ProjectNamespace}` = the namespace the project writes to — its custom namespace if one is defined (listed

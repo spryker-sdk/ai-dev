@@ -1,16 +1,6 @@
 ---
 name: ai-runtime-debugging
-description: >
-  Use when an AI agent needs to inspect Spryker runtime state — adding
-  temporary debug logs the agent can read back, or stepping through code
-  with XDebug like a human developer. Covers LoggerTrait, file_put_contents
-  fallback, log file locations for cli vs FPM containers, and driving an
-  XDebug-capable MCP bridge (PHPStorm or standalone). Also covers narrowing
-  test runs with codecept positional filters and @group AITestCase.
-  Triggers - "I can't tell why this code is doing X", "add some debug
-  output", "step through this", "set a breakpoint", "what does this
-  variable contain at runtime", error_log not working, can't see var_dump
-  output.
+description: "Inspects Spryker runtime state with temporary debug logs the agent reads back, or with XDebug breakpoints. Use when code does something unexplained or debug output is not visible."
 ---
 
 # AI Runtime Debugging in Spryker

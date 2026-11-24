@@ -1174,6 +1174,34 @@ $shipMissing = array_column(array_filter($resShip['findings'], fn ($f) => $f['gr
 check('demo-needs: a shipment method name / payment method name in the brief is found in shipment.csv / payment_method.csv', array_values($shipMissing) === ['Overnight Express']);
 
 // recursive: $tmp now contains a subdir (sub/) from the absent directory-recursion tests
+// --- CLI: --help / --help <check> ---
+$helpRun = static function (string $args) use ($php, $lib): array {
+    $out = [];
+    $code = 0;
+    exec("{$php} {$lib} {$args} 2>&1", $out, $code);
+
+    return [implode("\n", $out), $code];
+};
+[$helpAll, $helpAllCode] = $helpRun('--help');
+check('CLI --help: exit 0, lists the checks, the output format and points to --help <check>', $helpAllCode === 0 && str_contains($helpAll, 'usage: validate.php') && str_contains($helpAll, 'findingCount') && str_contains($helpAll, '--help <check>'));
+[$helpGate, $helpGateCode] = $helpRun('--help gate');
+check('CLI --help gate: exit 0, full explanation incl. --save instead of a redirect', $helpGateCode === 0 && str_contains($helpGate, 'the close-out command') && str_contains($helpGate, 'never') && str_contains($helpGate, '--save'));
+[$helpRefs] = $helpRun('--help refs');
+check('CLI --help refs: carries the worked example', str_contains($helpRefs, '--ref-file store.csv --ref-column name'));
+[$helpBundle, $helpBundleCode] = $helpRun('--help bundle-stock');
+check('CLI --help <check without long text>: prints its usage line', $helpBundleCode === 0 && str_starts_with($helpBundle, 'bundle-stock '));
+preg_match('/<([a-z|-]+)>/', validate_usage_lines()[0], $m);
+$undocumented = [];
+foreach (explode('|', $m[1] ?? '') as $name) {
+    [, $code] = $helpRun('--help ' . $name);
+    if ($code !== 0) {
+        $undocumented[] = $name;
+    }
+}
+check('CLI --help: every check in the usage list has help', ($m[1] ?? '') !== '' && $undocumented === []);
+[$helpBad, $helpBadCode] = $helpRun('--help zzz');
+check('CLI --help <unknown>: exit 2 with a JSON error', $helpBadCode === 2 && str_contains((string) (json_decode($helpBad, true)['errors'][0] ?? ''), "unknown check 'zzz'"));
+
 $tmpIt = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($tmpIt as $entry) {
     $entry->isDir() ? @rmdir($entry->getPathname()) : @unlink($entry->getPathname());

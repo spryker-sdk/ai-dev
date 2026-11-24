@@ -26,8 +26,3 @@ They are NOT allowed to:
 - Use method prefixes other than create*/get*
 - Perform data transformations
 - Pass the Factory instance as a constructor parameter to the model
-
-WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
-- Clear create*/get* pattern communicates instantiation strategy
-- No business logic keeps factories focused on object creation
-- Constructor injection ensures all dependencies are available

@@ -1,19 +1,11 @@
 ---
 name: spryker-bugfix
-description: >
-  End-to-end bug-fixing workflow: from an optional tracker ticket (JIRA, GitHub Issues, or any
-  service) or a plain bug description to a committed,
-  validated, QA-accepted fix on a bugfix branch (autonomous mode adds a pushed Draft PR +
-  CI watch). Orchestrates reproduce → root-cause → fix → functional tests → static checks →
-  review → QA → Cypress E2E coverage (when warranted) → final verification via the project's stage
-  skills. Trigger — "fix this bug",
-  "fix ticket XY-1122", "broken, reproduce and fix it": any bug symptom PLUS the expectation of a
-  DELIVERED fix. NOT for a single isolated step (one test, "just run CI"), new features,
-  refactors without a symptom, or investigation-only requests ("just find where it goes wrong,
-  don't fix").
+description: "Fixes a bug end to end: reproduce, root cause, fix, tests, static checks, review, QA, commit on a bugfix branch. Use when a bug or ticket needs a delivered fix, not only an analysis."
 ---
 
 # Spryker Bug-Fixing Workflow
+
+Boundary: use it for a bug symptom plus the expectation of a delivered fix. Not for a single isolated step (one test, "just run CI"), new features, refactors without a symptom, or investigation-only requests ("just find where it goes wrong, don't fix").
 
 This skill drives a bug from intake to a delivered, validated fix. It is an **orchestrator**: each
 stage delegates to an existing installed skill. Your job is to run the stages in order, carry context

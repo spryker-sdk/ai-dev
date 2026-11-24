@@ -1,9 +1,11 @@
 ---
 name: project-data
-description: "The one skill for a Spryker project's data/import/** — use whenever demo/import data must be populated, reshaped, reduced, cleaned up, or removed. Triggers: 'adapt the demo shop to my stores and currencies', 'add demo data / generate a catalog of tools/books/dresses from these images', 'create CMS blocks from these pictures', 'replace the demo catalog with our real product export (JSON/CSV)', 'start clean with no demo catalog', 'we only sell heat-recovery, drop the rest of the catalog', 'remove the demo customers / merchants / reviews', or any ad-hoc edit of import CSVs. Used by the wizard's data step and standalone on a fresh or running project. Boundary: it owns `data/import/**` rows only — how those rows are rendered or laid out belongs to `match-reference-design`, and a new or overridden importer, plugin or schema belongs to `spryker-customization`."
+description: "Populates, reshapes, reduces or cleans the data/import/** files of a Spryker project: catalog, CMS, customers, merchants. Use for any demo or import data change or an ad-hoc import CSV edit."
 ---
 
 # project-data
+
+Boundary: it owns `data/import/**` rows only — how those rows are rendered or laid out belongs to `match-reference-design`, and a new or overridden importer, plugin or schema belongs to `spryker-customization`.
 
 The universal skill for everything under the project's `data/import/**`. It owns one job — **get the project's import data into the shape the project needs** — and it does that through one of five **strategies**. You **pick the strategy** from the interview (`.ai-dev/project-setup.md` `data.mode`) or from what the user asks in plain terms, apply the **shared core** below (tools, discipline, state-reading, apply-ladder, invariants — the same for every strategy), then follow that strategy's **reference file** for the method.
 

@@ -1,11 +1,6 @@
 ---
 name: project-ci-generator
-description: >-
-  Use when turning a repo's inherited product/vendor CI into a single, lean project CI
-  pipeline — "clean up CI for the project", "make a project CI", "recreate one CI file",
-  "remove product-only CI jobs", "clear the CI folder and rebuild", or porting CI to
-  another host (GitLab, Bitbucket). A pre-boot wizard step of project start, and standalone
-  on any repo carrying product-style CI.
+description: "Replaces a repo's inherited product CI with one lean project CI pipeline, also for another CI host. Use for 'clean up CI for the project' or at project start as a pre-boot wizard step."
 ---
 
 # Project CI Generator

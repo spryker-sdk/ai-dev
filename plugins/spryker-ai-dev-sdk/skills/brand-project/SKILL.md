@@ -1,6 +1,6 @@
 ---
 name: brand-project
-description: "Use when applying or changing a Spryker project's brand identity — project name, dev domain, and docker namespace at project start (a pre-boot wizard step), or a standalone repeatable rebrand any time: 'change the palette', 'apply a new brand colour', 'set the storefront logo', 'rebrand the shop', 'use our brand colours'. Covers identity plus colours, logo and theme tokens; matching a reference site's layout ('make it look like <url>') is match-reference-design. Works pre- or post-boot. Palette-wide colours and logos via Configuration only — styling one component is the frontend skills' job."
+description: "Applies a Spryker project's brand: name, dev domain, docker namespace, palette, logo, theme tokens. Use at project start or for a rebrand ('change the palette', 'set the storefront logo')."
 ---
 
 # brand-project

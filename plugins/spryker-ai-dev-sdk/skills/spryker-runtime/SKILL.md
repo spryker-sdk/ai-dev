@@ -1,6 +1,6 @@
 ---
 name: spryker-runtime
-description: Use to actually RUN the Spryker application and observe real behavior, and to perform manual testing / QA against a real authenticated session — log in to Yves storefront, the Back Office, Merchant Portal, drive the UI in Chrome, run `docker/sdk cli console` commands, and call Yves/Glue endpoints over HTTP. Trigger whenever you need to manually test or QA a feature, walk through a user flow as a specific actor, confirm how an existing flow behaves before writing a PRD/spec/plan, reproduce a bug, verify a fix end-to-end, inspect what an endpoint returns, check which actors/roles exist at /user, or "run the app", "manually test this", "do a QA pass", "log in to backoffice", "call this endpoint", "execute this console command". Reusable building block for the PRD and verification skills.
+description: "Runs and operates the Spryker app: logs in to storefront, Back Office and Merchant Portal, drives the UI, runs console commands, calls Glue. Use for manual tests, bug reproduction or checks."
 ---
 
 # Spryker Local Runtime — Run, Log In, Operate

@@ -1,15 +1,6 @@
 ---
 name: match-reference-design
-description: >
-  Use when a Spryker storefront has to look like a reference site — the customer's own site or one the
-  person names. Triggers: "make it look like <url>", "match the reference", "fix the navigation to
-  be like theirs", and look-and-feel feedback on a page being matched to a reference or a demo look
-  ("this block looks ugly", "swap this block with the second one").
-  Owns the design loop for homepage composition, navigation and CMS blocks: reference capture, a
-  numbered page map, a printed cost ladder, one change per cycle, and a screenshotted before/after.
-  Not component mechanics (Twig/SCSS/TS, overrides, build, Twig cache) — that is `yves-atomic-
-  frontend`; not catalogue, CMS or navigation rows — `project-data`; not behaviour changes — `spryker-
-  customization`.
+description: "Makes a Spryker storefront look like a reference site: page map, homepage, navigation and CMS blocks, one change per cycle. Use for 'make it look like <url>' or look-and-feel feedback."
 ---
 
 # match-reference-design
@@ -40,7 +31,7 @@ run, where you take it from the needs list and the beat, log it, and go on. Then
 yourself: **is the stated fix the goal, or a symptom of one?** "Make the top image bigger" is a
 measurement change; "the landing page should look like theirs" is a composition change. Ask only when
 it is truly ambiguous, and in plain words — "just bigger, or should the whole top area look like their
-site?" Reading the first as the second turns a stylesheet edit into a rebuild (see Pitfalls).
+site?" Reading the first as the second turns a stylesheet edit into a rebuild.
 
 Plus the reference itself: read `up_front.reference_sites` in `.ai-dev/demo-prep.md` first, then
 `project.reference_sites` in `.ai-dev/project-setup.md`. Only outside a demo run, with neither set, ask
@@ -215,7 +206,8 @@ looks good?" — they are checking the result themselves.
 
 A navigation or layout task edits **templates, styles**, and at most **navigation node order, labels
 and visibility** (`position`, `title.<locale>`, whether a node is present in the menu). That is the
-whole permitted surface.
+whole permitted surface. A too-long menu is fixed with depth, visibility or a template, never by
+removing what the shop sells.
 
 **Categories, products and category keys are the catalog.** Removing them to make a menu fit is a
 data change, not a design fix: it changes what the shop sells in order to change how a bar looks, and
@@ -417,73 +409,6 @@ Grep the clone for each name first (`grep -rn "<name>" src/<Ns>/Yves --include='
 ## Pitfalls
 
 Format: **symptom → cause → what to do.**
-
-- **"Make the top image bigger" becomes a new component, project overrides, an importer change and
-  rebuilds, then a rollback.** → A measurement change was read as a request to rebuild the
-  landing page, and with no cost ladder logged the most expensive rung was taken. Such a fix is
-  usually a few lines in one stylesheet. → Size and
-  spacing complaints are rung 1 until proven otherwise: locate the element in the browser, read its
-  box, change the rule that sets it, build, look. Log the ladder (§3), take the cheapest rung that
-  achieves the look, and take the next rung yourself when it cannot.
-
-- **A swap is applied to the wrong pair: the person meant the block's original position, not where
-  an earlier move put it.** → a positional swap request was acted on
-  against a private numbering of a subset (only the image blocks) while the page rendered a much
-  larger set — so the two parties meant different blocks — and the wrong move then re-indexed
-  everything behind it. → Print the numbered map from the rendered page (§2), echo every positional
-  request against it and wait for the confirmation, and snapshot the map per change so "originally"
-  still resolves after a revert.
-
-- **A request to fix the navigation is answered by deleting categories from the import data.** → A
-  layout problem was compensated in data; the layout itself was never changed.
-  → §5: nav and layout work edits templates, styles and at most node order/labels/visibility. A
-  too-long menu is fixed with depth, visibility or a template, never by removing what the shop sells.
-  Catalog changes are a separate, explicitly requested step through `project-data`.
-
-- **A restyle intended for one homepage strip repaints the product detail page as well; the markup of
-  the two is compared, found identical, and the change is reported as scoped.** → The shared product tile was styled for one page, and the
-  identical markup was read as proof of no impact, when it means the change reaches both — the
-  difference between the two contexts was the wrapper, not the component. → §6: enumerate the consumers
-  (including templates, content-widget view names, the slots they land in) before the edit, and
-  register a new view/variant for a page-scoped intent.
-
-- **Styling cycles verified with `curl | grep` while the browser is used only to read the
-  reference.** → Markup presence was accepted as visual evidence, and the browser was treated as a
-  reading tool rather than a verification tool. → §4: the browser that looked at the reference looks
-  at the result. A cycle ends with a
-  screenshot pair at every sweep width, never a grep.
-
-- **Two utility classes swapped back and forth, neither producing the wanted result.** → The class was
-  chosen by its name; the two candidates were a few px apart, which no name reveals. → §7: read the
-  compiled value of the class before using it, read the current gap from the rendered page, and set
-  the number you measured.
-
-- **A panel that misaligns with everything around it on the first screenshot.** → Its width was
-  invented (1440px) while the site container is 1200px. → §7: read the container's computed max-width
-  from the page and inherit it; never restate a width from memory of some other site.
-
-- **Font and asset edits reported done, page unchanged.** → The edits landed in
-  gitignored build output, and in `app.css` — a stylesheet this page does not serve; it serves
-  `critical.css` + `util.css`. → §8: `git check-ignore -v` the path before writing, read the page's
-  own `<link>` tags to learn which stylesheet is served, edit the source component or theme file, and
-  rebuild.
-
-- **A change lands on the wrong dimension: "bigger" meant the block, not the text; "looks ugly" got
-  another guess instead of a question.** → An ambiguous word was resolved by guessing, and the second
-  guess also displaced what the first one moved. → §9: one question naming the two candidates, then
-  one edit.
-
-- **Reference sites were supplied — the customer's own and a second one — and never opened for
-  structure.** → The references were mined for content (copy, imagery, category names) or not opened
-  at all, so the composition was re-derived by trial and error, with the person checking each attempt. → §1:
-  capture comes first, always, and produces a written spec the person approves (autonomous: logged,
-  shown at the final review); that spec is the acceptance criterion for every cycle afterwards.
-
-- **A block whose full-bleed and spacing live in inline CSS inside a CMS placeholder cell, and a
-  second content area faked with a separator inside one cell.** → Layout was put into content because
-  content looked like the cheaper rung, and the block template's shipped placeholders were treated as
-  optional. → §10: layout in the template or a section modifier, content in the placeholder; more
-  content areas means a second block with its own key, slot wiring and per-store rows.
 
 - **A reset taken to undo a visual experiment, after which the person's positional references no
   longer resolve.** → A reset restores the stack but not the map the person was looking at. → §2: map snapshots are per change and survive the reset; quote the snapshot

@@ -1,19 +1,6 @@
 ---
 name: spryker-customization
-description: >
-  Use whenever the user wants to change how the shop behaves — new or overridden PHP
-  (plugins, expanders, dependency providers, config classes, importers), permissions,
-  checkout/cart/payment logic, new modules — from a PRD or acceptance criteria.
-  Triggers include "build this", "implement this", "here is a PRD - build it",
-  "add this behaviour for the demo", "build this PoC", "production-quality build".
-  Boundary: it owns behaviour only. Adding content, products, categories, CMS or banner
-  rows is `project-data`; making a page look a certain way is `match-reference-design`;
-  stores, locales, currencies and project identity are `project-starter-wizard`.
-  Drives the full workflow from intake to commit,
-  choosing a quality bar (PoC or MVP) at the start and delegating focused
-  work (research, verification, debugging, test-data setup, refresh,
-  Cypress E2E coverage, demo-artifact capture) to the spryker-* subagents
-  and skills. Never auto-commits; the user always confirms.
+description: "Builds a change to shop behaviour (PHP plugins, config, modules, checkout logic) from a PRD or criteria, from intake to commit. Use for 'build this', 'implement this' or a PoC or MVP."
 ---
 
 # Spryker Customization Workflow
@@ -487,23 +474,9 @@ section of `decisions.md` — not from recollection. The report is the log, summ
 
 ## What you do NOT do
 
-- Outside the demo preset (Step 0), which settles both from the confirmed row: do not skip the quality-bar decision at intake, or the AC restate + user confirmation step.
-- Do not edit anything under `vendor/`.
-- Do not work on the user's current branch directly. Always cut `ai-customize/<slug>`.
-- Do not commit without user confirmation. Even when all ACs are green. (Demo preset: no commit at all unless the preparer asks.)
-- Do not push to remote.
-- Do not keep iterating on an AC past a stuck signal (or the N = 10 runaway failsafe) — escalate to
-  the user per Step 7's rules, and report failures as they are. (The self-correct loop's default is
-  persistence until green or genuinely stuck, not a fixed retry count; the only bounded-retry gate is
-  static validation at Step 7b with N = 2.)
-- Do not do **discovery** research yourself (which mechanism / which extension point / how does X work — exploring `vendor/`, sweeping transfer XMLs, fetching docs). Delegate to `spryker-feature-expert` — that is its job. **Confirmation** of a symbol you can already name (exact signature, spelling, stack position) is allowed inline with a `file:line` citation — a one-line grep does not need an agent dispatch.
 - When you *do* need to read project files directly (e.g. project namespaces from `composer.json`, install recipes from `config/install/*.yml`), prefer **native tools over `Bash`**: `Read` for files (relative paths from the project root, never absolute `/Users/...`), `Glob` for filename discovery, `Grep` for content search. When the session has no `Grep`/`Glob` tool, a read-only `grep -rn` / `find` from the project root is the fallback — never `sed -i`, `awk` rewrites or a `cd` + `&&` chain into another directory.
-- Do not manipulate CSV files. Delegate to `spryker-data-seeder`.
 - Do not touch the database directly via any shell route. Reads go through `executeDatabaseQuery` (delegated to expert / verifier / debugger); writes go through the data-import path (delegated to data-seeder) or schema XML + propel migrations.
 - **Do not drive the browser from the main loop.** Verification UI work belongs to `spryker-verifier`; demo capture belongs to `spryker-screenshot-collector`. When a screenshot or verification result looks wrong, the answer is to **re-invoke the agent with sharper instructions** — never to load browser-automation tools into the main session and *"just check it yourself"*. Self-correction signal: if you're about to pull in any of the tools listed in the `spryker-runtime` skill's Browser tool map from the main loop, **stop** — that is main-loop bleed. The agents own the browser; the orchestrator delegates. This rule applies equally to *"just one quick screenshot to verify the agent's output"* — that quick check is still the agent's job.
 - Do not run `docker/sdk reset` or any environment-destructive command. When the change needs one, say so in the report; under the demo preset `demo-prep-wizard` runs it.
 - Do not produce MVP-grade ceremony when the chosen bar is PoC. If you have more than ~5 PHP classes in a PoC, you're building MVP — re-cut.
-- Do not produce PoC-grade shortcuts when the chosen bar is MVP. Canonical patterns are required for MVP.
-- Do not produce ceremony the Code-convention resolution didn't sanction when the bar is MVP either. A single-implementation interface outside the canonical seams — with no project rule and no feature-code precedent behind it — contradicts the plan's `Convention:` line and gets inlined, not shipped.
-- Do not leave `[AI-DEBUG]` logs, `use LoggerTrait;` lines you added for debugging, `file_put_contents('/data/data/tmp/ai-debug.log', ...)` fallback writes, or `@group AITestCase` tags in committed code. Strip everything in Step 7b's cleanup pass.
-- **Do not invoke the `static-validation` skill before Step 7b.** Its description triggers on any PHP edit, but the workflow owns the timing: only Step 7b runs static-validation, against the final stable diff. If you catch yourself reaching for it after Step 4 (edit), Step 5 (refresh), or any iteration of Step 7 (self-correct) — stop. Same applies to `phpcbf` / `phpcs` / `phpstan` invoked any other way.
+- **Do not invoke the `static-validation` skill before Step 7b.** Same applies to `phpcbf` / `phpcs` / `phpstan` invoked any other way.

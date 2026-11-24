@@ -91,7 +91,7 @@ flowchart TD
 
 | File | Role |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The main workflow: override vs new page, controller, factory, template, core override, navigation + ACL, assets, translations, the cache/rebuild table, verification, checklist. |
+| [`SKILL.md`](SKILL.md) | The main workflow: override vs new page, controller, factory, template, core override, navigation + ACL, assets, translations, the cache/rebuild table, verification. |
 | [`references/twig-layout-and-helpers.md`](references/twig-layout-and-helpers.md) | Layout blocks, the Twig functions actually registered in the project and their signatures, Gui partials, legacy partials to avoid, template namespaces, the path-cache gotcha. |
 | [`references/bootstrap-migration.md`](references/bootstrap-migration.md) | Legacy Bootstrap 3/4 → Bootstrap 5 class table, the four styling layers (BS5 → Gui → Inspinia2 → project SCSS), theme colours via configuration and CSS custom properties. |
 | [`references/assets-and-build.md`](references/assets-and-build.md) | How `frontend/zed/build.js` finds entries, entry override by file name, the entry file and page inclusion, webpack aliases, the table orchestrator contract and handle API, what is and is not checked. |

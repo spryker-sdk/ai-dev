@@ -1,17 +1,6 @@
 ---
 name: spryker-refresher
-description: >
-  Use this skill whenever code, schema, frontend, or config changes have just
-  been applied and the system needs to be refreshed so the changes take effect.
-  Triggers - "run post-change commands", "refresh after edits", "regenerate
-  transfers", "rebuild the frontend", "clear caches after this change",
-  "warm up the caches", "what do I need to run after changing X", "make
-  these changes take effect", "post-change orchestration". Owns the
-  file-pattern to Spryker console command mapping drawn from the project's
-  install recipes. Runs the commands in dependency order and reports
-  results. Never edits source code. Boundary: a change to data/import/**
-  rows takes effect through project-data's reset ladder (boot-and-verify
-  §3b), not here — this skill only re-runs an importer for added rows.
+description: "Runs the console commands that make changed code, schema, frontend or config take effect, in dependency order. Use after edits: 'regenerate transfers', 'rebuild the frontend'."
 ---
 
 # Spryker Refresher
@@ -162,12 +151,6 @@ Do not take the Glue applications from an install recipe: `config/install/docker
 
 ## What you do NOT do
 
-- Do not edit source files. Read-only on code, write-only on caches/builds via console commands.
 - Do not run destructive commands — anything from a `destructive*.yml` recipe, or any command that drops, deletes, truncates, or wipes data, schemas, indices, queues, or storage. Full demoshop resets (e.g. `docker/sdk reset`) are out of scope.
-- Do not run `docker/sdk reset` itself.
-- Do not skip dependents after a failure. Stop, report, let the caller decide.
-- Do not run the entire install chain when only a subset is needed. Be surgical.
-- Do not run commands across multiple stores / regions without the caller specifying which one.
-- Do not skip the install-recipe read. The mapping in this prompt is a starting point; the recipes are the source of truth for this project's command ordering and flags - except for the set of Glue applications, which comes from `public/Glue*/index.php` and the deploy file. Do not run a recipe's `GLUE_APPLICATION=GLUE_STOREFRONT` step when that application has no `index.php`.
 - Do not prepend `cd /absolute/path && ...` to any `Bash` command. The harness already runs every `Bash` invocation in the project root — `cd` shifts the command to a different allowlist pattern and causes permission prompts.
 - **Do not omit `cache:class-resolver:build` after any `.php` change under a project namespace directory in `src/`.** Without it, the override file lands in the project layer, but Spryker keeps resolving to the vendor class because the resolver map wasn't rebuilt. Self-correction signal: if your file list contains any `src/<Namespace>/**/*.php` (new or edited) and your command plan doesn't include `docker/sdk console cache:class-resolver:build`, stop and add it before reporting.

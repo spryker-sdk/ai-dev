@@ -64,7 +64,7 @@ flowchart TD
 
 | file | holds |
 |---|---|
-| `SKILL.md` | the format question, the source table for every fact, the seven sections, the test rules, the count gate, scope, the Markdown template, the close checklist, pitfalls |
+| `SKILL.md` | the format question, the source table for every fact, the seven sections, the test rules, the count gate, scope, the Markdown template, the close checklist |
 | `references/output-format.md` | the paste contract, which HTML survives a rich-text paste and which does not, the HTML template with the status labels |
 
 ## Design decisions baked in

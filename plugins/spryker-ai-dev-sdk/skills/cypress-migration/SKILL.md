@@ -1,17 +1,11 @@
 ---
 name: cypress-migration
-description: >
-  Use when onboarding a Spryker project onto its own Cypress E2E baseline in place of
-  Spryker's demo-shop suites — "migrate off spryker/cypress-tests", "remove the demo-shop
-  cypress/robot suites", "set up project-owned cypress testing", "integrate
-  cypress-boilerplate". One-time migration: removes spryker/cypress-tests and
-  spryker/robotframework-suite-tests, vendors tests/cypress-boilerplate/ from
-  spryker-shop/b2b-demo-marketplace, wires CI and generates the project's day-to-day
-  cypress-tests skill. Each step first discovers the target project's hostnames, fixtures and
-  CI patterns. For writing or running tests after the migration use cypress-tests.
+description: "Replaces Spryker's demo-shop Cypress and Robot suites with a project-owned Cypress baseline, CI wiring and a cypress-tests skill. Use once, to migrate off spryker/cypress-tests."
 ---
 
 # Cypress Migration: Demo-Shop Suites → Project-Owned Baseline
+
+Boundary: this is a one-time migration. For writing or running tests after the migration use `cypress-tests`.
 
 Failure-signature triage for the E2E steps lives in the Known-traps catalog: `../project-starter-wizard/references/pitfalls.md`.
 

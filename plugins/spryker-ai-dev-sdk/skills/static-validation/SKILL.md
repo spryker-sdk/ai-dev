@@ -1,16 +1,6 @@
 ---
 name: static-validation
-description: >
-  Run Spryker static analysis over only the code that changed versus a base branch — PHP (phpcbf,
-  phpcs, phpmd/architecture-sniffer, phpstan) and frontend (eslint, stylelint, prettier for
-  js/ts/scss/css/less/html across Yves, Back Office and Merchant Portal) — after implementing or
-  editing code, before commit, or as an interim check while iterating. Trigger on "validate", "lint",
-  "check code", "run static analysis", "fix phpcs/phpstan", "run QA on changes", "static check the
-  diff", "lint the changed modules", "check js/css/scss I changed", "lint my Yves/Merchant Portal
-  change", "check code vs master/main", "static-check the branch". Works from any git worktree, auto-
-  detects or takes a base branch (master, main or any ref), validates only added/changed files, and
-  groups PHP by changed files (files scope) or by every Spryker module with a changed file (module
-  scope — validates the whole module).
+description: "Runs Spryker static analysis (phpcs, phpstan, phpmd, eslint, stylelint, prettier) on the files changed against a base branch. Use after edits, before a commit, or for 'lint' or 'validate'."
 ---
 
 # static-validation

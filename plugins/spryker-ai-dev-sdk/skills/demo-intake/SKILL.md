@@ -1,18 +1,11 @@
 ---
 name: demo-intake
-description: >
-  Use to turn a customer briefing into structured input — a .docx/.pdf/.txt brief, a demo script, a
-  reference URL or a verbal brief. Triggers: "turn this brief into wizard input", "what data do we
-  need from this brief", "classify this briefing", "give me a description of this demo". Phase 1 of
-  `demo-prep-wizard`: when a whole demo is being prepared ("prepare the demo", "here is the briefing
-  for the demo"), use `demo-prep-wizard`, which runs this skill itself. Usable on its own ahead of
-  `project-starter-wizard`. Read-only on the
-  source: platform pin, a routing table classifying every briefing item, dataset field mapping, a
-  measured brand colour, and every question the brief does not answer left as `?`. It does not
-  brainstorm, write a plan, or interview about the repo.
+description: "Turns a customer brief (docx, pdf, text, demo script, URL or verbal) into structured input: platform, routing table, field mapping, brand colour, open questions. Use to classify a brief."
 ---
 
 # demo-intake (briefing → wizard handoff)
+
+Boundary: when a whole demo is being prepared ("prepare the demo", "here is the briefing for the demo"), use `demo-prep-wizard`, which runs this skill itself. This skill does not brainstorm, write a plan, or interview about the repo.
 
 You turn a customer briefing into the one thing `project-starter-wizard` can consume: a short, pasteable
 handoff that states what is known, names where the data lives, and leaves everything the brief does not
@@ -236,33 +229,3 @@ Then hand back. **Run from `demo-prep-wizard`:** return the block and the routin
 **Run on its own:** the next step is **`project-starter-wizard`**, which reads this block as interview
 pre-fill (candidates marked "from your brief") — never as a questionnaire. With `purpose: demo` it runs its
 demo fast path; otherwise every section is still asked.
-
-## Pitfalls
-
-Format: **signature → cause → fix.**
-
-- **A wizard-style interview about the target repo, when the ask was "how do we collect the data"** → the
-  wizard was used as the fallback for an unread brief → intake first (§0); the repo is not the subject, and
-  `composer.json` is the only file in it you open.
-- **A proposed product-attribute change so the catalogue matches the narrative, shown as "(Recommended)"** →
-  the story was treated as ground truth and the source as adjustable → the source is ground truth; the
-  mismatch is a gap line (§3). Never rank fabrication, never offer it.
-- **"Get me a description" answered with repo reads, a plan document and a markdown table** → a two-sentence
-  request escalated into research → answer from context, zero tool calls, before any research (§0); the
-  short variant is two sentences of plain text.
-- **A consumer brief turned into business buyers — shoppers rewritten as business-unit users, guest
-  checkout dropped** → the audience was inferred from the clone instead of read from the brief → record
-  `audience:` from the brief (§1); the B2B clone serves a consumer demo. A term with no platform
-  equivalent is still an open question.
-- **Hotspots, quick view and a bundle builder listed as setup work** → items the platform already does, and
-  items that would change how it behaves, were never separated from setup and data → classify every item
-  against `references/work-classes.md` and emit the routing table (§2); *already works* and customization
-  items do not reach the handoff.
-- **A questionnaire YAML with a brand hex, a domain, a region and a locale nobody stated** → a
-  brief was read as a questionnaire → no IDs in the handoff, every unstated value a `?` (§7); the wizard's
-  Rule 0 refuses this from the other side.
-- **A remembered hex (`#123457` where the site measures `#123456`)** → the colour was recalled instead of
-  read → measure it in the browser and record URL + element + property + date (§5).
-- **The wizard spends question rounds reconstructing master / colour / size semantics from the CSVs** → the
-  handoff shipped without a logo, without a measured colour and without a field mapping → §4 and §5 are
-  mandatory lines.

@@ -553,6 +553,32 @@ check('CLI add-row: unknown column is a hard error, file untouched', ($arBad['st
 $orderJson = json_decode((string) shell_exec("{$php} {$lib} columns --plain " . escapeshellarg($ap) . ' 2>/dev/null'), true);
 check('CLI: a flag before the file names the actual problem', ($orderJson['status'] ?? '') === 'error' && str_contains(json_encode($orderJson), 'did you put a --flag before the file'));
 
+// --- CLI: --help / --help <command> ---
+$helpRun = static function (string $args) use ($php, $lib): array {
+    $out = [];
+    $code = 0;
+    exec("{$php} {$lib} {$args} 2>&1", $out, $code);
+
+    return [implode("\n", $out), $code];
+};
+[$helpAll, $helpAllCode] = $helpRun('--help');
+check('CLI --help: exit 0, lists the commands and points to --help <command>', $helpAllCode === 0 && str_contains($helpAll, 'usage: csv.php') && str_contains($helpAll, '--help <command>'));
+check('CLI --help: prints the general rules (files before flags, atomic LF writes)', str_contains($helpAll, 'Files are positional and come before the flags') && str_contains($helpAll, 'LF-terminated'));
+[$helpFilter, $helpFilterCode] = $helpRun('--help filter');
+check('CLI --help filter: exit 0, full explanation and the worked example', $helpFilterCode === 0 && str_contains($helpFilter, 'keep matching rows') && str_contains($helpFilter, '--match prefix'));
+$usageCommands = [];
+foreach (csv_usage_lines() as $line) {
+    if (preg_match('/^  ([a-z-]+) /', $line, $m)) {
+        $usageCommands[] = $m[1];
+    }
+}
+$missingHelp = array_values(array_diff($usageCommands, array_keys(csv_help_texts())));
+check('CLI --help: every command in the usage list has a help text', $usageCommands !== [] && $missingHelp === []);
+[$helpBad, $helpBadCode] = $helpRun('--help nope');
+check('CLI --help <unknown>: exit 2 with a JSON error naming the known commands', $helpBadCode === 2 && str_contains((string) (json_decode($helpBad, true)['errors'][0] ?? ''), "unknown command 'nope'"));
+[, $noArgCode] = $helpRun('');
+check('CLI with no argument still prints the usage error, exit 2', $noArgCode === 2);
+
 // cleanup
 array_map('unlink', glob($tmp . '/*') ?: []);
 @rmdir($tmp);

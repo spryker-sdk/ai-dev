@@ -1,7 +1,7 @@
 ---
 name: performance
 description: Use when writing or reviewing performance-sensitive Spryker code — storefront reads, Propel queries and writes, key-value/search access, Twig templates, external HTTP calls, and batch processing. Enforces architecture boundaries, bulk-over-loop patterns, and non-blocking request handling.
-paths: "**/*.{php,twig}"
+paths: "src/**/*.{php,twig}"
 ---
 
 **Performance rule**

@@ -1,20 +1,12 @@
 ---
 name: payment-template
-description: >
-  Use when a developer wants to build, implement, scaffold, or onboard a new PSP (Payment Service
-  Provider) or payment gateway integration in Spryker from scratch — including named providers like
-  Adyen, Mollie, Stripe, Braintree, Klarna, Worldpay, Buckaroo, Payone, Nuvei, or any custom PSP
-  partner. Trigger whenever someone says "add X as payment provider", "implement X payment
-  integration", "build a payment module for X", "set up a new payment gateway", "new PSP
-  integration", or "create a payment provider module". Uses spryker-community/payment-template as
-  scaffold, collects requirements interactively (payment methods, auth mechanism, webhooks),
-  confirms a plan, then executes full implementation. Do NOT trigger for: debugging existing
-  integrations, adding refunds to existing modules, back office payment configuration, writing
-  payment tests, or API Platform migrations.
+description: "Builds a new PSP or payment gateway integration in Spryker from the payment-template scaffold, from requirements to code. Use for 'add X as payment provider' or a new PSP module."
 user-invocable: true
 ---
 
 # Payment Template Implementation Skill
+
+Boundary: do not use this skill for debugging existing integrations, adding refunds to existing modules, back office payment configuration, writing payment tests, or API Platform migrations.
 
 Produces a complete, working PSP payment integration through four phases:
 **Collect → Plan → Confirm → Execute.**

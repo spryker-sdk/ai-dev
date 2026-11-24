@@ -1,11 +1,6 @@
 ---
 name: backoffice-frontend
-description: >
-  Use when building or overriding Spryker Back Office (Zed) pages in a project — new list/create/edit
-  pages, overrides of core Zed Twig templates, Back Office navigation/ACL, or Back Office JS/SCSS. Triggers:
-  "create a Back Office page", "add an admin screen for X", "override a Zed template", "add BO navigation",
-  "add a menu entry to the Back Office", "BO JS/SCSS", "Bootstrap classes in Zed", "my Zed override is not
-  picked up", "the new menu item does not show".
+description: "Builds or overrides Back Office (Zed) pages: list/create/edit pages, Zed Twig overrides, navigation, ACL, JS/SCSS. Use for a new admin screen or a Zed override that is not picked up."
 ---
 
 # Spryker Back Office Frontend
@@ -141,10 +136,3 @@ Verification — a green build is not proof:
    JS errors and the table's AJAX request (`/{module}/{controller}/table`) returning JSON.
 2. Exercise the happy path, a validation error, and a user role without the ACL rule (expect the `/acl/index/denied` "Access denied" page).
 3. `npm run formatter` is the only automated Zed JS/SCSS check; PHP via `static-validation`; E2E: `cypress-tests`.
-
-## Checklist
-
-- [ ] Override extends `@Spryker:...` and overrides blocks only; no vendor edit
-- [ ] `indexAction` + `tableAction`; tables/forms/tabs created in the factory
-- [ ] All text `| trans` with keys in both CSVs; navigation entry + ACL rule for restricted roles
-- [ ] Caches rebuilt per the table above; page verified in the running Back Office

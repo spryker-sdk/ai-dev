@@ -1,6 +1,6 @@
 ---
 name: ai-dev-setup
-description: "Sets up the Spryker AI Dev SDK in a Spryker project. Covers three related flows: first-time onboarding (installs the Composer package, wires console commands, registers the MCP server with the coding agent in use, installs the project instructions file and the Spryker coding rules), updating (refreshes just those two artifacts from the latest bundled content, skipping install and wiring), and rules-only (installs or refreshes the coding rules alone, for a project without Composer or a running container stack). The skill first detects which coding agent is running it, then infers which flow the user wants from their request and from project state. Onboarding requires Composer and a running `docker/sdk` environment; updating only needs the bundled content on disk; rules-only needs neither."
+description: "Sets up the Spryker AI Dev SDK in a project: onboarding (package, console commands, MCP server, instructions, rules), update, or rules-only. Use to install or refresh the SDK."
 disable-model-invocation: true
 user-invocable: true
 ---

@@ -1,7 +1,7 @@
 ---
 name: owasp
 description: Use during any code review and when writing code that handles user input, authentication, data storage, or external calls. Enforces OWASP Top 10 categories as blocking issues — flag injection, access control, cryptographic, auth, and logging failures.
-paths: "**/*.{php,js,ts,jsx,tsx}"
+paths: "src/**/*.{php,js,ts}"
 ---
 
 **Security rule**
@@ -92,11 +92,3 @@ Critical instructions:
 - Error messages MUST NOT reveal sensitive system information
 - Application MUST fail securely and gracefully
 - Unhandled exceptions MUST be caught at top level
-
-WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
-- OWASP Top 10 represents the most critical web application security risks
-- Following these standards prevents the majority of security vulnerabilities
-- Security breaches can result in data theft, financial loss, and reputation damage
-- Compliance requirements (GDPR, PCI-DSS, SOC2) mandate these security controls
-- Prevention is far less costly than remediation after a breach
-- Reference: https://owasp.org/Top10/

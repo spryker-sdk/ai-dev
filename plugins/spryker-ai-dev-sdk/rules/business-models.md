@@ -1,7 +1,7 @@
 ---
 name: business-models
 description: Use when writing or reviewing Business models in Zed, Client, or Service layers. Enforces single responsibility, statelessness, constructor injection, and module boundary discipline.
-paths: "src/**/Business/**/*.php"
+paths: "src/**/Business/**/*.php,src/**/Client/**/*.php,src/**/Service/**/*.php"
 ---
 
 **Architecture rule**

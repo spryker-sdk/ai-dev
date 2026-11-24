@@ -1,14 +1,6 @@
 ---
 name: spryker-qa-coverage
-description: >
-  Hands-on QA of a Spryker feature against the running application: turns a PRD or feature
-  description into a checklist and test cases (happy path, negative, authorization, edge
-  cases), runs them through spryker-runtime (Back Office and storefront in the browser, CLI,
-  HTTP/API, database/Redis/queue checks) and reports pass/fail with evidence. Use when a
-  feature is done, mid-development, or as a smoke test after a refactor — "test this", "does
-  this still work", "did my refactor break anything", "make sure it works in the back office",
-  or a PRD with "is this implemented correctly?". Does not write automated tests
-  (codecept-functional, cypress-tests), run static analysis (static-validation) or fix code.
+description: "Runs manual QA of a Spryker feature on the running app: test cases from a PRD, run in browser, CLI and API, pass/fail with evidence. Use for 'test this' or a smoke test after a refactor."
 ---
 
 # Spryker QA & Testing (from PRD → checklist → execute → report)
@@ -192,15 +184,8 @@ ALWAYS structure the final report like this:
 
 ## Red flags — stop and reconsider
 
-- "I'll just run phpstan/spryker-ci to check it" → NO. This skill never runs static analysis.
-- "I'll write a Codeception test for this" → NO. That's `codecept-functional`. Here you execute against the running app.
 - "Only the happy path matters" → NO. Corner and authorization cases are where features break; cover all five buckets (Scale/NFR when an envelope is supplied — else note its absence).
 - "It probably works" / "the code looks right" → NO. QA reports *observed* behavior with evidence, not inferences from code.
-- "The endpoint returns 200, so the feature works" → NO. A synthetic/endpoint hit is a layer below the UI. If the AC is a user flow, prove it through the real UI (E2E); otherwise mark it `PASS (server only)` and keep the UI-flow case FAIL/BLOCKED. Reading code is fine to *understand what to test* — it is never a substitute for *observing* the running flow.
-- "The button did nothing once, so it's a blocker" → NO. Reproduce on ≥3 fresh loads (hard reload + navigate-back) and rule out your own driver first. Spryker Zed front-end bootstrap bugs are often intermittent races — works-on-some-loads is a *minor/flaky* finding, not a blocker. One dead load is a hypothesis, not a verdict.
-- "Server works (Mode 5 = 200) and the UI is dead — clean story, done" → NO. That split is the signature of a *prematurely-closed* investigation. Mode 5 proves the server only; keep driving the real button to completion across reloads before you fail the UI case.
-- "I'll fix the bug I found" → NO. Report it; offer handoff; don't change product code.
-- "Mark it passed even though I couldn't run it" → NO. That's BLOCKED, not PASS.
 
 ## Supporting files
 - **[test-case-template.md](test-case-template.md)** — the per-case structure and a worked example.
