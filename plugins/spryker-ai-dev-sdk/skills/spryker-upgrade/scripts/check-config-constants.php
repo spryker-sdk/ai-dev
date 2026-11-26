@@ -10,7 +10,9 @@
  * reflection that the type and the constant still exist.
  *
  * Usage:
- *   php $UP/check-config-constants.php   # any time — exit 1 on missing
+ *   php $UP/check-config-constants.php --baseline   # Phase 0: also keeps the result in config-constants-baseline.json
+ *   php $UP/check-config-constants.php              # any time — exit 1 on missing; marks findings inBaseline
+ *   [--limit N]                                     # findings printed (default 10, 0 = counts only)
  */
 
 declare(strict_types=1);
@@ -19,6 +21,7 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 
 require __DIR__ . '/bootstrap.php';
 
+$options = spryker_upgrade_output_options($argv, true);
 $root = spryker_upgrade_project_root();
 require $root . '/vendor/autoload.php';
 
@@ -144,33 +147,46 @@ foreach ($iterator as $file) {
 if (!is_dir($stateDir)) {
     mkdir($stateDir, 0775, true);
 }
-file_put_contents($reportFile, json_encode([
+$report = [
     'createdAt' => date('c'),
     'checkedTypes' => $checkedTypes,
     'checkedConstants' => $checkedConstants,
     'problems' => $problems,
     'generatedMissing' => $generatedMissing,
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+];
+$report = spryker_upgrade_compare_with_baseline(
+    $stateDir,
+    'config-constants',
+    $report,
+    ['problems'],
+    static fn (string $list, array $entry): string => implode(' ', [$entry['type'] ?? '', $entry['file'] ?? '', $entry['subject'] ?? '']),
+    $options['baseline']
+) ?? $report;
+file_put_contents($reportFile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-printf("Checked %d vendor type imports and %d vendor constant references across config/.\n", $checkedTypes, $checkedConstants);
-
+$notes = [];
 if ($generatedMissing !== []) {
-    printf(
-        "\nNOTE: %d Generated\\ transfer class(es) referenced by config are absent. Run\n"
-        . "  vendor/bin/console transfer:generate\n"
-        . "and re-run this check — any that are still missing then were dropped upstream.\n",
+    $notes[] = sprintf(
+        'NOTE: %d Generated\\ transfer class(es) referenced by config are absent. Run vendor/bin/console transfer:generate'
+        . ' and re-run this check; any that are still missing then were dropped upstream.',
         count($generatedMissing)
     );
 }
-
-if ($problems === []) {
-    echo "\nOK: all vendor types and constants used by project config still exist.\n";
-    exit(0);
+$baselineNote = spryker_upgrade_baseline_note($stateDir, 'config-constants', $options['baseline'], $problems !== []);
+if ($baselineNote !== null) {
+    $notes[] = $baselineNote;
 }
-
-printf("\nFOUND %d problem(s):\n\n", count($problems));
+$counts = [];
 foreach ($problems as $p) {
-    printf("[%s] %s\n  file: %s\n  %s\n\n", $p['type'], $p['subject'], $p['file'], $p['detail']);
+    $counts[$p['type']] = ($counts[$p['type']] ?? 0) + 1;
 }
-echo "Full report: " . str_replace($root . '/', '', $reportFile) . "\n";
-exit(1);
+spryker_upgrade_print_summary(
+    'check-config-constants',
+    $counts === [] ? ['problems' => 0] : $counts,
+    array_map(static fn (array $p): array => spryker_upgrade_finding($p['type'], $p['subject'] . ' in ' . $p['file'], $p), $report['problems']),
+    $reportFile,
+    $root,
+    $options['limit'],
+    $notes
+);
+exit($problems === [] ? 0 : 1);

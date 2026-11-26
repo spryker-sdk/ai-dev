@@ -150,8 +150,8 @@ or a package name.** Record in `state.md` that the search ran through a fallback
 3. Before the install (Phase 5), record the baselines. The `$UP` scripts write into the directory
    that `SPRYKER_UPGRADE_STATE_DIR` names:
    ```bash
-   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-plugin-usage.php || true
-   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-config-constants.php || true
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-plugin-usage.php --baseline || true
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-config-constants.php --baseline || true
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-dead-overrides.php snapshot
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/twig-shadow-map.php snapshot
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/run-tools.php baseline phpstan sniffer tests --tests-args=--no-exit
@@ -301,8 +301,9 @@ Read [references/reconcile.md](references/reconcile.md) on entry.
      `propel:install` is for a fresh local database only;
    - codegen and setup: `spryker-refresher` with the changed files, then the section's own setup
      commands;
-   - re-run `check-plugin-usage.php` and `check-config-constants.php`; a new finding blocks the
-     next section;
+   - re-run `check-plugin-usage.php` and `check-config-constants.php` with
+     `SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline` and without `--baseline`: they list the findings
+     that Phase 0 did not have. A new finding blocks the next section;
    - commit the section, if the developer chose commits.
 4. Gate: `php $FI/check-feature-installed.php $STATE/checklist.json --wiring` exits 0.
 

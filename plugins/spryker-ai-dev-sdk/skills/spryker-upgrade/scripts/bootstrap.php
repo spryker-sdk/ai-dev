@@ -180,3 +180,5 @@ function spryker_upgrade_record_base_ref(string $projectRoot, string $stateDir, 
 
     return ['ref' => $ref, 'written' => true];
 }
+
+require_once __DIR__ . '/detector-output.php';

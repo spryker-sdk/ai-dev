@@ -11,6 +11,7 @@
  * Usage:
  *   php $UP/merge-shadowed-files.php --dry-run   # classify only, touch nothing
  *   php $UP/merge-shadowed-files.php --apply     # write the clean merges
+ *   [--limit N]                                  # conflicted files printed (default 10, 0 = counts only)
  *
  * Outcomes:
  *   CLEAN      - merged without conflict markers; written when --apply
@@ -35,6 +36,7 @@ $reportFile = $stateDir . '/twig-conflicts-report.json';
 $baselineDir = $stateDir . '/vendor-baseline';
 $outFile = $stateDir . '/merge-results.json';
 
+$options = spryker_upgrade_output_options($argv);
 $apply = in_array('--apply', $argv, true);
 $dryRun = in_array('--dry-run', $argv, true);
 if ($apply === $dryRun) {
@@ -115,26 +117,19 @@ file_put_contents($outFile, json_encode([
     'results' => $results,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-printf(
-    "%s\n  CLEAN      %d\n  IDENTICAL  %d (override carried no customisation — candidates for deletion)\n"
-    . "  CONFLICTED %d (need manual resolution)\n  NO_BASE    %d\n  REMOVED    %d (vendor template gone — semantic decision)\n",
-    $apply ? 'Applied merges:' : 'Dry run (nothing written):',
-    count($results['clean']),
-    count($results['identical']),
-    count($results['conflicted']),
-    count($results['noBase']),
-    count($results['removed'])
+spryker_upgrade_print_summary(
+    'merge-shadowed-files ' . ($apply ? '(applied merges)' : '(dry run, nothing written)'),
+    [
+        'CLEAN' => count($results['clean']),
+        'IDENTICAL (override carried no customisation: candidates for deletion)' => count($results['identical']),
+        'CONFLICTED (need manual resolution)' => count($results['conflicted']),
+        'NO_BASE' => count($results['noBase']),
+        'REMOVED (vendor template gone: semantic decision)' => count($results['removed']),
+    ],
+    array_map(static fn ($file): array => spryker_upgrade_finding('CONFLICTED', (string)$file), $results['conflicted']),
+    $outFile,
+    $root,
+    $options['limit'],
+    $apply && $results['conflicted'] !== [] ? ['Each conflicted merge was written to <file>.merge-conflict; the project file is untouched.'] : []
 );
-
-if ($results['conflicted'] !== []) {
-    echo "\nConflicted files:\n";
-    foreach ($results['conflicted'] as $file) {
-        echo "  $file\n";
-    }
-    if ($apply) {
-        echo "\nEach conflicted merge was written to <file>.merge-conflict; the project file is untouched.\n";
-    }
-}
-
-printf("\nFull results: %s\n", str_replace($root . '/', '', $outFile));
 exit($results['conflicted'] === [] ? 0 : 1);

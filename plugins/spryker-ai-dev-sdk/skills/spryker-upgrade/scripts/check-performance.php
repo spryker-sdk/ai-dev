@@ -29,7 +29,7 @@
  * that rendered before stop rendering.
  *
  * Usage:
- *   php $UP/check-performance.php [--before-lock <file>]      ProductGroupWidget check, performance-report.json
+ *   php $UP/check-performance.php [--before-lock <file>] [--limit N]  ProductGroupWidget check, performance-report.json
  *   php $UP/check-performance.php --scan-code                 code-pattern candidates, performance-code-scan.json
  *   php $UP/check-performance.php --init [--docs <dir>]       performance-fixes.json from the guideline index
  *   php $UP/check-performance.php --set <ID> --status <status> [--title <t>] [--detected <t>] [--size S|M|L]
@@ -998,7 +998,7 @@ function pf_write_status(string $file, array $data): void
 /**
  * The default run: the ProductGroupWidget check, performance-report.json.
  */
-function pf_detect(string $root, string $stateDir, ?string $beforeLock): int
+function pf_detect(string $root, string $stateDir, ?string $beforeLock, int $limit = SPRYKER_UPGRADE_DEFAULT_LIMIT): int
 {
     if (!is_file($root . '/composer.lock')) {
         fwrite(STDERR, "composer.lock not found in the project root.\n");
@@ -1017,32 +1017,31 @@ function pf_detect(string $root, string $stateDir, ?string $beforeLock): int
         'findings' => $productGroupWidget['finding'] ? ['PRODUCT_GROUP_WIDGET_REMOVED'] : [],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    fwrite(STDOUT, sprintf(
-        "ProductGroupWidget — shop-ui %s -> %s: %s\n",
-        $productGroupWidget['shopUiBefore'] ?? '-',
-        $productGroupWidget['shopUiNow'] ?? '-',
-        match ($productGroupWidget['crossed']) {
-            null => 'Phase 0 lock not found (composer.lock.before or --before-lock), crossing of ' . PF_SHOP_UI_BREAK . ' not checked',
-            true => 'crossed ' . PF_SHOP_UI_BREAK . ' (ProductGroupWidget removed from the product-card, product-item and product-list-item molecules)',
-            false => 'did not cross ' . PF_SHOP_UI_BREAK,
-        }
-    ));
-    if ($productGroupWidget['crossed'] === true) {
-        fwrite(STDOUT, sprintf(
-            "  product groups used: %s; a project molecule template renders ProductGroupWidget: %s\n",
-            $productGroupWidget['productGroups']['used'] ? 'yes (' . implode('; ', $productGroupWidget['productGroups']['evidence']) . ')' : 'no evidence',
-            $productGroupWidget['rendered'] ? 'yes' : 'no'
+    $crossing = match ($productGroupWidget['crossed']) {
+        null => 'Phase 0 lock not found (composer.lock.before or --before-lock), crossing of ' . PF_SHOP_UI_BREAK . ' not checked',
+        true => 'crossed ' . PF_SHOP_UI_BREAK . ' (ProductGroupWidget removed from the product-card, product-item and product-list-item molecules)',
+        false => 'did not cross ' . PF_SHOP_UI_BREAK,
+    };
+    $findings = [];
+    if ($productGroupWidget['finding']) {
+        $findings[] = spryker_upgrade_finding('PRODUCT_GROUP_WIDGET_REMOVED', sprintf(
+            'product groups used (%d evidence item(s) in the report); no project molecule template renders ProductGroupWidget',
+            count($productGroupWidget['productGroups']['evidence'])
         ));
     }
-    fwrite(STDOUT, "\nFull report: " . spryker_upgrade_rel($reportFile, $root) . "\n");
-    if ($productGroupWidget['finding']) {
-        fwrite(STDOUT, "\nFOUND: product groups do not render on product cards and lists after the upgrade. Restore the ProductGroupWidget call in the\n"
-            . "`groups` block of the project's product-card, product-item and product-list-item molecule templates.\n");
+    spryker_upgrade_print_summary(
+        sprintf('check-performance (shop-ui %s -> %s: %s)', $productGroupWidget['shopUiBefore'] ?? '-', $productGroupWidget['shopUiNow'] ?? '-', $crossing),
+        ['PRODUCT_GROUP_WIDGET_REMOVED' => $productGroupWidget['finding'] ? 1 : 0],
+        $findings,
+        $reportFile,
+        $root,
+        $limit,
+        $productGroupWidget['finding']
+            ? ['FOUND: product groups do not render on product cards and lists after the upgrade. Restore the ProductGroupWidget call in the `groups` block of the project\'s product-card, product-item and product-list-item molecule templates.']
+            : []
+    );
 
-        return 1;
-    }
-
-    return 0;
+    return $productGroupWidget['finding'] ? 1 : 0;
 }
 
 /**
@@ -1099,6 +1098,7 @@ function pf_usage(): string
 
 function pf_main(array $argv): int
 {
+    $output = spryker_upgrade_output_options($argv);
     $arguments = array_slice($argv, 1);
     $mode = 'detect';
     $options = [];
@@ -1163,7 +1163,7 @@ function pf_main(array $argv): int
             return 2;
         }
 
-        return pf_detect($root, $stateDir, $options['--before-lock'] ?? null);
+        return pf_detect($root, $stateDir, $options['--before-lock'] ?? null, $output['limit']);
     }
     if ($mode === 'scan') {
         $hits = pf_scan_code($root, spryker_upgrade_project_namespaces($root));

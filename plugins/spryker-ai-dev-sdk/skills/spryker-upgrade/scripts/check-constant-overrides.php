@@ -741,16 +741,17 @@ function co_core_changes(array $baseline, array $current, array $projectClasses)
 
 function co_main(array $argv): int
 {
+    $options = spryker_upgrade_output_options($argv);
     $arguments = array_slice($argv, 1);
     foreach ($arguments as $argument) {
         if (!in_array($argument, ['--snapshot', '--help'], true)) {
-            fwrite(STDERR, "Unknown argument: $argument\nUsage: php check-constant-overrides.php [--snapshot]\n");
+            fwrite(STDERR, "Unknown argument: $argument\nUsage: php check-constant-overrides.php [--snapshot] [--limit N]\n");
 
             return 2;
         }
     }
     if (in_array('--help', $arguments, true)) {
-        fwrite(STDOUT, "Usage: php check-constant-overrides.php [--snapshot]\n");
+        fwrite(STDOUT, "Usage: php check-constant-overrides.php [--snapshot] [--limit N]\n");
 
         return 0;
     }
@@ -775,13 +776,19 @@ function co_main(array $argv): int
             'namespaces' => $namespaces,
             'overrides' => $overrides,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-        fwrite(STDOUT, sprintf(
-            "Snapshot written: %s\n  %d project constant(s) redeclare a vendor class or interface constant in src/%s; %d with a different value.\n",
-            spryker_upgrade_rel($baselineFile, $root),
-            count($overrides),
-            implode(', src/', $namespaces),
-            count($differing)
-        ));
+        spryker_upgrade_print_summary(
+            sprintf(
+                'check-constant-overrides snapshot (%d project constant(s) redeclare a vendor constant in src/%s; %d with a different value)',
+                count($overrides),
+                implode(', src/', $namespaces),
+                count($differing)
+            ),
+            [],
+            [],
+            $baselineFile,
+            $root,
+            $options['limit']
+        );
 
         return 0;
     }
@@ -802,36 +809,31 @@ function co_main(array $argv): int
         'newOverlaps' => $changes['added'],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    fwrite(STDOUT, sprintf("%d project constant(s) differ from the vendor value (review list in the report).\n", count($differing)));
-    foreach ($changes['added'] as $added) {
-        fwrite(STDOUT, sprintf("  [NEW_OVERLAP] %s::%s — core declares %s, the project value %s replaces it\n", $added['class'], $added['constant'], $added['coreValue'], $added['projectValue']));
-    }
-    if ($changes['changed'] === []) {
-        fwrite(STDOUT, "OK: no core value changed under a project override since the snapshot.\n");
-        fwrite(STDOUT, 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n");
-
-        return 0;
-    }
-    fwrite(STDOUT, sprintf("\nFOUND %d core value(s) changed under a project override:\n\n", count($changes['changed'])));
+    $findings = [];
     foreach ($changes['changed'] as $change) {
-        fwrite(STDOUT, sprintf(
-            "[%s] %s::%s (%s, %s)\n  project: %s  (%s:%d)\n  core before: %s\n  core now:    %s  (%s)\n\n",
-            $change['type'],
+        $findings[] = spryker_upgrade_finding($change['type'], sprintf(
+            '%s::%s (%s, %s): core %s -> %s',
             $change['class'],
             $change['constant'],
             $change['sourceKind'],
             $change['lane'],
-            $change['projectValue'],
-            $change['file'],
-            $change['line'],
             $change['coreValueBefore'],
-            $change['coreValueNow'] ?? '(removed)',
-            $change['coreFile']
+            $change['coreValueNow'] ?? '(removed)'
         ));
     }
-    fwrite(STDOUT, 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n");
+    foreach ($changes['added'] as $added) {
+        $findings[] = spryker_upgrade_finding('NEW_OVERLAP', sprintf('%s::%s: core declares %s, the project value %s replaces it', $added['class'], $added['constant'], $added['coreValue'], $added['projectValue']));
+    }
+    spryker_upgrade_print_summary(
+        sprintf('check-constant-overrides (%d project constant(s) differ from the vendor value: review list in the report)', count($differing)),
+        ['core values changed under a project override' => count($changes['changed']), 'new overlaps' => count($changes['added'])],
+        $findings,
+        $reportFile,
+        $root,
+        $options['limit']
+    );
 
-    return 1;
+    return $changes['changed'] === [] ? 0 : 1;
 }
 
 if (realpath($argv[0] ?? '') === __FILE__) {

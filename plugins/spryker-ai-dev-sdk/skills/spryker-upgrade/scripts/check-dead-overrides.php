@@ -9,6 +9,7 @@
  * Usage:
  *   php $UP/check-dead-overrides.php snapshot   # BEFORE composer update
  *   php $UP/check-dead-overrides.php verify     # AFTER composer update
+ *   [--limit N]                                 # findings printed (default 10, 0 = counts only)
  *
  * snapshot: records every Pyz method that currently overrides a method declared in a vendor
  *           (Spryker*) ancestor into the state dir as override-map.json
@@ -39,6 +40,7 @@ foreach ($argv as $arg) {
     }
 }
 
+$options = spryker_upgrade_output_options($argv);
 $mode = $argv[1] ?? '';
 if (!in_array($mode, ['snapshot', 'verify'], true)) {
     fwrite(STDERR, "Usage: check-dead-overrides.php <snapshot|verify>\n");
@@ -241,11 +243,17 @@ if ($mode === 'snapshot') {
         'unloadable' => $result['unloadable'],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    printf(
-        "Snapshot written: %s\n  %d vendor-method overrides recorded across src/Pyz\n  %d classes could not be loaded (see snapshot file)\n",
-        str_replace($root . '/', '', $stateFile),
-        count($result['map']),
-        count($result['unloadable'])
+    spryker_upgrade_print_summary(
+        sprintf('check-dead-overrides snapshot (%d vendor-method overrides recorded)', count($result['map'])),
+        ['classes that do not load' => count($result['unloadable'])],
+        array_map(
+            static fn (string $class, string $error): array => spryker_upgrade_finding('UNLOADABLE', $class . ': ' . $error),
+            array_keys($result['unloadable']),
+            array_values($result['unloadable'])
+        ),
+        $stateFile,
+        $root,
+        $options['limit']
     );
     exit(0);
 }
@@ -322,19 +330,18 @@ file_put_contents($reportFile, json_encode([
     'resolved' => $resolved,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-if ($resolved !== []) {
-    printf("%d recorded override(s) are gone because the project removed them (resolved, not damage).\n", count($resolved));
-}
-
-if ($conflicts === []) {
-    echo "OK: all " . count($snapshot['overrides']) . " recorded vendor-method overrides are still anchored.\n";
-    exit(0);
-}
-
-printf("FOUND %d dead/broken override(s):\n\n", count($conflicts));
+$notes = $resolved === [] ? [] : [sprintf('%d recorded override(s) are gone because the project removed them (resolved, not damage).', count($resolved))];
+$counts = ['OVERRIDE_ORPHANED' => 0, 'CLASS_BROKEN' => 0];
 foreach ($conflicts as $c) {
-    printf("[%s] %s::%s\n  file:   %s\n  vendor: %s\n  %s\n\n",
-        $c['type'], $c['class'], $c['method'], $c['file'], $c['vendorDeclaringClass'], $c['detail']);
+    $counts[$c['type']] = ($counts[$c['type']] ?? 0) + 1;
 }
-echo "Full report: " . str_replace($root . '/', '', $reportFile) . "\n";
-exit(1);
+spryker_upgrade_print_summary(
+    sprintf('check-dead-overrides verify (%d recorded overrides)', count($snapshot['overrides'])),
+    $counts,
+    array_map(static fn (array $c): array => spryker_upgrade_finding($c['type'], $c['class'] . '::' . $c['method'] . ' (' . $c['file'] . ')'), $conflicts),
+    $reportFile,
+    $root,
+    $options['limit'],
+    $notes
+);
+exit($conflicts === [] ? 0 : 1);

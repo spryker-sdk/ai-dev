@@ -15,7 +15,11 @@
  *   the parent chain, so every offender in every class is reported in one pass.
  *
  * Usage:
- *   php $UP/check-typed-members.php [<scanDir> ...]
+ *   php $UP/check-typed-members.php [<scanDir> ...] [--baseline] [--limit N]
+ *
+ * --baseline (Phase 0) also keeps the result in typed-members-baseline.json; a later run marks each
+ * finding inBaseline and lists only the new ones. --limit sets the findings printed (default 10,
+ * 0 = counts only).
  *
  * Defaults to scanning src/Pyz. Pass extra directories to cover packages that ship project-owned
  * code too, e.g. a merge-plugin bundle tree:
@@ -30,6 +34,7 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 
 require __DIR__ . '/bootstrap.php';
 
+$options = spryker_upgrade_output_options($argv, true);
 $root = spryker_upgrade_project_root();
 require $root . '/vendor/autoload.php';
 
@@ -205,36 +210,32 @@ foreach ($dirs as $dir) {
 if (!is_dir($stateDir)) {
     mkdir($stateDir, 0775, true);
 }
-file_put_contents($reportFile, json_encode([
+$report = [
     'createdAt' => date('c'),
     'scannedDirs' => $dirs,
     'classesWithUntypedMembers' => $scannedClasses,
     'problems' => $problems,
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+];
+$report = spryker_upgrade_compare_with_baseline(
+    $stateDir,
+    'typed-members',
+    $report,
+    ['problems'],
+    static fn (string $list, array $entry): string => implode(' ', [$entry['kind'] ?? '', $entry['class'] ?? '', $entry['member'] ?? '']),
+    $options['baseline']
+) ?? $report;
+file_put_contents($reportFile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-printf(
-    "Checked %d class(es) declaring untyped constants/properties across: %s\n",
-    $scannedClasses,
-    implode(', ', $dirs)
+spryker_upgrade_print_summary(
+    'check-typed-members',
+    ['typed-member fatals' => count($problems)],
+    array_map(
+        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf('%s::%s (parent %s declares %s)', $p['class'], $p['member'], $p['parent'], $p['requiredType']), $p),
+        $report['problems']
+    ),
+    $reportFile,
+    $root,
+    $options['limit'],
+    array_values(array_filter([spryker_upgrade_baseline_note($stateDir, 'typed-members', $options['baseline'], $problems !== [])]))
 );
-
-if ($problems === []) {
-    echo "OK: no untyped member shadows a typed parent member.\n";
-    exit(0);
-}
-
-printf("\nFOUND %d untyped member(s) shadowing a TYPED parent member — each is a fatal on class load:\n\n", count($problems));
-foreach ($problems as $p) {
-    printf(
-        "[%s] %s::%s\n  file:   %s\n  parent: %s (declares it as %s)\n  fix:    %s\n\n",
-        $p['kind'],
-        $p['class'],
-        $p['member'],
-        $p['file'],
-        $p['parent'],
-        $p['requiredType'],
-        $p['fix']
-    );
-}
-echo 'Full report: ' . str_replace($root . '/', '', $reportFile) . "\n";
-exit(1);
+exit($problems === [] ? 0 : 1);

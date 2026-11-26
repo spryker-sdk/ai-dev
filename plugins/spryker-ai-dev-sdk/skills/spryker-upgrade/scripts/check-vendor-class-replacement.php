@@ -19,6 +19,7 @@
  *
  * Usage:
  *   php $UP/check-vendor-class-replacement.php [<scanDir> ...]     # defaults to src/
+ *   [--limit N]                                                     # findings printed (default 10, 0 = counts only)
  *
  * Exit code 1 when a vendor-owned class is replaced.
  */
@@ -29,6 +30,7 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 
 require __DIR__ . '/bootstrap.php';
 
+$options = spryker_upgrade_output_options($argv);
 $root = spryker_upgrade_project_root();
 $stateDir = spryker_upgrade_state_dir($root);
 $reportFile = $stateDir . '/vendor-class-replacement-report.json';
@@ -234,40 +236,27 @@ file_put_contents($reportFile, json_encode([
     'problems' => $problems,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-printf(
-    "Scanned %d class declaration(s) across: %s\nProject-owned namespace roots: %s\n\n",
-    $scanned,
-    implode(', ', $dirs),
-    implode(', ', $projectRoots)
+$counts = [];
+foreach ($problems as $p) {
+    $counts[$p['kind']] = ($counts[$p['kind']] ?? 0) + 1;
+}
+$replaced = array_filter($problems, static fn(array $p): bool => $p['kind'] === 'VENDOR_CLASS_REPLACED');
+spryker_upgrade_print_summary(
+    sprintf('check-vendor-class-replacement (%d class declaration(s); project namespace roots: %s)', $scanned, implode(', ', $projectRoots)),
+    $counts === [] ? ['classes outside the project namespaces' => 0] : $counts,
+    array_map(
+        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf('%s (%s, %d lines%s)', $p['class'], $p['file'], $p['lines'], $p['eagerlyIncluded'] ? ', force-loaded via autoload.files' : '')),
+        $problems
+    ),
+    $reportFile,
+    $root,
+    $options['limit'],
+    $replaced === [] ? [] : [sprintf(
+        'VENDOR_CLASS_REPLACED: %d class(es) need a decision BEFORE the upgrade: diff the copy against the current vendor file (diffCommand in the report);'
+        . ' re-express the delta as a subclass or a plugin where an extension point exists; else re-copy from the target release, re-apply the delta,'
+        . ' and record it as upgrade debt with an extension-point request to the vendor.',
+        count($replaced)
+    )]
 );
 
-if ($problems === []) {
-    echo "OK: no class is declared in a namespace the project does not own.\n";
-    exit(0);
-}
-
-$replaced = array_filter($problems, static fn(array $p): bool => $p['kind'] === 'VENDOR_CLASS_REPLACED');
-printf("FOUND %d class(es) declared outside the project's own namespaces:\n\n", count($problems));
-foreach ($problems as $p) {
-    printf("[%s] %s\n  file:   %s (%d lines%s)\n", $p['kind'], $p['class'], $p['file'], $p['lines'], $p['eagerlyIncluded'] ? ', force-loaded via autoload.files' : '');
-    if ($p['vendorFile'] !== null) {
-        printf("  vendor: %s (%d lines)\n  diff:   %s\n", $p['vendorFile'], $p['vendorLines'], $p['diffCommand']);
-    }
-    printf("  %s\n\n", $p['detail']);
-}
-
-echo 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n";
-
-if ($replaced !== []) {
-    printf(
-        "\n%d vendor-owned class(es) are replaced outright. Each needs a decision BEFORE the upgrade:\n"
-        . "  - diff the copy against the CURRENT vendor file to see what the project actually changed;\n"
-        . "  - re-express that delta as a subclass or a plugin if an extension point exists;\n"
-        . "  - if none exists, re-copy from the target release's version and re-apply the delta, and\n"
-        . "    record it as upgrade debt with an extension-point request to the vendor.\n",
-        count($replaced)
-    );
-    exit(1);
-}
-
-exit(0);
+exit($replaced === [] ? 0 : 1);

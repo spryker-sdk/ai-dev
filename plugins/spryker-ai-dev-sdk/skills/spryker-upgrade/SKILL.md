@@ -96,7 +96,10 @@ Before the first `composer` command, run the shared environment preflight in
 **Tool output.** `run-tools.php` and `compare-tool-runs.php` print a summary and write the full
 output to files in the state directory. Read the summary. Open a log file only for the failing part
 and search it for that part; never read the whole file. When a run is stopped before it ends,
-`tool-runs-<run>.json` holds the tools that finished: run the other tools again.
+`tool-runs-<run>.json` holds the tools that finished: run the other tools again. The detectors and
+`run-detectors.php` print one verdict line per detector and at most 10 findings (`--limit N`); the
+full list is in the report file the line names. Read a report file when you start the lane that
+uses it.
 
 **Coverage matrix.** Every known failure mode, what detects it and which phase resolves it is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Read it when something turns up that
@@ -113,21 +116,22 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
 4. Confirm `vendor/autoload.php` resolves a core class — snapshots taken against an incomplete vendor
    tree silently under-record. Then the detector baselines:
    ```bash
-   php $UP/check-platform-alignment.php || true # is this host even valid to resolve on? (do this FIRST)
-   php $UP/check-dead-overrides.php snapshot
-   php $UP/twig-shadow-map.php snapshot
-   php $UP/check-plugin-usage.php || true      # baseline: MISSING here = pre-existing damage
-   php $UP/check-config-constants.php || true  # baseline: problems here = pre-existing damage
-   php $UP/check-typed-members.php || true     # baseline: should be clean before upgrading
-   php $UP/check-constraint-style.php || true  # baseline: patch-locked + merged constraints
-   php $UP/check-test-coverage.php || true     # baseline: is the override surface verifiable at all?
-   php $UP/check-vendor-class-replacement.php || true  # baseline: classes declared in vendor namespaces
-   php $UP/check-constant-overrides.php --snapshot     # core values under project constants
+   php $UP/run-detectors.php phase0             # exit 1 = findings: the Phase 0 baseline, not a stop
    php $YI/yves-integration-scan.php snapshot  # storefront widgets the project already does not render (Phase 6.1)
    cp composer.lock .spryker-upgrade/state/composer.lock.before
    cp $UP/storage-search-counts.php .spryker-upgrade/state/   # publish baseline: drain the queues first
    script -q /dev/null docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
    ```
+   `run-detectors.php phase0` runs, in this order: `check-platform-alignment.php` (is this host even
+   valid to resolve on?), `check-dead-overrides.php snapshot`, `twig-shadow-map.php snapshot`,
+   `check-plugin-usage.php --baseline` (MISSING here = pre-existing damage),
+   `check-config-constants.php --baseline` (problems here = pre-existing damage),
+   `check-typed-members.php --baseline` (should be clean before upgrading),
+   `check-constraint-style.php` (patch-locked and merged constraints), `check-test-coverage.php` (is
+   the override surface verifiable at all?), `check-vendor-class-replacement.php` (classes declared in
+   vendor namespaces) and `check-constant-overrides.php --snapshot` (core values under project
+   constants). `--baseline` keeps the Phase 0 result of the detectors without a snapshot of their own.
+   Exit 2 names a detector that did not run: run it alone, fix the cause, run it again.
 5. MISSING plugins, config problems or unloadable classes in these baselines are pre-existing breaks,
    usually leftovers of a removed feature. Surface them, offer to fix first, at minimum record counts.
 6. **Static baselines** (record, don't fix) — PHPStan, the sniffer and the evaluator, into
@@ -310,21 +314,21 @@ advisory blocking, and never drop a package to make the tree resolve (Lane 5).
 ## Phase 3 — Detection (run all, collect before resolving)
 
 ```bash
-php $UP/list-major-bumps.php                   # majors/new/removed classification
-php $UP/check-typed-members.php src/Pyz        # exit 1 = PHP 8.3 typed-member fatals
-php $UP/check-dead-overrides.php verify        # exit 1 = conflicts
-php $UP/twig-shadow-map.php diff               # exit 1 = conflicts
-php $UP/check-plugin-usage.php                 # exit 1 = missing plugins
-php $UP/check-config-constants.php             # exit 1 = broken config refs
-php $UP/check-constant-overrides.php           # exit 1 = core value changed under a project constant
-php $UP/check-performance.php                  # exit 1 = ProductGroupWidget rendering lost (Lane 2)
+php $UP/run-detectors.php phase3               # exit 1 = findings; each verdict line names them
 php $UP/run-tools.php detect phpstan
 php $UP/compare-tool-runs.php detect phpstan   # exit 1 = new PHPStan errors against the baseline
 ```
 
-Run `check-typed-members.php` first: typed-member fatals abort `vendor/bin/console` itself (with
-composer-merge-plugin, add `vendor/<vendor>/<pkg>/Bundles`). Subtract the Phase 0 baselines and present
-a summary: packages moved (majors highlighted), conflicts per lane, NEW packages, deprecated items.
+`run-detectors.php phase3` runs, in this order: `check-typed-members.php src/Pyz` (exit 1 = PHP 8.3
+typed-member fatals), `list-major-bumps.php` (majors/new/removed classification),
+`check-dead-overrides.php verify` and `twig-shadow-map.php diff` (exit 1 = conflicts),
+`check-plugin-usage.php` (exit 1 = missing plugins), `check-config-constants.php` (exit 1 = broken
+config refs), `check-constant-overrides.php` (exit 1 = core value changed under a project constant)
+and `check-performance.php` (exit 1 = ProductGroupWidget rendering lost, Lane 2).
+`check-typed-members.php` runs first: typed-member fatals abort `vendor/bin/console` itself (with
+composer-merge-plugin, add `--typed-members-dir vendor/<vendor>/<pkg>/Bundles`). The verdict lines
+count the findings Phase 0 already had and list only the new ones. Present a summary: packages moved
+(majors highlighted), conflicts per lane, NEW packages, deprecated items.
 PHPStan errors only a database, a search backend or the bootstrap explain are environment gaps (matrix #50).
 
 **Security fixes in project overrides.** For each `fixed` row in `security-fixes.md`, find the

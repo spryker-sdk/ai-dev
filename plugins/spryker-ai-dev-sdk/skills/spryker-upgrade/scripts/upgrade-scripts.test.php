@@ -12,6 +12,7 @@ require __DIR__ . '/check-constant-overrides.php';
 require __DIR__ . '/storage-search-counts.php';
 require __DIR__ . '/check-performance.php';
 require __DIR__ . '/compare-tool-runs.php';
+require __DIR__ . '/run-detectors.php';
 
 $failures = 0;
 $count = 0;
@@ -353,7 +354,7 @@ check('tooling: missing --reference -> exit 2', $noRefCode === 2);
 // --- check-baselines ---
 $baselineState = $tmp . '/baseline-state';
 [$blCode, $blOut] = run_script('check-baselines.php', [], $tooling, $baselineState);
-$allNames = ['base-ref', 'codecept-baseline.txt', 'phpstan-baseline-run.txt', 'sniff-baseline.txt', 'evaluator-baseline.txt', 'backoffice-smoke-baseline.json', 'constant-overrides-baseline.json', 'storage-search-counts-before.json'];
+$allNames = ['base-ref', 'codecept-baseline.txt', 'phpstan-baseline-run.txt', 'sniff-baseline.txt', 'evaluator-baseline.txt', 'backoffice-smoke-baseline.json', 'constant-overrides-baseline.json', 'plugin-usage-baseline.json', 'config-constants-baseline.json', 'typed-members-baseline.json', 'storage-search-counts-before.json'];
 check('baselines: exit 1 with an empty state dir', $blCode === 1);
 check('baselines: every missing file named', array_filter($allNames, static fn(string $n): bool => !str_contains($blOut, $n)) === []);
 $realResults = [
@@ -363,6 +364,9 @@ $realResults = [
     'sniff-baseline.txt' => "Run Code Style Sniffer for PROJECT\n",
     'evaluator-baseline.txt' => "====================\nPHP_VERSION_CHECKER\n====================\nRead more: https://docs.spryker.com\n",
     'constant-overrides-baseline.json' => json_encode(['overrides' => []]) . "\n",
+    'plugin-usage-baseline.json' => json_encode(['missing' => [], 'deprecated' => []]) . "\n",
+    'config-constants-baseline.json' => json_encode(['problems' => []]) . "\n",
+    'typed-members-baseline.json' => json_encode(['problems' => []]) . "\n",
     'storage-search-counts-before.json' => json_encode(['tables' => ['spy_product_abstract_storage' => 3], 'totalRows' => 3]) . "\n",
 ];
 foreach ($realResults as $name => $contents) {
@@ -378,7 +382,19 @@ check('baselines: Back Office baseline without results -> exit 1, NO RESULT', $b
 file_put_contents($baselineState . '/backoffice-smoke-baseline.json', json_encode(['results' => []]) . "\n");
 [$blAll] = run_script('check-baselines.php', [], $tooling, $baselineState);
 check('baselines: exit 0 when all present with a result', $blAll === 0);
-check('baselines: bl_status lists the eight files', array_keys(bl_status($baselineState, true)) === $allNames);
+check('baselines: bl_status lists the eleven files', array_keys(bl_status($baselineState, true)) === $allNames);
+check('baselines content: a detector baseline without its finding list fails', bl_content_problem('plugin-usage-baseline.json', "{}\n") !== null && bl_content_problem('typed-members-baseline.json', json_encode(['problems' => []])) === null);
+$pickFrom = [];
+foreach (['A', 'A', 'A', 'A', 'B', 'C', 'C'] as $index => $category) {
+    $pickFrom[] = spryker_upgrade_finding($category, 'finding ' . $index);
+}
+check('detector output: the limit keeps one finding of each category, then fills in order', array_map(static fn (array $f): string => $f['text'], spryker_upgrade_pick_findings($pickFrom, 4)) === ['finding 0', 'finding 1', 'finding 4', 'finding 5']);
+check('detector output: a limit below the number of categories keeps the first categories; 0 keeps none', array_map(static fn (array $f): string => $f['category'], spryker_upgrade_pick_findings($pickFrom, 2)) === ['A', 'B'] && spryker_upgrade_pick_findings($pickFrom, 0) === []);
+$noteState = $tmp . '/note-state';
+mkdir($noteState, 0777, true);
+check('detector output: findings without a Phase 0 result -> a note that names the file', str_contains((string)spryker_upgrade_baseline_note($noteState, 'plugin-usage', false, true), 'plugin-usage-baseline.json'));
+file_put_contents($noteState . '/plugin-usage-baseline.json', "{}\n");
+check('detector output: no note with a Phase 0 result, in the Phase 0 run, or without findings', spryker_upgrade_baseline_note($noteState, 'plugin-usage', false, true) === null && spryker_upgrade_baseline_note($noteState, 'typed-members', true, true) === null && spryker_upgrade_baseline_note($noteState, 'typed-members', false, false) === null);
 check('baselines: --no-data leaves out the storage/search counts baseline', !in_array('storage-search-counts-before.json', array_keys(bl_status($baselineState, true, false)), true));
 check('baselines content: a counts snapshot without rows fails', str_starts_with((string)bl_content_problem('storage-search-counts-before.json', json_encode(['tables' => ['a_storage' => 0], 'totalRows' => 0])), 'no rows'));
 check('baselines content: a constant-overrides file without overrides list fails', bl_content_problem('constant-overrides-baseline.json', "{}\n") !== null);
@@ -1103,6 +1119,70 @@ check('compare: a run without a result -> NO RESULT, exit 1', $ctNoResult === 1 
 [$ctNoRun] = run_script('compare-tool-runs.php', ['nothing'], $cmp, $cmpState);
 [$ctMissingLog] = run_script('compare-tool-runs.php', ['detect', 'sniffer'], $cmp, $cmpState);
 check('compare: no log of the run, or of a named tool -> exit 2', $ctNoRun === 2 && $ctMissingLog === 2);
+
+// --- detector summaries, Phase 0 results and run-detectors ---
+$det = $tmp . '/detectors';
+$detState = $det . '/.state';
+write_file($det . '/composer.json', "{}\n");
+write_file($det . '/vendor/autoload.php', <<<'PHP'
+<?php
+namespace Spryker\Zed\Old\Communication\Plugin { /** @deprecated Use NewPlugin. */ class OldPlugin {} }
+namespace Spryker\Shared\Kept { interface KeptConstants { public const A = 'a'; } }
+namespace Spryker\Zed\Base { class BaseConfig { protected const string NAME = 'x'; protected const int SIZE = 1; } }
+PHP);
+$providerUses = static fn (array $plugins): string => "<?php\nnamespace Pyz\\Zed\\Foo;\n" . implode('', array_map(static fn (string $p): string => "use $p;\n", $plugins)) . "class FooDependencyProvider {}\n";
+write_file($det . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', $providerUses(['Spryker\\Zed\\Gone\\Communication\\Plugin\\GonePlugin', 'Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin']));
+write_file($det . '/src/Pyz/Zed/Foo/FooConfig.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nuse Spryker\\Zed\\Base\\BaseConfig;\nclass FooConfig extends BaseConfig { protected const NAME = 'y'; }\n");
+write_file($det . '/config/Shared/config_default.php', "<?php\nuse Spryker\\Shared\\Kept\\KeptConstants;\nuse Spryker\\Shared\\Gone\\GoneConstants;\n\$config[GoneConstants::B] = 2;\n");
+
+[$puBase, $puBaseOut] = run_script('check-plugin-usage.php', ['--baseline'], $det, $detState);
+[$ccBase] = run_script('check-config-constants.php', ['--baseline'], $det, $detState);
+[$tmBase] = run_script('check-typed-members.php', ['--baseline'], $det, $detState);
+check('detectors: --baseline keeps the Phase 0 result in its own file, exit codes unchanged', $puBase === 1 && $ccBase === 1 && $tmBase === 1 && is_file($detState . '/plugin-usage-baseline.json') && is_file($detState . '/config-constants-baseline.json') && is_file($detState . '/typed-members-baseline.json'));
+check('detectors: verdict line with the detector, FOUND and a count per category', str_starts_with($puBaseOut, 'check-plugin-usage: FOUND missing 1, deprecated 1, porting 0') && str_contains($puBaseOut, 'Full report: .state/plugin-usage-report.json'));
+check('detectors: one line per finding, no Phase 0 marks in the baseline run', str_contains($puBaseOut, "\n  MISSING Spryker\\Zed\\Gone\\Communication\\Plugin\\GonePlugin (used in: src/Pyz/Zed/Foo/FooDependencyProvider.php)\n") && !str_contains($puBaseOut, '[new]'));
+
+write_file($det . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', $providerUses(['Spryker\\Zed\\Gone\\Communication\\Plugin\\GonePlugin', 'Spryker\\Zed\\Gone2\\Communication\\Plugin\\Gone2Plugin', 'Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin']));
+write_file($det . '/config/Shared/config_default.php', "<?php\nuse Spryker\\Shared\\Kept\\KeptConstants;\nuse Spryker\\Shared\\Gone\\GoneConstants;\n\$config[GoneConstants::B] = 2;\n\$config[KeptConstants::MISSING] = 3;\n");
+write_file($det . '/src/Pyz/Zed/Foo/FooConfig.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nuse Spryker\\Zed\\Base\\BaseConfig;\nclass FooConfig extends BaseConfig { protected const NAME = 'y'; protected const SIZE = 2; }\n");
+[$pu, $puOut] = run_script('check-plugin-usage.php', [], $det, $detState);
+$puLines = explode("\n", trim($puOut));
+check('plugin-usage: only the new finding is listed, with the count Phase 0 already had', str_contains($puLines[0], '(1 new, 2 already in Phase 0') && str_starts_with($puLines[1] ?? '', '  [new] MISSING Spryker\\Zed\\Gone2') && str_starts_with($puLines[2] ?? '', 'Full report: '));
+$puReport = read_json($detState . '/plugin-usage-report.json');
+check('plugin-usage: the report keeps every finding, marked inBaseline', count($puReport['missing'] ?? []) === 2 && ($puReport['missing'][0]['inBaseline'] ?? null) === true && ($puReport['missing'][1]['inBaseline'] ?? null) === false && ($puReport['deprecated'][0]['inBaseline'] ?? null) === true);
+[$cc, $ccOut] = run_script('check-config-constants.php', [], $det, $detState);
+check('config-constants: the new problem listed, the Phase 0 one counted only', $cc === 1 && str_contains($ccOut, '(1 new, 1 already in Phase 0') && str_contains($ccOut, '[new] CONSTANT_MISSING') && !str_contains($ccOut, 'TYPE_MISSING Spryker'));
+[$tm, $tmOut] = run_script('check-typed-members.php', [], $det, $detState);
+check('typed-members: the new fatal listed, the Phase 0 one counted only', $tm === 1 && str_contains($tmOut, '(1 new, 1 already in Phase 0') && str_contains($tmOut, '[new] CONSTANT Pyz\\Zed\\Foo\\FooConfig::SIZE') && !str_contains($tmOut, 'FooConfig::NAME'));
+write_file($det . '/src/Pyz/Zed/Foo/FooConfig.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nuse Spryker\\Zed\\Base\\BaseConfig;\nclass FooConfig extends BaseConfig { protected const NAME = 'y'; }\n");
+[$tmOld, $tmOldOut] = run_script('check-typed-members.php', [], $det, $detState);
+check('typed-members: exit 1 also when every finding is from Phase 0', $tmOld === 1 && str_contains($tmOldOut, '(0 new, 1 already in Phase 0'));
+
+[, $puLimitOut] = run_script('check-plugin-usage.php', ['--limit', '1'], $det, $tmp . '/detectors-no-baseline');
+check('summary: --limit caps the findings and says how many more are in the report', substr_count($puLimitOut, "\n  MISSING") + substr_count($puLimitOut, "\n  DEPRECATED") === 1 && str_contains($puLimitOut, '  (2 more in the report)'));
+[$puZero, $puZeroOut] = run_script('check-plugin-usage.php', ['--limit=0'], $det, $tmp . '/detectors-no-baseline');
+check('summary: --limit 0 prints the counts only', $puZero === 1 && !str_contains($puZeroOut, "\n  MISSING") && !str_contains($puZeroOut, "\n  DEPRECATED") && !str_contains($puZeroOut, 'more in the report'));
+check('summary: findings without a Phase 0 result -> the verdict, one note that names the missing file, the report path', count(explode("\n", trim($puZeroOut))) === 3 && str_contains($puZeroOut, 'NOTE: no Phase 0 result (plugin-usage-baseline.json)'));
+[$puBadLimit] = run_script('check-plugin-usage.php', ['--limit', 'all'], $det, $detState);
+check('summary: a --limit that is not a number -> exit 2', $puBadLimit === 2);
+ob_start();
+spryker_upgrade_print_summary('x', ['a' => 0], [], null, $det, 10);
+check('summary: no finding -> OK', trim((string)ob_get_clean()) === 'x: OK a 0');
+
+check('run-detectors: Phase 0 order of the skill text, with --baseline on the detectors without a snapshot', array_map(static fn (array $c): string => $c[0] . ' ' . implode(' ', $c[1]), rd_plan('phase0', [])) === [
+    'check-platform-alignment.php ', 'check-dead-overrides.php snapshot', 'twig-shadow-map.php snapshot', 'check-plugin-usage.php --baseline',
+    'check-config-constants.php --baseline', 'check-typed-members.php --baseline', 'check-constraint-style.php ', 'check-test-coverage.php ',
+    'check-vendor-class-replacement.php ', 'check-constant-overrides.php --snapshot',
+]);
+check('run-detectors: --typed-members-dir adds to src/Pyz', rd_plan('phase3', ['vendor/x/Bundles'])[0] === ['check-typed-members.php', ['src/Pyz', 'vendor/x/Bundles']]);
+[$rd, $rdOut] = run_script('run-detectors.php', ['phase3', '--limit', '1'], $det, $detState);
+preg_match_all('/^([a-z-]+): /m', $rdOut, $rdNames);
+check('run-detectors: Phase 3 runs check-typed-members first, then the skill order', $rdNames[1] === ['check-typed-members', 'list-major-bumps', 'check-dead-overrides', 'twig-shadow-map', 'check-plugin-usage', 'check-config-constants', 'check-constant-overrides', 'check-performance']);
+check('run-detectors: a detector that fails to run is named with its error, the others still run, exit 2', $rd === 2 && str_contains($rdOut, 'list-major-bumps: DID NOT RUN (exit 2): No baseline at') && str_contains($rdOut, 'check-plugin-usage: FOUND') && str_contains($rdOut, 'Did not run: list-major-bumps'));
+[, $rdZeroOut] = run_script('run-detectors.php', ['phase3', '--limit', '0'], $det, $detState);
+check('run-detectors: --limit reaches each detector', !str_contains($rdZeroOut, '[new]') && str_contains($rdOut, '[new]'));
+[$rdBad] = run_script('run-detectors.php', ['phase9'], $det, $detState);
+check('run-detectors: unknown phase -> exit 2', $rdBad === 2);
 
 $cleanup = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($cleanup as $entry) {
