@@ -42,7 +42,8 @@ script). Read `console code:sniff:style --help` for how it takes a path or modul
    `git diff --name-only --diff-filter=AM "$(cat .spryker-upgrade/state/base-ref)" -- '*.php'`.
 2. Auto-fix those files first (`code:sniff:style -f <path>`, or `phpcbf <files>`), and review the
    fixer's diff — it is part of the upgrade diff.
-3. Run the sniffer over the same scope Phase 0 used and compare with the sniffer baseline
+3. Run the sniffer over the same scope Phase 0 used (`run-tools.php` runs the pinned entry point)
+   and compare with the sniffer baseline with `compare-tool-runs.php`
    (`sniff-post-tooling.txt` when Phase 1.2 re-took it, else `sniff-baseline.txt`; after a deferred
    tooling step, the Phase 0 findings plus the new-rule findings). A violation that is not in the
    baseline blocks, like a PHPStan regression; fix it by hand. Never add an ignore rule or exclude a
@@ -51,7 +52,8 @@ script). Read `console code:sniff:style --help` for how it takes a path or modul
 ### Comparing the test run with the baseline
 
 Compare per suite against the test baseline — `codecept-post-tooling.txt` when Phase 1.2 re-took it,
-else `codecept-baseline.txt` — with the exact invocation Phase 0 pinned. A test that was red in the
+else `codecept-baseline.txt` — with the exact invocation Phase 0 pinned. `compare-tool-runs.php`
+lists, per suite, the tests that fail now and did not fail in the baseline. A test that was red in the
 baseline and is still red is not upgrade damage — list it under "Tests already red before the
 upgrade". A test that was green and is now red is classified in Phase 5.5 (app damage, harness
 damage or environment noise).

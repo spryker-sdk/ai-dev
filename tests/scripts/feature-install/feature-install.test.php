@@ -357,9 +357,9 @@ check('new packages are listed, not judged', $moves['spryker/y']['verdict'] === 
 check('accepted moves are not open', array_keys(cnm_open($moves, ['spryker/gui' => 'developer: needed for the new Back Office assets'])) === ['spryker/mail']);
 
 echo "compare-baselines\n";
-check('PHPStan error count', cb_phpstan_errors('[ERROR] Found 12 errors') === 12 && cb_phpstan_errors(' [OK] No errors') === 0);
-check('sniffer total', cb_sniff_findings('A TOTAL OF 3 ERRORS AND 2 WARNINGS WERE FOUND') === 5 && cb_sniff_findings("FOUND 2 ERRORS AFFECTING 2 LINES\nFOUND 1 ERROR AND 1 WARNING AFFECTING 2 LINES") === 4);
-check('codecept failing tests are named', cb_codecept("There were 2 failures:\n1) FooTest: bar\n2) BazTest: qux\nFAILURES!\nTests: 10, Assertions: 20, Failures: 2.")['failing'] === ['FooTest: bar', 'BazTest: qux']);
+check('PHPStan error count', to_phpstan_count('[ERROR] Found 12 errors') === 12 && to_phpstan_count(' [OK] No errors') === 0);
+check('sniffer total', to_sniff_count('A TOTAL OF 3 ERRORS AND 2 WARNINGS WERE FOUND') === 5 && to_sniff_count("FOUND 2 ERRORS AFFECTING 2 LINES\nFOUND 1 ERROR AND 1 WARNING AFFECTING 2 LINES") === 4);
+check('codecept failing tests are named', to_codecept_summary("There were 2 failures:\n1) FooTest: bar\n2) BazTest: qux\nFAILURES!\nTests: 10, Assertions: 20, Failures: 2.")['failing'] === ['FooTest: bar', 'BazTest: qux']);
 
 echo "check-data-manifests\n";
 $manifestProject = temp_dir('manifests');

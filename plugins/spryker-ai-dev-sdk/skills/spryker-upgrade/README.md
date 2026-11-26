@@ -25,12 +25,14 @@ SPRYKER_PROJECT_ROOT=/path/to/project        # skip discovery
 SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI cache directory)
 ```
 
-## The twenty-one scripts
+## The twenty-three scripts
 
 | Script | Phase | What it answers |
 |---|---|---|
 | `check-added-comments.php` | 0 (`--record-base`), every lane, 7 | were explanatory comments or suppressions added since the upgrade began? |
 | `check-baselines.php` | 0 (gate) | do all Phase 0 baselines exist, so Phase 1 may start? |
+| `run-tools.php` | 0, 1.2, 3, 5, 5.5 | what did PHPStan, the sniffer, the evaluator and the test suite report, with the invocation Phase 0 pinned? |
+| `compare-tool-runs.php` | 1.2, 3, 5, 5.5 | which PHPStan errors, sniffer violations, evaluator findings and failing tests are new against the baselines? |
 | `backoffice-smoke.php` | 0 (`--baseline`), 4.9, 6.5 | does every Back Office navigation page and table data endpoint still answer? |
 | `check-platform-alignment.php` | 0, 1.2 | will a lock resolved on this host install on the project's image? |
 | `check-test-coverage.php` | 0, 0.5 | which customised modules would not notice if the upgrade broke them? |
@@ -53,7 +55,8 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 
 Phase 0 (`snapshot`) and Phase 6.1 (`diff`) also run `yves-integration-scan.php` from the sibling `yves-twig-integration` skill: which widgets the upgrade added that no template the project renders calls. Its findings are suggestions for the developer, not upgrade damage.
 
-`bootstrap.php` is the shared library the scripts load. `upgrade-scripts.test.php` is the
+`bootstrap.php` is the shared library the scripts load; `tool-output.php` parses the tool output
+for `check-baselines.php`, `run-tools.php`, `compare-tool-runs.php` and `spryker-feature-install`. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
 upgrade run.
 
@@ -94,7 +97,8 @@ php $UP/check-plugin-usage.php || true         # record pre-existing damage
 php $UP/check-config-constants.php || true
 php $UP/check-constant-overrides.php --snapshot
 cp composer.lock .spryker-upgrade/state/composer.lock.before
-# ... PHPStan, sniffer, evaluator and codecept runs tee'd into the state dir (see SKILL.md Phase 0)
+php $UP/run-tools.php baseline phpstan sniffer evaluator
+php $UP/run-tools.php baseline codecept-build tests --tests-args=--no-exit
 php $UP/backoffice-smoke.php --url <zed base url> --baseline
 cp $UP/storage-search-counts.php .spryker-upgrade/state/   # queues drained first
 docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before
@@ -170,7 +174,7 @@ php $UP/check-baselines.php --no-data         # only when the environment cannot
 Checks the state directory for `base-ref`, `codecept-baseline.txt`, `phpstan-baseline-run.txt`,
 `sniff-baseline.txt`, `evaluator-baseline.txt`, `backoffice-smoke-baseline.json`,
 `constant-overrides-baseline.json` and `storage-search-counts-before.json`, and that each holds a real
-result of its tool: `2>&1 | tee` creates the file even when the command failed. The check is a
+result of its tool: `run-tools.php` writes the file also when the tool did not run. The check is a
 codecept summary line (`OK (`, `Tests:`, `FAILURES!`), a PHPStan `[OK]` or `Found N errors` line,
 sniffer or evaluator output that is not only a tool error or usage message, a commit hash in
 `base-ref`, a `results` list in the Back Office baseline, an `overrides` list in the constant-overrides
@@ -181,6 +185,44 @@ The Phase 1.2 re-takes (`codecept-`, `phpstan-`, `sniff-`, `evaluator-post-tooli
 the same way when they exist. It names the command that produces each missing file or file without
 a result. Every "after" check of the upgrade is compared against a "before" run; without it a new
 failure cannot be told from a pre-existing one. Exit 0 all present with a result, 1 otherwise.
+
+## run-tools.php — PHPStan, sniffer, evaluator and tests in one call
+
+```bash
+php $UP/run-tools.php baseline phpstan sniffer evaluator codecept-build tests --tests-args=--no-exit
+php $UP/run-tools.php verify evaluator phpstan sniffer
+php $UP/run-tools.php verify codecept-build tests --tests-args="-x Acceptance"
+```
+
+Runs each named tool in the container with the commands of the phases (inside `script` for a
+pseudo-terminal, in its macOS or Linux form), writes the full output to `<tool>-<run>.txt` in the
+state directory (`phpstan-baseline-run.txt` for the baseline) with `exit <code>` as the last line,
+and prints one line per tool: exit code, result (error count, or tests passed/failed/skipped and the
+failing suites) and log file. A tool whose output holds no result is reported as "did not run".
+The baseline run pins the sniffer entry point (detected, or `--sniffer`), the `--env` variables and
+the `--codecept-options` in `tool-invocation.json`; later runs use the pin (`--pin-dir` reads it from
+another directory) and refuse values that differ from it. A project with several test configurations
+gives `--codecept-options` once for each (`--codecept-options "-c codeception.api.yml"`): the tests
+tool runs `codecept run` once per configuration into one log, and a configuration that did not start
+makes it "did not run". `tool-runs-<run>.json` holds the commands, exit codes, the tests per suite
+and the names of the failing tests; it is written after each tool, so a stopped run keeps the tools
+that finished. Exit 0 every tool ran, 1 a tool did not run, 2 usage or no pin.
+
+## compare-tool-runs.php — what is new against the baselines
+
+```bash
+php $UP/compare-tool-runs.php verify                       # every tool with a log of the run
+php $UP/compare-tool-runs.php final tests --limit 20
+php $UP/compare-tool-runs.php detect phpstan --baseline phase0
+```
+
+Compares the logs of a run with each tool's baseline: `*-post-tooling.txt` when it exists, else the
+Phase 0 file (`--baseline phase0` forces the Phase 0 file; the post-tooling run is always compared
+with it). Prints one verdict line per tool and at most `--limit` (default 10) new entries: PHPStan
+errors and sniffer violations by file and message, evaluator violations, and tests that fail now
+and did not fail in the baseline, per suite. The full lists go to `tool-comparison-<run>.json`.
+Exit 0 no regression, 1 regression or a run without a result, 2 usage, a missing log or a missing
+baseline.
 
 ## backoffice-smoke.php — crawl the whole Back Office
 

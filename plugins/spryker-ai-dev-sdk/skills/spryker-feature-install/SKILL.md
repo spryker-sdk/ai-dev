@@ -95,6 +95,10 @@ list, and keep the phase table in `$STATE/state.md`: it survives a compaction.
 `.ai-dev/feature-install/<feature-slug>/` in the project. Substitute each one inline as a literal
 path; never set a shell variable and never `cd`. Run every script from the project root.
 
+**Tool output.** `run-tools.php` prints one line per tool and writes the full output to files in
+`$STATE`; `compare-baselines.php` prints one line per check. Read these lines. Open a log file
+only for the failing part and search it for that part; never read the whole file.
+
 **Delegation.** Invoke skills by slash command (`/spryker-refresher`, or
 `/spryker-ai-dev-sdk:spryker-refresher` on a plugin install). Agent names carry the plugin prefix
 on a plugin install, and the separator differs by harness (see
@@ -150,11 +154,14 @@ or a package name.** Record in `state.md` that the search ran through a fallback
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-config-constants.php || true
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/check-dead-overrides.php snapshot
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/twig-shadow-map.php snapshot
-   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee $STATE/baseline/phpstan-baseline-run.txt
-   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee $STATE/baseline/sniff-baseline.txt
-   script -q /dev/null docker/sdk testing codecept run --no-exit 2>&1 | tee $STATE/baseline/codecept-baseline.txt
+   SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline php $UP/run-tools.php baseline phpstan sniffer tests --tests-args=--no-exit
    SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline SPRYKER_BACKOFFICE_USER=<user> SPRYKER_BACKOFFICE_PASSWORD=<password> php $UP/backoffice-smoke.php --url <zed base url> --baseline
    ```
+   `run-tools.php` writes `phpstan-baseline-run.txt`, `sniff-baseline.txt` and
+   `codecept-baseline.txt`, and pins the invocation in `tool-invocation.json` for Phase 6. It detects
+   the sniffer entry point; pass `--sniffer "<command>"` when it names the wrong one,
+   `--env NAME=VALUE` for each environment variable the developer sets for the tests, and
+   `--codecept-options "<options>"` once for each test configuration the project runs.
    For the storage and search counts, copy `$UP/storage-search-counts.php` into `$STATE/baseline/`
    and run it in the container with `--snapshot before`.
 4. Check the baselines: `php $FI/compare-baselines.php $STATE` — every line under "Baselines" is
@@ -323,9 +330,12 @@ widgets; every vendor template the project overrides has lost the vendor's calls
    acceptance criterion, in the guide's words. Record `verdict` PASS, FAIL or BLOCKED with the
    evidence path. Weigh a FAIL as a hypothesis before acting: browser problems look like feature
    failures.
-3. Run the baseline tools again, into `$STATE/after/` with the same commands as in Phase 0:
-   `phpstan-after.txt`, `sniff-after.txt`, `codecept-after.txt`; the Back Office crawl without
-   `--baseline` (same `SPRYKER_UPGRADE_STATE_DIR`: it marks each failure that is in the baseline);
+3. Run the baseline tools again, into `$STATE/after/` with the invocation Phase 0 pinned:
+   `SPRYKER_UPGRADE_STATE_DIR=$STATE/after php $UP/run-tools.php after phpstan sniffer tests
+   --tests-args=--no-exit --pin-dir $STATE/baseline` (it writes `phpstan-after.txt`,
+   `sniff-after.txt`, `codecept-after.txt`); the Back Office crawl without
+   `--baseline` (`SPRYKER_UPGRADE_STATE_DIR=$STATE/baseline` as in Phase 0: it marks each failure
+   that is in the baseline);
    the storage and search counts with `--snapshot after`, then `--compare before after`. Run each
    frontend build the project has into `after/yves-build.txt`, `after/zed-build.txt`,
    `after/mp-build.txt`, each ending with its exit code
