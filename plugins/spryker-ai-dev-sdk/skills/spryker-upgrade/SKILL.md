@@ -39,7 +39,7 @@ detector re-run that reopens a lane reopens its task. `TaskList` survives compac
 `Base directory for this skill:` when this skill loaded — that line is correct for every install. `$UP` below stands for
 whichever resolves — substitute it inline as a literal path; never set a shell variable and never
 `cd`, both prompt on every call. Run them from the project root: they write every snapshot and report
-into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The twenty-one scripts are listed in
+into `<project>/.spryker-upgrade/state/`, created self-gitignoring. The twenty-three scripts are listed in
 `README.md` next to this skill; your job is to run the phases in order, do the semantic resolution
 work, and stop at the gates that belong to the developer.
 
@@ -93,6 +93,12 @@ scripts run on host PHP. Never modify `vendor/`. Read
 Before the first `composer` command, run the shared environment preflight in
 [../spryker-feature-install/references/environment-preflight.md](../spryker-feature-install/references/environment-preflight.md).
 
+**Tool output.** `run-tools.php` and `compare-tool-runs.php` print a summary and write the full
+output to files in the state directory. Read the summary. Open a log file only for the failing part
+and search it for that part; never read the whole file. Do not read `tool-comparison-*.json`; to see
+more new findings, run `compare-tool-runs.php` again with `--limit N <tool>`. When a run is stopped
+before it ends, `tool-runs-<run>.json` holds the tools that finished: run the other tools again.
+
 **Coverage matrix.** Every known failure mode, what detects it and which phase resolves it is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Read it when something turns up that
 you cannot place, and before the Phase 7 report; a new failure mode gets a row and a check.
@@ -125,22 +131,27 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    ```
 5. MISSING plugins, config problems or unloadable classes in these baselines are pre-existing breaks,
    usually leftovers of a removed feature. Surface them, offer to fix first, at minimum record counts.
-6. **Static baselines** (record, don't fix). Use the project's sniffer entry point —
-   `vendor/bin/console code:sniff:style`, or its phpcs setup — and note which, for Phase 5:
+6. **Static baselines** (record, don't fix) — PHPStan, the sniffer and the evaluator, into
+   `phpstan-baseline-run.txt`, `sniff-baseline.txt` and `evaluator-baseline.txt`:
    ```bash
-   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee .spryker-upgrade/state/phpstan-baseline-run.txt
-   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee .spryker-upgrade/state/sniff-baseline.txt
-   script -q /dev/null docker/sdk cli vendor/bin/evaluator evaluate 2>&1 | tee .spryker-upgrade/state/evaluator-baseline.txt
+   php $UP/run-tools.php baseline phpstan sniffer evaluator
    ```
+   The runner detects the project's sniffer entry point (`vendor/bin/console code:sniff:style`, or
+   its phpcs setup) and records which, for Phase 5. When it names the wrong one, run it again with
+   `--sniffer "<command>"`.
 7. **Baseline test run** — projects routinely start with red tests, often because of their own
    customisation, so the post-upgrade result means nothing without it:
    ```bash
-   script -q /dev/null docker/sdk testing codecept build
-   script -q /dev/null docker/sdk testing codecept run --no-exit 2>&1 | tee .spryker-upgrade/state/codecept-baseline.txt
+   php $UP/run-tools.php baseline codecept-build tests --tests-args=--no-exit
    ```
-   Record pass/fail/skip per suite and the exact invocation, environment variables included (matrix
-   #66). The red tests become the report's "Tests already red before the upgrade" list; a suite that
-   cannot run is named with the reason, never counted as passing.
+   Add `--env NAME=VALUE` for each environment variable the developer sets for the tests, and
+   `--codecept-options "<options>"` once for each test configuration the project runs (for example
+   `--codecept-options "-c codeception.api.yml"`); the runner runs them in that order into one log.
+   The baseline run pins the exact invocation, environment variables included, in
+   `tool-invocation.json` (matrix #66); every later run uses it. It records pass/fail/skip per suite
+   and writes the names of the failing tests, by suite, to `failing-tests-baseline.txt`. Take the
+   report's "Tests already red before the upgrade" list from that file; a suite that cannot run is
+   named with the reason, never counted as passing.
 8. **Back Office crawl baseline** — every navigation page and every table data endpoint; `--baseline`
    writes `backoffice-smoke-baseline.json`. Exit 1 lists pages already failing (record them); exit 2
    is a failed login or an unreachable or wrong URL, and no baseline was written:
@@ -150,8 +161,8 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    The credentials come from the environment (exported by the developer, or the repository-seeded
    demo account `spryker-runtime` documents); never write them into a file.
 9. **Gate the baselines:** `php $UP/check-baselines.php` exits 0 before Phase 1 starts. It names each
-   baseline file above that is missing or holds no result of its tool (`tee` writes the file even when
-   the command failed or ran nothing): re-run that command. `--no-backoffice` (`--no-data`) only when
+   baseline file above that is missing or holds no result of its tool (the runner writes the file
+   also when the tool did not run): re-run that command. `--no-backoffice` (`--no-data`) only when
    the environment cannot boot (with data); the report then says the crawl (publish check) never ran.
 10. **Create the task list** (§ Non-negotiables) as the last action of Phase 0.
 
@@ -245,10 +256,12 @@ the target release**, each as its own commit, following
 3. **Tooling set** — `phpstan/phpstan` and the PHPStan extensions the project has,
    `spryker-sdk/evaluator`, `spryker/code-sniffer`, `codeception/*`, `phpunit/phpunit` — to the
    reference's constraints, updated alone, in the container, as its own commit.
-4. **Re-take the PHPStan, sniffer and evaluator baselines** right after that commit (and the test
-   baseline when codeception or phpunit moved) into `phpstan-`, `sniff-`, `evaluator-` and
-   `codecept-post-tooling.txt`, keeping the Phase 0 files, then re-run `check-baselines.php`. From
-   here on a tool's baseline is its `*-post-tooling.txt` file, so new tool rules are not upgrade damage.
+4. **Re-take the PHPStan, sniffer and evaluator baselines** right after that commit with
+   `php $UP/run-tools.php post-tooling phpstan sniffer evaluator` (add `codecept-build tests
+   --tests-args=--no-exit` when codeception or phpunit moved). It writes `phpstan-`, `sniff-`,
+   `evaluator-` and `codecept-post-tooling.txt` and keeps the Phase 0 files; then re-run
+   `check-baselines.php`. From here on a tool's baseline is its `*-post-tooling.txt` file, so new tool
+   rules are not upgrade damage.
 
 If the new tools cannot resolve against the pre-upgrade modules, the tooling step and the image tag
 defer until right after Phase 2 (the reference's § When the new tools cannot resolve against the old code).
@@ -306,7 +319,8 @@ php $UP/check-plugin-usage.php                 # exit 1 = missing plugins
 php $UP/check-config-constants.php             # exit 1 = broken config refs
 php $UP/check-constant-overrides.php           # exit 1 = core value changed under a project constant
 php $UP/check-performance.php                  # exit 1 = ProductGroupWidget rendering lost (Lane 2)
-script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6
+php $UP/run-tools.php detect phpstan
+php $UP/compare-tool-runs.php detect phpstan   # exit 1 = new PHPStan errors against the baseline
 ```
 
 Run `check-typed-members.php` first: typed-member fatals abort `vendor/bin/console` itself (with
@@ -412,11 +426,9 @@ script -q /dev/null docker/sdk cli vendor/bin/console transfer:generate
 script -q /dev/null docker/sdk cli vendor/bin/console propel:migration:diff   # inspect; NEVER auto-migrate
 script -q /dev/null docker/sdk cli vendor/bin/console search:setup:index-map
 script -q /dev/null docker/sdk cli vendor/bin/console navigation:build-cache
-script -q /dev/null docker/sdk cli vendor/bin/evaluator evaluate
-script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6
-script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style   # the entry point Phase 0 recorded
-script -q /dev/null docker/sdk testing codecept build
-script -q /dev/null docker/sdk testing codecept run -x Acceptance
+php $UP/run-tools.php verify evaluator phpstan sniffer
+php $UP/run-tools.php verify codecept-build tests --tests-args="-x Acceptance"
+php $UP/compare-tool-runs.php verify   # exit 1 = new findings or failing tests against the baselines
 script -q /dev/null docker/sdk cli npm run yves
 php $UP/check-tooling-alignment.php --reference .spryker-upgrade/state/reference
 ```
@@ -431,8 +443,10 @@ Read [references/verification.md](references/verification.md) before the first o
 - **Sniffer:** auto-fix the PHP files the upgrade changed first (`-f`), then compare with the sniffer
   baseline. A new violation blocks, like a PHPStan or evaluator regression.
 - Tests: compare per suite with the test baseline, with the pinned invocation.
-- A tool's baseline is its Phase 1.2 re-take (`*-post-tooling.txt`), else its Phase 0 file; after a
-  deferred tooling step, the Phase 0 findings plus the findings from rules new in the tool version.
+- A tool's baseline is its Phase 1.2 re-take (`*-post-tooling.txt`), else its Phase 0 file;
+  `compare-tool-runs.php` takes them in that order. After a deferred tooling step the baseline is the
+  Phase 0 findings plus the findings from rules new in the tool version: compare with
+  `--baseline phase0` and take those tool findings out of its list.
 
 ## Phase 5.5 — The full suite against the final code, in the real environment
 
@@ -440,8 +454,8 @@ Until the suite has run in the booted environment against the final code, it has
 upgrade. Run it after Phase 5's regeneration, never before.
 
 ```bash
-script -q /dev/null docker/sdk testing codecept build
-script -q /dev/null docker/sdk testing codecept run 2>&1 | tee .spryker-upgrade/state/codecept-final.txt
+php $UP/run-tools.php final codecept-build tests
+php $UP/compare-tool-runs.php final tests
 ```
 
 Compare per suite with the test baseline (as in Phase 5) and classify every failure before fixing as

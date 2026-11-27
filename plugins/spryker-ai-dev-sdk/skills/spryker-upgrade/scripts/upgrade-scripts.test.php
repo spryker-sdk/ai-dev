@@ -11,6 +11,7 @@ require __DIR__ . '/check-baselines.php';
 require __DIR__ . '/check-constant-overrides.php';
 require __DIR__ . '/storage-search-counts.php';
 require __DIR__ . '/check-performance.php';
+require __DIR__ . '/compare-tool-runs.php';
 
 $failures = 0;
 $count = 0;
@@ -945,6 +946,234 @@ run_script('check-performance.php', ['--init', '--docs', $docs], $perf, $perfSta
 check('performance --init: with the docs reachable again, not-checked pages are pending', (read_json($perfStatusFile)['pages']['new-page']['status'] ?? '') === 'pending');
 [$twoModes] = run_script('check-performance.php', ['--init', '--verify'], $perf, $perfState);
 check('performance: two modes in one run -> exit 2', $twoModes === 2);
+
+// --- run-tools and compare-tool-runs ---
+$phpstanTable = static fn (array $errors): string => " ------ ------------------------------------------\n  Line   src/Pyz/Zed/Foo/FooFacade.php\n ------ ------------------------------------------\n"
+    . implode('', array_map(static fn (array $e): string => sprintf("  %-6d %s\n         🪪  %s\n", $e[0], $e[1], $e[2]), $errors))
+    . " ------ ------------------------------------------\n\n [ERROR] Found " . count($errors) . " error" . (count($errors) === 1 ? '' : 's') . "\n";
+$phpstanBase = $phpstanTable([[12, 'Call to an undefined method Foo::bar().', 'method.notFound']]);
+$phpstanAfter = $phpstanTable([[14, 'Call to an undefined method Foo::bar().', 'method.notFound'], [30, 'Parameter #1 $x of method Foo::baz() expects int, string given.', 'argument.type']]);
+$sniffReport = static fn (array $violations): string => implode('', array_map(static fn (array $v): string => "FILE: /data/{$v[0]}\n----------------------------------------------------------------------\nFOUND 1 ERROR AFFECTING 1 LINE\n----------------------------------------------------------------------\n {$v[1]} | ERROR | [x] {$v[2]}\n    |       |     found\n----------------------------------------------------------------------\n", $violations)) . "Time: 1.2 secs; Memory: 20MB\n";
+$sniffBase = $sniffReport([['src/Pyz/Zed/Foo/FooFacade.php', 12, 'Expected 1 space after FUNCTION keyword; 0']]);
+$sniffAfter = $sniffReport([['src/Pyz/Zed/Foo/FooFacade.php', 13, 'Expected 1 space after FUNCTION keyword; 0'], ['src/Pyz/Zed/Bar/BarFacade.php', 5, 'Missing doc comment']]);
+$evaluatorReport = static fn (array $rows): string => "=====================\nPHP VERSION CHECKER\n=====================\n\n+---+---------------------------+---------------+\n| # | Message                   | Target        |\n+---+---------------------------+---------------+\n"
+    . implode('', array_map(static fn (int $i, array $r): string => sprintf("| %d | %-25s | %-13s |\n", $i + 1, $r[0], $r[1]), array_keys($rows), $rows))
+    . "+---+---------------------------+---------------+\n\nRead more: https://docs.spryker.com/evaluator\n\n=================\nDEAD CODE CHECKER\n=================\n\nNo violations found\n";
+$evaluatorBase = $evaluatorReport([['Composer PHP is 8.1', 'composer.json']]);
+$evaluatorAfter = $evaluatorReport([['Composer PHP is 8.1', 'composer.json'], ['Deploy PHP is 8.0', 'deploy.yml']]);
+$codeceptRun = static fn (string $barMark, int $failures): string => "Codeception PHP Testing Framework v5.1.2\n[PyzTest\\Zed\\Foo]: tests from /data/tests/PyzTest/Zed/Foo\n\n\e[1mBusiness Tests (3) ------------------------------\e[22m\n"
+    . "- FooFacadeTest: Calculates price\r\e[32m✔\e[39m FooFacadeTest: Calculates price (0.01s)\r\n\e[31m✖\e[39m FooFacadeTest: Rounds tax (0.02s)\r\nS FooFacadeTest: Needs search\r\n------------------------------\n"
+    . "[PyzTest\\Zed\\Bar]: tests from /data/tests/PyzTest/Zed/Bar\n\nBusiness Tests (1) ------\n$barMark BarFacadeTest: Reads bar (0.01s)\n------\nTime: 00:01.234, Memory: 40.00 MB\n\n"
+    . "There " . ($failures === 1 ? 'was 1 failure' : "were $failures failures") . ":\n1) FooFacadeTest: Rounds tax\n Test  tests/PyzTest/Zed/Foo/Business/FooFacadeTest.php:testRoundsTax\n" . ($failures > 1 ? "2) BarFacadeTest: Reads bar\n" : '')
+    . "\nFAILURES!\nTests: 4, Assertions: 5, Failures: $failures, Skipped: 1.\n";
+$codeceptBase = $codeceptRun('✔', 1);
+$codeceptAfter = $codeceptRun('✖', 2);
+
+check('tool output: PHPStan errors by file and message, line number and identifier left out', to_phpstan_errors($phpstanBase) === ['src/Pyz/Zed/Foo/FooFacade.php: Call to an undefined method Foo::bar().']);
+check('tool output: sniffer violations with wrapped message, line number left out', to_sniff_violations($sniffBase) === ['/data/src/Pyz/Zed/Foo/FooFacade.php: ERROR Expected 1 space after FUNCTION keyword; 0 found']);
+check('tool output: evaluator violation rows per checker; a checker without violations adds none', to_evaluator_findings($evaluatorBase) === ['PHP VERSION CHECKER: Composer PHP is 8.1 (composer.json)']);
+$suites = to_codecept_suites(to_plain_text($codeceptBase));
+check('tool output: codecept tests per suite from the result lines, include namespace in the suite name', array_keys($suites) === ['PyzTest\\Zed\\Foo Business', 'PyzTest\\Zed\\Bar Business'] && $suites['PyzTest\\Zed\\Foo Business']['failed'] === ['FooFacadeTest: Rounds tax'] && count($suites['PyzTest\\Zed\\Foo Business']['skipped']) === 1 && $suites['PyzTest\\Zed\\Bar Business']['passed'] === ['BarFacadeTest: Reads bar']);
+check('tool output: pseudo-terminal line ends (CR LF) keep the evaluator and sniffer tables readable', to_evaluator_findings(str_replace("\n", "\r\n", $evaluatorBase)) === to_evaluator_findings($evaluatorBase) && to_sniff_violations(to_plain_text(str_replace("\n", "\r\n", $sniffBase))) === to_sniff_violations($sniffBase));
+check('tool output: codecept counts from the summary line when there are no result lines', to_codecept_counts("Tests: 10, Assertions: 20, Errors: 1, Failures: 2, Skipped: 3.\n") === ['tests' => 10, 'passed' => 4, 'failed' => 3, 'skipped' => 3]);
+$dockerDown = "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
+check('tool output: sniffer or evaluator without a result line and exit not 0 -> no result (docker daemon down)', to_result_problem('sniff', $dockerDown, 1) !== null && to_result_problem('evaluator', $dockerDown, 1) !== null);
+check('tool output: sniffer or evaluator without a result line and exit not 0 -> no result (Killed)', str_contains((string)to_result_problem('sniff', "Killed\n", 137), 'exit 137: Killed') && to_result_problem('evaluator', "Killed\n", 137) !== null);
+check('tool output: sniffer without a result line and exit 0 -> result', to_result_problem('sniff', "nothing to report\n", 0) === null);
+check('tool output: the exit code of a log is read from its last line', to_log_exit_code("x\nexit 137\n") === 137 && to_log_exit_code("x\n") === null && to_strip_exit("exit 0\n") === '');
+check('baselines content: a sniffer or evaluator log that crashed -> no result', bl_content_problem('sniff-baseline.txt', "Killed\nexit 137\n") !== null && bl_content_problem('evaluator-baseline.txt', $dockerDown . "exit 1\n") !== null);
+check('baselines content: a log with only `exit 0` -> empty', bl_content_problem('sniff-baseline.txt', "exit 0\n") === 'empty' && bl_content_problem('evaluator-baseline.txt', "exit 0\n") === 'empty');
+check('run-tools: an evaluator that was killed did not run', rt_result('evaluator', "Killed\nexit 137\n", 137)['ran'] === false && rt_result('sniffer', $dockerDown . "exit 1\n", 1)['ran'] === false);
+check('tool output: PHPStan findings keep line and identifier for printing', array_column(to_phpstan_findings($phpstanAfter), 'text') === ['src/Pyz/Zed/Foo/FooFacade.php:14: Call to an undefined method Foo::bar(). [method.notFound]', 'src/Pyz/Zed/Foo/FooFacade.php:30: Parameter #1 $x of method Foo::baz() expects int, string given. [argument.type]']);
+check('run-tools: macOS and Linux pseudo-terminal wrappers', rt_wrap(['docker/sdk', 'cli', 'x y'], 'Darwin') === ['script', '-q', '/dev/null', 'docker/sdk', 'cli', 'x y'] && rt_wrap(['docker/sdk', 'cli', 'x y'], 'Linux') === ['script', '-q', '-e', '-c', "'docker/sdk' 'cli' 'x y'", '/dev/null']);
+check('run-tools: log names keep the names the gates read', rt_log_name('phpstan', 'baseline') === 'phpstan-baseline-run.txt' && rt_log_name('sniffer', 'post-tooling') === 'sniff-post-tooling.txt' && rt_log_name('tests', 'final') === 'codecept-final.txt' && rt_log_name('tests', 'after') === 'codecept-after.txt');
+check('run-tools: phpstan command keeps the memory limit and the analysed paths', rt_tool_command('phpstan', ['sniffer' => 'x', 'codeceptOptions' => ''], '') === ['docker/sdk', 'cli', 'php', '-d', 'memory_limit=2048M', 'vendor/bin/phpstan', 'analyze', '-c', 'phpstan.neon', 'src/', '-l', '6']);
+
+$runner = $tmp . '/runner';
+$runnerState = $runner . '/.state';
+$stub = $tmp . '/stub';
+write_file($runner . '/composer.json', "{}\n");
+mkdir($runner . '/src/Pyz', 0777, true);
+mkdir($runner . '/vendor/spryker/development', 0777, true);
+write_file($runner . '/docker/sdk', "#!/bin/sh\necho \"\$* ENV=\${SPRYKER_TESTING_ENABLED:-}\" >> \"\$STUB_DIR/calls.log\"\ncase \"\$*\" in\n  *phpstan*) key=phpstan;;\n  *code:sniff:style*|*phpcs*) key=sniffer;;\n  *evaluator*) key=evaluator;;\n  *'codecept build'*) key=build;;\n  *) key=tests;;\nesac\ncat \"\$STUB_DIR/\$key.out\" 2>/dev/null\nexit \$(cat \"\$STUB_DIR/\$key.exit\" 2>/dev/null || echo 0)\n");
+chmod($runner . '/docker/sdk', 0755);
+$stubOutput = static function (string $key, string $output, int $exit) use ($stub): void {
+    write_file("$stub/$key.out", $output);
+    write_file("$stub/$key.exit", (string)$exit);
+};
+$stubOutput('phpstan', " [OK] No errors\n", 0);
+$stubOutput('sniffer', $sniffBase, 1);
+$stubOutput('evaluator', "Error response from daemon: container cli is not running\n", 1);
+$stubOutput('build', "Building Actor classes for suites: Business\n", 0);
+$stubOutput('tests', $codeceptBase, 0);
+$stubEnv = ['STUB_DIR' => $stub];
+[$rtCode, $rtOut] = run_script('run-tools.php', ['baseline', 'phpstan', 'sniffer', 'evaluator', 'codecept-build', 'tests', '--tests-args=--no-exit', '--env', 'SPRYKER_TESTING_ENABLED=1'], $runner, $runnerState, $stubEnv);
+$rtLines = explode("\n", trim($rtOut));
+check('run-tools: exit 1 when a tool did not run', $rtCode === 1);
+check('run-tools: a passing tool -> one line with exit code, result and log file', str_contains($rtLines[0] ?? '', 'phpstan') && str_contains($rtLines[0], 'exit 0') && str_contains($rtLines[0], '0 error(s)') && str_contains($rtLines[0], '.state/phpstan-baseline-run.txt'));
+check('run-tools: a failing tool -> its finding count', str_contains($rtLines[1] ?? '', 'exit 1') && str_contains($rtLines[1], '1 violation(s)') && str_contains($rtLines[1], 'sniff-baseline.txt'));
+check('run-tools: a tool that did not start -> "did not run" with the reason, no result', str_contains($rtLines[2] ?? '', 'did not run: Error response from daemon') && !str_contains($rtLines[2], 'finding'));
+check('run-tools: red tests -> passed, failed and skipped, failing suite named', str_contains($rtLines[4] ?? '', '4 tests in 2 suite(s): 2 passed, 1 failed, 1 skipped') && str_contains($rtLines[4], 'PyzTest\\Zed\\Foo Business (1)'));
+check('run-tools: no raw tool output on stdout', !str_contains($rtOut, 'Expected 1 space') && !str_contains($rtOut, 'Rounds tax'));
+check('run-tools: full output in the log, ending with the exit code', str_contains((string)file_get_contents($runnerState . '/sniff-baseline.txt'), 'Expected 1 space') && preg_match('/exit 1\n$/', (string)file_get_contents($runnerState . '/sniff-baseline.txt')) === 1);
+check('run-tools: check-baselines accepts the logs of tools that ran and rejects the one that did not', bl_content_problem('phpstan-baseline-run.txt', (string)file_get_contents($runnerState . '/phpstan-baseline-run.txt')) === null && bl_content_problem('codecept-baseline.txt', (string)file_get_contents($runnerState . '/codecept-baseline.txt')) === null && bl_content_problem('evaluator-baseline.txt', (string)file_get_contents($runnerState . '/evaluator-baseline.txt')) !== null);
+$pinned = read_json($runnerState . '/tool-invocation.json');
+check('run-tools: the baseline pins the sniffer it detected and the environment', ($pinned['sniffer'] ?? '') === 'vendor/bin/console code:sniff:style' && str_starts_with((string)($pinned['snifferSource'] ?? ''), 'detected') && ($pinned['env'] ?? []) === ['SPRYKER_TESTING_ENABLED' => '1']);
+check('run-tools: tests run with the environment and the tests arguments', str_contains((string)file_get_contents($stub . '/calls.log'), 'testing codecept run --no-exit ENV=1'));
+check('run-tools: the failing tests of the run in a small file, grouped by suite', (string)@file_get_contents($runnerState . '/failing-tests-baseline.txt') === "PyzTest\\Zed\\Foo Business\n  FooFacadeTest: Rounds tax\n");
+check('run-tools: tool-runs JSON holds the tests per suite', (read_json($runnerState . '/tool-runs-baseline.json')['tools']['tests']['suites']['PyzTest\\Zed\\Bar Business']['passed'] ?? 0) === 1);
+@unlink($stub . '/calls.log');
+[$rtFinal, $rtFinalOut] = run_script('run-tools.php', ['final', 'codecept-build', 'tests'], $runner, $runnerState, $stubEnv);
+check('run-tools: a later run uses the pinned environment without --env', $rtFinal === 0 && str_contains((string)file_get_contents($stub . '/calls.log'), 'testing codecept run ENV=1') && is_file($runnerState . '/codecept-final.txt'));
+[$rtOtherEnv] = run_script('run-tools.php', ['final', 'tests', '--env', 'SPRYKER_TESTING_ENABLED=0'], $runner, $runnerState, $stubEnv);
+[$rtOtherSniffer] = run_script('run-tools.php', ['final', 'sniffer', '--sniffer', 'vendor/bin/phpcs'], $runner, $runnerState, $stubEnv);
+check('run-tools: an environment or sniffer that differs from the pin -> exit 2', $rtOtherEnv === 2 && $rtOtherSniffer === 2);
+[$rtNoPin, $rtNoPinOut] = run_script('run-tools.php', ['after', 'phpstan'], $runner, $tmp . '/runner-after', $stubEnv);
+[$rtPinDir] = run_script('run-tools.php', ['after', 'phpstan', '--pin-dir', $runnerState], $runner, $tmp . '/runner-after', $stubEnv);
+check('run-tools: no pinned invocation -> exit 2; --pin-dir reads the baseline pin', $rtNoPin === 2 && str_contains($rtNoPinOut, 'No pinned invocation') && $rtPinDir === 0 && is_file($tmp . '/runner-after/phpstan-after.txt'));
+[$rtBadTool] = run_script('run-tools.php', ['baseline', 'psalm'], $runner, $runnerState, $stubEnv);
+check('run-tools: unknown tool -> exit 2', $rtBadTool === 2);
+rename($runner . '/docker/sdk', $runner . '/docker/sdk.off');
+[$rtNoSdk, $rtNoSdkOut] = run_script('run-tools.php', ['detect', 'phpstan'], $runner, $runnerState, $stubEnv);
+rename($runner . '/docker/sdk.off', $runner . '/docker/sdk');
+check('run-tools: docker/sdk missing -> did not run, exit 1', $rtNoSdk === 1 && str_contains($rtNoSdkOut, 'did not run'));
+check('run-tools: tool-runs JSON names the failing tests per suite', (read_json($runnerState . '/tool-runs-baseline.json')['tools']['tests']['failedTests'] ?? null) === ['PyzTest\\Zed\\Foo Business' => ['FooFacadeTest: Rounds tax']]);
+check('run-tools: tool-runs JSON keeps the tools of an earlier call of the same run', array_keys(read_json($runnerState . '/tool-runs-final.json')['tools'] ?? []) === ['codecept-build', 'tests']);
+
+// A second baseline run after the code changed: refused while base-ref differs from HEAD.
+git($runner, 'init', '-q');
+git($runner, 'add', 'composer.json');
+git($runner, 'commit', '-q', '-m', 'one');
+write_file($runnerState . '/base-ref', git($runner, 'rev-parse', 'HEAD') . "\n");
+[$rtSameHead] = run_script('run-tools.php', ['baseline', 'phpstan'], $runner, $runnerState, $stubEnv);
+check('run-tools: a baseline run at the base ref replaces the baseline', $rtSameHead === 0);
+git($runner, 'commit', '-q', '--allow-empty', '-m', 'two');
+$baselineBefore = (string)file_get_contents($runnerState . '/phpstan-baseline-run.txt');
+[$rtMoved, $rtMovedOut] = run_script('run-tools.php', ['baseline', 'phpstan'], $runner, $runnerState, $stubEnv);
+check('run-tools: a baseline run after HEAD moved from the base ref -> exit 2, the baseline log stays', $rtMoved === 2 && str_contains($rtMovedOut, 'phpstan-baseline-run.txt') && str_contains($rtMovedOut, '--force') && (string)file_get_contents($runnerState . '/phpstan-baseline-run.txt') === $baselineBefore);
+[$rtForced] = run_script('run-tools.php', ['baseline', 'phpstan', '--force'], $runner, $runnerState, $stubEnv);
+check('run-tools: --force replaces the baseline', $rtForced === 0);
+unlink($runnerState . '/base-ref');
+[$rtNoBaseRef] = run_script('run-tools.php', ['baseline', 'phpstan'], $runner, $runnerState, $stubEnv);
+check('run-tools: no base-ref -> no check', $rtNoBaseRef === 0);
+
+// A tool's earlier log and record are removed before it starts.
+$stale = $tmp . '/runner-stale';
+$staleState = $stale . '/.state';
+write_file($stale . '/composer.json', "{}\n");
+mkdir($stale . '/src/Pyz', 0777, true);
+write_file($stale . '/docker/sdk', "#!/bin/sh\nls \"\$SPRYKER_UPGRADE_STATE_DIR\" > \"\$STUB_DIR/stale-ls.log\"\ncat \"\$SPRYKER_UPGRADE_STATE_DIR/tool-runs-final.json\" >> \"\$STUB_DIR/stale-ls.log\" 2>/dev/null\ncat \"\$STUB_DIR/tests.out\"\n");
+chmod($stale . '/docker/sdk', 0755);
+write_file($staleState . '/codecept-final.txt', "OK (99 tests, 99 assertions)\nexit 0\n");
+write_file($staleState . '/failing-tests-final.txt', "Old Suite\n  OldTest: old\n");
+write_file($staleState . '/tool-runs-final.json', json_encode(['run' => 'final', 'tools' => ['tests' => ['result' => 'old'], 'phpstan' => ['result' => 'kept']]]));
+[$rtStale] = run_script('run-tools.php', ['final', 'tests', '--pin-dir', $runnerState], $stale, $staleState, $stubEnv);
+$staleSeen = (string)file_get_contents($stub . '/stale-ls.log');
+check('run-tools: while a tool runs, its log of an earlier run is gone', $rtStale === 0 && preg_match('/^(codecept-final|failing-tests-final)\.txt$/m', $staleSeen) === 0);
+check('run-tools: while a tool runs, its record of an earlier run is gone, other records stay', !str_contains($staleSeen, '"old"') && str_contains($staleSeen, '"kept"'));
+
+// Several test configurations: one `codecept run` per --codecept-options, one log.
+$multi = $tmp . '/runner-multi';
+$multiState = $multi . '/.state';
+write_file($multi . '/composer.json', "{}\n");
+mkdir($multi . '/src/Pyz', 0777, true);
+write_file($multi . '/docker/sdk', "#!/bin/sh\necho \"\$*\" >> \"\$STUB_DIR/multi-calls.log\"\ncase \"\$*\" in\n  *codeception.api.yml*) key=tests-api;;\n  *codeception.broken.yml*) key=tests-broken;;\n  *) key=tests;;\nesac\ncat \"\$STUB_DIR/\$key.out\" 2>/dev/null\nexit \$(cat \"\$STUB_DIR/\$key.exit\" 2>/dev/null || echo 0)\n");
+chmod($multi . '/docker/sdk', 0755);
+$stubOutput('tests-api', "Codeception PHP Testing Framework v5.1.2\n\nApi Tests (2) ------\n✔ OrdersCest: Reads orders (0.01s)\nE OrdersCest: Creates order (0.01s)\n------\nTime: 00:01.000, Memory: 40.00 MB\n\nERRORS!\nTests: 2, Assertions: 2, Errors: 1.\n", 1);
+$stubOutput('tests-broken', "Error response from daemon: container testing is not running\n", 1);
+[$rtMulti, $rtMultiOut] = run_script('run-tools.php', ['baseline', 'tests', '--tests-args=--no-exit', '--codecept-options', '-c codeception.functional.yml', '--codecept-options', '-c codeception.api.yml'], $multi, $multiState, $stubEnv);
+$multiLog = (string)file_get_contents($multiState . '/codecept-baseline.txt');
+$multiCalls = (string)file_get_contents($stub . '/multi-calls.log');
+check('run-tools: one codecept run per configuration, in the order given, with the tests arguments', $rtMulti === 0 && strpos($multiCalls, 'codecept run -c codeception.functional.yml --no-exit') !== false && strpos($multiCalls, 'codecept run -c codeception.api.yml --no-exit') > strpos($multiCalls, 'codeception.functional.yml'));
+check('run-tools: the configurations share one log that ends with the highest exit code', substr_count($multiLog, '==> docker/sdk testing codecept run') === 2 && str_contains($multiLog, 'Rounds tax') && str_contains($multiLog, 'Creates order') && preg_match('/\nexit 1\n$/', $multiLog) === 1);
+check('run-tools: the result adds up the configurations', str_contains($rtMultiOut, '6 tests in 3 suite(s): 3 passed, 2 failed, 1 skipped'));
+check('run-tools: a suite of a later configuration does not take the namespace of the one before', array_key_exists('Api', read_json($multiState . '/tool-runs-baseline.json')['tools']['tests']['suites'] ?? []));
+check('run-tools: check-baselines accepts the combined log', bl_content_problem('codecept-baseline.txt', $multiLog) === null);
+check('run-tools: the pin holds the options of each configuration', (read_json($multiState . '/tool-invocation.json')['codeceptOptions'] ?? null) === ['-c codeception.functional.yml', '-c codeception.api.yml']);
+@unlink($stub . '/multi-calls.log');
+[$rtMultiLater] = run_script('run-tools.php', ['final', 'tests'], $multi, $multiState, $stubEnv);
+check('run-tools: a later run uses every pinned configuration', $rtMultiLater === 0 && substr_count((string)file_get_contents($stub . '/multi-calls.log'), 'codecept run -c ') === 2);
+[$rtMultiOther] = run_script('run-tools.php', ['final', 'tests', '--codecept-options', '-c codeception.api.yml'], $multi, $multiState, $stubEnv);
+check('run-tools: configurations that differ from the pin -> exit 2', $rtMultiOther === 2);
+[$rtMultiBroken, $rtMultiBrokenOut] = run_script('run-tools.php', ['baseline', 'tests', '--codecept-options', '-c codeception.functional.yml', '--codecept-options', '-c codeception.broken.yml'], $multi, $multiState, $stubEnv);
+check('run-tools: a configuration that did not start -> tests did not run, named with the reason', $rtMultiBroken === 1 && str_contains($rtMultiBrokenOut, 'did not run: codecept run -c codeception.broken.yml: Error response from daemon'));
+$oneFileTwoRuns = to_codecept_suites(to_plain_text($codeceptBase . "Codeception PHP Testing Framework v5.1.2\n\nApi Tests (1) ------\n✔ OrdersCest: Reads orders (0.01s)\n------\nTime: 00:01.000, Memory: 40.00 MB\n\nOK (1 test, 1 assertion)\n"));
+check('tool output: a second codecept run in one file starts without an include namespace', array_keys($oneFileTwoRuns) === ['PyzTest\\Zed\\Foo Business', 'PyzTest\\Zed\\Bar Business', 'Api']);
+
+$cmp = $tmp . '/compare';
+$cmpState = $cmp . '/.state';
+write_file($cmp . '/composer.json', "{}\n");
+mkdir($cmp . '/src/Pyz', 0777, true);
+$baselines = ['phpstan-baseline-run.txt' => $phpstanBase, 'sniff-baseline.txt' => $sniffBase, 'evaluator-baseline.txt' => $evaluatorBase, 'codecept-baseline.txt' => $codeceptBase];
+foreach ($baselines as $name => $contents) {
+    write_file("$cmpState/$name", $contents . "exit 0\n");
+}
+$writeRun = static function (string $run, array $logs) use ($cmpState): void {
+    foreach ($logs as $tool => $contents) {
+        write_file($cmpState . '/' . rt_log_name($tool, $run), $contents . "exit 1\n");
+    }
+};
+// Feature install: run logs in the state directory, baseline files in --baseline-dir.
+$fiState = $tmp . '/fi-state';
+write_file("$fiState/baseline/phpstan-baseline-run.txt", $phpstanBase . "exit 1\n");
+write_file("$fiState/baseline/sniff-baseline.txt", $sniffBase . "exit 1\n");
+write_file("$fiState/baseline/codecept-baseline.txt", $codeceptBase . "exit 1\n");
+write_file("$fiState/after/phpstan-after.txt", $phpstanAfter . "exit 1\n");
+write_file("$fiState/after/sniff-after.txt", $sniffBase . "exit 1\n");
+write_file("$fiState/after/codecept-after.txt", $codeceptBase . "exit 1\n");
+[$ctFi, $ctFiOut] = run_script('compare-tool-runs.php', ['after', '--baseline-dir', "$fiState/baseline"], $cmp, "$fiState/after");
+check('compare --baseline-dir: baselines from the directory, logs from the state directory, new findings listed', $ctFi === 1 && preg_match('/^phpstan\s+REGRESSION .*phpstan-baseline-run\.txt/m', $ctFiOut) === 1 && str_contains($ctFiOut, 'FooFacade.php:30: Parameter #1') && preg_match('/^sniffer\s+ok/m', $ctFiOut) === 1 && preg_match('/^tests\s+ok/m', $ctFiOut) === 1);
+[$ctFiNoDir] = run_script('compare-tool-runs.php', ['after'], $cmp, "$fiState/after");
+[$ctFiBadDir] = run_script('compare-tool-runs.php', ['after', '--baseline-dir', "$fiState/missing"], $cmp, "$fiState/after");
+check('compare --baseline-dir: without it no baseline -> exit 2; a directory that does not exist -> exit 2', $ctFiNoDir === 2 && $ctFiBadDir === 2);
+$writeRun('verify', ['phpstan' => $phpstanBase, 'sniffer' => $sniffBase, 'evaluator' => $evaluatorBase, 'tests' => $codeceptBase]);
+[$ctSame, $ctSameOut] = run_script('compare-tool-runs.php', ['verify'], $cmp, $cmpState);
+check('compare: a baseline with red tests and the same result -> exit 0, every tool ok', $ctSame === 0 && substr_count($ctSameOut, ' ok ') === 4 && !str_contains($ctSameOut, '  + '));
+$writeRun('final', ['phpstan' => $phpstanAfter, 'sniffer' => $sniffAfter, 'evaluator' => $evaluatorAfter, 'tests' => $codeceptAfter]);
+[$ctReg, $ctRegOut] = run_script('compare-tool-runs.php', ['final'], $cmp, $cmpState);
+check('compare: regressions -> exit 1', $ctReg === 1);
+check('compare: new PHPStan error only, the moved line of the old one is not new', str_contains($ctRegOut, '+ src/Pyz/Zed/Foo/FooFacade.php:30: Parameter #1 $x') && !str_contains($ctRegOut, 'Call to an undefined'));
+check('compare: a new PHPStan error is printed with its line and identifier from the run', str_contains($ctRegOut, "+ src/Pyz/Zed/Foo/FooFacade.php:30: Parameter #1 \$x of method Foo::baz() expects int, string given. [argument.type]\n"));
+check('compare: new sniffer violation only, with its line', str_contains($ctRegOut, '+ /data/src/Pyz/Zed/Bar/BarFacade.php:5: ERROR Missing doc comment') && substr_count($ctRegOut, 'Expected 1 space') === 0);
+check('compare: new evaluator finding only', str_contains($ctRegOut, '+ PHP VERSION CHECKER: Deploy PHP is 8.0 (deploy.yml)') && !str_contains($ctRegOut, 'Composer PHP is 8.1'));
+check('compare: a test that passed before and fails now, with its suite; the test red in the baseline is not listed', str_contains($ctRegOut, '+ PyzTest\\Zed\\Bar Business: BarFacadeTest: Reads bar') && !str_contains($ctRegOut, 'Rounds tax'));
+check('compare: one verdict line per tool and the report path', preg_match_all('/^(phpstan|sniffer|evaluator|tests)\s+REGRESSION/m', $ctRegOut) === 4 && str_contains($ctRegOut, 'Full report: .state/tool-comparison-final.json'));
+check('compare: the report holds the full lists', count(read_json($cmpState . '/tool-comparison-final.json')['tools']['phpstan']['new'] ?? []) === 1);
+$ctReport = read_json($cmpState . '/tool-comparison-final.json')['tools'] ?? [];
+check('compare: the report keeps line and identifier of a new finding', ($ctReport['phpstan']['newFindings'][0]['line'] ?? null) === 30 && ($ctReport['phpstan']['newFindings'][0]['identifier'] ?? null) === 'argument.type' && ($ctReport['sniffer']['newFindings'][0]['line'] ?? null) === 5);
+check('compare: the tests verdict line holds the baseline totals', str_contains($ctRegOut, '4 tests, 2 failed, 1 skipped; baseline 4 tests, 1 failed, 1 skipped (codecept-baseline.txt)'));
+[$ctLimit, $ctLimitOut] = run_script('compare-tool-runs.php', ['final', 'sniffer', '--limit', '0'], $cmp, $cmpState);
+check('compare: --limit caps the listed findings and names the rerun with a higher limit', $ctLimit === 1 && str_contains($ctLimitOut, '(1 more: compare-tool-runs.php final sniffer --limit 1)') && !str_contains($ctLimitOut, '  + '));
+write_file($cmpState . '/phpstan-post-tooling.txt', $phpstanAfter . "exit 1\n");
+[$ctPost, $ctPostOut] = run_script('compare-tool-runs.php', ['final', 'phpstan'], $cmp, $cmpState);
+[$ctPhase0] = run_script('compare-tool-runs.php', ['final', 'phpstan', '--baseline', 'phase0'], $cmp, $cmpState);
+check('compare: the post-tooling file is the baseline when it exists; --baseline phase0 overrides', $ctPost === 0 && str_contains($ctPostOut, 'phpstan-post-tooling.txt') && $ctPhase0 === 1);
+[$ctPostRun, $ctPostRunOut] = run_script('compare-tool-runs.php', ['post-tooling', 'phpstan'], $cmp, $cmpState);
+check('compare: the post-tooling run is compared with the Phase 0 file', $ctPostRun === 1 && str_contains($ctPostRunOut, 'phpstan-baseline-run.txt'));
+unlink($cmpState . '/evaluator-baseline.txt');
+[$ctNoBase, $ctNoBaseOut] = run_script('compare-tool-runs.php', ['final'], $cmp, $cmpState);
+check('compare: a missing baseline -> exit 2, named', $ctNoBase === 2 && str_contains($ctNoBaseOut, 'evaluator: no baseline'));
+write_file($cmpState . '/evaluator-baseline.txt', "Could not open input file: vendor/bin/evaluator\nexit 1\n");
+[$ctBadBase] = run_script('compare-tool-runs.php', ['final', 'evaluator'], $cmp, $cmpState);
+check('compare: a baseline without a result -> exit 2', $ctBadBase === 2);
+$writeRun('detect', ['phpstan' => "Error response from daemon: container cli is not running\n"]);
+[$ctNoResult, $ctNoResultOut] = run_script('compare-tool-runs.php', ['detect'], $cmp, $cmpState);
+check('compare: a run without a result -> NO RESULT, exit 1', $ctNoResult === 1 && str_contains($ctNoResultOut, 'NO RESULT'));
+$writeRun('crash', ['sniffer' => "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n"]);
+[$ctCrash, $ctCrashOut] = run_script('compare-tool-runs.php', ['crash', 'sniffer'], $cmp, $cmpState);
+check('compare: a sniffer that crashed with exit 1 and no result line -> NO RESULT, exit 1', $ctCrash === 1 && preg_match('/^sniffer\s+NO RESULT .*exit 1/m', $ctCrashOut) === 1);
+write_file($cmpState . '/codecept-cut.txt', $codeceptBase);
+[$ctCut, $ctCutOut] = run_script('compare-tool-runs.php', ['cut', 'tests'], $cmp, $cmpState);
+check('compare: a log whose last line is not `exit <code>` -> NO RESULT, exit 1', $ctCut === 1 && str_contains($ctCutOut, 'NO RESULT') && str_contains($ctCutOut, 'not `exit <code>`'));
+$codeceptDropped = str_replace(["\e[32m✔\e[39m FooFacadeTest: Calculates price", "Business Tests (1) ------\n✔ BarFacadeTest: Reads bar (0.01s)\n"], ['S FooFacadeTest: Calculates price', "Business Tests (0) ------\n"], $codeceptBase);
+$writeRun('dropped', ['tests' => $codeceptDropped]);
+[$ctDropped, $ctDroppedOut] = run_script('compare-tool-runs.php', ['dropped', 'tests'], $cmp, $cmpState);
+check('compare: a test that passed in the baseline and is skipped now -> REGRESSION', $ctDropped === 1 && str_contains($ctDroppedOut, '+ PyzTest\\Zed\\Foo Business: FooFacadeTest: Calculates price: skipped now, passed in the baseline'));
+check('compare: a test that passed in the baseline and is not in the run -> listed', str_contains($ctDroppedOut, '+ PyzTest\\Zed\\Bar Business: BarFacadeTest: Reads bar: not in this run, passed in the baseline'));
+check('compare: the red test of the baseline stays out of the list', !str_contains($ctDroppedOut, 'Rounds tax'));
+[$ctNoRun] = run_script('compare-tool-runs.php', ['nothing'], $cmp, $cmpState);
+[$ctMissingLog] = run_script('compare-tool-runs.php', ['detect', 'sniffer'], $cmp, $cmpState);
+check('compare: no log of the run, or of a named tool -> exit 2', $ctNoRun === 2 && $ctMissingLog === 2);
 
 $cleanup = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($cleanup as $entry) {

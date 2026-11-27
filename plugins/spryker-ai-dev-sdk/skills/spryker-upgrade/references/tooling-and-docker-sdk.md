@@ -92,14 +92,14 @@ exactly these packages.
    upgrade damage. The re-takes go to `*-post-tooling.txt`; the Phase 0 files stay as they are:
 
    ```bash
-   script -q /dev/null docker/sdk cli php -d memory_limit=2048M vendor/bin/phpstan analyze -c phpstan.neon src/ -l 6 2>&1 | tee .spryker-upgrade/state/phpstan-post-tooling.txt
-   script -q /dev/null docker/sdk cli vendor/bin/console code:sniff:style 2>&1 | tee .spryker-upgrade/state/sniff-post-tooling.txt
-   script -q /dev/null docker/sdk cli vendor/bin/evaluator evaluate 2>&1 | tee .spryker-upgrade/state/evaluator-post-tooling.txt
+   php $UP/run-tools.php post-tooling phpstan sniffer evaluator
    ```
 
    When `codeception/*` or `phpunit/phpunit` moved, re-take the tests as well, with the exact
-   invocation Phase 0 pinned, into `codecept-post-tooling.txt`. Use the project's own sniffer entry
-   point if it has one (Phase 0 recorded which). Then `php $UP/check-baselines.php` must exit 0 again:
+   invocation Phase 0 pinned, into `codecept-post-tooling.txt`:
+   `php $UP/run-tools.php post-tooling codecept-build tests --tests-args=--no-exit`. The runner uses
+   the sniffer entry point and the environment variables Phase 0 pinned. Then
+   `php $UP/check-baselines.php` must exit 0 again:
    it checks each `*-post-tooling.txt` that exists for a real result. From here on a tool's baseline is
    its `*-post-tooling.txt` file (after a deferred tooling step: see the next section).
 
@@ -114,10 +114,11 @@ New tooling can require versions of shared dependencies (`symfony/*`, `nikic/php
 3. Directly after Phase 2 — before Phase 3 and before any lane edits a file — do the tooling step
    above as its own commit, with the re-takes into the `*-post-tooling.txt` files. The Phase 0 files
    stay unchanged.
-4. Those re-takes run on upgraded code, so they mix two causes. Compare each with its Phase 0 file:
-   a finding whose rule or error identifier is new in the tool version is a tool finding; every other
-   new finding is Phase 3 upgrade damage. The baseline for the rest of the upgrade is the Phase 0
-   findings plus only the tool findings; list those tool findings in the report.
+4. Those re-takes run on upgraded code, so they mix two causes. Compare each with its Phase 0 file
+   (`php $UP/compare-tool-runs.php post-tooling` lists what is new against it): a finding whose
+   rule or error identifier is new in the tool version is a tool finding; every other new finding
+   is Phase 3 upgrade damage. The baseline for the rest of the upgrade is the Phase 0 findings plus
+   only the tool findings; list those tool findings in the report.
 5. Say in the report that the tooling moved after Phase 2 and why, and which image the re-takes ran
    on when the image tag was deferred too.
 

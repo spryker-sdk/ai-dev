@@ -6,7 +6,7 @@
  *
  * Every "after" check of the upgrade is compared against a "before" run. Without the baseline a new
  * failure cannot be told apart from a pre-existing one, so the upgrade does not start until all of
- * them exist. `2>&1 | tee` creates the file even when the command failed, so each file is also
+ * them exist. run-tools.php writes the file also when the tool did not run, so each file is also
  * checked for its tool's result line. The Phase 1.2 re-takes (`*-post-tooling.txt`) are checked the
  * same way when they exist.
  *
@@ -24,45 +24,32 @@ declare(strict_types=1);
 
 error_reporting(E_ALL & ~E_DEPRECATED);
 
+require_once __DIR__ . '/tool-output.php';
+
 const BL_REQUIRED = [
     'base-ref' => 'php $UP/check-added-comments.php --record-base',
-    'codecept-baseline.txt' => 'full codecept run output before the upgrade',
-    'phpstan-baseline-run.txt' => 'phpstan analyse output before the upgrade',
-    'sniff-baseline.txt' => 'code sniffer output before the upgrade',
-    'evaluator-baseline.txt' => 'spryker-sdk/evaluator output before the upgrade',
+    'codecept-baseline.txt' => 'php $UP/run-tools.php baseline codecept-build tests --tests-args=--no-exit',
+    'phpstan-baseline-run.txt' => 'php $UP/run-tools.php baseline phpstan',
+    'sniff-baseline.txt' => 'php $UP/run-tools.php baseline sniffer',
+    'evaluator-baseline.txt' => 'php $UP/run-tools.php baseline evaluator',
     'backoffice-smoke-baseline.json' => 'php $UP/backoffice-smoke.php --url <zed url> --baseline',
     'constant-overrides-baseline.json' => 'php $UP/check-constant-overrides.php --snapshot',
     'storage-search-counts-before.json' => 'cp $UP/storage-search-counts.php .spryker-upgrade/state/ && docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before',
 ];
 
 const BL_POST_TOOLING = [
-    'codecept-post-tooling.txt' => 'codecept run output after the tooling step',
-    'phpstan-post-tooling.txt' => 'phpstan analyse output after the tooling step',
-    'sniff-post-tooling.txt' => 'code sniffer output after the tooling step',
-    'evaluator-post-tooling.txt' => 'spryker-sdk/evaluator output after the tooling step',
+    'codecept-post-tooling.txt' => 'php $UP/run-tools.php post-tooling codecept-build tests --tests-args=--no-exit',
+    'phpstan-post-tooling.txt' => 'php $UP/run-tools.php post-tooling phpstan',
+    'sniff-post-tooling.txt' => 'php $UP/run-tools.php post-tooling sniffer',
+    'evaluator-post-tooling.txt' => 'php $UP/run-tools.php post-tooling evaluator',
 ];
-
-const BL_TOOL_FAILURE = '/is not defined|There are no commands defined|Could not open input file|command not found'
-    . '|No such file or directory|Error response from daemon|is not running|Fatal error|Uncaught|Usage:|Unknown option'
-    . '|option does not exist|Permission denied/i';
-
-/**
- * The file's text without ANSI escape sequences, carriage returns and other control characters.
- */
-function bl_plain_text(string $contents): string
-{
-    $text = (string)preg_replace('/\e\[[0-9;?]*[ -\/]*[@-~]|\e[()][A-Z0-9]|\e[=>]/', '', $contents);
-    $text = str_replace("\r", "\n", $text);
-
-    return (string)preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/', '', $text);
-}
 
 /**
  * The reason a baseline file holds no real result of its tool, or null when it does.
  */
 function bl_content_problem(string $file, string $contents): ?string
 {
-    $text = bl_plain_text($contents);
+    $text = to_plain_text($contents);
     if (trim($text) === '') {
         return 'empty';
     }
@@ -87,30 +74,8 @@ function bl_content_problem(string $file, string $contents): ?string
 
         return (int)($decoded['totalRows'] ?? 0) > 0 ? null : 'no rows: the environment held no published data (boot with --data, drain the queues)';
     }
-    $tool = explode('-', $file)[0];
-    if ($tool === 'codecept') {
-        return preg_match('/\bOK \(\d+ tests?|\bTests: \d+|FAILURES!|ERRORS!/', $text) === 1
-            ? null
-            : 'no codecept summary line (`OK (`, `Tests:`, `FAILURES!`)';
-    }
-    if ($tool === 'phpstan') {
-        return preg_match('/\[OK\]|Found \d+ (?:\S+ )?errors?/', $text) === 1
-            ? null
-            : 'no PHPStan result line (`[OK] No errors` or `Found N errors`)';
-    }
-    $resultPattern = $tool === 'sniff'
-        ? '/FOUND \d+ ERRORS?|^FILE: |Time: |\d+ \/ \d+ \(\d+%\)/m'
-        : '/Success!|Read more: |^={5,}\s*$|^\s*\{"/m';
-    if (preg_match($resultPattern, $text) === 1) {
-        return null;
-    }
-    foreach (preg_split('/\n/', $text) ?: [] as $row) {
-        if (preg_match(BL_TOOL_FAILURE, $row) === 1) {
-            return 'tool error instead of a result: ' . trim($row);
-        }
-    }
 
-    return null;
+    return to_result_problem(explode('-', $file)[0], to_strip_exit($contents), to_log_exit_code($contents));
 }
 
 /**

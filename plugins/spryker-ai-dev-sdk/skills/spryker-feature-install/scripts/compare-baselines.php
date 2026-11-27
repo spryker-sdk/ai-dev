@@ -47,47 +47,7 @@ const CB_BUILDS = ['yves-build.txt', 'zed-build.txt', 'mp-build.txt'];
 
 function cb_text(string $file): ?string
 {
-    return is_file($file) ? bl_plain_text((string)file_get_contents($file)) : null;
-}
-
-function cb_phpstan_errors(string $text): ?int
-{
-    if (preg_match('/Found (\d+) (?:\S+ )?errors?/', $text, $m)) {
-        return (int)$m[1];
-    }
-
-    return preg_match('/\[OK\] No errors/', $text) ? 0 : null;
-}
-
-function cb_sniff_findings(string $text): ?int
-{
-    if (preg_match('/A TOTAL OF (\d+) ERRORS? AND (\d+) WARNINGS?/', $text, $m)) {
-        return (int)$m[1] + (int)$m[2];
-    }
-    if (preg_match_all('/FOUND (\d+) ERRORS?(?: AND (\d+) WARNINGS?)?/', $text, $m, PREG_SET_ORDER)) {
-        return array_sum(array_map(static fn (array $hit): int => (int)$hit[1] + (int)($hit[2] ?? 0), $m));
-    }
-
-    return bl_content_problem('sniff-baseline.txt', $text) === null ? 0 : null;
-}
-
-/**
- * @return array{total: ?int, failing: list<string>}
- */
-function cb_codecept(string $text): array
-{
-    $failing = [];
-    if (preg_match_all('/^\s*\d+\) (\S.*?)\s*$/m', $text, $m)) {
-        $failing = array_values(array_unique(array_map('trim', $m[1])));
-    }
-    $total = null;
-    if (preg_match_all('/Tests: \d+, Assertions: \d+(?:, Errors: (\d+))?(?:, Failures: (\d+))?/', $text, $m, PREG_SET_ORDER)) {
-        $total = array_sum(array_map(static fn (array $hit): int => (int)($hit[1] ?? 0) + (int)($hit[2] ?? 0), $m));
-    } elseif (preg_match('/\bOK \(\d+ tests?/', $text)) {
-        $total = 0;
-    }
-
-    return ['total' => $total, 'failing' => $failing];
+    return is_file($file) ? to_plain_text((string)file_get_contents($file)) : null;
 }
 
 /**
@@ -109,9 +69,9 @@ function cb_evaluate(string $stateDir): array
     $after = cb_text($afterDir . '/phpstan-after.txt');
     $checks['phpstan'] = match (true) {
         $after === null => 'missing after/phpstan-after.txt',
-        cb_phpstan_errors($after) === null => 'after/phpstan-after.txt has no PHPStan result line',
-        $before === null || cb_phpstan_errors($before) === null => 'no valid baseline to compare with',
-        cb_phpstan_errors($after) > cb_phpstan_errors($before) => sprintf('errors grew from %d to %d', cb_phpstan_errors($before), cb_phpstan_errors($after)),
+        to_phpstan_count($after) === null => 'after/phpstan-after.txt has no PHPStan result line',
+        $before === null || to_phpstan_count($before) === null => 'no valid baseline to compare with',
+        to_phpstan_count($after) > to_phpstan_count($before) => sprintf('errors grew from %d to %d', to_phpstan_count($before), to_phpstan_count($after)),
         default => null,
     };
 
@@ -119,9 +79,9 @@ function cb_evaluate(string $stateDir): array
     $after = cb_text($afterDir . '/sniff-after.txt');
     $checks['sniffer'] = match (true) {
         $after === null => 'missing after/sniff-after.txt',
-        cb_sniff_findings($after) === null => 'after/sniff-after.txt has no sniffer result',
-        $before === null || cb_sniff_findings($before) === null => 'no valid baseline to compare with',
-        cb_sniff_findings($after) > cb_sniff_findings($before) => sprintf('findings grew from %d to %d', cb_sniff_findings($before), cb_sniff_findings($after)),
+        to_sniff_count($after) === null => 'after/sniff-after.txt has no sniffer result',
+        $before === null || to_sniff_count($before) === null => 'no valid baseline to compare with',
+        to_sniff_count($after) > to_sniff_count($before) => sprintf('findings grew from %d to %d', to_sniff_count($before), to_sniff_count($after)),
         default => null,
     };
 
@@ -132,8 +92,8 @@ function cb_evaluate(string $stateDir): array
     } elseif ($before === null) {
         $checks['tests'] = 'no valid baseline to compare with';
     } else {
-        $old = cb_codecept($before);
-        $new = cb_codecept($after);
+        $old = to_codecept_summary($before);
+        $new = to_codecept_summary($after);
         $newFailures = array_values(array_diff($new['failing'], $old['failing']));
         $checks['tests'] = match (true) {
             $new['total'] === null => 'after/codecept-after.txt has no summary line',
