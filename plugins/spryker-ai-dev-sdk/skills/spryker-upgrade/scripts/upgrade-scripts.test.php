@@ -1143,7 +1143,7 @@ $ctReport = read_json($cmpState . '/tool-comparison-final.json')['tools'] ?? [];
 check('compare: the report keeps line and identifier of a new finding', ($ctReport['phpstan']['newFindings'][0]['line'] ?? null) === 30 && ($ctReport['phpstan']['newFindings'][0]['identifier'] ?? null) === 'argument.type' && ($ctReport['sniffer']['newFindings'][0]['line'] ?? null) === 5);
 check('compare: the tests verdict line holds the baseline totals', str_contains($ctRegOut, '4 tests, 2 failed, 1 skipped; baseline 4 tests, 1 failed, 1 skipped (codecept-baseline.txt)'));
 [$ctLimit, $ctLimitOut] = run_script('compare-tool-runs.php', ['final', 'sniffer', '--limit', '0'], $cmp, $cmpState);
-check('compare: --limit caps the listed findings and names the rerun with a higher limit', $ctLimit === 1 && str_contains($ctLimitOut, '(1 more: rerun with --limit 1 sniffer)') && !str_contains($ctLimitOut, '  + '));
+check('compare: --limit caps the listed findings and names the rerun with a higher limit', $ctLimit === 1 && str_contains($ctLimitOut, '(1 more: compare-tool-runs.php final sniffer --limit 1)') && !str_contains($ctLimitOut, '  + '));
 write_file($cmpState . '/phpstan-post-tooling.txt', $phpstanAfter . "exit 1\n");
 [$ctPost, $ctPostOut] = run_script('compare-tool-runs.php', ['final', 'phpstan'], $cmp, $cmpState);
 [$ctPhase0] = run_script('compare-tool-runs.php', ['final', 'phpstan', '--baseline', 'phase0'], $cmp, $cmpState);

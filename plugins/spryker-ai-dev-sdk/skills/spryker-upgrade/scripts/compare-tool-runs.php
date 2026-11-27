@@ -329,7 +329,14 @@ function ct_main(array $argv): int
             fwrite(STDOUT, "  + $entry\n");
         }
         if (count($result['new']) > $limit) {
-            fwrite(STDOUT, sprintf("  (%d more: rerun with --limit %d %s)\n", count($result['new']) - $limit, count($result['new']), $tool));
+            fwrite(STDOUT, sprintf(
+                "  (%d more: compare-tool-runs.php %s %s --limit %d%s)\n",
+                count($result['new']) - $limit,
+                $run,
+                $tool,
+                count($result['new']),
+                $baselineDir !== $stateDir ? ' --baseline-dir ' . spryker_upgrade_rel($baselineDir, $root) : ''
+            ));
         }
     }
     fwrite(STDOUT, 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n");
