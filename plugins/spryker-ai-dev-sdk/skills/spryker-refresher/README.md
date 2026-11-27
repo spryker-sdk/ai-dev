@@ -24,66 +24,44 @@ commands (anything from a `destructive*.yml` recipe, anything that drops/truncat
 
 ```mermaid
 flowchart TD
-    A([Refresh requested]) --> B{"File list supplied<br/>by the caller?"}
-    B -- "no" --> B1["git status /<br/>git diff --name-only HEAD~1"]
-    B1 --> B2{"Derivable?"}
-    B2 -- "no" --> ASK([Ask the caller])
-    B2 -- "yes" --> C
-    B -- "yes" --> C["1 · Match each file<br/>to mapping-table rows<br/>(every matching row applies)"]
-
-    C --> R["Read config/install/*.yml<br/>recipes — authoritative for<br/>this project's order &amp; flags"]
-    R --> D["2 · Order the matched commands<br/>1 cache removes → 2 codegen →<br/>3 autoload → 4 cache builds/warmups →<br/>5 class-resolver build → 6 data imports →<br/>7 frontend builds"]
-
-    D --> SC{"File list has any<br/>src/&lt;Namespace&gt;/**/*.php<br/>but no class-resolver:build?"}
-    SC -- "yes" --> SCFIX["Self-correct:<br/>add cache:class-resolver:build"]
-    SCFIX --> E
-    SC -- "no" --> E["3 · Run each command separately<br/>via Bash, capture exit + tail"]
-
+    A([Refresh requested]) --> B["refresh.php plan &lt;files&gt;<br/>(or from git against HEAD / --base)"]
+    B --> C{"Needs a decision?"}
+    C -- "yes" --> D["Ask the caller (store, router app, …)<br/>plan again with the flag"]
+    D --> B
+    C -- "no" --> R["Check against config/install/*.yml<br/>recipes — authoritative for order"]
+    R --> E["refresh.php run<br/>one line per command, logs in .ai-dev/refresher/logs"]
     E --> F{"Exit code 0?"}
-    F -- "no" --> STOP(["STOP — report what ran,<br/>what failed, output tail<br/>suggest spryker-issue-diagnoser"])
-    F -- "yes" --> G{"More commands<br/>in the plan?"}
-    G -- "yes" --> E
-    G -- "no" --> H(["Refresh Report:<br/>Inputs · Plan · Execution table<br/>· Failures · Caveats"])
+    F -- "no" --> STOP(["STOP — the run printed the 20-line tail<br/>suggest spryker-issue-diagnoser"])
+    F -- "yes" --> H(["Refresh Report:<br/>files · plan · run lines · decisions · caveats"])
 
     classDef step fill:#1f6feb,stroke:#0b3d91,color:#fff;
     classDef decision fill:#f0ad4e,stroke:#8a6d3b,color:#000;
     classDef terminal fill:#2ea043,stroke:#176f2c,color:#fff;
-    class B1,C,R,D,SCFIX,E step;
-    class B,B2,SC,F,G decision;
-    class A,ASK,STOP,H terminal;
+    class B,D,R,E step;
+    class C,F decision;
+    class A,STOP,H terminal;
 ```
 
-## Touched file → command mapping
+## The script
 
-The heart of the skill. Each row's trigger is independent — apply **every** row that matches a file in
-the change set. Your coding agent runs on the host, so commands are invoked as `docker/sdk console <command>`
-(Composer as `docker/sdk cli composer <args>`).
+`scripts/refresh.php` holds the file-pattern → command mapping as data, in one place:
 
-| Trigger | Commands |
+| Call | What it does |
 |---|---|
-| `*.transfer.xml` changed | `transfer:generate` |
-| `*.schema.xml` changed (project layer) | `propel:install` |
-| `.php` added / renamed / moved / deleted under a project namespace in `src/` | `composer dumpautoload --apcu` |
-| Project-layer `.php` whose FQCN matches an existing vendor class (an override) | `cache:class-resolver:build` |
-| `*DependencyProvider.php` changed | `cache:empty-all` |
-| `config/*.php` or `config_default*.php` changed | `cache:empty-all` |
-| Yves / Zed / Merchant Portal JS, TS, SCSS, LESS changed | `frontend:yves:build` \| `frontend:zed:build` \| `frontend:mp:build` |
-| Twig file added / moved / deleted (new override) | `twig:cache:warmer` — edits to an existing Twig file need nothing |
-| `navigation.xml` changed | `navigation:cache:remove` → `navigation:build-cache` |
-| Glue / SAPI / BAPI route or `*RestApi*` plugin changed | `rest-api:remove-validation-cache` → `rest-api:build-request-validation-cache` |
-| API Platform resource (`resources/api/{storefront,backend}/*.resource.yml`) added/updated, or `*RestApi` dependency provider changed, in a project with `src/Generated/Api/<App>` | `glue api:generate` → `glue cache:clear` → `glue cache:warmup`, per Glue application resolved from `public/Glue*/index.php` and the deploy file (never from the install recipe) |
-| `composer.lock` changed (modules added/updated) | `transfer:generate`, `propel:install` (module ships `*.schema.xml`), `transfer:entity:generate`, `composer dump-autoload`, `dev:ide-auto-completion:generate` + phpstan cache clear, `cache:class-resolver:build`, `glue api:generate` (API resources), `router:cache:warm-up*` (route providers), `frontend:project:install-dependencies` (changed `package.json`) |
-| Before a frontend build after vendor changes / `ERR_MODULE_NOT_FOUND: Cannot find package` | Check vendor `package.json` dependencies against `package-lock.json` / `node_modules`; the error is a pre-existing environment issue - fix with `frontend:project:install-dependencies` (lock update needs user approval), not code |
-| `RouteProvider` plugin or route config added/changed/deleted, or a new Zed controller/action | `router:cache:warm-up` and/or `:backoffice` / `:backend-gateway` / `:merchant-portal` |
-| OMS XML (`config/Zed/oms/*.xml`) changed | `oms:process-cache:warm-up` |
-| Glossary CSV changed | `data:import:glossary` (Yves translations only — not Zed BO labels) |
-| Zed translator CSV (`src/<Ns>/Zed/Translator/data/<Module>/*.csv`) | `translator:generate-cache` |
-| Search schema / index-map JSON changed | `search:source-map:remove` → `search:setup:source-map` → `search:setup:sources` |
-| Data import CSV changed | `data:import:<entity>` |
-| Publisher plugin / queue config changed | Queue workers need a **manual** restart — document it, don't auto-run |
-| BO stale template after a clean refresh (rare) | `rm -f src/Generated/Zed/Twig/codeBucket/.pathCache` → `twig:cache:warmer` |
+| `php refresh.php plan [<file>...]` | Matches each changed file (a path, or `A:` / `M:` / `D:` / `R:<old>-><new>`; default: git working tree against `HEAD`, `--base <ref>`) to the mapping rows and prints the commands in run order, each with its reason, plus manual, decision and skipped items. A bare path in the base commit without a diff is a "status unknown" decision. `--symptom` without files does not read git. Writes `.ai-dev/refresher/plan.json`; `--print-only` writes nothing. Flags: `--store`, `--router`, `--symptom`, `--deploy-file`. |
+| `php refresh.php run [--from <n>] [--only <n>,…] [--skip <n>,…] [--force]` | Prints the plan's creation time and counts, then runs the selected steps through `docker/sdk`, each command as its own process, full output in `.ai-dev/refresher/logs/`, one line per command; stops at the first non-zero exit with the last 20 log lines. Rebuilds every command from the mapping, so nothing outside it runs. Container checks: `console list` before an importer or `translator:generate-cache`, `/data/node_modules` before the Yves build (else `docker/sdk up --assets`), the dependencies of changed vendor `package.json` files before a frontend build. With `--from` or `--only`, a first step whose log has no `exit` line stops the run unless `--force`. Run it in the background or with a long timeout: `propel:install` and frontend builds can take minutes. |
+| `php refresh.php table` | Prints the mapping and the run order. |
 
-If a command not in the table seems needed, confirm it exists in `docker/sdk console list` first.
+The lookups the script does: the project namespaces (`config_default.php`), whether a project class
+overrides a vendor class, whether a module directory is new (not in the base commit), the Glue
+applications (`public/Glue*/index.php`, cross-checked with the deploy file), whether
+`src/Generated/Api/<App>` exists, a DMS project (`SPRYKER_DYNAMIC_STORE_MODE`), the modules a
+`composer.lock` change moved, and from a CSV diff whether rows were only added.
+
+Run order: 1 cache removes → 2 codegen → 3 autoload → 4 IDE/locator stubs → 5 cache builds/warmups →
+6 class-resolver build → 7 data imports → 8 frontend builds → 9 phpstan result-cache clear.
+
+Tests: `php scripts/refresh.test.php` (a fixture project and a stub in place of `docker/sdk`).
 
 ## Knowledge sources — discover, don't assume
 
@@ -92,27 +70,26 @@ If a command not in the table seems needed, confirm it exists in `docker/sdk con
 | `config/install/*.yml` | The canonical sequences this project actually runs — source of truth for spelling, flags, ordering. Read before improvising. |
 | `docker/sdk console list` | Live truth for which commands exist in the running stack. |
 | `searchAlgoliaDocumentation` / `docs.spryker.com` | Fallback when a command's purpose isn't obvious. |
-| `git status`, `git diff --name-only HEAD~1` | Derive the touched-file list when the caller didn't enumerate it. |
+| `git diff` against `HEAD` (or `--base`) | `refresh.php plan` derives the touched-file list from it when the caller didn't enumerate it. |
 
 ## Output
 
-A **Refresh Report**: Inputs (files touched, change classes detected), Plan (each command + why),
-Execution table (`#`, command, exit code, notes), Failures (full command, exit code, ~20-line output
-tail, suggested next step), and Caveats — manual follow-ups such as a queue-worker restart or a
-storefront hard refresh.
+A **Refresh Report**: files touched, the plan, the run script's lines (number, command, exit code, log
+file), the failure with the 20-line tail the run printed and the suggested next step, open decisions,
+and Caveats — the plan's manual items, such as a queue-worker restart or a storefront hard refresh.
 
 ## Design decisions baked in
 
-- **Recipes over memory.** The mapping table narrows the search; `config/install/*.yml` is authoritative
-  for this project's ordering and flags.
-- **Exception: Glue applications come from the project.** Install recipes list steps for applications the project may not run (the demo shop has no `GlueStorefront` entry point; the storefront API runs in `Glue`). The skill lists `public/Glue*/index.php`, cross-checks the deploy file's `entry-point: Glue*` and reports other steps as `skipped (no such Glue application)`. `glue` runs via `docker/sdk cli`, not `docker/sdk console`.
+- **One source for the mapping.** The table lives in `scripts/refresh.php` as data; `table` prints it.
+  `config/install/*.yml` stays authoritative for this project's ordering and flags.
+- **Exception: Glue applications come from the project.** Install recipes list steps for applications the project may not run (the demo shop has no `GlueStorefront` entry point; the storefront API runs in `Glue`). The script lists `public/Glue*/index.php`, cross-checks the deploy file's `entry-point: Glue*` or `application: glue*` and reports other steps as `skipped (no such Glue application)`. `glue` runs via `docker/sdk cli`, not `docker/sdk console`.
 - **Surgical, never the full chain.** Only the commands the actual file list demands.
-- **One command per Bash call.** So every step's exit code and output tail is captured individually.
+- **One process per command.** The run captures every step's exit code and log individually.
 - **Stop on the first failure.** Dependents are not skipped-over — the run stops and the caller decides
   retry vs. hand-off to `spryker-issue-diagnoser`.
 - **`cache:class-resolver:build` is easy to miss.** Without it, a project override lands while
-  Spryker keeps resolving to the vendor class. The skill self-checks for it before
-  reporting.
+  Spryker keeps resolving to the vendor class. The plan adds it for every `.php` change under a project
+  namespace.
 - **No `cd` prefixes in Bash.** The harness already runs from the project root; a `cd` shifts the command
   onto a different permission-allowlist pattern and triggers prompts.
 
