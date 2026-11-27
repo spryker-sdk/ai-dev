@@ -1,6 +1,6 @@
 ---
 name: find-existing-capability
-description: "Checks the Spryker capability map and composer.lock for what already exists and returns a reuse verdict per need. Use before designing new feature work or mapping requirements to Spryker."
+description: "Checks the capability map and composer.lock for what Spryker already has and returns a reuse verdict per need. Use before 'build / add / implement X' or when mapping requirements to Spryker."
 ---
 
 # Find Existing Capability - the reuse gate
@@ -116,8 +116,4 @@ End with a verdict table and one **Reuse decision** block per capability that ma
 - Card: https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md
 ```
 
-State what you did not verify (a version-drift check you skipped, a fallback search, an API package you assumed is not needed). Then stop and let the user choose. A PRD for something that ships is framed as "configure / extend / install X", not "build X".
-
-## What you do not do
-
-- Proposals go to `spryker-feature-install` or `spryker-customization` after the user agrees.
+State what you did not verify (a version-drift check you skipped, a fallback search, an API package you assumed is not needed). Then stop and let the user choose. A PRD for something that ships is framed as "configure / extend / install X", not "build X". Proposals go to `spryker-feature-install` or `spryker-customization` after the user agrees.

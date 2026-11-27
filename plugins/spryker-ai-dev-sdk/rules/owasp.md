@@ -1,7 +1,7 @@
 ---
 name: owasp
 description: Use during any code review and when writing code that handles user input, authentication, data storage, or external calls. Enforces OWASP Top 10 categories as blocking issues — flag injection, access control, cryptographic, auth, and logging failures.
-paths: "src/**/*.{php,js,ts}"
+paths: "{src,config}/**/*.{php,js,ts,jsx,tsx},data/import/**"
 ---
 
 **Security rule**

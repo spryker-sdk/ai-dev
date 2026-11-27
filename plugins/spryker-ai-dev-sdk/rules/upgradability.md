@@ -1,7 +1,7 @@
 ---
 name: upgradability
 description: Use when writing or reviewing any Spryker project code that extends or customizes core modules — including plugins, facades, models, configuration, and DependencyProviders. Enforces upgrade-safe customization strategies to keep the project compatible with the Spryker Code Upgrader.
-paths: "src/**/*.php,composer.json"
+paths: "{src,config}/**/*.{php,js,ts,jsx,tsx,twig,scss},data/import/**,composer.json,package.json"
 ---
 
 **Upgradability rule**

@@ -97,7 +97,7 @@ endpoint is confirmed at the story checkpoint and merely written down afterwards
 
 | File | Role |
 |---|---|
-| [`SKILL.md`](SKILL.md) | The spine — the 9 phases, critical requirements, structured-question usage, storage locations, red flags, and the interactive checklist. |
+| [`SKILL.md`](SKILL.md) | The spine — the 9 phases, critical requirements, structured-question usage, storage locations, and red flags. |
 | [`workflow.md`](workflow.md) | The detailed phase-by-phase interactive script. |
 | [`actors.md`](actors.md) | The canonical actor set — Back Office user, Customer, Company user (Customer), Agent, Merchant user, Merchant Agent — where each operates, how each authenticates, the Merchant user vs. Merchant Agent scope distinction, and story phrasing. |
 | [`gherkin-guide.md`](gherkin-guide.md) | Strict Gherkin rules: one behavior per scenario, max 3–4 steps, everything quantified, plus common mistakes and a validation checklist. |

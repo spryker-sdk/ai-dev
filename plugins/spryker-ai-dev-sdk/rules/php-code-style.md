@@ -1,7 +1,7 @@
 ---
 name: php-code-style
 description: Use when writing or editing any PHP file. Enforces PHP 8.4 native types over DocBlocks, minimalist DocBlock rules, no if/else (early returns instead), max nesting level 2, sprintf over concatenation, and private visibility preference for project code.
-paths: "{src,tests}/**/*.php"
+paths: "{src,tests,config}/**/*.php"
 ---
 
 # General Principle

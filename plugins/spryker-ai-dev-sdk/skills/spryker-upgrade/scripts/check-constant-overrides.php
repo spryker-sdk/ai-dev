@@ -783,6 +783,7 @@ function co_main(array $argv): int
                 implode(', src/', $namespaces),
                 count($differing)
             ),
+            false,
             [],
             [],
             $baselineFile,
@@ -812,13 +813,16 @@ function co_main(array $argv): int
     $findings = [];
     foreach ($changes['changed'] as $change) {
         $findings[] = spryker_upgrade_finding($change['type'], sprintf(
-            '%s::%s (%s, %s): core %s -> %s',
+            '%s::%s (%s, %s): core %s -> %s; project value %s at %s:%d',
             $change['class'],
             $change['constant'],
             $change['sourceKind'],
             $change['lane'],
-            $change['coreValueBefore'],
-            $change['coreValueNow'] ?? '(removed)'
+            spryker_upgrade_short((string)$change['coreValueBefore'], 60),
+            spryker_upgrade_short((string)($change['coreValueNow'] ?? '(removed)'), 60),
+            spryker_upgrade_short((string)$change['projectValue'], 60),
+            $change['file'],
+            $change['line']
         ));
     }
     foreach ($changes['added'] as $added) {
@@ -826,6 +830,7 @@ function co_main(array $argv): int
     }
     spryker_upgrade_print_summary(
         sprintf('check-constant-overrides (%d project constant(s) differ from the vendor value: review list in the report)', count($differing)),
+        $changes['changed'] !== [],
         ['core values changed under a project override' => count($changes['changed']), 'new overlaps' => count($changes['added'])],
         $findings,
         $reportFile,

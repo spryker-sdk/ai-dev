@@ -185,6 +185,7 @@ if ($patchLocked !== [] && !$relax) {
 }
 spryker_upgrade_print_summary(
     sprintf('check-constraint-style (%d minor-open (^), %d floating (dev/branch))', $caret, count($floating)),
+    $thirdPartyPinned !== [] || ($patchLocked !== [] && !$relax),
     [
         'patch-locked' => count($patchLocked),
         'third-party exact pins' => count($thirdPartyPinned),

@@ -339,6 +339,7 @@ if ($log['unresolved'] !== []) {
 }
 spryker_upgrade_print_summary(
     'resolve-constraints ' . ($resolved ? '(resolved)' : '(not resolved)'),
+    !$resolved,
     ['major bumps applied' => count($log['majorBumps']), 'unresolved' => count($log['unresolved'])],
     $findings,
     $logFile,
