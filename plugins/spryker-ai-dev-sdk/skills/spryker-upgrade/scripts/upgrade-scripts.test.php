@@ -1159,30 +1159,165 @@ write_file($det . '/src/Pyz/Zed/Foo/FooConfig.php', "<?php\nnamespace Pyz\\Zed\\
 check('typed-members: exit 1 also when every finding is from Phase 0', $tmOld === 1 && str_contains($tmOldOut, '(0 new, 1 already in Phase 0'));
 
 [, $puLimitOut] = run_script('check-plugin-usage.php', ['--limit', '1'], $det, $tmp . '/detectors-no-baseline');
-check('summary: --limit caps the findings and says how many more are in the report', substr_count($puLimitOut, "\n  MISSING") + substr_count($puLimitOut, "\n  DEPRECATED") === 1 && str_contains($puLimitOut, '  (2 more in the report)'));
+check('summary: --limit caps the findings and names the rerun for the rest', substr_count($puLimitOut, "\n  MISSING") + substr_count($puLimitOut, "\n  DEPRECATED") === 1 && str_contains($puLimitOut, '  (2 more: rerun with --category <category> --limit 3)'));
 [$puZero, $puZeroOut] = run_script('check-plugin-usage.php', ['--limit=0'], $det, $tmp . '/detectors-no-baseline');
-check('summary: --limit 0 prints the counts only', $puZero === 1 && !str_contains($puZeroOut, "\n  MISSING") && !str_contains($puZeroOut, "\n  DEPRECATED") && !str_contains($puZeroOut, 'more in the report'));
+check('summary: --limit 0 prints the counts only', $puZero === 1 && !str_contains($puZeroOut, "\n  MISSING") && !str_contains($puZeroOut, "\n  DEPRECATED") && !str_contains($puZeroOut, 'more: rerun'));
 check('summary: findings without a Phase 0 result -> the verdict, one note that names the missing file, the report path', count(explode("\n", trim($puZeroOut))) === 3 && str_contains($puZeroOut, 'NOTE: no Phase 0 result (plugin-usage-baseline.json)'));
 [$puBadLimit] = run_script('check-plugin-usage.php', ['--limit', 'all'], $det, $detState);
 check('summary: a --limit that is not a number -> exit 2', $puBadLimit === 2);
 ob_start();
-spryker_upgrade_print_summary('x', ['a' => 0], [], null, $det, 10);
+spryker_upgrade_print_summary('x', false, ['a' => 0], [], null, $det, 10);
 check('summary: no finding -> OK', trim((string)ob_get_clean()) === 'x: OK a 0');
+ob_start();
+spryker_upgrade_print_summary('x', false, ['informational' => 2], [spryker_upgrade_finding('INFO', 'a')], null, $det, 10);
+check('summary: counts without the exit-1 condition -> OK, the findings still listed', str_starts_with((string)ob_get_clean(), "x: OK informational 2\n  INFO a\n"));
+check('summary: a long field is cut to about 120 characters', strlen(spryker_upgrade_short(str_repeat('word ', 60))) === 120 && str_ends_with(spryker_upgrade_short(str_repeat('word ', 60)), '...'));
 
-check('run-detectors: Phase 0 order of the skill text, with --baseline on the detectors without a snapshot', array_map(static fn (array $c): string => $c[0] . ' ' . implode(' ', $c[1]), rd_plan('phase0', [])) === [
+[$puCat, $puCatOut] = run_script('check-plugin-usage.php', ['--category', 'deprecated'], $det, $detState);
+check('summary: --category prints only that category, the Phase 0 entries marked, the exit code unchanged', $puCat === 1 && str_contains($puCatOut, "\n  [Phase 0] DEPRECATED Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin (used in: src/Pyz/Zed/Foo/FooDependencyProvider.php) note: Use NewPlugin.") && !str_contains($puCatOut, 'MISSING Spryker'));
+[, $puCatMissingOut] = run_script('check-plugin-usage.php', ['--category=missing,porting', '--limit', '1'], $det, $detState);
+check('summary: --category takes a comma list; --limit caps it and names the rerun', substr_count($puCatMissingOut, "\n  [") === 1 && str_contains($puCatMissingOut, '(1 more: rerun with --category missing,porting --limit 2)'));
+[, $puCatNoneOut] = run_script('check-plugin-usage.php', ['--category', 'porting'], $det, $detState);
+check('summary: --category without a finding says so', str_contains($puCatNoneOut, '  (no finding in --category porting)'));
+[$puCatBad] = run_script('check-plugin-usage.php', ['--category'], $det, $detState);
+check('summary: --category without a name -> exit 2', $puCatBad === 2);
+
+// --- Phase 0 result: a finding that changes after the update is new; the result is kept ---
+$keyDir = $tmp . '/detectors-key';
+$keyState = $keyDir . '/.state';
+$keyAutoload = static fn (string $vendor): string => "<?php\n" . $vendor . "\nnamespace { spl_autoload_register(static function (string \$c): void { \$f = __DIR__ . '/../src/' . str_replace('\\\\', '/', \$c) . '.php'; if (is_file(\$f)) { require \$f; } }); }\n";
+write_file($keyDir . '/composer.json', "{}\n");
+write_file($keyDir . '/vendor/autoload.php', $keyAutoload(
+    "namespace Spryker\\Zed\\Old\\Communication\\Plugin { /** @deprecated Use NewPlugin. */ class OldPlugin {} }\n"
+    . "namespace Spryker\\Zed\\Api\\Dependency\\Plugin { /** @deprecated Use NewPluginInterface. */ interface OldPluginInterface {} }"
+));
+write_file($keyDir . '/src/Pyz/Zed/Foo/FooDependencyProvider.php', $providerUses(['Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin']));
+write_file($keyDir . '/src/Pyz/Zed/Foo/Communication/Plugin/FooPlugin.php', "<?php\nnamespace Pyz\\Zed\\Foo\\Communication\\Plugin;\nclass FooPlugin implements \\Spryker\\Zed\\Api\\Dependency\\Plugin\\OldPluginInterface {}\n");
+write_file($keyDir . '/composer.lock', "{\"packages\": []}\n");
+write_file($keyState . '/composer.lock.before', "{\"packages\": []}\n");
+[$keyBase, $keyBaseOut] = run_script('check-plugin-usage.php', ['--baseline'], $keyDir, $keyState);
+check('plugin-usage: Phase 0 with a deprecated plugin and a project plugin on a deprecated interface', $keyBase === 0 && str_starts_with($keyBaseOut, 'check-plugin-usage: OK missing 0, deprecated 1, porting 1'));
+write_file($keyDir . '/vendor/autoload.php', $keyAutoload("namespace Spryker\\Zed\\Old\\Communication\\Plugin { /** @deprecated Use OtherPlugin. */ class OldPlugin {} }"));
+write_file($keyDir . '/composer.lock', "{\"packages\": [{\"name\": \"spryker/api\", \"version\": \"2.0.0\"}]}\n");
+[, $keyOut] = run_script('check-plugin-usage.php', [], $keyDir, $keyState);
+check('plugin-usage: a changed deprecation note and a plugin that no longer loads are new findings', str_contains($keyOut, '(2 new, 0 already in Phase 0') && str_contains($keyOut, '[new] DEPRECATED Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin (used in: src/Pyz/Zed/Foo/FooDependencyProvider.php) note: Use OtherPlugin.') && str_contains($keyOut, '[new] PORTING Pyz\\Zed\\Foo\\Communication\\Plugin\\FooPlugin: Class no longer loads'));
+[$keyAgain, $keyAgainOut] = run_script('check-plugin-usage.php', ['--baseline'], $keyDir, $keyState);
+check('baseline: --baseline after the update -> exit 2, the Phase 0 result stays', $keyAgain === 2 && str_contains($keyAgainOut, 'composer.lock differs from composer.lock.before') && str_contains((string)file_get_contents($keyState . '/plugin-usage-baseline.json'), 'Use NewPlugin.'));
+[$keyRd, $keyRdOut] = run_script('run-detectors.php', ['phase0'], $keyDir, $keyState);
+check('run-detectors: phase0 after the update names the refused detector', $keyRd === 2 && str_contains($keyRdOut, 'check-plugin-usage: DID NOT RUN (exit 2): plugin-usage-baseline.json exists'));
+[$keyForce] = run_script('check-plugin-usage.php', ['--baseline', '--force'], $keyDir, $keyState);
+check('baseline: --force records the Phase 0 result again', $keyForce === 0 && str_contains((string)file_get_contents($keyState . '/plugin-usage-baseline.json'), 'Use OtherPlugin.'));
+write_file($keyState . '/plugin-usage-baseline.json', "{not json\n");
+[, $keyBadOut] = run_script('check-plugin-usage.php', [], $keyDir, $keyState);
+check('baseline: a Phase 0 result that is not valid JSON -> a note', str_contains($keyBadOut, 'NOTE: plugin-usage-baseline.json is not valid JSON'));
+check('run-detectors: --force reaches the --baseline detectors only', rd_plan('phase0', [], true)[3] === ['check-plugin-usage.php', ['--baseline', '--force']] && rd_plan('phase0', [], true)[1] === ['check-dead-overrides.php', ['snapshot']]);
+
+check('run-detectors: Phase 0 order of the skill text, with --baseline on the detectors without a snapshot; Phase 0.5 runs check-test-coverage', array_map(static fn (array $c): string => $c[0] . ' ' . implode(' ', $c[1]), rd_plan('phase0', [])) === [
     'check-platform-alignment.php ', 'check-dead-overrides.php snapshot', 'twig-shadow-map.php snapshot', 'check-plugin-usage.php --baseline',
-    'check-config-constants.php --baseline', 'check-typed-members.php --baseline', 'check-constraint-style.php ', 'check-test-coverage.php ',
+    'check-config-constants.php --baseline', 'check-typed-members.php --baseline', 'check-constraint-style.php ',
     'check-vendor-class-replacement.php ', 'check-constant-overrides.php --snapshot',
 ]);
 check('run-detectors: --typed-members-dir adds to src/Pyz', rd_plan('phase3', ['vendor/x/Bundles'])[0] === ['check-typed-members.php', ['src/Pyz', 'vendor/x/Bundles']]);
-[$rd, $rdOut] = run_script('run-detectors.php', ['phase3', '--limit', '1'], $det, $detState);
+check('run-detectors: the verdict line may carry the mode after the name', rd_has_verdict('twig-shadow-map', "twig-shadow-map diff (1 shadowed vendor files): FOUND VENDOR_FILE_CHANGED 1\n") && rd_has_verdict('x', "x: OK\n") && !rd_has_verdict('x', "Fatal error\n") && !rd_has_verdict('x', ''));
+[$rd, $rdOut] = run_script('run-detectors.php', ['phase3', '--limit', '1', '--typed-members-dir', 'no/such/dir'], $det, $detState);
 preg_match_all('/^([a-z-]+): /m', $rdOut, $rdNames);
 check('run-detectors: Phase 3 runs check-typed-members first, then the skill order', $rdNames[1] === ['check-typed-members', 'list-major-bumps', 'check-dead-overrides', 'twig-shadow-map', 'check-plugin-usage', 'check-config-constants', 'check-constant-overrides', 'check-performance']);
 check('run-detectors: a detector that fails to run is named with its error, the others still run, exit 2', $rd === 2 && str_contains($rdOut, 'list-major-bumps: DID NOT RUN (exit 2): No baseline at') && str_contains($rdOut, 'check-plugin-usage: FOUND') && str_contains($rdOut, 'Did not run: list-major-bumps'));
+check('run-detectors: the first stderr line of a detector is printed under its output', str_contains($rdOut, "  stderr: Skipping missing directory: no/such/dir\n"));
 [, $rdZeroOut] = run_script('run-detectors.php', ['phase3', '--limit', '0'], $det, $detState);
 check('run-detectors: --limit reaches each detector', !str_contains($rdZeroOut, '[new]') && str_contains($rdOut, '[new]'));
 [$rdBad] = run_script('run-detectors.php', ['phase9'], $det, $detState);
 check('run-detectors: unknown phase -> exit 2', $rdBad === 2);
+$silent = $tmp . '/detectors-silent';
+write_file($silent . '/composer.json', "{}\n");
+write_file($silent . '/vendor/autoload.php', "<?php\nexit(1);\n");
+mkdir($silent . '/src/Pyz', 0777, true);
+[$rdSilent, $rdSilentOut] = run_script('run-detectors.php', ['phase3'], $silent, $silent . '/.state');
+check('run-detectors: exit 1 without a verdict line -> DID NOT RUN', $rdSilent === 2 && str_contains($rdSilentOut, 'check-typed-members: DID NOT RUN (exit 1): no verdict line'));
+
+// --- detector printers: the field to act on, FOUND only on the exit-1 condition ---
+$dead = $tmp . '/dead';
+$deadState = $dead . '/.state';
+$deadVendor = static fn (string $base): string => "<?php\nnamespace Spryker\\Zed\\Base { class BaseModel { $base } }\nnamespace { spl_autoload_register(static function (string \$c): void { \$f = __DIR__ . '/../src/' . str_replace('\\\\', '/', \$c) . '.php'; if (is_file(\$f)) { require \$f; } }); }\n";
+write_file($dead . '/composer.json', "{}\n");
+write_file($dead . '/vendor/autoload.php', $deadVendor('public function read() {} public function write() {}'));
+write_file($dead . '/src/Pyz/Zed/Foo/Reader.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nclass Reader extends \\Spryker\\Zed\\Base\\BaseModel { public function read() {} }\n");
+write_file($dead . '/src/Pyz/Zed/Foo/Writer.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nclass Writer extends \\Spryker\\Zed\\Base\\BaseModel { public function write() {} }\n");
+[$deadSnap, $deadSnapOut] = run_script('check-dead-overrides.php', ['snapshot'], $dead, $deadState);
+check('dead-overrides: snapshot -> OK, exit 0', $deadSnap === 0 && str_starts_with($deadSnapOut, 'check-dead-overrides snapshot (2 vendor-method overrides recorded): OK'));
+write_file($dead . '/vendor/autoload.php', $deadVendor('public function write() {}'));
+write_file($dead . '/src/Pyz/Zed/Foo/Writer.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nclass Writer extends \\Spryker\\Zed\\Gone\\GoneModel { public function write() {} }\n");
+write_file($dead . '/src/Pyz/Zed/Foo/Broken.php', "<?php\nnamespace Pyz\\Zed\\Foo;\nclass Broken extends \\Spryker\\Zed\\Gone\\GoneModel {}\n");
+[$deadVerify, $deadOut] = run_script('check-dead-overrides.php', ['verify'], $dead, $deadState);
+check('dead-overrides: an orphaned override names the vendor class that declared the method', $deadVerify === 1 && str_contains($deadOut, '  OVERRIDE_ORPHANED Pyz\\Zed\\Foo\\Reader::read (src/Pyz/Zed/Foo/Reader.php) was declared in Spryker\\Zed\\Base\\BaseModel'));
+check('dead-overrides: a broken class prints its load error, without an empty method or file', str_contains($deadOut, 'CLASS_BROKEN Pyz\\Zed\\Foo\\Writer::write (src/Pyz/Zed/Foo/Writer.php) load error:') && str_contains($deadOut, '  CLASS_BROKEN Pyz\\Zed\\Foo\\Broken load error:') && !str_contains($deadOut, '::-'));
+
+$shadow = $tmp . '/shadow';
+$shadowState = $shadow . '/.state';
+$shadowVendor = $shadow . '/vendor/spryker-shop/foo-widget/src/SprykerShop/Yves/FooWidget/Theme/default';
+$shadowProject = $shadow . '/src/Pyz/Yves/FooWidget/Theme/default';
+write_file($shadow . '/composer.json', "{}\n");
+write_file($shadowVendor . '/views/same.twig', "a\nb\nc\n");
+write_file($shadowProject . '/views/same.twig', "a\nb\nc\n");
+write_file($shadowVendor . '/views/own.twig', "a\nb\nc\n");
+write_file($shadowProject . '/views/own.twig', "a\nproject\nc\n");
+[$shadowSnap, $shadowSnapOut] = run_script('twig-shadow-map.php', ['snapshot'], $shadow, $shadowState);
+check('twig-shadow-map: snapshot -> OK, exit 0', $shadowSnap === 0 && str_contains($shadowSnapOut, ': OK'));
+write_file($shadowVendor . '/views/same.twig', "a\nb\nc\nd\n");
+write_file($shadowVendor . '/views/own.twig', "a\nvendor\nc\n");
+write_file($shadowVendor . '/views/added.twig', "x\n");
+[$shadowDiff, $shadowOut] = run_script('twig-shadow-map.php', ['diff'], $shadow, $shadowState);
+check('twig-shadow-map: a changed vendor file prints its merge command', $shadowDiff === 1 && str_contains($shadowOut, '  VENDOR_FILE_CHANGED src/Pyz/Yves/FooWidget/Theme/default/views/own.twig merge: git merge-file -p src/Pyz/Yves/FooWidget/Theme/default/views/own.twig .state/vendor-baseline/vendor/spryker-shop/foo-widget/'));
+check('twig-shadow-map: a new vendor file is listed as information', str_contains($shadowOut, 'NEW_VENDOR_FILE vendor/spryker-shop/foo-widget/src/SprykerShop/Yves/FooWidget/Theme/default/views/added.twig'));
+[$mergeDry, $mergeDryOut] = run_script('merge-shadowed-files.php', ['--dry-run'], $shadow, $shadowState);
+check('merge-shadowed-files: a conflicted merge -> FOUND, listed, exit 1; nothing written', $mergeDry === 1 && str_contains($mergeDryOut, ': FOUND CLEAN 0, IDENTICAL') && str_contains($mergeDryOut, '  CONFLICTED src/Pyz/Yves/FooWidget/Theme/default/views/own.twig') && (string)file_get_contents($shadowProject . '/views/same.twig') === "a\nb\nc\n");
+unlink($shadowProject . '/views/own.twig');
+[$mergeIdentical, $mergeIdenticalOut] = run_script('merge-shadowed-files.php', ['--apply'], $shadow, $shadowState);
+check('merge-shadowed-files: IDENTICAL only -> OK, exit 0, the vendor version adopted', $mergeIdentical === 0 && str_contains($mergeIdenticalOut, ': OK CLEAN 0, IDENTICAL (override carried no customisation: candidates for deletion) 1') && (string)file_get_contents($shadowProject . '/views/same.twig') === "a\nb\nc\nd\n");
+
+$style = $tmp . '/style';
+write_file($style . '/composer.json', json_encode(['require' => ['spryker/foo' => '~1.2.3', 'spryker/bar' => '^2.0.0', 'twig/twig' => '3.20']]) . "\n");
+[$styleCode, $styleOut] = run_script('check-constraint-style.php', [], $style, $style . '/.state');
+check('constraint-style: patch-locked and third-party pins -> FOUND, one line each, exit 1', $styleCode === 1 && str_contains($styleOut, ': FOUND patch-locked 1, third-party exact pins 1') && str_contains($styleOut, '  PATCH_LOCKED spryker/foo ~1.2.3') && str_contains($styleOut, '  THIRD_PARTY_PINNED twig/twig 3.20'));
+[, $styleCatOut] = run_script('check-constraint-style.php', ['--category', 'third_party_pinned'], $style, $style . '/.state');
+check('constraint-style: --category prints one category', str_contains($styleCatOut, 'THIRD_PARTY_PINNED twig/twig') && !str_contains($styleCatOut, '  PATCH_LOCKED'));
+
+$replace = $tmp . '/replace';
+write_file($replace . '/composer.json', json_encode(['autoload' => ['psr-4' => ['Pyz\\' => 'src/Pyz/']]]) . "\n");
+write_file($replace . '/vendor/composer/autoload_psr4.php', "<?php\n\$vendorDir = dirname(__DIR__);\nreturn ['Spryker\\\\Zed\\\\Gui\\\\' => [\$vendorDir . '/spryker/gui/src/Spryker/Zed/Gui']];\n");
+write_file($replace . '/vendor/spryker/gui/src/Spryker/Zed/Gui/Table.php', "<?php\nnamespace Spryker\\Zed\\Gui;\nclass Table {}\n");
+write_file($replace . '/src/Spryker/Zed/Gui/Table.php', "<?php\nnamespace Spryker\\Zed\\Gui;\nclass Table { public function old() {} }\n");
+[$replaceCode, $replaceOut] = run_script('check-vendor-class-replacement.php', [], $replace, $replace . '/.state');
+check('vendor-class-replacement: a replaced class prints its diff command, exit 1', $replaceCode === 1 && str_contains($replaceOut, ': FOUND VENDOR_CLASS_REPLACED 1') && str_contains($replaceOut, 'VENDOR_CLASS_REPLACED Spryker\\Zed\\Gui\\Table (src/Spryker/Zed/Gui/Table.php, 4 lines) diff: diff -u vendor/spryker/gui/src/Spryker/Zed/Gui/Table.php src/Spryker/Zed/Gui/Table.php'));
+
+$bumps = $tmp . '/bumps';
+$bumpsState = $bumps . '/.state';
+$lockOf = static fn (array $versions): string => json_encode(['packages' => array_map(static fn (string $n, string $v): array => ['name' => $n, 'version' => $v], array_keys($versions), array_values($versions))]) . "\n";
+write_file($bumps . '/composer.json', "{}\n");
+write_file($bumpsState . '/composer.lock.before', $lockOf(['spryker/foo-bar' => '1.4.0', 'spryker/baz' => '2.1.0']));
+write_file($bumps . '/composer.lock', $lockOf(['spryker/foo-bar' => '2.0.0', 'spryker/baz' => '2.2.0']));
+[$bumpsCode, $bumpsOut] = run_script('list-major-bumps.php', [], $bumps, $bumpsState);
+check('list-major-bumps: a major bump prints its guide search URL, exit 1', $bumpsCode === 1 && str_contains($bumpsOut, 'list-major-bumps: FOUND major 1') && str_contains($bumpsOut, '  MAJOR spryker/foo-bar 1.4.0 -> 2.0.0 guide: https://docs.spryker.com/search?q=migration%20guide%20FooBar'));
+write_file($bumps . '/composer.lock', $lockOf(['spryker/foo-bar' => '1.4.0', 'spryker/baz' => '2.2.0']));
+[$minorCode, $minorOut] = run_script('list-major-bumps.php', [], $bumps, $bumpsState);
+check('list-major-bumps: minor/patch only -> OK, exit 0', $minorCode === 0 && str_starts_with($minorOut, 'list-major-bumps: OK major 0, new 0, removed 0, minor/patch 1'));
+
+$platform = $tmp . '/platform';
+write_file($platform . '/composer.json', json_encode(['require' => ['php' => '>=8.1'], 'config' => ['platform' => ['php' => '8.1.0']]]) . "\n");
+write_file($platform . '/deploy.yml', "image:\n  tag: spryker/php:8.3\n");
+[$platformCode, $platformOut] = run_script('check-platform-alignment.php', [], $platform, $platform . '/.state');
+check('platform-alignment: a config.platform.php -> FOUND, the problem on one line, exit 1', $platformCode === 1 && str_contains($platformOut, 'target 8.3.0): FOUND problems 1') && str_contains($platformOut, '  PROBLEM composer.json sets config.platform.php to 8.1.0'));
+write_file($platform . '/composer.json', json_encode(['require' => ['php' => '>=8.1']]) . "\n");
+[$alignedPlatform, $alignedPlatformOut] = run_script('check-platform-alignment.php', [], $platform, $platform . '/.state');
+check('platform-alignment: aligned -> OK, exit 0', $alignedPlatform === 0 && str_contains($alignedPlatformOut, '): OK problems 0'));
+
+$resolve = $tmp . '/resolve';
+$resolveBin = $resolve . '/bin';
+write_file($resolve . '/composer.json', "{\n    \"require\": {\n        \"spryker/foo\": \"^1.0.0\"\n    }\n}\n");
+write_file($resolveBin . '/composer', "#!/bin/sh\nif [ -f \"\$STUB_DIR/round\" ]; then exit 0; fi\ntouch \"\$STUB_DIR/round\"\necho '  - spryker/feature 2.0.0 requires spryker/foo ^2.0.0 -> found spryker/foo[2.0.0] but it conflicts with your root composer.json require (^1.0.0).'\necho 'Your requirements could not be resolved to an installable set of packages.'\nexit 2\n");
+chmod($resolveBin . '/composer', 0755);
+[$resolveCode, $resolveOut] = run_script('resolve-constraints.php', [], $resolve, $resolve . '/.state', ['PATH' => $resolveBin . ':' . getenv('PATH'), 'STUB_DIR' => $resolveBin]);
+check('resolve-constraints: resolved after a major bump -> OK, the bump listed, exit 0 (composer stubbed, fixture only)', $resolveCode === 0 && str_contains($resolveOut, 'resolve-constraints (resolved): OK major bumps applied 1, unresolved 0') && str_contains($resolveOut, '  MAJOR spryker/foo ^1.0.0 -> ^2.0.0') && str_contains((string)file_get_contents($resolve . '/composer.json'), '"spryker/foo": "^2.0.0"'));
 
 $cleanup = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($cleanup as $entry) {

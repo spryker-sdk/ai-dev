@@ -27,6 +27,9 @@ require $root . '/vendor/autoload.php';
 
 $stateDir = spryker_upgrade_state_dir($root);
 $reportFile = $stateDir . '/config-constants-report.json';
+if ($options['baseline']) {
+    spryker_upgrade_guard_baseline($root, $stateDir, 'config-constants', $options['force']);
+}
 
 function isVendorClass(string $fqcn): bool
 {
@@ -159,7 +162,7 @@ $report = spryker_upgrade_compare_with_baseline(
     'config-constants',
     $report,
     ['problems'],
-    static fn (string $list, array $entry): string => implode(' ', [$entry['type'] ?? '', $entry['file'] ?? '', $entry['subject'] ?? '']),
+    static fn (string $list, array $entry): string => implode(' | ', [$entry['type'] ?? '', $entry['file'] ?? '', $entry['subject'] ?? '', $entry['detail'] ?? '']),
     $options['baseline']
 ) ?? $report;
 file_put_contents($reportFile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
@@ -182,8 +185,9 @@ foreach ($problems as $p) {
 }
 spryker_upgrade_print_summary(
     'check-config-constants',
+    $problems !== [],
     $counts === [] ? ['problems' => 0] : $counts,
-    array_map(static fn (array $p): array => spryker_upgrade_finding($p['type'], $p['subject'] . ' in ' . $p['file'], $p), $report['problems']),
+    array_map(static fn (array $p): array => spryker_upgrade_finding($p['type'], $p['subject'] . ' in ' . $p['file'] . ': ' . spryker_upgrade_short($p['detail']), $p), $report['problems']),
     $reportFile,
     $root,
     $options['limit'],

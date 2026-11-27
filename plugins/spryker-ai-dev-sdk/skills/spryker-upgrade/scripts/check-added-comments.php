@@ -492,6 +492,7 @@ function ac_main(array $argv): int
     }
     spryker_upgrade_print_summary(
         sprintf('check-added-comments (since %s, %d file(s) with added lines scanned)', $base, $filesScanned),
+        $findings !== [],
         $counts === [] ? ['added comments' => 0] : $counts,
         array_map(static fn (array $f): array => spryker_upgrade_finding('[' . $f['kind'] . ']', $f['file'] . ':' . $f['line'] . '  ' . $f['text']), $findings),
         $reportFile,

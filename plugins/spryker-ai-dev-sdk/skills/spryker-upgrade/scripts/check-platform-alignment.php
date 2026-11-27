@@ -45,7 +45,7 @@ require __DIR__ . '/bootstrap.php';
 
 $output = spryker_upgrade_output_options($argv);
 $root = spryker_upgrade_project_root();
-$options = getopt('', ['target:', 'help', 'limit:']) ?: [];
+$options = getopt('', ['target:', 'help', 'limit:', 'category:']) ?: [];
 
 if (isset($options['help'])) {
     fwrite(STDOUT, "Usage: php check-platform-alignment.php [--target=8.3.2]\n");
@@ -240,6 +240,7 @@ TEXT;
 }
 spryker_upgrade_print_summary(
     sprintf('check-platform-alignment (host PHP %s, target %s)', $hostPhp, $targetPhp ?? 'undetermined'),
+    $problems !== [],
     ['problems' => count($problems), 'packages not installable on the target PHP' => count($incompatible)],
     $findings,
     $reportFile,

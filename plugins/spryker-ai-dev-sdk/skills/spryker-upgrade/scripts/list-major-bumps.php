@@ -132,7 +132,7 @@ if (in_array('--json', $argv, true)) {
 
 $findings = [];
 foreach ($major as $m) {
-    $findings[] = spryker_upgrade_finding('MAJOR', sprintf('%s %s -> %s', $m['package'], $m['from'], $m['to']));
+    $findings[] = spryker_upgrade_finding('MAJOR', sprintf('%s %s -> %s guide: %s', $m['package'], $m['from'], $m['to'], $m['migrationGuideSearch']));
 }
 foreach ($new as $n) {
     $findings[] = spryker_upgrade_finding('NEW', $n['package'] . ' ' . $n['version']);
@@ -142,13 +142,14 @@ foreach ($removed as $r) {
 }
 $notes = [];
 if ($major !== []) {
-    $notes[] = 'MAJOR: a migration guide must be located and followed for each (guide search, changelog and compare URL are in the report).';
+    $notes[] = 'MAJOR: a migration guide must be located and followed for each (guide search on its line; changelog and compare URL in the report).';
 }
 if ($new !== []) {
     $notes[] = 'NEW: developer opt-in gate before wiring anything. REMOVED: verify each was replaced or dropped on purpose.';
 }
 spryker_upgrade_print_summary(
     'list-major-bumps',
+    $major !== [],
     ['major' => count($major), 'new' => count($new), 'removed' => count($removed), 'minor/patch' => count($minorPatch)],
     $findings,
     $reportFile,
