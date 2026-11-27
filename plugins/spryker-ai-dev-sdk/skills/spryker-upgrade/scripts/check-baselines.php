@@ -34,6 +34,9 @@ const BL_REQUIRED = [
     'evaluator-baseline.txt' => 'php $UP/run-tools.php baseline evaluator',
     'backoffice-smoke-baseline.json' => 'php $UP/backoffice-smoke.php --url <zed url> --baseline',
     'constant-overrides-baseline.json' => 'php $UP/check-constant-overrides.php --snapshot',
+    'plugin-usage-baseline.json' => 'php $UP/check-plugin-usage.php --baseline',
+    'config-constants-baseline.json' => 'php $UP/check-config-constants.php --baseline',
+    'typed-members-baseline.json' => 'php $UP/check-typed-members.php --baseline',
     'storage-search-counts-before.json' => 'cp $UP/storage-search-counts.php .spryker-upgrade/state/ && docker/sdk cli php .spryker-upgrade/state/storage-search-counts.php --snapshot before',
 ];
 
@@ -65,6 +68,12 @@ function bl_content_problem(string $file, string $contents): ?string
         $decoded = json_decode($contents, true);
 
         return is_array($decoded) && is_array($decoded['overrides'] ?? null) ? null : 'not a constant-overrides snapshot (no "overrides" list)';
+    }
+    $findingList = ['plugin-usage-baseline.json' => 'missing', 'config-constants-baseline.json' => 'problems', 'typed-members-baseline.json' => 'problems'][$file] ?? null;
+    if ($findingList !== null) {
+        $decoded = json_decode($contents, true);
+
+        return is_array($decoded) && is_array($decoded[$findingList] ?? null) ? null : sprintf('not a detector result (no "%s" list)', $findingList);
     }
     if ($file === 'storage-search-counts-before.json') {
         $decoded = json_decode($contents, true);

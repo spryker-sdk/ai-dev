@@ -25,17 +25,18 @@ SPRYKER_PROJECT_ROOT=/path/to/project        # skip discovery
 SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI cache directory)
 ```
 
-## The twenty-three scripts
+## The twenty-four scripts
 
 | Script | Phase | What it answers |
 |---|---|---|
 | `check-added-comments.php` | 0 (`--record-base`), every lane, 7 | were explanatory comments or suppressions added since the upgrade began? |
 | `check-baselines.php` | 0 (gate) | do all Phase 0 baselines exist, so Phase 1 may start? |
+| `run-detectors.php` | 0, 3 | what do the detectors of the phase find, and what is new against Phase 0? |
 | `run-tools.php` | 0, 1.2, 3, 5, 5.5 | what did PHPStan, the sniffer, the evaluator and the test suite report, with the invocation Phase 0 pinned? |
 | `compare-tool-runs.php` | 1.2, 3, 5, 5.5 | which PHPStan errors, sniffer violations, evaluator findings and failing tests are new against the baselines? |
 | `backoffice-smoke.php` | 0 (`--baseline`), 4.9, 6.5 | does every Back Office navigation page and table data endpoint still answer? |
 | `check-platform-alignment.php` | 0, 1.2 | will a lock resolved on this host install on the project's image? |
-| `check-test-coverage.php` | 0, 0.5 | which customised modules would not notice if the upgrade broke them? |
+| `check-test-coverage.php` | 0.5 | which customised modules would not notice if the upgrade broke them? |
 | `check-vendor-class-replacement.php` | 0 | does the project declare classes in a vendor's namespace? |
 | `check-tooling-alignment.php` | 1.2, 5 | do tooling, the Docker SDK pin and the deploy files match the target release's reference demo shop? |
 | `check-constraint-style.php` | 0, 1.5 | which root constraints are patch-locked, exact, or merged in from another repository? |
@@ -55,7 +56,8 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 
 Phase 0 (`snapshot`) and Phase 6.1 (`diff`) also run `yves-integration-scan.php` from the sibling `yves-twig-integration` skill: which widgets the upgrade added that no template the project renders calls. Its findings are suggestions for the developer, not upgrade damage.
 
-`bootstrap.php` is the shared library the scripts load; `tool-output.php` parses the tool output
+`bootstrap.php` is the shared library the scripts load; `detector-output.php` prints the detector
+summaries; `tool-output.php` parses the tool output
 for `check-baselines.php`, `run-tools.php`, `compare-tool-runs.php` and `spryker-feature-install`. `upgrade-scripts.test.php` is the
 maintainer test suite for the scripts (`php $UP/upgrade-scripts.test.php`); it is not part of an
 upgrade run.
@@ -86,16 +88,7 @@ The scripts depend on each other's output; running them out of order produces sp
 ```bash
 # Phase 0: base ref, detector baselines, then (booted) quality baselines
 php $UP/check-added-comments.php --record-base
-php $UP/check-platform-alignment.php           # is this host a valid place to resolve at all?
-php $UP/check-test-coverage.php                # override surface vs. tests
-php $UP/check-vendor-class-replacement.php     # classes declared in vendor namespaces
-php $UP/check-constraint-style.php             # patch-locked / merged constraints
-php $UP/check-typed-members.php                # must be clean before upgrading
-php $UP/check-dead-overrides.php snapshot
-php $UP/twig-shadow-map.php snapshot
-php $UP/check-plugin-usage.php || true         # record pre-existing damage
-php $UP/check-config-constants.php || true
-php $UP/check-constant-overrides.php --snapshot
+php $UP/run-detectors.php phase0              # the detector baselines, in the order of SKILL.md Phase 0
 cp composer.lock .spryker-upgrade/state/composer.lock.before
 php $UP/run-tools.php baseline phpstan sniffer evaluator
 php $UP/run-tools.php baseline codecept-build tests --tests-args=--no-exit
@@ -113,15 +106,8 @@ php $UP/resolve-constraints.php --max-rounds=8
 php $UP/unpin-feature-driven-modules.php --match=...   # only on a cohort deadlock
 
 # Phase 3 and the lanes: detection, then resolution
-php $UP/list-major-bumps.php                  # -> migration guide worklist
-php $UP/check-typed-members.php               # FIRST: fatals block the console
-php $UP/check-dead-overrides.php verify
-php $UP/twig-shadow-map.php diff
+php $UP/run-detectors.php phase3              # check-typed-members FIRST (fatals block the console), then the rest
 php $UP/merge-shadowed-files.php --dry-run
-php $UP/check-plugin-usage.php
-php $UP/check-config-constants.php
-php $UP/check-constant-overrides.php
-php $UP/check-performance.php
 php $UP/check-added-comments.php              # end of every lane, and Phase 7
 
 # Phase 4.9 / 6.5: the whole Back Office against the baseline
@@ -143,6 +129,39 @@ php $UP/check-performance.php --decide <slug>-<n> --decision apply|defer|skip [-
 php $UP/check-performance.php --backlog       # the deferred fixes, for the report's Performance backlog
 php $UP/check-performance.php --verify        # gate: Phase 7 starts only when this exits 0
 ```
+
+## Detector output and run-detectors.php
+
+Every detector prints one verdict line (the detector, `OK` or `FOUND`, a count per category), at
+most 10 findings of one line each, then "(K more: rerun with --category ... --limit N)", and the
+path of its report file, which holds the full list. `FOUND` is the condition of the detector's exit
+1; informational counts (minor/patch bumps, IDENTICAL merges, new overlaps) do not make it `FOUND`.
+Each finding line keeps the field to act on: the deprecation note, the typed-member fix, the vendor
+class or load error, the merge command, the project value with its file and line, the guide search
+URL, the diff command. A prose field is cut to about 120 characters.
+`--limit N` sets the number of findings; `--limit 0` prints the counts only. `--category <name>`
+(comma list or repeated; the name is the first word of a finding line) prints only that category,
+the Phase 0 entries marked `[Phase 0]`, so `--category X --limit N` replaces a read of the report.
+`check-plugin-usage.php`, `check-config-constants.php` and `check-typed-members.php` have no snapshot
+of their own: `--baseline` (Phase 0) also writes `<name>-baseline.json`, and a later run marks each
+finding `inBaseline` in its report, lists only the new findings and counts those Phase 0 already
+had. A finding is in Phase 0 only when the fields that give its meaning are the same (for
+`check-plugin-usage.php` the note or the reason, so a plugin that stops loading is new). When the
+baseline file exists and `composer.lock` differs from `composer.lock.before`, `--baseline` exits 2
+and keeps the file; `--force` records it again. A baseline file that is not valid JSON gives a note.
+Exit codes do not change: exit 1 means findings exist, also when Phase 0 had them all.
+
+```bash
+php $UP/run-detectors.php phase0 [--limit N] [--force]
+php $UP/run-detectors.php phase3 [--limit N] [--typed-members-dir vendor/<v>/<pkg>/Bundles]
+```
+
+Runs the detectors of the phase in the order of SKILL.md, each as its own process, and prints their
+summaries. `phase0` does not run `check-test-coverage.php`: Phase 0.5 runs it. `--force` goes to the
+`--baseline` detectors. A detector that exits with another code than 0 or 1, or that prints no
+verdict line, is reported as `DID NOT RUN` with its first error line; the others still run. The
+first stderr line of a detector that ran is printed under its output. Exit 0 nothing found,
+1 findings, 2 a detector did not run or usage.
 
 ## check-added-comments.php — no explanatory comments, no suppressions
 
@@ -173,7 +192,9 @@ php $UP/check-baselines.php --no-data         # only when the environment cannot
 
 Checks the state directory for `base-ref`, `codecept-baseline.txt`, `phpstan-baseline-run.txt`,
 `sniff-baseline.txt`, `evaluator-baseline.txt`, `backoffice-smoke-baseline.json`,
-`constant-overrides-baseline.json` and `storage-search-counts-before.json`, and that each holds a real
+`constant-overrides-baseline.json`, the Phase 0 results of the detectors (`plugin-usage-baseline.json`,
+`config-constants-baseline.json`, `typed-members-baseline.json`) and
+`storage-search-counts-before.json`, and that each holds a real
 result of its tool: `run-tools.php` writes the file also when the tool did not run. The check is a
 codecept summary line (`OK (`, `Tests:`, `FAILURES!`), a PHPStan `[OK]` or `Found N errors` line,
 sniffer or evaluator output that is not only a tool error or usage message, a commit hash in
@@ -538,6 +559,7 @@ property is a **compile-time fatal**, so it aborts
 
 ```bash
 php $UP/check-typed-members.php                                   # src/Pyz
+php $UP/check-typed-members.php --baseline                        # Phase 0: also keeps typed-members-baseline.json
 php $UP/check-typed-members.php src/Pyz vendor/<v>/<pkg>/Bundles  # + merged tree
 ```
 
@@ -608,7 +630,8 @@ blocks, don't text-merge it.
 ## check-plugin-usage.php — replaced plugin stacks
 
 ```bash
-php $UP/check-plugin-usage.php   # any time — exit 1 on MISSING
+php $UP/check-plugin-usage.php --baseline   # Phase 0: also keeps plugin-usage-baseline.json
+php $UP/check-plugin-usage.php              # any time — exit 1 on MISSING
 ```
 
 Scans all Pyz dependency providers for imported vendor plugin classes and reports:
@@ -627,7 +650,8 @@ Project configuration (`config/**/*.php`) keys settings by vendor `*Constants` i
 that removes/renames an interface or constant breaks bootstrap of every application.
 
 ```bash
-php $UP/check-config-constants.php   # any time — exit 1 on problems
+php $UP/check-config-constants.php --baseline   # Phase 0: also keeps config-constants-baseline.json
+php $UP/check-config-constants.php              # any time — exit 1 on problems
 ```
 
 Reports `TYPE_MISSING` (imported/inline vendor type gone) and `CONSTANT_MISSING` (constant gone
@@ -692,6 +716,8 @@ machine the project actually runs on?
 php $UP/check-platform-alignment.php                 # report
 php $UP/check-platform-alignment.php --target=8.3.2  # override the detected deployment PHP
 ```
+
+The full result goes to `platform-alignment-report.json`.
 
 The mechanism: for example, a project declares `require.php: ">=8.3"` and runs `spryker/php:8.3`. A
 host on PHP 8.5 satisfies `">=8.3"`, so composer raises no objection and resolves dev tooling

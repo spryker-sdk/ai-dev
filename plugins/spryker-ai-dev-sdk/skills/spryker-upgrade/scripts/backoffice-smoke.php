@@ -407,9 +407,10 @@ function bo_option(array $argv, string $name): ?string
 function bo_main(array $argv): int
 {
     require_once __DIR__ . '/bootstrap.php';
+    $output = spryker_upgrade_output_options($argv);
 
     if (in_array('--help', $argv, true)) {
-        fwrite(STDOUT, "Usage: SPRYKER_BACKOFFICE_USER=.. SPRYKER_BACKOFFICE_PASSWORD=.. php backoffice-smoke.php --url <zed url> [--max 200] [--timeout 30] [--baseline] [--insecure]\n");
+        fwrite(STDOUT, "Usage: SPRYKER_BACKOFFICE_USER=.. SPRYKER_BACKOFFICE_PASSWORD=.. php backoffice-smoke.php --url <zed url> [--max 200] [--timeout 30] [--baseline] [--insecure] [--limit N]\n");
 
         return 0;
     }
@@ -520,7 +521,7 @@ function bo_main(array $argv): int
         }
     }
 
-    return bo_finish($results, $reportFile, $baseUrl, $truncated, $root, $isBaseline ? null : $baselineFile);
+    return bo_finish($results, $reportFile, $baseUrl, $truncated, $root, $isBaseline ? null : $baselineFile, $output['limit']);
 }
 
 /**
@@ -528,8 +529,9 @@ function bo_main(array $argv): int
  *
  * @param list<array{url: string, status: int, kind: string, problem: ?string}> $results
  */
-function bo_finish(array $results, string $reportFile, string $baseUrl, bool $truncated, string $root, ?string $baselineFile): int
+function bo_finish(array $results, string $reportFile, string $baseUrl, bool $truncated, string $root, ?string $baselineFile, int $limit = SPRYKER_UPGRADE_DEFAULT_LIMIT): int
 {
+    $compared = $baselineFile !== null && is_file($baselineFile);
     $baselineProblems = [];
     if ($baselineFile !== null && is_file($baselineFile)) {
         $baseline = json_decode((string)file_get_contents($baselineFile), true);
@@ -557,26 +559,27 @@ function bo_finish(array $results, string $reportFile, string $baseUrl, bool $tr
         'results' => $results,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    fwrite(STDOUT, sprintf("Back Office smoke: %d page(s), %d table endpoint(s) requested on %s\n\n", $pages, count($results) - $pages, $baseUrl));
-    if ($problems === []) {
-        fwrite(STDOUT, "OK: every page and table endpoint succeeded.\n");
-    } else {
-        fwrite(STDOUT, sprintf("PROBLEMS (%d):\n", count($problems)));
-        foreach ($problems as $problem) {
-            fwrite(STDOUT, sprintf(
-                "  [%-5s %3d] %s  %s%s\n",
-                $problem['kind'],
-                $problem['status'],
-                $problem['url'],
-                $problem['problem'],
-                $problem['inBaseline'] ? '  (also in baseline)' : ''
-            ));
-        }
+    $counts = ['page' => 0, 'table' => 0];
+    foreach ($problems as $problem) {
+        $counts[$problem['kind']] = ($counts[$problem['kind']] ?? 0) + 1;
     }
-    if ($truncated) {
-        fwrite(STDOUT, "\nNOTE: stopped at --max; raise it to cover the remaining pages.\n");
-    }
-    fwrite(STDOUT, "\nFull report: " . spryker_upgrade_rel($reportFile, $root) . "\n");
+    spryker_upgrade_print_summary(
+        sprintf('backoffice-smoke (%d page(s), %d table endpoint(s) requested on %s)', $pages, count($results) - $pages, $baseUrl),
+        $problems !== [],
+        ['failing pages' => $counts['page'], 'failing table endpoints' => $counts['table']],
+        array_map(
+            static fn (array $problem): array => spryker_upgrade_finding(
+                sprintf('[%s %d]', $problem['kind'], $problem['status']),
+                $problem['url'] . '  ' . $problem['problem'],
+                $compared ? $problem : []
+            ),
+            $problems
+        ),
+        $reportFile,
+        $root,
+        $limit,
+        $truncated ? ['NOTE: stopped at --max; raise it to cover the remaining pages.'] : []
+    );
 
     return $problems === [] ? 0 : 1;
 }

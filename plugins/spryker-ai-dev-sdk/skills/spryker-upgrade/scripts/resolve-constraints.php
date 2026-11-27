@@ -19,6 +19,7 @@
  *
  * Usage:
  *   php $UP/resolve-constraints.php [--max-rounds=8] [--dry-run] [--only=<glob,glob>]
+ *   [--limit N]   bump lines per round and findings printed (default 10, 0 = counts only)
  *
  * --only restricts composer to the listed package globs, leaving every other package at its locked
  * version. Use it when the policy is "upgrade Spryker only, leave third-party alone":
@@ -42,6 +43,7 @@ $composerFile = $root . '/composer.json';
 $maxRounds = 8;
 $dryRun = false;
 $only = [];
+$options = spryker_upgrade_output_options($argv);
 foreach (array_slice($argv, 1) as $arg) {
     if (preg_match('/^--max-rounds=(\d+)$/', $arg, $m)) {
         $maxRounds = max(1, (int)$m[1]);
@@ -278,7 +280,7 @@ for ($round = 1; $round <= $maxRounds; $round++) {
 
     $applied = array_filter($bumps, fn ($b) => $b['applied']);
     printf("  %d conflict(s) parsed, %d constraint(s) bumped\n", count($conflicts), count($applied));
-    foreach ($bumps as $b) {
+    foreach (array_slice($bumps, 0, $options['limit']) as $b) {
         printf(
             "    %-58s %s -> %s%s\n",
             $b['package'],
@@ -286,6 +288,9 @@ for ($round = 1; $round <= $maxRounds; $round++) {
             $b['to'],
             $b['applied'] ? (($b['major'] ?? false) ? '  [MAJOR]' : '') : '  [skipped: ' . ($b['note'] ?? 'no match') . ']'
         );
+    }
+    if (count($bumps) > $options['limit']) {
+        printf("    (%d more in the log)\n", count($bumps) - $options['limit']);
     }
 
     $log['rounds'][] = ['round' => $round, 'status' => 'bumped', 'bumps' => $bumps];
@@ -318,21 +323,29 @@ if (!$resolved && $log['unresolved'] === [] && count($log['rounds']) >= $maxRoun
 
 file_put_contents($logFile, json_encode($log, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-echo "\n";
+$findings = [];
+foreach ($log['majorBumps'] as $package => $info) {
+    $findings[] = spryker_upgrade_finding('MAJOR', sprintf('%s %s -> %s', $package, $info['from'], $info['to']));
+}
+foreach ($log['unresolved'] as $unresolved) {
+    $findings[] = spryker_upgrade_finding('UNRESOLVED', $unresolved);
+}
+$notes = [];
 if ($log['majorBumps'] !== []) {
-    printf("MAJOR bumps applied (%d) — each needs its migration guide processed:\n", count($log['majorBumps']));
-    foreach ($log['majorBumps'] as $package => $info) {
-        printf("  %-58s %s -> %s\n", $package, $info['from'], $info['to']);
-    }
-    echo "\n";
+    $notes[] = 'MAJOR: each bump needs its migration guide processed.';
 }
 if ($log['unresolved'] !== []) {
-    echo "UNRESOLVED — manual decisions required:\n";
-    foreach ($log['unresolved'] as $u) {
-        echo "  - $u\n";
-    }
-    echo "\n";
+    $notes[] = 'UNRESOLVED: manual decisions required.';
 }
-printf("Log: %s\n", str_replace($root . '/', '', $logFile));
+spryker_upgrade_print_summary(
+    'resolve-constraints ' . ($resolved ? '(resolved)' : '(not resolved)'),
+    !$resolved,
+    ['major bumps applied' => count($log['majorBumps']), 'unresolved' => count($log['unresolved'])],
+    $findings,
+    $logFile,
+    $root,
+    $options['limit'],
+    $notes
+);
 
 exit($resolved ? 0 : 1);

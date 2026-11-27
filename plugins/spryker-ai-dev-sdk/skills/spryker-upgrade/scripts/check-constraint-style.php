@@ -16,6 +16,7 @@
  * Usage:
  *   php $UP/check-constraint-style.php            # report only
  *   php $UP/check-constraint-style.php --relax    # rewrite ~/exact -> ^ in composer.json
+ *   [--limit N]                                   # findings printed (default 10, 0 = counts only)
  *
  * Exit code 1 when patch-locked constraints exist (report mode), 0 when clean or after --relax.
  */
@@ -29,6 +30,7 @@ $stateDir = spryker_upgrade_state_dir($root);
 $reportFile = $stateDir . '/constraint-style-report.json';
 $composerFile = $root . '/composer.json';
 
+$options = spryker_upgrade_output_options($argv);
 $relax = in_array('--relax', $argv, true);
 
 $raw = (string)file_get_contents($composerFile);
@@ -148,69 +150,59 @@ file_put_contents($reportFile, json_encode([
     'mergedConstraints' => $merged,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-printf(
-    "Spryker module constraints: %d minor-open (^), %d patch-locked (~ or exact), %d floating (dev/branch).\n",
-    $caret,
-    count($patchLocked),
-    count($floating)
+$findings = [];
+foreach ($patchLocked as $name => $info) {
+    $findings[] = spryker_upgrade_finding('PATCH_LOCKED', $name . ' ' . $info['constraint']);
+}
+foreach ($thirdPartyPinned as $name => $constraint) {
+    $findings[] = spryker_upgrade_finding('THIRD_PARTY_PINNED', $name . ' ' . $constraint);
+}
+$byPackage = [];
+foreach ($merged as $file => $constraints) {
+    foreach ($constraints as $package => $constraint) {
+        $byPackage[$package][$constraint][] = $file;
+    }
+}
+ksort($byPackage);
+foreach ($byPackage as $package => $variants) {
+    foreach ($variants as $constraint => $files) {
+        $findings[] = spryker_upgrade_finding('MERGED', sprintf('%s %s (%d file(s), e.g. %s)', $package, $constraint, count($files), $files[0]));
+    }
+}
+$notes = [];
+if ($merged !== []) {
+    $notes[] = sprintf(
+        'MERGED: composer-merge-plugin merges %d file(s) into the root package; composer reports these as "your root composer.json require".'
+        . ' Under vendor/ they belong to another repository, and a stale constraint there blocks the upgrade until it is fixed upstream.',
+        count($merged)
+    );
+}
+if ($thirdPartyPinned !== []) {
+    $notes[] = 'THIRD_PARTY_PINNED: can block Spryker modules that need a newer version (security fixes included). Review each by hand; not auto-relaxed.';
+}
+if ($patchLocked !== [] && !$relax) {
+    $notes[] = 'PATCH_LOCKED: blocks the upgrade with root-conflict errors. --relax rewrites them to caret (^); majors stay blocked, a major bump needs its migration guide (list-major-bumps.php).';
+}
+spryker_upgrade_print_summary(
+    sprintf('check-constraint-style (%d minor-open (^), %d floating (dev/branch))', $caret, count($floating)),
+    $thirdPartyPinned !== [] || ($patchLocked !== [] && !$relax),
+    [
+        'patch-locked' => count($patchLocked),
+        'third-party exact pins' => count($thirdPartyPinned),
+        'merged constraints' => array_sum(array_map('count', $merged)),
+    ],
+    $findings,
+    $reportFile,
+    $root,
+    $options['limit'],
+    $notes
 );
 
-if ($merged !== []) {
-    $files = count($merged);
-    $constraintCount = array_sum(array_map('count', $merged));
-    printf(
-        "\ncomposer-merge-plugin merges %d file(s) contributing %d Spryker constraint(s) INTO the\n"
-        . "root package. Composer reports these as \"your root composer.json require\" even though\n"
-        . "they are not in this project's composer.json:\n",
-        $files,
-        $constraintCount
-    );
-    // Group by package so a single stale constraint is obvious.
-    $byPackage = [];
-    foreach ($merged as $file => $constraints) {
-        foreach ($constraints as $package => $constraint) {
-            $byPackage[$package][$constraint][] = $file;
-        }
-    }
-    ksort($byPackage);
-    foreach ($byPackage as $package => $variants) {
-        foreach ($variants as $constraint => $files2) {
-            printf("  %-42s %-16s (%d file(s), e.g. %s)\n", $package, $constraint, count($files2), $files2[0]);
-        }
-    }
-    printf(
-        "\nIf any of these live under vendor/, they belong to another repository and a stale\n"
-        . "constraint there blocks this upgrade until it is fixed upstream.\n"
-    );
-}
-
-if ($thirdPartyPinned !== []) {
-    printf(
-        "\n%d exactly-pinned third-party package(s) — these can block Spryker modules that need a\n"
-        . "newer version (including security fixes). Review each by hand; not auto-relaxed:\n",
-        count($thirdPartyPinned)
-    );
-    foreach ($thirdPartyPinned as $name => $constraint) {
-        printf("  %-50s %s\n", $name, $constraint);
-    }
-}
-
 if ($patchLocked === []) {
-    echo "\nOK: no patch-locked Spryker module constraints — feature meta-packages can drive the upgrade.\n";
     exit($thirdPartyPinned === [] ? 0 : 1);
 }
 
 if (!$relax) {
-    echo "\nThese will block the upgrade with root-conflict errors:\n";
-    foreach ($patchLocked as $name => $info) {
-        printf("  %-60s %s\n", $name, $info['constraint']);
-    }
-    printf(
-        "\nRe-run with --relax to rewrite them to caret (^) constraints, which allows minor\n"
-        . "upgrades inside the same major. Majors stay blocked on purpose — a major bump needs\n"
-        . "its migration guide (see list-major-bumps.php).\nFull report: %s\n",
-        str_replace($root . '/', '', $reportFile)
-    );
     exit(1);
 }
 

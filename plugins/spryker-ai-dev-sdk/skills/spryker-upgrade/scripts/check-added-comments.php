@@ -398,8 +398,9 @@ function ac_in_scope(string $relPath): ?string
 function ac_main(array $argv): int
 {
     require_once __DIR__ . '/bootstrap.php';
+    $output = spryker_upgrade_output_options($argv);
 
-    $options = getopt('', ['base:', 'record-base', 'force', 'help']) ?: [];
+    $options = getopt('', ['base:', 'record-base', 'force', 'help', 'limit:']) ?: [];
     if (isset($options['help'])) {
         fwrite(STDOUT, "Usage: php check-added-comments.php [--base <ref>] | --record-base [--force]\n");
 
@@ -485,17 +486,20 @@ function ac_main(array $argv): int
         'findings' => $findings,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    fwrite(STDOUT, sprintf("Comments added since %s: %d file(s) with added lines scanned.\n\n", $base, $filesScanned));
-    if ($findings === []) {
-        fwrite(STDOUT, "OK: no explanatory comments added.\n");
-    } else {
-        fwrite(STDOUT, sprintf("ADDED COMMENTS (%d) — remove them; rename the method/variable instead:\n", count($findings)));
-        foreach ($findings as $finding) {
-            fwrite(STDOUT, sprintf("  %s:%d  [%s] %s\n", $finding['file'], $finding['line'], $finding['kind'], $finding['text']));
-        }
-        fwrite(STDOUT, "\n");
+    $counts = [];
+    foreach ($findings as $finding) {
+        $counts[$finding['kind']] = ($counts[$finding['kind']] ?? 0) + 1;
     }
-    fwrite(STDOUT, 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n");
+    spryker_upgrade_print_summary(
+        sprintf('check-added-comments (since %s, %d file(s) with added lines scanned)', $base, $filesScanned),
+        $findings !== [],
+        $counts === [] ? ['added comments' => 0] : $counts,
+        array_map(static fn (array $f): array => spryker_upgrade_finding('[' . $f['kind'] . ']', $f['file'] . ':' . $f['line'] . '  ' . $f['text']), $findings),
+        $reportFile,
+        $root,
+        $output['limit'],
+        $findings === [] ? [] : ['Remove each added comment; rename the method or variable instead.']
+    );
 
     return $findings === [] ? 0 : 1;
 }

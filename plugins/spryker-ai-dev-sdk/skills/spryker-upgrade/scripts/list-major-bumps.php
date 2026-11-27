@@ -15,6 +15,7 @@
  * Usage:
  *   php $UP/list-major-bumps.php          # human output
  *   php $UP/list-major-bumps.php --json   # machine output only
+ *   [--limit N]                           # findings printed (default 10, 0 = counts only)
  *
  * Exit code 1 when MAJOR bumps exist (reminder that guides must be processed), 0 otherwise.
  */
@@ -23,6 +24,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+$options = spryker_upgrade_output_options($argv);
 $root = spryker_upgrade_project_root();
 $stateDir = spryker_upgrade_state_dir($root);
 $beforeFile = $stateDir . '/composer.lock.before';
@@ -128,43 +130,31 @@ if (in_array('--json', $argv, true)) {
     exit($major === [] ? 0 : 1);
 }
 
-printf(
-    "Spryker package changes: %d MAJOR, %d minor/patch, %d NEW, %d removed.\n\n",
-    count($major),
-    count($minorPatch),
-    count($new),
-    count($removed)
-);
-
+$findings = [];
+foreach ($major as $m) {
+    $findings[] = spryker_upgrade_finding('MAJOR', sprintf('%s %s -> %s guide: %s', $m['package'], $m['from'], $m['to'], $m['migrationGuideSearch']));
+}
+foreach ($new as $n) {
+    $findings[] = spryker_upgrade_finding('NEW', $n['package'] . ' ' . $n['version']);
+}
+foreach ($removed as $r) {
+    $findings[] = spryker_upgrade_finding('REMOVED', sprintf('%s (was %s)', $r['package'], $r['version']));
+}
+$notes = [];
 if ($major !== []) {
-    echo "MAJOR bumps — a migration guide MUST be located and followed for each:\n";
-    foreach ($major as $m) {
-        printf(
-            "  %s  %s -> %s\n    guide search: %s\n    changelog:    %s\n    compare:      %s\n",
-            $m['package'],
-            $m['from'],
-            $m['to'],
-            $m['migrationGuideSearch'],
-            $m['changelog'],
-            $m['compare']
-        );
-    }
-    echo "\n";
+    $notes[] = 'MAJOR: a migration guide must be located and followed for each (guide search on its line; changelog and compare URL in the report).';
 }
 if ($new !== []) {
-    echo "NEW packages — developer opt-in gate required before wiring anything:\n";
-    foreach ($new as $n) {
-        printf("  %s %s\n", $n['package'], $n['version']);
-    }
-    echo "\n";
+    $notes[] = 'NEW: developer opt-in gate before wiring anything. REMOVED: verify each was replaced or dropped on purpose.';
 }
-if ($removed !== []) {
-    echo "REMOVED packages — verify each was intentionally replaced/dropped:\n";
-    foreach ($removed as $r) {
-        printf("  %s (was %s)\n", $r['package'], $r['version']);
-    }
-    echo "\n";
-}
-
-echo 'Full report: ' . spryker_upgrade_rel($reportFile, $root) . "\n";
+spryker_upgrade_print_summary(
+    'list-major-bumps',
+    $major !== [],
+    ['major' => count($major), 'new' => count($new), 'removed' => count($removed), 'minor/patch' => count($minorPatch)],
+    $findings,
+    $reportFile,
+    $root,
+    $options['limit'],
+    $notes
+);
 exit($major === [] ? 0 : 1);

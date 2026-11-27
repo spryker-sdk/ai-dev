@@ -19,6 +19,7 @@
  * Usage:
  *   php $UP/twig-shadow-map.php snapshot   # BEFORE composer update
  *   php $UP/twig-shadow-map.php diff       # AFTER composer update
+ *   [--limit N]                            # findings printed (default 10, 0 = counts only)
  *
  * snapshot: maps every shadowing project file to its vendor counterpart, records the vendor
  *           file hash, copies the vendor file into state/vendor-baseline/ (merge base), and
@@ -40,6 +41,7 @@ $reportFile = $stateDir . '/twig-conflicts-report.json';
 
 $extensions = ['twig', 'scss', 'ts', 'js', 'css'];
 
+$options = spryker_upgrade_output_options($argv);
 $mode = $argv[1] ?? '';
 if (!in_array($mode, ['snapshot', 'diff'], true)) {
     fwrite(STDERR, "Usage: twig-shadow-map.php <snapshot|diff>\n");
@@ -210,12 +212,19 @@ if ($mode === 'snapshot') {
         'scopes' => $current['scopes'],
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-    printf(
-        "Snapshot written: %s\n  %d project files shadow a vendor counterpart across %d module scopes\n  vendor baselines copied to %s\n",
-        str_replace($root . '/', '', $mapFile),
-        count($current['entries']),
-        count($current['scopes']),
-        str_replace($root . '/', '', $baselineDir)
+    spryker_upgrade_print_summary(
+        sprintf(
+            'twig-shadow-map snapshot (%d project files shadow a vendor counterpart across %d module scopes; vendor copies in %s)',
+            count($current['entries']),
+            count($current['scopes']),
+            spryker_upgrade_rel($baselineDir, $root)
+        ),
+        false,
+        [],
+        [],
+        $mapFile,
+        $root,
+        $options['limit']
     );
     exit(0);
 }
@@ -277,22 +286,28 @@ file_put_contents($reportFile, json_encode([
     'info' => $info,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
-foreach ($info as $i) {
-    printf("[%s] %s\n  %s\n\n", $i['type'], $i['vendor'], $i['detail']);
-}
-
-if ($conflicts === []) {
-    printf("OK: none of the %d shadowed vendor files changed. (%d informational notes)\n", count($snapshot['entries']), count($info));
-    exit(0);
-}
-
-printf("FOUND %d shadowed vendor file(s) affected by the upgrade:\n\n", count($conflicts));
+$counts = ['VENDOR_FILE_CHANGED' => 0, 'VENDOR_FILE_REMOVED' => 0];
 foreach ($conflicts as $c) {
-    printf("[%s]\n  project: %s\n  vendor:  %s\n  %s\n", $c['type'], $c['project'], $c['vendor'], $c['detail']);
-    if ($c['mergeCommand']) {
-        printf("  merge:   %s\n", $c['mergeCommand']);
-    }
-    echo "\n";
+    $counts[$c['type']]++;
 }
-echo "Full report: " . str_replace($root . '/', '', $reportFile) . "\n";
-exit(1);
+$findings = array_map(
+    static fn (array $c): array => spryker_upgrade_finding(
+        $c['type'],
+        $c['mergeCommand'] !== null ? $c['project'] . ' merge: ' . $c['mergeCommand'] : $c['project'] . ' (vendor ' . $c['vendor'] . ' removed: see the module changelog)'
+    ),
+    $conflicts
+);
+foreach ($info as $i) {
+    $findings[] = spryker_upgrade_finding('NEW_VENDOR_FILE', $i['vendor'] . ' (informational)');
+}
+spryker_upgrade_print_summary(
+    sprintf('twig-shadow-map diff (%d shadowed vendor files, %d new vendor files: informational)', count($snapshot['entries']), count($info)),
+    $conflicts !== [],
+    $counts,
+    $findings,
+    $reportFile,
+    $root,
+    $options['limit'],
+    []
+);
+exit($conflicts === [] ? 0 : 1);
