@@ -7,21 +7,27 @@
  * Usage (from the project root):
  *   php refresh.php plan [<file>...] [--base <ref>] [--store <STORE>]... [--router <app>[,<app>]]
  *                        [--symptom yves-twig-stale|zed-twig-stale]... [--deploy-file <file>] [--print-only]
- *   php refresh.php run [--from <step>]
+ *   php refresh.php run [--from <step>] [--only <step>[,<step>]] [--skip <step>[,<step>]] [--force]
  *   php refresh.php table
  *
  * plan: the changed files come from the arguments, or from git (the working tree and untracked files
- *   against HEAD, or against --base). An argument is a path, or <status>:<path> with status A, M or
- *   D, or R:<old>-><new>. A bare path is A when the base commit does not have it, D when it is gone,
- *   else M; a bare path that is neither on disk nor in the base commit is listed as "not found" and
- *   gets no command. Prints the commands in the order of the mapping groups, each with the files and rows that
- *   caused it; "manual" items the skill never runs; "needs a decision" items that a flag resolves.
- *   Writes .ai-dev/refresher/plan.json (--print-only: writes nothing).
- * run: runs plan.json step by step through docker/sdk (inside `script` for a pseudo-terminal), one
- *   log file per step under .ai-dev/refresher/logs/, one line per step; stops at the first non-zero
- *   exit and prints the last 20 lines of its log. Each step is rebuilt from the mapping by its key:
- *   a command the mapping does not hold does not run. At its end it prints the decisions the plan
- *   left open and the manual items.
+ *   against HEAD, or against --base); with --symptom and no file, git is not read. An argument is a
+ *   path (relative, or absolute under the project root), or <status>:<path> with status A, M or D,
+ *   or R:<old>-><new>. A bare path is A when the base commit does not have it, D when it is gone, M
+ *   when it differs from the base commit; a bare path in the base commit without a diff is a
+ *   "status unknown" decision, and a bare path that is neither on disk nor in the base commit is
+ *   "not found": neither gets a command. Prints the commands in the order of the mapping groups
+ *   (several data imports: in the order of the data/import/**\/*.yml file that lists the most of
+ *   them, else in the order of the files), each with the files and rows that caused it; "manual"
+ *   items the skill never runs; "needs a decision" items that a flag resolves. Writes
+ *   .ai-dev/refresher/plan.json (--print-only: writes nothing).
+ * run: prints the creation time, file count and step count of plan.json, then runs its steps
+ *   (--from, --only and --skip select them) through docker/sdk (inside `script` for a
+ *   pseudo-terminal), one log file per step under .ai-dev/refresher/logs/, one line per step; stops
+ *   at the first non-zero exit and prints the last 20 lines of its log. Each step is rebuilt from the
+ *   mapping by its key: a command the mapping does not hold does not run. With --from or --only, a
+ *   first step whose log has no `exit` line stops the run (the step may still run), unless --force.
+ *   At its end it prints the decisions the plan left open and the count of the manual items.
  * table: prints the mapping for a reader.
  *
  * Exit codes. plan: 0 written, 2 usage error or no file. run: 0 every step exited 0, 1 a step failed,
@@ -103,6 +109,9 @@ const RF_ROUTERS = [
  */
 const RF_VALUE_KEYED_IMPORTS = ['product-price', 'product-price-schedule', 'discount-amount', 'cms-block'];
 
+const RF_ENTITY_PATTERN = '/^[a-z0-9][a-z0-9-]*$/';
+const RF_LIST_CAP = 10;
+
 /**
  * The mapping: trigger → commands, for the table and for the plan reasons. The matching itself is
  * rf_match_file(); each row id there is a row here.
@@ -112,7 +121,7 @@ const RF_ROWS = [
     'schema' => ['*.schema.xml changed (project layer)', 'propel:install'],
     'php-layout' => ['.php added, renamed, moved or deleted under a project namespace in src/', 'composer dumpautoload --apcu'],
     'php-class-resolver' => ['.php added, changed, renamed or deleted under a project namespace in src/ (an override of a vendor class is named)', 'cache:class-resolver:build'],
-    'new-module' => ['new module directory under src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<Module>/', 'dev:ide-auto-completion:generate, then vendor/bin/phpstan clear-result-cache (last)'],
+    'new-module' => ['new module directory under src/<Ns>/{Shared,Zed,Client,Yves,Glue,Service}/<Module>/ (a file added or renamed into it)', 'dev:ide-auto-completion:generate, then vendor/bin/phpstan clear-result-cache (last)'],
     'dependency-provider' => ['*DependencyProvider.php changed (body or new file)', 'cache:empty-all'],
     'config' => ['config/**/*.php or config_default*.php changed', 'cache:empty-all'],
     'yves-twig' => ['Yves Twig changed; added, renamed or deleted also warms the path map', 'rm -rf src/Generated/Yves/Twig/codeBucket (+ twig:cache:warmer). Never data/cache/Yves/<env>'],
@@ -120,19 +129,19 @@ const RF_ROWS = [
     'zed-assets' => ['Back Office assets/Zed/** JS, TS, SCSS or LESS changed', 'frontend:zed:build'],
     'mp-assets' => ['Merchant Portal Presentation/Components/** changed', 'frontend:mp:build'],
     'zed-twig-layout' => ['Twig file added, renamed or deleted in Zed or Merchant Portal', 'twig:cache:warmer'],
-    'navigation' => ['navigation.xml changed', 'navigation:cache:remove, navigation:build-cache'],
-    'rest-api' => ['Glue / SAPI / BAPI route or *RestApi* plugin changed', 'rest-api:remove-validation-cache, rest-api:build-request-validation-cache'],
+    'navigation' => ['navigation.xml or config/Zed/navigation*.xml changed', 'navigation:cache:remove, navigation:build-cache'],
+    'rest-api' => ['Glue / SAPI / BAPI route, *RestApi* plugin or GlueApplicationDependencyProvider.php changed', 'rest-api:remove-validation-cache, rest-api:build-request-validation-cache'],
     'api-platform' => ['resources/api/{storefront,backend}/*.resource.yml added or changed, or a *RestApi dependency provider changed, and src/Generated/Api/<App> exists', 'per Glue application: glue api:generate, glue cache:clear, glue cache:warmup'],
-    'composer-lock' => ['composer.lock changed', 'transfer:generate; propel:install (a changed module ships *.schema.xml); transfer:entity:generate; composer dump-autoload; dev:ide-auto-completion:generate + phpstan cache clear; cache:class-resolver:build; glue api:generate (module ships API resources); router:cache:warm-up* (module ships route providers: decision); frontend:project:install-dependencies (changed module has package.json: decision)'],
+    'composer-lock' => ['composer.lock changed', 'transfer:generate; propel:install (a changed module ships *.schema.xml); transfer:entity:generate; composer dump-autoload; dev:ide-auto-completion:generate + phpstan cache clear; cache:class-resolver:build; glue api:generate (module ships API resources); router:cache:warm-up* (module ships route providers: decision); frontend:project:install-dependencies (changed module has a package.json in vendor/<package>/**: decision); 0 package(s) changed against the base: decision'],
     'frontend-dependencies' => ['a frontend build after vendor modules were added or updated', 'run: every dependency of the changed vendor package.json files exists in /data/node_modules, else stop (frontend:project:install-dependencies; a lock update needs the user)'],
     'router' => ['RouteProvider plugin added, changed or deleted, or a new Zed controller or action', 'router:cache:warm-up and/or :backoffice / :backend-gateway / :merchant-portal (decision: --router)'],
     'oms' => ['OMS XML (config/Zed/oms/*.xml) changed', 'oms:process-cache:warm-up'],
     'glossary' => ['glossary CSV changed (data/import/**/glossary*.csv)', 'data:import:glossary (Yves translations only, not Zed Back Office labels)'],
     'translator' => ['Zed translator CSV (src/<Ns>/Zed/Translator/data/<Module>/*.csv) changed', 'translator:generate-cache (run checks console list first)'],
     'search-schema' => ['search schema / index-map JSON (src/<Ns>/Shared/Search/Schema/*.json) changed', 'search:source-map:remove, search:setup:source-map, search:setup:sources'],
-    'data-import' => ['data import CSV changed, rows added only (decided from the diff)', 'data:import:<entity> (run checks console list first); a removed row, or a changed value of product-price, product-price-schedule, discount-amount or cms-block: manual (project-data reset ladder)'],
+    'data-import' => ['data import CSV changed, rows added only (decided from the diff)', 'data:import:<entity> (run checks console list first; several: in the order of the data import config, else of the files given; a file name that is no plain entity: decision); a removed row, or a changed value of product-price, product-price-schedule, discount-amount or cms-block: manual (project-data reset ladder)'],
     'dms-drain' => ['a data import runs in a DMS project (SPRYKER_DYNAMIC_STORE_MODE in the deploy file)', 'per store: APPLICATION_STORE=<STORE> vendor/bin/console queue:worker:start --stop-when-empty (decision: --store); then the broker depth check: manual'],
-    'publisher' => ['publisher plugin or queue config changed', 'manual: queue workers need a restart'],
+    'publisher' => ['publisher plugin, queue config, src/<Ns>/Client/RabbitMq/** or *RabbitMq*Config.php changed', 'manual: queue workers need a restart'],
     'wiring' => ['a DependencyProvider, ApplicationServices.php or other container wiring changed', 'manual: the wiring smoke check (one Back Office route, one backend-gateway route)'],
     'symptom-zed-twig' => ['--symptom zed-twig-stale: Back Office shows a stale template after a clean refresh', 'rm -f src/Generated/Zed/Twig/codeBucket/.pathCache, twig:cache:warmer'],
     'symptom-yves-twig' => ['--symptom yves-twig-stale: a Yves template fix shows no effect, the file is right on disk and in the container', 'rm -rf src/Generated/Yves/Twig/codeBucket (+ twig:cache:warmer for a new override file)'],
@@ -187,34 +196,72 @@ function rf_files_from_git(string $root, string $base): array
 }
 
 /**
+ * A path relative to the project root: a leading ./ is removed, and an absolute path under the root
+ * loses the root.
+ */
+function rf_relative(string $root, string $path): string
+{
+    while (str_starts_with($path, './')) {
+        $path = substr($path, 2);
+    }
+    if (!str_starts_with($path, '/')) {
+        return $path;
+    }
+    $candidates = [$path];
+    $real = realpath($path);
+    if ($real === false && ($dir = realpath(dirname($path))) !== false) {
+        $real = $dir . '/' . basename($path);
+    }
+    if ($real !== false) {
+        $candidates[] = $real;
+    }
+    foreach ($candidates as $candidate) {
+        if (str_starts_with($candidate, $root . '/')) {
+            return substr($candidate, strlen($root) + 1);
+        }
+    }
+
+    return $path;
+}
+
+/**
  * A bare path that is not on disk is a deleted file when the base commit has it. With git, a path
- * that is in neither place goes to $notFound: it never existed, so nothing is planned for it.
+ * that is in neither place goes to $notFound: it never existed, so nothing is planned for it. A bare
+ * path that is in the base commit and has no diff against it goes to $unknown: its status cannot be
+ * read, so nothing is planned for it.
  *
  * @param list<string> $args
  * @param list<string> $notFound
+ * @param list<string> $unknown
  *
  * @return list<array{status: string, path: string, old: ?string}>
  */
-function rf_files_from_args(string $root, array $args, string $base, bool $git, array &$notFound = []): array
+function rf_files_from_args(string $root, array $args, string $base, bool $git, array &$notFound = [], array &$unknown = []): array
 {
     $files = [];
     foreach ($args as $arg) {
         if (preg_match('/^R:(.+)->(.+)$/', $arg, $m)) {
-            $files[] = ['status' => 'R', 'path' => ltrim($m[2], './'), 'old' => ltrim($m[1], './')];
+            $files[] = ['status' => 'R', 'path' => rf_relative($root, $m[2]), 'old' => rf_relative($root, $m[1])];
             continue;
         }
         if (preg_match('/^([AMD]):(.+)$/', $arg, $m)) {
-            $files[] = ['status' => $m[1], 'path' => ltrim($m[2], './'), 'old' => null];
+            $files[] = ['status' => $m[1], 'path' => rf_relative($root, $m[2]), 'old' => null];
             continue;
         }
-        $path = ltrim($arg, './');
-        if ($git && !file_exists($root . '/' . $path) && !rf_in_base($root, $base, $path)) {
+        $path = rf_relative($root, $arg);
+        $onDisk = file_exists($root . '/' . $path);
+        $inBase = $git && rf_in_base($root, $base, $path);
+        if ($git && !$onDisk && !$inBase) {
             $notFound[] = $path;
             continue;
         }
+        if ($onDisk && $inBase && rf_git($root, ['diff', '--quiet', $base, '--', $path])[0] === 0) {
+            $unknown[] = $path;
+            continue;
+        }
         $status = match (true) {
-            !file_exists($root . '/' . $path) => 'D',
-            $git && !rf_in_base($root, $base, $path) => 'A',
+            !$onDisk => 'D',
+            $git && !$inBase => 'A',
             default => 'M',
         };
         $files[] = ['status' => $status, 'path' => $path, 'old' => null];
@@ -316,15 +363,15 @@ function rf_vendor_class(array $context, string $path): ?string
 
 /**
  * Is the module directory of a path new: no file of it in the base commit (with git), or every file
- * in it is in the added list (without git)?
+ * in it is in the added list (added or renamed into it)?
  *
  * @param list<string> $added
  */
 function rf_new_module(array $context, array $parts, array $added): bool
 {
     $dir = sprintf('src/%s/%s/%s', $parts['ns'], $parts['layer'], $parts['module']);
-    if ($context['git']) {
-        return !rf_in_base($context['root'], $context['base'], $dir);
+    if ($context['git'] && !rf_in_base($context['root'], $context['base'], $dir)) {
+        return true;
     }
     $present = [];
     if (is_dir($context['root'] . '/' . $dir)) {
@@ -430,6 +477,83 @@ function rf_package_has(string $root, string $package, string $pattern): bool
 }
 
 /**
+ * The package.json files of a vendor package (vendor/<package>/**, without node_modules), relative to
+ * the project root.
+ *
+ * @return list<string>
+ */
+function rf_package_json_files(string $root, string $package): array
+{
+    $dir = $root . '/vendor/' . $package;
+    if (!is_dir($dir)) {
+        return [];
+    }
+    $filter = new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+        static fn (SplFileInfo $file): bool => !($file->isDir() && $file->getFilename() === 'node_modules')
+    );
+    $files = [];
+    foreach (new RecursiveIteratorIterator($filter) as $file) {
+        if ($file->getFilename() === 'package.json') {
+            $files[] = substr($file->getPathname(), strlen($root) + 1);
+        }
+    }
+    sort($files);
+
+    return $files;
+}
+
+/**
+ * The run order of data import entities from the project's data import config: the
+ * data/import/**\/*.yml file that lists the most of $entities. Entities it does not list keep their
+ * given order after the listed ones.
+ *
+ * @param list<string> $entities in the order of the files given
+ *
+ * @return array{order: list<string>, source: ?string}
+ */
+function rf_import_order(string $root, array $entities): array
+{
+    $best = [];
+    $source = null;
+    if (is_dir($root . '/data/import')) {
+        $configs = [];
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/data/import', FilesystemIterator::SKIP_DOTS)) as $file) {
+            if (in_array(strtolower($file->getExtension()), ['yml', 'yaml'], true)) {
+                $configs[] = $file->getPathname();
+            }
+        }
+        sort($configs);
+        foreach ($configs as $config) {
+            preg_match_all('/data_entity:\s*[\'"]?([\w-]+)/', (string)file_get_contents($config), $m);
+            $listed = array_values(array_intersect(array_unique($m[1]), $entities));
+            if (count($listed) > count($best)) {
+                $best = $listed;
+                $source = substr($config, strlen($root) + 1);
+            }
+        }
+    }
+
+    return ['order' => array_values(array_unique(array_merge($best, $entities))), 'source' => $source];
+}
+
+/**
+ * A list of at most RF_LIST_CAP lines, then "(+N more)".
+ *
+ * @param list<string> $lines
+ *
+ * @return list<string>
+ */
+function rf_cap(array $lines): array
+{
+    if (count($lines) <= RF_LIST_CAP) {
+        return $lines;
+    }
+
+    return array_merge(array_slice($lines, 0, RF_LIST_CAP), [sprintf('(+%d more)', count($lines) - RF_LIST_CAP)]);
+}
+
+/**
  * Match one changed file to the mapping rows.
  *
  * @param array{status: string, path: string, old: ?string} $file
@@ -460,7 +584,7 @@ function rf_match_file(array $context, array $file, array $added, array $glue): 
         $vendorClass = rf_vendor_class($context, $path) ?? ($file['old'] !== null ? rf_vendor_class($context, $file['old']) : null);
         $hits[] = ['row' => 'php-class-resolver', 'steps' => [['cache:class-resolver:build']], 'note' => $vendorClass !== null ? 'overrides ' . $vendorClass : null];
     }
-    if ($parts !== null && $status === 'A' && in_array($parts['layer'], ['Shared', 'Zed', 'Client', 'Yves', 'Glue', 'Service'], true) && rf_new_module($context, $parts, $added)) {
+    if ($parts !== null && in_array($status, ['A', 'R'], true) && in_array($parts['layer'], ['Shared', 'Zed', 'Client', 'Yves', 'Glue', 'Service'], true) && rf_new_module($context, $parts, $added)) {
         $hits[] = ['row' => 'new-module', 'steps' => [['dev:ide-auto-completion:generate'], ['phpstan:clear-result-cache']], 'note' => 'new module ' . $parts['layer'] . '/' . $parts['module']];
     }
     if (str_ends_with($base, 'DependencyProvider.php')) {
@@ -488,11 +612,11 @@ function rf_match_file(array $context, array $file, array $added, array $glue): 
     if ($ext === 'twig' && $parts !== null && $parts['layer'] === 'Zed' && $layoutChange) {
         $hits[] = ['row' => 'zed-twig-layout', 'steps' => [['twig:cache:warmer']]];
     }
-    if ($base === 'navigation.xml') {
+    if ($base === 'navigation.xml' || preg_match('#^config/Zed/navigation[\w-]*\.xml$#', $path)) {
         $hits[] = ['row' => 'navigation', 'steps' => [['navigation:cache:remove'], ['navigation:build-cache']]];
     }
     $restApiModule = $parts !== null && str_contains($parts['module'], 'RestApi');
-    if ($ext === 'php' && $parts !== null && (($parts['layer'] === 'Glue' && str_contains($base, 'Route')) || ($restApiModule && str_contains($path, '/Plugin/')) || preg_match('/RestApi\w*Plugin\.php$/', $base))) {
+    if ($ext === 'php' && $parts !== null && (($parts['layer'] === 'Glue' && str_contains($base, 'Route')) || ($restApiModule && str_contains($path, '/Plugin/')) || preg_match('/RestApi\w*Plugin\.php$/', $base) || $base === 'GlueApplicationDependencyProvider.php')) {
         $hits[] = ['row' => 'rest-api', 'steps' => [['rest-api:remove-validation-cache'], ['rest-api:build-request-validation-cache']]];
     }
     $apiResource = preg_match('#resources/api/(storefront|backend)/[^/]+\.resource\.yml$#', $path) === 1 && $status !== 'D';
@@ -504,9 +628,9 @@ function rf_match_file(array $context, array $file, array $added, array $glue): 
             $steps[] = ['glue:cache:clear', $app];
             $steps[] = ['glue:cache:warmup', $app];
         }
-        $hits[] = ['row' => 'api-platform', 'steps' => $steps, 'note' => $steps === [] ? 'no resolved Glue application' : null];
+        $hits[] = ['row' => 'api-platform', 'steps' => $steps, 'glue' => true];
     } elseif ($apiResource || $restApiProvider) {
-        $hits[] = ['row' => 'api-platform', 'steps' => [], 'note' => 'no src/Generated/Api/<App>: the project does not generate API Platform resources'];
+        $hits[] = ['row' => 'api-platform', 'skipped' => 'API Platform steps: skipped (no src/Generated/Api/<App>: the project does not generate API Platform resources)'];
     }
     $newAction = false;
     if ($ext === 'php' && $parts !== null && $parts['layer'] === 'Zed' && str_ends_with($base, 'Controller.php')) {
@@ -529,7 +653,8 @@ function rf_match_file(array $context, array $file, array $added, array $glue): 
     if ($ext === 'json' && $parts !== null && $parts['layer'] === 'Shared' && $parts['module'] === 'Search' && str_starts_with($parts['rest'], 'Schema/')) {
         $hits[] = ['row' => 'search-schema', 'steps' => [['search:source-map:remove'], ['search:setup:source-map'], ['search:setup:sources']]];
     }
-    if (preg_match('/Publisher|QueueDependencyProvider|QueueConfig/', $path) && $ext === 'php') {
+    $rabbitMq = ($parts !== null && $parts['layer'] === 'Client' && $parts['module'] === 'RabbitMq') || preg_match('/RabbitMq\w*Config\.php$/', $base) === 1;
+    if ((preg_match('/Publisher|QueueDependencyProvider|QueueConfig/', $path) && $ext === 'php') || $rabbitMq) {
         $hits[] = ['row' => 'publisher', 'manual' => 'queue workers need a manual restart (publisher plugin or queue config changed); project-specific'];
     }
     if (str_ends_with($base, 'DependencyProvider.php') || $base === 'ApplicationServices.php' || preg_match('#^config/Shared/.*[Ss]ervices?\.php$#', $path)) {
@@ -552,6 +677,9 @@ function rf_match_import(array $context, array $file): array
     $entity = rf_entity($file['path']);
     if ($file['status'] === 'D') {
         return ['row' => 'data-import', 'manual' => sprintf('%s was deleted: no importer deletes rows. Hand it to project-data (reset ladder).', $file['path'])];
+    }
+    if (!preg_match(RF_ENTITY_PATTERN, $entity)) {
+        return ['row' => 'data-import', 'decision' => sprintf('%s: the file name gives no plain data import entity ("%s"). Find the importer of this file in the data import config (data/import/**/*.yml) and run it by hand.', $file['path'], $entity)];
     }
     if ($file['status'] === 'A') {
         return ['row' => 'data-import', 'steps' => [['data:import', $entity]], 'import' => true, 'note' => 'new file'];
@@ -581,18 +709,21 @@ function rf_match_import(array $context, array $file): array
  *
  * @param list<array{status: string, path: string, old: ?string}> $files
  * @param array{store: list<string>, router: list<string>, symptom: list<string>} $flags
+ * @param list<string> $unknown bare paths whose status cannot be read (in the base commit, no diff)
  *
  * @return array{steps: list<array<string, mixed>>, manual: list<string>, decisions: list<string>, skipped: list<string>, unmatched: list<string>}
  */
-function rf_plan(array $context, array $files, array $flags): array
+function rf_plan(array $context, array $files, array $flags, array $unknown = []): array
 {
     $glue = rf_glue_apps($context);
-    $added = array_column(array_filter($files, static fn (array $f): bool => $f['status'] === 'A'), 'path');
+    $added = array_column(array_filter($files, static fn (array $f): bool => in_array($f['status'], ['A', 'R'], true)), 'path');
     $steps = [];
     $manual = [];
     $decisions = [];
+    $skipped = [];
     $unmatched = [];
     $imports = false;
+    $glueNeeded = false;
     $routerFiles = [];
     $vendorFrontend = [];
     $add = static function (array $step, string $reason) use (&$steps): void {
@@ -602,7 +733,16 @@ function rf_plan(array $context, array $files, array $flags): array
             $steps[$key]['reasons'][] = $reason;
         }
     };
+    $addManual = static function (string $text, ?string $path = null) use (&$manual): void {
+        $manual[$text] ??= [];
+        if ($path !== null && !in_array($path, $manual[$text], true)) {
+            $manual[$text][] = $path;
+        }
+    };
 
+    if ($unknown !== []) {
+        $decisions[] = sprintf('status unknown for %s: in %s and no diff against it, so nothing is planned. Name each file with its status (A:<path>, M:<path>, D:<path>), or plan with --base <the commit before the change>.', implode(', ', rf_cap($unknown)), $context['base']);
+    }
     foreach ($files as $file) {
         $label = ($file['old'] !== null ? $file['old'] . ' -> ' : '') . $file['path'] . ' (' . $file['status'] . ')';
         if ($file['path'] === 'composer.lock') {
@@ -611,16 +751,22 @@ function rf_plan(array $context, array $files, array $flags): array
                 $decisions[] = 'composer.lock: the previous lock cannot be read from git, so the changed modules are unknown; name them, or plan with --base <ref>.';
                 continue;
             }
+            if ($changes === []) {
+                $decisions[] = sprintf('composer.lock: 0 package(s) changed against %s, so nothing is planned. Plan with --base <the commit before the lock change>.', $context['base']);
+                continue;
+            }
             $reason = sprintf('%s [composer-lock: %d package(s) changed]', $label, count($changes));
             foreach (['transfer:generate', 'transfer:entity:generate', 'composer:dump-autoload', 'dev:ide-auto-completion:generate', 'phpstan:clear-result-cache', 'cache:class-resolver:build'] as $key) {
                 $add([$key], $reason);
             }
+            $lockFrontend = [];
             foreach (array_keys($changes) as $package) {
                 if (rf_package_has($context['root'], $package, '/\.schema\.xml$/')) {
                     $add(['propel:install'], sprintf('%s [composer-lock: %s ships *.schema.xml]', $label, $package));
-                    $manual[] = sprintf('propel:install runs for %s: it changes the database schema; say so in the report.', $package);
+                    $addManual(sprintf('propel:install runs for %s: it changes the database schema; say so in the report.', $package));
                 }
                 if (rf_package_has($context['root'], $package, '#/resources/api/(storefront|backend)/[^/]+\.resource\.yml$#')) {
+                    $glueNeeded = true;
                     foreach (array_keys($glue['apps']) as $app) {
                         $add(['glue:api:generate', $app], sprintf('%s [composer-lock: %s ships API resources]', $label, $package));
                     }
@@ -628,16 +774,17 @@ function rf_plan(array $context, array $files, array $flags): array
                 if (rf_package_has($context['root'], $package, '/RouteProvider\w*\.php$/')) {
                     $routerFiles[] = sprintf('composer.lock (%s ships route providers)', $package);
                 }
-                if (is_file($context['root'] . '/vendor/' . $package . '/package.json')) {
+                if (rf_package_json_files($context['root'], $package) !== []) {
                     $vendorFrontend[] = $package;
+                    $lockFrontend[] = $package;
                 }
             }
-            if ($vendorFrontend !== []) {
-                $decisions[] = sprintf('frontend:project:install-dependencies: run it when the package.json of a changed module changed (%s have one). Plan again with the file vendor/<package>/package.json named.', implode(', ', $vendorFrontend));
+            if ($lockFrontend !== []) {
+                $decisions[] = sprintf('frontend:project:install-dependencies: run it when a package.json of a changed module changed (%s have one). Plan again with the changed vendor/<package>/**/package.json named.', implode(', ', rf_cap($lockFrontend)));
             }
             continue;
         }
-        if (preg_match('#^vendor/(.+)/package\.json$#', $file['path'], $m)) {
+        if (preg_match('#^vendor/([^/]+/[^/]+)/(.+/)?package\.json$#', $file['path'], $m)) {
             $add(['frontend:project:install-dependencies'], $label . ' [composer-lock: package.json of a changed module]');
             $vendorFrontend[] = $m[1];
             continue;
@@ -652,15 +799,19 @@ function rf_plan(array $context, array $files, array $flags): array
                 $add($step, $reason);
             }
             if (isset($hit['manual'])) {
-                $manual[] = $hit['manual'] . ' — ' . $file['path'];
+                $addManual($hit['manual'], $file['path']);
             }
             if (isset($hit['decision'])) {
                 $decisions[] = $hit['decision'];
+            }
+            if (isset($hit['skipped'])) {
+                $skipped[] = $hit['skipped'];
             }
             if (!empty($hit['router'])) {
                 $routerFiles[] = $file['path'];
             }
             $imports = $imports || !empty($hit['import']);
+            $glueNeeded = $glueNeeded || !empty($hit['glue']);
         }
     }
 
@@ -673,12 +824,22 @@ function rf_plan(array $context, array $files, array $flags): array
         }
     }
     if ($routerFiles !== []) {
+        $routerList = implode(', ', rf_cap(array_values(array_unique($routerFiles))));
         if ($flags['router'] === []) {
-            $decisions[] = sprintf('router cache warm-up for %s: name the applications the routes belong to with --router %s.', implode(', ', array_unique($routerFiles)), implode('|', array_keys(RF_ROUTERS)));
+            $decisions[] = sprintf('router cache warm-up for %s: name the applications the routes belong to with --router %s.', $routerList, implode('|', array_keys(RF_ROUTERS)));
         }
         foreach ($flags['router'] as $router) {
-            $add(['router:cache:warm-up', $router], implode(', ', array_unique($routerFiles)) . ' [router: --router ' . $router . ']');
+            $add(['router:cache:warm-up', $router], $routerList . ' [router: --router ' . $router . ']');
         }
+    }
+    if ($context['deploy'] === null && ($glueNeeded || $imports)) {
+        $decisions[] = sprintf('deploy file %s not found: the Glue applications and the DMS mode (the per-store queue drain after an import) come from it, so their steps are not planned. Plan again with --deploy-file <the active deploy file>.', $context['deployFile']);
+    } elseif ($glueNeeded) {
+        $decisions = array_merge($decisions, $glue['decisions']);
+        if ($glue['apps'] === []) {
+            $decisions[] = sprintf('API Platform resources changed, but no Glue application is resolved (public/Glue*/index.php and an entry point in %s), so no glue step is planned. Plan again with --deploy-file <the active deploy file>, or run the glue commands by hand.', $context['deployFile']);
+        }
+        $skipped = array_merge($skipped, $glue['skipped']);
     }
     if ($imports && $context['dms']) {
         if ($flags['store'] === []) {
@@ -687,26 +848,32 @@ function rf_plan(array $context, array $files, array $flags): array
         foreach ($flags['store'] as $store) {
             $add(['queue:drain', $store], 'data import in a DMS project [dms-drain: --store ' . $store . ']');
         }
-        $manual[] = 'after the per-store drain, confirm the queues are empty: the broker container from `docker ps` (name contains `broker`), `rabbitmqctl list_queues -p /<vhost> name messages` all 0';
+        $addManual('after the per-store drain, confirm the queues are empty: the broker container from `docker ps` (name contains `broker`), `rabbitmqctl list_queues -p /<vhost> name messages` all 0');
     }
     $hasFrontendBuild = array_filter($steps, static fn (array $s): bool => str_starts_with($s['key'], 'frontend:') && $s['key'] !== 'frontend:project:install-dependencies') !== [];
     if (array_filter($files, static fn (array $f): bool => preg_match('#^src/[^/]+/Yves/.+\.(twig|js|ts|scss|less)$#', $f['path']) === 1) !== []) {
-        $manual[] = 'the storefront may need a browser hard refresh';
+        $addManual('the storefront may need a browser hard refresh');
     }
 
-    uasort($steps, static function (array $a, array $b): int {
-        $order = array_flip(array_keys(RF_COMMANDS));
+    $importEntities = array_values(array_map(static fn (array $s): string => (string)$s['param'], array_filter($steps, static fn (array $s): bool => $s['key'] === 'data:import')));
+    $importOrder = count($importEntities) > 1 ? rf_import_order($context['root'], $importEntities) : ['order' => $importEntities, 'source' => null];
+    $importRank = array_flip($importOrder['order']);
+    $commandOrder = array_flip(array_keys(RF_COMMANDS));
+    $sortKey = static fn (array $s): array => [RF_COMMANDS[$s['key']]['group'], $commandOrder[$s['key']], $s['key'] === 'data:import' ? $importRank[$s['param']] : 0, (string)$s['param']];
+    uasort($steps, static fn (array $a, array $b): int => $sortKey($a) <=> $sortKey($b));
 
-        return [RF_COMMANDS[$a['key']]['group'], $order[$a['key']], (string)$a['param']] <=> [RF_COMMANDS[$b['key']]['group'], $order[$b['key']], (string)$b['param']];
-    });
-    $usesGlue = array_filter($steps, static fn (array $s): bool => str_starts_with($s['key'], 'glue:')) !== [];
+    $manualLines = [];
+    foreach ($manual as $text => $paths) {
+        $manualLines[] = $text . ($paths !== [] ? ' — ' . $paths[0] . (count($paths) > 1 ? sprintf(' (+%d files)', count($paths) - 1) : '') : '');
+    }
 
     return [
         'steps' => array_values($steps),
+        'importOrder' => count($importEntities) > 1 ? ($importOrder['source'] ?? 'the order of the files given') : null,
         'vendorFrontend' => $hasFrontendBuild ? array_values(array_unique($vendorFrontend)) : [],
-        'manual' => array_values(array_unique($manual)),
-        'decisions' => array_values(array_unique(array_merge($decisions, $usesGlue ? $glue['decisions'] : []))),
-        'skipped' => $usesGlue ? $glue['skipped'] : [],
+        'manual' => $manualLines,
+        'decisions' => array_values(array_unique($decisions)),
+        'skipped' => array_values(array_unique($skipped)),
         'unmatched' => $unmatched,
     ];
 }
@@ -730,7 +897,7 @@ function rf_call(array $step): ?array
     $value = match ($kind) {
         'app' => array_key_exists((string)$param, RF_GLUE_APPS) ? (RF_GLUE_APPS[$param] === '' ? 'vendor/bin/glue' : 'GLUE_APPLICATION=' . RF_GLUE_APPS[$param] . ' vendor/bin/glue') : null,
         'router' => RF_ROUTERS[(string)$param] ?? null,
-        'entity' => preg_match('/^[a-z0-9][a-z0-9-]*$/', (string)$param) ? $param : null,
+        'entity' => preg_match(RF_ENTITY_PATTERN, (string)$param) ? $param : null,
         'store' => preg_match('/^[A-Z][A-Z0-9_]*$/', (string)$param) ? $param : null,
         default => '',
     };
@@ -754,13 +921,16 @@ function rf_print_plan(array $plan, int $fileCount, string $planFile): void
             count($reasons) > 1 ? sprintf(' (+%d more)', count($reasons) - 1) : ''
         );
     }
+    if (($plan['importOrder'] ?? null) !== null) {
+        printf("Data import order: %s.\n", $plan['importOrder']);
+    }
     if ($plan['vendorFrontend'] !== []) {
         printf("Before the frontend build the run checks the dependencies of %s in /data/node_modules.\n", implode(', ', $plan['vendorFrontend']));
     }
     foreach (['manual' => 'Manual (the skill does not run these)', 'decisions' => 'Needs a decision', 'skipped' => 'Skipped', 'unmatched' => 'No row matches', 'notFound' => 'Not found (not on disk and not in the base commit; nothing planned. A deleted file is named D:<path>)'] as $key => $title) {
         if (($plan[$key] ?? []) !== []) {
             echo $title . ":\n";
-            foreach ($plan[$key] as $line) {
+            foreach (in_array($key, ['unmatched', 'notFound'], true) ? rf_cap($plan[$key]) : $plan[$key] as $line) {
                 echo '  - ' . $line . "\n";
             }
         }
@@ -784,10 +954,33 @@ function rf_tail(string $logFile): string
 }
 
 /**
- * Run the plan. Container checks: console list for importers and translator:generate-cache,
- * /data/node_modules for the Yves build, the vendor frontend dependencies before a build.
+ * The log file of a step, relative to the project root.
  */
-function rf_run(string $root, array $plan, int $from): int
+function rf_log_file(int $number, array $step): string
+{
+    return sprintf('%s/logs/%02d-%s.log', RF_STATE, $number, trim((string)preg_replace('/[^a-z0-9]+/i', '-', $step['key'] . '-' . ($step['param'] ?? '')), '-'));
+}
+
+/**
+ * Has the log of a step no closing `exit <code>` line: the step started and did not end?
+ */
+function rf_log_unfinished(string $root, string $logFile): bool
+{
+    if (!is_file($root . '/' . $logFile)) {
+        return false;
+    }
+
+    return !preg_match('/(^|\n)exit -?\d+\s*$/', (string)file_get_contents($root . '/' . $logFile));
+}
+
+/**
+ * Run the selected steps of the plan (step numbers, 1-based). Container checks: console list for
+ * importers and translator:generate-cache, /data/node_modules for the Yves build, the vendor frontend
+ * dependencies before a build.
+ *
+ * @param list<int> $selected
+ */
+function rf_run(string $root, array $plan, array $selected): int
 {
     $logDir = $root . '/' . RF_STATE . '/logs';
     if (!is_dir($logDir)) {
@@ -803,14 +996,15 @@ function rf_run(string $root, array $plan, int $from): int
     $consoleList = null;
     $checkedFrontend = false;
     $number = 0;
+    $ran = 0;
     foreach ($plan['steps'] as $i => $step) {
         $number = $i + 1;
-        if ($number < $from) {
+        if (!in_array($number, $selected, true)) {
             continue;
         }
         $call = rf_call($step);
-        $slug = sprintf('%02d-%s', $number, trim((string)preg_replace('/[^a-z0-9]+/i', '-', $step['key'] . '-' . ($step['param'] ?? '')), '-'));
-        $logFile = $logDir . '/' . $slug . '.log';
+        $logFile = $root . '/' . rf_log_file($number, $step);
+        $slug = basename($logFile, '.log');
         $verify = RF_COMMANDS[$step['key']]['verify'] ?? null;
         if ($verify !== null) {
             if ($consoleList === null) {
@@ -828,9 +1022,11 @@ function rf_run(string $root, array $plan, int $from): int
             $checkedFrontend = true;
             $paths = [];
             foreach ($plan['vendorFrontend'] as $package) {
-                $json = json_decode((string)@file_get_contents($root . '/vendor/' . $package . '/package.json'), true);
-                foreach (array_keys(array_merge($json['dependencies'] ?? [], $json['devDependencies'] ?? [])) as $dependency) {
-                    $paths[] = '/data/node_modules/' . $dependency;
+                foreach (rf_package_json_files($root, $package) as $packageJson) {
+                    $json = json_decode((string)@file_get_contents($root . '/' . $packageJson), true);
+                    foreach (array_keys(array_merge($json['dependencies'] ?? [], $json['devDependencies'] ?? [])) as $dependency) {
+                        $paths[] = '/data/node_modules/' . $dependency;
+                    }
                 }
             }
             if ($paths !== []) {
@@ -838,7 +1034,7 @@ function rf_run(string $root, array $plan, int $from): int
                 $code = rf_execute(['cli', 'ls -d ' . implode(' ', array_map('escapeshellarg', array_unique($paths)))], $root, $checkLog);
                 printf("%2d  frontend dependency check  exit %d  %s\n", $number, $code, RF_STATE . '/logs/' . basename($checkLog));
                 if ($code !== 0) {
-                    echo "A dependency of a changed vendor module is missing: run frontend:project:install-dependencies first (plan again with vendor/<package>/package.json); a package missing from the lock needs a lock update the user approves.\n" . rf_tail($checkLog);
+                    echo "A dependency of a changed vendor module is missing: run frontend:project:install-dependencies first (plan again with the changed vendor/<package>/**/package.json); a package missing from the lock needs a lock update the user approves.\n" . rf_tail($checkLog);
 
                     return 1;
                 }
@@ -852,39 +1048,78 @@ function rf_run(string $root, array $plan, int $from): int
             }
         }
         $code = rf_execute($call, $root, $logFile);
+        $ran++;
         printf("%2d  docker/sdk %s  exit %d  %s\n", $number, implode(' ', $call), $code, RF_STATE . '/logs/' . basename($logFile));
         if ($code !== 0) {
             printf("--- last %d lines of %s\n%s", RF_TAIL_LINES, RF_STATE . '/logs/' . basename($logFile), rf_tail($logFile));
-            $left = count($plan['steps']) - $number;
-            printf("Stopped at step %d.%s\n", $number, $left > 0 ? sprintf(' Steps %d-%d did not run (resume with --from %d).', $number + 1, count($plan['steps']), $number) : '');
+            $left = array_values(array_filter($selected, static fn (int $n): bool => $n > $number));
+            printf("Stopped at step %d.%s\n", $number, $left !== [] ? sprintf(' Steps %s did not run (resume with --from %d).', rf_ranges($left), $number) : '');
 
             return 1;
         }
     }
-    printf("All %d step(s) exited 0.\n", count($plan['steps']) - max(0, $from - 1));
+    printf("All %d step(s) exited 0.\n", $ran);
 
     return 0;
 }
 
 /**
- * After a run: the decisions the plan left open (their steps are not in the run) and the manual items.
+ * After a run: the decisions the plan left open (their steps are not in the run) and the count of the
+ * manual items.
  */
 function rf_print_open(array $plan): void
 {
-    $titles = [
-        'decisions' => 'Open decisions (their steps did not run: plan again with the flag, or settle each by hand)',
-        'manual' => 'Manual (the skill does not run these)',
-    ];
-    foreach ($titles as $key => $title) {
-        $lines = (array)($plan[$key] ?? []);
-        if ($lines === []) {
-            continue;
-        }
-        echo $title . ":\n";
-        foreach ($lines as $line) {
+    $decisions = (array)($plan['decisions'] ?? []);
+    if ($decisions !== []) {
+        echo "Open decisions (their steps did not run: plan again with the flag, or settle each by hand):\n";
+        foreach ($decisions as $line) {
             echo '  - ' . $line . "\n";
         }
     }
+    $manual = count((array)($plan['manual'] ?? []));
+    if ($manual > 0) {
+        printf("Manual items: %d (the skill does not run these; see the plan output or %s/plan.json).\n", $manual, RF_STATE);
+    }
+}
+
+/**
+ * Step numbers as ranges: [1, 2, 3, 5] → "1-3,5".
+ *
+ * @param list<int> $numbers ascending
+ */
+function rf_ranges(array $numbers): string
+{
+    $parts = [];
+    $start = null;
+    $previous = null;
+    foreach (array_merge($numbers, [null]) as $number) {
+        if ($start !== null && $number !== $previous + 1) {
+            $parts[] = $start === $previous ? (string)$start : $start . '-' . $previous;
+            $start = null;
+        }
+        $start ??= $number;
+        $previous = $number;
+    }
+
+    return implode(',', $parts);
+}
+
+/**
+ * The step numbers of a list argument such as "3,5".
+ *
+ * @return list<int>|null null when an item is not a step number of the plan
+ */
+function rf_step_list(string $value, int $stepCount): ?array
+{
+    $numbers = [];
+    foreach (explode(',', $value) as $item) {
+        if (!ctype_digit($item) || (int)$item < 1 || (int)$item > $stepCount) {
+            return null;
+        }
+        $numbers[] = (int)$item;
+    }
+
+    return $numbers;
 }
 
 function rf_print_table(): void
@@ -914,13 +1149,19 @@ function rf_main(array $argv): int
     }
     $planFile = RF_STATE . '/plan.json';
     if ($mode === 'run') {
-        $from = 1;
-        if (($args[0] ?? null) === '--from' && ctype_digit($args[1] ?? '')) {
-            $from = (int)$args[1];
-        } elseif ($args !== []) {
-            fwrite(STDERR, "Usage: php refresh.php run [--from <step>]\n");
+        $usage = "Usage: php refresh.php run [--from <step>] [--only <step>[,<step>]] [--skip <step>[,<step>]] [--force]\n";
+        $options = ['--from' => null, '--only' => null, '--skip' => null];
+        $force = false;
+        for ($i = 0; $i < count($args); $i++) {
+            if ($args[$i] === '--force') {
+                $force = true;
+            } elseif (array_key_exists($args[$i], $options) && isset($args[$i + 1])) {
+                $options[$args[$i]] = $args[++$i];
+            } else {
+                fwrite(STDERR, $usage);
 
-            return 2;
+                return 2;
+            }
         }
         $plan = json_decode((string)@file_get_contents($root . '/' . $planFile), true);
         if (!is_array($plan) || !is_array($plan['steps'] ?? null)) {
@@ -928,8 +1169,32 @@ function rf_main(array $argv): int
 
             return 2;
         }
+        $stepCount = count($plan['steps']);
+        $lists = [];
+        foreach ($options as $option => $value) {
+            $lists[$option] = $value === null ? null : rf_step_list($value, $stepCount);
+            if ($value !== null && ($lists[$option] === null || ($option === '--from' && count($lists[$option]) !== 1))) {
+                fwrite(STDERR, sprintf("%s takes %s between 1 and %d (the plan has %d step(s)).\n", $option, $option === '--from' ? 'one step number' : 'step numbers', $stepCount, $stepCount));
 
-        $code = rf_run($root, $plan, $from);
+                return 2;
+            }
+        }
+        $from = $lists['--from'][0] ?? 1;
+        $selected = array_values(array_filter(range(1, max(1, $stepCount)), static fn (int $n): bool => $n <= $stepCount && $n >= $from
+            && ($lists['--only'] === null || in_array($n, $lists['--only'], true))
+            && ($lists['--skip'] === null || !in_array($n, $lists['--skip'], true))));
+        printf("Plan: created %s, %d file(s), %d step(s); this run: %s.\n", (string)($plan['createdAt'] ?? 'unknown'), count((array)($plan['files'] ?? [])), $stepCount, $selected === [] ? 'no step' : 'steps ' . rf_ranges($selected));
+        if (!$force && ($options['--from'] !== null || $options['--only'] !== null) && $selected !== []) {
+            $first = $selected[0];
+            $firstLog = rf_log_file($first, $plan['steps'][$first - 1]);
+            if (rf_log_unfinished($root, $firstLog)) {
+                fwrite(STDERR, sprintf("The log of step %d (%s) has no exit line: the step may still run. Wait for it to end, or pass --force when it no longer runs.\n", $first, $firstLog));
+
+                return 2;
+            }
+        }
+
+        $code = rf_run($root, $plan, $selected);
         if ($code !== 2) {
             rf_print_open($plan);
         }
@@ -938,7 +1203,7 @@ function rf_main(array $argv): int
     }
     if ($mode !== 'plan') {
         fwrite(STDERR, "Usage: php refresh.php plan [<file>...] [--base <ref>] [--store <STORE>]... [--router <app>[,<app>]] [--symptom yves-twig-stale|zed-twig-stale]... [--deploy-file <file>] [--print-only]\n"
-            . "       php refresh.php run [--from <step>]\n       php refresh.php table\n");
+            . "       php refresh.php run [--from <step>] [--only <step>[,<step>]] [--skip <step>[,<step>]] [--force]\n       php refresh.php table\n");
 
         return 2;
     }
@@ -999,8 +1264,13 @@ function rf_main(array $argv): int
 
     $git = rf_has_git($root);
     $notFound = [];
-    $files = $paths !== [] ? rf_files_from_args($root, $paths, $base, $git, $notFound) : ($git ? rf_files_from_git($root, $base) : []);
-    if ($files === [] && $flags['symptom'] === []) {
+    $unknown = [];
+    $files = match (true) {
+        $paths !== [] => rf_files_from_args($root, $paths, $base, $git, $notFound, $unknown),
+        $git && $flags['symptom'] === [] => rf_files_from_git($root, $base),
+        default => [],
+    };
+    if ($files === [] && $unknown === [] && $flags['symptom'] === []) {
         fwrite(STDERR, match (true) {
             $notFound !== [] => sprintf("Not found (not on disk and not in %s): %s. Check the paths; a deleted file is named D:<path>.\n", $base, implode(', ', $notFound)),
             $git => "No changed files against $base.\n",
@@ -1010,12 +1280,12 @@ function rf_main(array $argv): int
         return 2;
     }
     $context = rf_context($root, $base, $deployFile, $git);
-    $plan = rf_plan($context, $files, $flags);
+    $plan = rf_plan($context, $files, $flags, $unknown);
     $plan['notFound'] = $notFound;
     $plan['files'] = $files;
     $plan['createdAt'] = date('c');
     if ($printOnly) {
-        rf_print_plan($plan, count($files), '(not written: --print-only)');
+        rf_print_plan($plan, count($files) + count($unknown), '(not written: --print-only)');
 
         return 0;
     }
@@ -1027,7 +1297,7 @@ function rf_main(array $argv): int
         file_put_contents($stateDir . '/.gitignore', "*\n");
     }
     file_put_contents($root . '/' . $planFile, json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
-    rf_print_plan($plan, count($files), $planFile);
+    rf_print_plan($plan, count($files) + count($unknown), $planFile);
 
     return 0;
 }
