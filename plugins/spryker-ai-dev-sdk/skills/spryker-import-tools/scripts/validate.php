@@ -2670,6 +2670,9 @@ function validate_report_gate(array $result, ?string $savePath = null): int
     if (validate_quiet()) {
         return $exit;
     }
+    if ($exit !== 0) {
+        $result['help'] = 'validate.php --help gate (one check: validate.php --help <check>)';
+    }
     if ($savePath !== null && isset($result['saved'])) {
         echo json_encode(['status' => $result['status'], 'check' => 'gate', 'saved' => $result['saved'] ?? null, 'gatingCount' => $result['gatingCount'], 'warningCount' => $result['warningCount'], 'summary' => $result['summary'], 'manifests' => $result['manifests'], 'locales' => $result['locales'], 'stores' => $result['stores']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
@@ -3740,8 +3743,11 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
 function validate_cli(array $argv): int
 {
     $check = $argv[1] ?? '';
-    if ($check === '--help') {
-        return validate_help($argv[2] ?? null);
+    $args = array_slice($argv, 1);
+    if (in_array('--help', $args, true)) {
+        $named = array_values(array_filter($args, static fn (string $a): bool => $a !== '--help'));
+
+        return validate_help($named[0] ?? null);
     }
     $opts = validate_parse_opts(array_slice($argv, 2));
     validate_quiet(isset($opts['quiet']));
@@ -4359,7 +4365,11 @@ function validate_report_preflight(array $result): int
     if (validate_quiet()) {
         return $exit;
     }
-    echo json_encode(validate_preflight_payload($result), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+    $payload = validate_preflight_payload($result);
+    if ($exit !== 0 || $payload['warningCount'] > 0) {
+        $payload['help'] = 'validate.php --help preflight';
+    }
+    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
     return $exit;
 }

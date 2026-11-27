@@ -566,6 +566,9 @@ check('CLI --help: exit 0, lists the commands and points to --help <command>', $
 check('CLI --help: prints the general rules (files before flags, atomic LF writes)', str_contains($helpAll, 'Files are positional and come before the flags') && str_contains($helpAll, 'LF-terminated'));
 [$helpFilter, $helpFilterCode] = $helpRun('--help filter');
 check('CLI --help filter: exit 0, full explanation and the worked example', $helpFilterCode === 0 && str_contains($helpFilter, 'keep matching rows') && str_contains($helpFilter, '--match prefix'));
+[$helpAfter, $helpAfterCode] = $helpRun('filter --help');
+[$helpAfterFile, $helpAfterFileCode] = $helpRun('filter some.csv --where a=b --help');
+check('CLI <command> --help: same text as --help <command>, also after files and flags', $helpAfterCode === 0 && $helpAfter === $helpFilter && $helpAfterFileCode === 0 && $helpAfterFile === $helpFilter);
 $usageCommands = [];
 foreach (csv_usage_lines() as $line) {
     if (preg_match('/^  ([a-z-]+) /', $line, $m)) {

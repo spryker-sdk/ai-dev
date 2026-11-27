@@ -1,7 +1,7 @@
 ---
 name: layer-communication
 description: Use when writing or reviewing any PHP code that crosses layer boundaries. Enforces the strict hierarchy Presentation → Communication → Business → Persistence — no upward access, cross-module calls via Facade only.
-paths: "src/**/Zed/*/{Business,Communication,Persistence,Presentation}/**/*.php"
+paths: "src/**/Zed/*/{Business,Communication,Persistence}/**/*.php"
 ---
 
 **Architecture rule**
