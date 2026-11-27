@@ -20,7 +20,7 @@ You are a capture agent. The caller hands you a list of pages or short flows in 
 
 ### User / credential discovery (do this first, before any login)
 
-Pick a user from seed data whose **role and permissions match what the capture needs** — not just *"any seeded customer."* Relevant files under `data/import/<scope>/common/`: `customer.csv` (emails), `company_user.csv` (user → company), `company_role.csv` (roles per company), `company_user_role.csv` (user → role), `company_role_permission.csv` (role → permissions), `marketplace/merchant_user.csv` (merchant users). For example: capturing a quote-approval flow needs a user with `ApproveQuotePermissionPlugin`; capturing a "request approval" flow needs a user with `RequestQuoteApprovalPermissionPlugin` (typically `Buyer_With_Limit`). Trace the permission chain back to a real seeded email. If no seeded user has the needed permission, return `precondition_failed` naming the permission — don't guess credentials.
+Pick a user from seed data whose **role and permissions match what the capture needs** — not just *"any seeded customer."* Load the `spryker-runtime` skill: its accounts call (`runtime.php accounts`, run in the project root as that skill describes) lists the seeded customers, Back Office users and merchant users with the file and line of each. The permission chain is in files under `data/import/<scope>/common/`: `company_user.csv` (user → company), `company_role.csv` (roles per company), `company_user_role.csv` (user → role), `company_role_permission.csv` (role → permissions). For example: capturing a quote-approval flow needs a user with `ApproveQuotePermissionPlugin`; capturing a "request approval" flow needs a user with `RequestQuoteApprovalPermissionPlugin` (typically `Buyer_With_Limit`). Trace the permission chain back to a real seeded email. If no seeded user has the needed permission, return `precondition_failed` naming the permission — don't guess credentials.
 
 **On login failure: report, don't debug.** If your first login attempt fails (wrong credentials, redirect back to login, role-mismatch), **stop immediately and return `precondition_failed`** naming the account and the credential needed. Do not try alternates. Do not invoke other subagents to investigate. A failed login is a credentials question, not a defect.
 
@@ -29,13 +29,9 @@ Pick a user from seed data whose **role and permissions match what the capture n
 You must **never guess URLs**. Discover them from the project's deploy file:
 
 1. Identify the active deploy file by checking `git status` or the `docker/sdk` command output (for example `deploy.dev.yml`). Do not assume a name.
-2. `Read` the deploy file and look for `groups → applications`. The `endpoints` block under each application gives the hostname:
-   - `application: yves` → storefront (e.g. `yves.eu.spryker.local`)
-   - `application: backoffice` → Zed admin (e.g. `backoffice.eu.spryker.local`)
-   - `application: merchant-portal` → merchant admin (e.g. `mp.eu.spryker.local`)
-3. Multi-store projects have multiple regions (EU / US / DE / AT / …). Use the region the caller asked for; default to the `primal: true` region if unspecified.
-4. **Scheme (http vs https):** read `docker.ssl.enabled` at the top level of the deploy file. `true` → `https://`, `false` → `http://`. **Never assume https** — many local Spryker setups have `ssl.enabled: false`.
-5. If the deploy file can't be read or endpoints aren't reachable, **return `precondition_failed`** naming what is missing — don't improvise hostnames.
+2. Load the `spryker-runtime` skill and run its environment call in the project root, as that skill describes (`runtime.php env --deploy-file <active deploy file>`). It prints the URL (scheme from `docker.ssl.enabled`, host, port) of each application — `yves` (storefront), `backoffice` (Zed admin), `merchant-portal` (merchant admin) — per store or region, and marks the `primal` endpoint. Use these URLs as printed.
+3. Multi-store projects have multiple regions (EU / US / DE / AT / …). Use the region the caller asked for (`--region <region or store>`); default to the `primal` region if unspecified.
+4. If the deploy file can't be read or endpoints aren't reachable, **return `precondition_failed`** naming what is missing — don't improvise hostnames.
 
 ### Browser drive
 

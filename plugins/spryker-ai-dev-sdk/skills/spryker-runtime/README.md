@@ -21,7 +21,7 @@ fix end-to-end, inspect what an endpoint returns, or check which actors and role
 
 ```mermaid
 flowchart TD
-    A([Runtime session starts]) --> H["Resolve hosts from deploy.dev.yml<br/>groups.region.applications.app.endpoints<br/>NEVER hard-code — a user-supplied<br/>target always wins"]
+    A([Runtime session starts]) --> H["runtime.php env — hosts, cookies,<br/>containers from the deploy file<br/>NEVER hard-code — a user-supplied<br/>target always wins"]
 
     H --> Q{"What does the<br/>question need?"}
 
@@ -30,7 +30,7 @@ flowchart TD
     Q -- "rendered UI, JS, real login" --> M3["Mode 3 — Browser<br/>needs a browser MCP server"]
     Q -- "many requests / CSRF flow" --> M4["Mode 4 — Browser-seeded curl<br/>log in once, harvest the REAL<br/>request, replay in the shell"]
 
-    M3 --> L["Pick the actor + its OWN login URL<br/>password change123 for all demo accounts"]
+    M3 --> L["Pick the actor + its OWN login URL<br/>account from runtime.php accounts"]
     L --> LOGIN{"Login OK?<br/>fill &amp; submit ATOMICALLY —<br/>no navigate in between"}
     LOGIN -- "no" --> DB["Look up real accounts read-only<br/>spy_user / spy_customer / spy_merchant_user"]
     DB --> LOGIN2{"Still blocked?"}
@@ -70,23 +70,36 @@ flowchart TD
 | Mode | Use it for | Cost |
 |------|-----------|------|
 | **1 · Console (CLI)** | Does the data/command exist, run a console command, inspect DB / Redis / queues. `console list` prints the full catalogue — find the real command name instead of guessing. | Cheapest |
-| **2 · HTTP / API** | Exactly what an endpoint returns. Cookie session for Yves/Back Office (**cookie name = the resolved host with `.` → `-`**), bearer token from `/access-tokens` for Glue. | Cheap |
+| **2 · HTTP / API** | Exactly what an endpoint returns. `runtime.php login` leaves a cookie jar for Yves/Back Office/Merchant Portal or a token file for Glue; curl reuses it. | Cheap |
 | **3 · Browser** | Rendered UI, client JS, establishing a login session. Needs a browser-automation MCP server; see the Browser tool map in SKILL.md. | Expensive |
 | **4 · Browser-seeded curl** | Multi-step, CSRF-protected, or repeated scenarios. Log in **once**, perform the action once and read the request it *actually* sent, then replay scriptably. | Fast after setup |
 | **5 · Page-context fetch** | A CSRF/session endpoint whose token the harness won't let you read, or proving the server when a UI control is dead. Runs the page's own `fetch` — the cookie attaches implicitly, the secret is never printed. | Fallback |
+
+## The script
+
+`scripts/runtime.php`, run from the project root:
+
+| Call | What it does |
+|---|---|
+| `runtime.php env [--deploy-file <file>] [--app <application>] [--region <region or store>]` | One line per application endpoint of the deploy file (`deploy.dev.yml` by default): application, store or region, URL with scheme (`docker.ssl.enabled`) and port, session cookie name (the host with `.` → `-`), container (`<namespace>_<application key>_1`); then the services with their containers and endpoints. No credentials of the deploy file. |
+| `runtime.php accounts [--role <role>] [--limit N]` | The seeded accounts: Back Office users and agents from `src/<Ns>/Zed/User/UserConfig.php`, merchant users and customers from `data/import/**`, each with its file and line and where its password is. Never a password. |
+| `runtime.php login <app> <user> [--region …] [--host …]` | Logs in to a host the deploy file names: a session for `yves`, `agent`, `backoffice`, `merchant-portal` (cookie jar), a token for `glue`, `glue-storefront`, `glue-backend`. Password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files (a hashed one is matched against the plain passwords in the project's files and E2E fixtures). Writes `.ai-dev/runtime/sessions/` (ignored by git) and prints one line, never a secret. |
+
+`scripts/deploy-file.php` reads the deploy file; `spryker-refresher` uses it too. Tests:
+`php scripts/runtime.test.php` (fixture deploy and data files, a local `php -S` server for the login).
 
 ## Actors and login
 
 Every demo account shares the password **`change123`**, but each actor has its **own** login URL —
 using the wrong one fails silently.
 
-| Actor | Path (on the resolved host) | Demo account | Scope |
-|-------|------------------------------|--------------|-------|
-| Back Office user (admin) | `<host:backoffice>/security-gui/login` | `admin@spryker.com` | Back Office dashboard |
-| Customer | `<host:yves>/DE/en/login` | `sonia@acme.com` | `/DE/en/customer/overview` |
-| Agent | `<host:yves>/agent/login` | `agent123@spryker.com` | Agent dashboard; can impersonate a customer |
-| Merchant user | `<host:merchant-portal>/security-merchant-portal-gui/login` | `harald@spryker.com` | **One** merchant, via `spy_merchant_user.fk_merchant` |
-| Merchant Agent | same URL as Merchant user | see the DB lookup | **Across** merchants |
+| Actor | Path (on the resolved host) | Role in `runtime.php accounts` | Scope |
+|-------|------------------------------|--------------------------------|-------|
+| Back Office user (admin) | `<host:backoffice>/security-gui/login` | `backoffice-user` | Back Office dashboard |
+| Customer | `<host:yves>/DE/en/login` | `customer` | `/DE/en/customer/overview` |
+| Agent | `<host:yves>/agent/login` | `backoffice-user, agent` | Agent dashboard; can impersonate a customer |
+| Merchant user | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-user` | **One** merchant, via `spy_merchant_user.fk_merchant` |
+| Merchant Agent | same URL as Merchant user | `merchant-agent` | **Across** merchants |
 
 When the defaults don't work, the skill runs read-only lookups against `spy_user`, `spy_customer`,
 and `spy_merchant_user` — and if authentication still fails, it **asks the user** rather than
@@ -94,9 +107,12 @@ guessing. Passwords are hashed and cannot be read back.
 
 ## Design decisions baked in
 
-- **Hosts are resolved, never hard-coded.** They come from `groups.<region>.applications.<app>.endpoints`
-  in `deploy.dev.yml` (the skill ships an `awk` one-liner that picks the endpoint carrying `region:`).
-  A user-named target — a cloud or staging URL — always wins over the local default.
+- **Hosts are resolved, never hard-coded.** `runtime.php env` reads them from
+  `groups.<group>.applications.<app>.endpoints` of the active deploy file, with the scheme, the port,
+  the cookie name and the container. A user-named target — a cloud or staging URL — always wins over
+  the local default.
+- **No secret on the output.** The accounts call names where a password is; the login call puts the
+  session or token in a file under `.ai-dev/runtime/` and prints its path.
 - **Pick the lightest mode that answers the question.** Chrome only when rendered UI or a real
   session is genuinely the thing under test.
 - **Mode 5 proves the server, not the user flow.** The JS that builds the payload, fires the

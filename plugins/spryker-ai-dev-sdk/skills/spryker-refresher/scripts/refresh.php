@@ -31,6 +31,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../spryker-upgrade/scripts/run-tools.php';
+require_once __DIR__ . '/../../spryker-runtime/scripts/deploy-file.php';
 
 const RF_STATE = '.ai-dev/refresher';
 const RF_TAIL_LINES = 20;
@@ -230,12 +231,7 @@ function rf_files_from_args(string $root, array $args, string $base, bool $git, 
  */
 function rf_context(string $root, string $base, string $deployFile, bool $git): array
 {
-    $deploy = is_file($root . '/' . $deployFile) ? (string)file_get_contents($root . '/' . $deployFile) : null;
-    preg_match_all('/entry-point:\s*[\'"]?(Glue\w*)/', (string)$deploy, $entryPoints);
-    preg_match_all('/application:\s*[\'"]?(glue[\w-]*)/', (string)$deploy, $applications);
-    foreach ($applications[1] as $application) {
-        $entryPoints[1][] = str_replace(' ', '', ucwords(str_replace('-', ' ', $application)));
-    }
+    $deploy = df_load($root, $deployFile);
 
     return [
         'root' => $root,
@@ -244,8 +240,8 @@ function rf_context(string $root, string $base, string $deployFile, bool $git): 
         'namespaces' => spryker_upgrade_project_namespaces($root),
         'deployFile' => $deployFile,
         'deploy' => $deploy,
-        'entryPoints' => array_values(array_unique($entryPoints[1])),
-        'dms' => $deploy !== null && preg_match('/SPRYKER_DYNAMIC_STORE_MODE:\s*[\'"]?(true|1)\b/i', $deploy) === 1,
+        'entryPoints' => $deploy === null ? [] : df_glue_entry_points($deploy),
+        'dms' => $deploy !== null && df_dynamic_store($deploy),
         'apiPlatform' => glob($root . '/src/Generated/Api/*', GLOB_ONLYDIR) !== [],
     ];
 }

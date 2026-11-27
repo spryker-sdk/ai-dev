@@ -69,6 +69,9 @@ jobs:
             - name: Refresher plan and run
               run: php plugins/spryker-ai-dev-sdk/skills/spryker-refresher/scripts/refresh.test.php
 
+            - name: Runtime environment, accounts and login
+              run: php plugins/spryker-ai-dev-sdk/skills/spryker-runtime/scripts/runtime.test.php
+
             - name: Stop guard, under both harnesses
               run: php plugins/spryker-ai-dev-sdk/hooks/hooks.test.php
 

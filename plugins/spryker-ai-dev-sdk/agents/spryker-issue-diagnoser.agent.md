@@ -48,7 +48,7 @@ Skip this only when the diagnosis is **synchronous** (HTTP request, console comm
 
 ### Debug-tool URLs — discover from the active deploy file's `services:` section
 
-Spryker's docker SDK ships with infrastructure UIs you can drive in the browser to inspect runtime state. **Never guess these URLs.** Read the active deploy file (identify it from `git status` / `docker/sdk` output, or ask) and look at its **`services:` block** (separate from `groups → applications`). Each service has an `endpoints:` map giving a hostname; use the deploy file's `docker.ssl.enabled` flag to pick `http://` (false) or `https://` (true).
+Spryker's docker SDK ships with infrastructure UIs you can drive in the browser to inspect runtime state. **Never guess these URLs.** Identify the active deploy file (from `git status` / `docker/sdk` output, or ask) and load the `spryker-runtime` skill and run its environment call in the project root, as that skill describes (`runtime.php env --deploy-file <active deploy file>`). Its **Services** lines list each service of the deploy file's `services:` block with its engine, container and endpoints (scheme from `docker.ssl.enabled`).
 
 | Service in deploy file | Engine (typical) | What it's for | How to use |
 |---|---|---|---|
