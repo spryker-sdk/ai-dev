@@ -35,10 +35,29 @@ function to_plain_text(string $contents): string
 }
 
 /**
+ * The exit code of the `exit <code>` last line that run-tools.php appends to a log, or null when the
+ * last line is not `exit <code>`.
+ */
+function to_log_exit_code(string $contents): ?int
+{
+    return preg_match('/(?:^|\n)exit (\d+)\s*$/', $contents, $m) === 1 ? (int)$m[1] : null;
+}
+
+/**
+ * The log without its `exit <code>` last line.
+ */
+function to_strip_exit(string $contents): string
+{
+    return (string)preg_replace('/(^|\n)exit \d+\s*$/', '$1', $contents);
+}
+
+/**
  * The reason a tool output holds no real result of its tool, or null when it does.
  * $tool: phpstan, sniff, codecept; any other name is checked as evaluator output.
+ * $exitCode: the exit code of the tool, when known. A sniffer or evaluator output without a result
+ * marker holds a result only when the exit code is 0 or unknown.
  */
-function to_result_problem(string $tool, string $contents): ?string
+function to_result_problem(string $tool, string $contents, ?int $exitCode = null): ?string
 {
     $text = to_plain_text($contents);
     if (trim($text) === '') {
@@ -60,10 +79,22 @@ function to_result_problem(string $tool, string $contents): ?string
     if (preg_match($resultPattern, $text) === 1) {
         return null;
     }
-    foreach (preg_split('/\n/', $text) ?: [] as $row) {
+    $rows = preg_split('/\n/', $text) ?: [];
+    foreach ($rows as $row) {
         if (preg_match(TO_TOOL_FAILURE, $row) === 1) {
             return 'tool error instead of a result: ' . trim($row);
         }
+    }
+    if ($exitCode !== null && $exitCode !== 0) {
+        $last = '';
+        foreach (array_reverse($rows) as $row) {
+            if (trim($row) !== '') {
+                $last = trim($row);
+                break;
+            }
+        }
+
+        return "no result line and exit $exitCode: $last";
     }
 
     return null;
@@ -98,12 +129,38 @@ function to_phpstan_count(string $text): ?int
 }
 
 /**
- * The PHPStan errors of the table output, each as "<file>: <message>", without line numbers (lines
- * move between runs) and without the identifier, tip and link lines. Repeated errors stay repeated.
+ * A finding of a tool: "key" is the text the comparison matches (no line number: lines move between
+ * runs), "text" the text to print (`<file>:<line>: <message> [<identifier>]`).
+ *
+ * @return array{key: string, text: string, line: ?int, identifier: ?string}
+ */
+function to_finding(string $file, ?int $line, string $message, ?string $identifier = null): array
+{
+    return [
+        'key' => $file . ': ' . $message,
+        'text' => $file . ($line === null ? '' : ':' . $line) . ': ' . $message . ($identifier === null ? '' : " [$identifier]"),
+        'line' => $line,
+        'identifier' => $identifier,
+    ];
+}
+
+/**
+ * The PHPStan errors of the table output, each as "<file>: <message>", without line numbers and
+ * without the identifier, tip and link lines. Repeated errors stay repeated.
  *
  * @return list<string>
  */
 function to_phpstan_errors(string $text): array
+{
+    return array_column(to_phpstan_findings($text), 'key');
+}
+
+/**
+ * The PHPStan errors of the table output with line number and identifier (see to_finding()).
+ *
+ * @return list<array{key: string, text: string, line: ?int, identifier: ?string}>
+ */
+function to_phpstan_findings(string $text): array
 {
     $errors = [];
     $file = null;
@@ -111,7 +168,7 @@ function to_phpstan_errors(string $text): array
     $open = false;
     $flush = static function () use (&$errors, &$current, &$file): void {
         if ($current !== null) {
-            $errors[] = $file . ': ' . to_squash($current);
+            $errors[] = to_finding((string)$file, $current['line'], to_squash($current['message']), $current['identifier']);
         }
         $current = null;
     };
@@ -134,24 +191,29 @@ function to_phpstan_errors(string $text): array
         if ($file === null) {
             continue;
         }
+        if ($current !== null && preg_match('/^\s*🪪\s*(\S+)/u', $row, $m)) {
+            $current['identifier'] = $m[1];
+            $open = false;
+            continue;
+        }
         if (preg_match('/^\s*(?:[^\x00-\x7F]|See:|Tip:|https?:\/\/)/u', $row)) {
             $open = false;
             continue;
         }
-        if ($file !== '(no file)' && preg_match('/^\s+:?\d+\s{2,}(\S.*?)\s*$/', $row, $m)) {
+        if ($file !== '(no file)' && preg_match('/^\s+:?(\d+)\s{2,}(\S.*?)\s*$/', $row, $m)) {
             $flush();
-            $current = $m[1];
+            $current = ['line' => (int)$m[1], 'message' => $m[2], 'identifier' => null];
             $open = true;
             continue;
         }
         if ($file === '(no file)' && preg_match('/^\s+(\S.*?)\s*$/', $row, $m)) {
             $flush();
-            $current = $m[1];
+            $current = ['line' => null, 'message' => $m[1], 'identifier' => null];
             $open = true;
             continue;
         }
         if ($open && $current !== null && preg_match('/^\s{4,}(\S.*?)\s*$/', $row, $m)) {
-            $current .= ' ' . $m[1];
+            $current['message'] .= ' ' . $m[1];
         }
     }
     $flush();
@@ -172,7 +234,7 @@ function to_sniff_count(string $text): ?int
         return array_sum(array_map(static fn (array $hit): int => (int)$hit[1] + (int)($hit[2] ?? 0), $m));
     }
 
-    return to_result_problem('sniff', $text) === null ? 0 : null;
+    return to_result_problem('sniff', to_strip_exit($text), to_log_exit_code($text)) === null ? 0 : null;
 }
 
 /**
@@ -183,12 +245,22 @@ function to_sniff_count(string $text): ?int
  */
 function to_sniff_violations(string $text): array
 {
+    return array_column(to_sniff_findings($text), 'key');
+}
+
+/**
+ * The sniffer violations of the full report with line number (see to_finding()).
+ *
+ * @return list<array{key: string, text: string, line: ?int, identifier: ?string}>
+ */
+function to_sniff_findings(string $text): array
+{
     $violations = [];
     $file = null;
     $current = null;
-    $flush = static function () use (&$violations, &$current): void {
+    $flush = static function () use (&$violations, &$current, &$file): void {
         if ($current !== null) {
-            $violations[] = to_squash($current);
+            $violations[] = to_finding((string)$file, $current['line'], to_squash($current['message']));
         }
         $current = null;
     };
@@ -198,13 +270,13 @@ function to_sniff_violations(string $text): array
             $file = $m[1];
             continue;
         }
-        if ($file !== null && preg_match('/^\s*\d+\s*\|\s*(ERROR|WARNING)\s*\|\s*(?:\[[ x]\]\s*)?(.*?)\s*$/', $row, $m)) {
+        if ($file !== null && preg_match('/^\s*(\d+)\s*\|\s*(ERROR|WARNING)\s*\|\s*(?:\[[ x]\]\s*)?(.*?)\s*$/', $row, $m)) {
             $flush();
-            $current = $file . ': ' . $m[1] . ' ' . $m[2];
+            $current = ['line' => (int)$m[1], 'message' => $m[2] . ' ' . $m[3]];
             continue;
         }
         if ($current !== null && preg_match('/^\s*\|\s*\|\s*(.*?)\s*$/', $row, $m)) {
-            $current .= ' ' . $m[1];
+            $current['message'] .= ' ' . $m[1];
             continue;
         }
         $flush();
@@ -223,7 +295,7 @@ function to_sniff_violations(string $text): array
  */
 function to_evaluator_findings(string $text): ?array
 {
-    if (to_result_problem('evaluator', $text) !== null) {
+    if (to_result_problem('evaluator', to_strip_exit($text), to_log_exit_code($text)) !== null) {
         return null;
     }
     $rows = explode("\n", $text);

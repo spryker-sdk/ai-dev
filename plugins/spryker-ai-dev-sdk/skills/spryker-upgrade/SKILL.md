@@ -95,8 +95,10 @@ Before the first `composer` command, run the shared environment preflight in
 
 **Tool output.** `run-tools.php` and `compare-tool-runs.php` print a summary and write the full
 output to files in the state directory. Read the summary. Open a log file only for the failing part
-and search it for that part; never read the whole file. When a run is stopped before it ends,
-`tool-runs-<run>.json` holds the tools that finished: run the other tools again. The detectors and
+and search it for that part; never read the whole file. Do not read `tool-comparison-*.json`; to see
+more new findings, run `compare-tool-runs.php` again with `--limit N <tool>`. When a run is stopped
+before it ends, `tool-runs-<run>.json` holds the tools that finished: run the other tools again.
+The detectors and
 `run-detectors.php` print one verdict line per detector (`FOUND` = the detector's exit 1) and at
 most 10 findings (`--limit N`), each with the field to act on; the full list is in the report file
 the line names. The printed findings are a sample. Process each report entry where `inBaseline` is
@@ -161,9 +163,9 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    `--codecept-options "-c codeception.api.yml"`); the runner runs them in that order into one log.
    The baseline run pins the exact invocation, environment variables included, in
    `tool-invocation.json` (matrix #66); every later run uses it. It records pass/fail/skip per suite
-   and the names of the failing tests in `tool-runs-baseline.json`. The red tests
-   become the report's "Tests already red before the upgrade" list; a suite that cannot run is named
-   with the reason, never counted as passing.
+   and writes the names of the failing tests, by suite, to `failing-tests-baseline.txt`. Take the
+   report's "Tests already red before the upgrade" list from that file; a suite that cannot run is
+   named with the reason, never counted as passing.
 8. **Back Office crawl baseline** — every navigation page and every table data endpoint; `--baseline`
    writes `backoffice-smoke-baseline.json`. Exit 1 lists pages already failing (record them); exit 2
    is a failed login or an unreachable or wrong URL, and no baseline was written:

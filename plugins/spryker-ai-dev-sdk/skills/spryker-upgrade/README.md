@@ -225,9 +225,14 @@ the `--codecept-options` in `tool-invocation.json`; later runs use the pin (`--p
 another directory) and refuse values that differ from it. A project with several test configurations
 gives `--codecept-options` once for each (`--codecept-options "-c codeception.api.yml"`): the tests
 tool runs `codecept run` once per configuration into one log, and a configuration that did not start
-makes it "did not run". `tool-runs-<run>.json` holds the commands, exit codes, the tests per suite
-and the names of the failing tests; it is written after each tool, so a stopped run keeps the tools
-that finished. Exit 0 every tool ran, 1 a tool did not run, 2 usage or no pin.
+makes it "did not run". A sniffer or evaluator output without a result line and with an exit code
+other than 0 is "did not run" too. Before a tool starts, its log of an earlier run is removed.
+`tool-runs-<run>.json` holds the commands, exit codes, the tests per suite and the names of the
+failing tests; it is written after each tool, so a stopped run keeps the tools that finished.
+`failing-tests-<run>.txt` lists the failing tests, one per line under its suite. The baseline run
+refuses to replace a baseline log that holds a result when `base-ref` exists and HEAD is another
+commit; `--force` replaces it. Exit 0 every tool ran, 1 a tool did not run, 2 usage, no pin or a
+refused baseline run.
 
 ## compare-tool-runs.php — what is new against the baselines
 
@@ -235,15 +240,18 @@ that finished. Exit 0 every tool ran, 1 a tool did not run, 2 usage or no pin.
 php $UP/compare-tool-runs.php verify                       # every tool with a log of the run
 php $UP/compare-tool-runs.php final tests --limit 20
 php $UP/compare-tool-runs.php detect phpstan --baseline phase0
+SPRYKER_UPGRADE_STATE_DIR=$STATE/after php $UP/compare-tool-runs.php after --baseline-dir $STATE/baseline
 ```
 
 Compares the logs of a run with each tool's baseline: `*-post-tooling.txt` when it exists, else the
 Phase 0 file (`--baseline phase0` forces the Phase 0 file; the post-tooling run is always compared
-with it). Prints one verdict line per tool and at most `--limit` (default 10) new entries: PHPStan
-errors and sniffer violations by file and message, evaluator violations, and tests that fail now
-and did not fail in the baseline, per suite. The full lists go to `tool-comparison-<run>.json`.
-Exit 0 no regression, 1 regression or a run without a result, 2 usage, a missing log or a missing
-baseline.
+with it; `--baseline-dir` reads the baseline files from another directory). Prints one verdict line
+per tool and at most `--limit` (default 10) new entries: PHPStan errors and sniffer violations by
+file and message, printed as `file:line: message [identifier]`, evaluator violations, tests that fail
+now and did not fail in the baseline, and tests that passed in the baseline and are skipped or
+absent now, per suite. The tests verdict line holds the baseline totals. A log whose last line is
+not `exit <code>` is NO RESULT. The full lists go to `tool-comparison-<run>.json`. Exit 0 no
+regression, 1 regression or a run without a result, 2 usage, a missing log or a missing baseline.
 
 ## backoffice-smoke.php — crawl the whole Back Office
 
