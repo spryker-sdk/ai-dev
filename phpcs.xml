@@ -18,4 +18,7 @@
         <exclude name="Spryker.Commenting.DocBlockReturnVoid.ReturnVoidMissing"/>
         <exclude name="Spryker.Commenting.DocBlockReturnVoid.ReturnMissingInInterface"/>
     </rule>
+
+    <!-- Example projects of the script tests: parsed by the scripts, never run, some with errors on purpose. -->
+    <exclude-pattern>*/tests/scripts/*/fixture*/*</exclude-pattern>
 </ruleset>
