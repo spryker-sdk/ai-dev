@@ -2,55 +2,39 @@
 
 /**
  * Coverage gaps finder for the project code in src/ (every dir except Generated, Orm, SprykerConfig).
- * Static analysis, no test run needed.
- * Full documentation of the flags and the logic: coverage-gaps.md, next to this file.
+ * Static analysis, no test run needed. Gives per-method detail for a result of the Phase 0.5 gate check-test-coverage.php.
+ * Running, flags, report and limits: coverage-gaps.md; the analysis rules: coverage-gaps-logic.md (both next to this file).
  * Requirements: PHP >= 8.1, Composer vendor/, nikic/php-parser ^5.0, a Spryker project (checked at startup).
  *
- * Reports:
- *   1. Project classes (no core parent) whose methods are not reached by any test.
- *   2. Classes extending a core class whose own/overridden methods are not reached by any test.
- *   3. Entry points (Facade / Client / Service / Plugin / Controller) through which the untested
- *      core-extended classes are executed - i.e. where to write a test for the new behaviour.
- *   Rules: thin plugins that only delegate to tested project code count as covered.
- *   Skipped (not listed, not counted): application bootstraps (*Bootstrap), routing/resource plugins (Glue resource and
- *   route plugins, Yves route providers), Client methods that only forward to a Zed stub, declarative methods whose
- *   whole body returns constant data (constants, scalars, X::class, arrays/transfers built from them) and, with
- *   --skip-ui-definitions, form field definitions, form expander plugins and Table::configure().
- *   4. Unused code: methods not reachable from any framework entry in production code (tests excluded) -
- *      delete them instead of writing tests.
+ * Finds:
+ *   - project classes (no core parent) whose methods are not reached by any test;
+ *   - classes extending a core class whose own/overridden methods are not reached by any test;
+ *   - the entry points (Facade / Client / Service / Plugin / Controller) to test them through;
+ *   - unused code: methods not reachable from any framework entry in production code (tests excluded);
+ *   - classes and files that could not be analysed (load failure, parse error).
  *
- * "Reached by a test" = a method is called from a test class in tests/<Org>Test (mocks excluded) directly, or transitively:
+ * "Reached by a test" = a method is called from a test method in tests/<Org>Test directly or transitively:
  * Facade -> Factory -> new Model(...) -> constructor dependencies -> plugin stacks from DependencyProviders
- * -> Zed stubs -> Gateway controllers. HTTP-based tests (Glue Cest, Cypress) are not followed.
+ * -> Zed stubs -> Gateway controllers. A path through a mocked factory, a mocked factory method or a mock of a
+ * project class does not count; a skipped test method counts only up to the skip; a path from a test method with
+ * a conditional skip or a replaced dependency is "reachable, not proven". HTTP-based tests are not followed.
  *
- * Usage (from the project root; $UP is the scripts directory of the spryker-upgrade skill). The project root is the
- * working directory or SPRYKER_PROJECT_ROOT, never the location of this file. The script loads project classes, so
- * run it with a PHP that can load them: host PHP, or `docker/sdk cli php <path>` when this file is inside the project.
- *   php $UP/coverage-gaps/coverage-gaps.php
- *   php $UP/coverage-gaps/coverage-gaps.php --layer=Zed --module=Cart --only-untested --no-entries --no-unused --hide-unused --skip-ui-definitions --show-skipped --skip-layer=Yves,Glue --why=Pyz/Zed/Cart/Business/Model/Foo --root=. --json > report.json
+ * Project classes are never loaded into this process: each one is first loaded in a child PHP process. A class
+ * that fails there (fatal error, missing parent) is reported under "Could not analyse".
  *
- * Flags (all optional, combinable):
- *   --layer=Zed        only one application layer: Zed|Client|Yves|Glue|Service|Shared
- *   --module=Cart      only one module
- *   --only-untested    hide partially tested classes, keep classes without any test
- *   --no-entries       skip the "test via" lookup and section 3 (faster)
- *   --no-unused        skip the unused-code detection and section 4
- *   --hide-unused      detect unused code, then drop it from the lists and counts (no section 4); wins over --no-unused
- *   --skip-layer=Yves,Glue  ignore layers the project does not use (comma-separated or repeated): their classes are
- *                      not reported or counted, are no production callers for the unused-code check (code only they
- *                      call becomes unused) and are no entry points for "test via"
- *   --show-skipped     list the skipped methods per reason in the summary (by default only the counts)
- *   --skip-ui-definitions  also skip form definitions (buildForm, configureOptions, getBlockPrefix, add* methods
- *                      without logic), whole form expander plugins (*FormExpanderPluginInterface) and Table::configure()
- *   --why=FQCN         print to stderr the call paths from entry points to the untested methods of FQCN;
- *                      write "/" instead of "\" - docker/sdk strips backslashes
- *   --root=DIR         analyse another project dir (its src/<Org> dirs are autoloaded; vendor/ stays this project's)
- *   --json             print the result as JSON instead of the text report
- *   --help             print the flags
+ * Usage (from the project root; $UP is the scripts directory of the spryker-upgrade skill):
+ *   php $UP/coverage-gaps/coverage-gaps.php [--layer=Zed] [--module=Cart] [--only-untested] [--no-entries] [--no-unused]
+ *       [--hide-unused] [--skip-ui-definitions] [--show-skipped] [--skip-layer=Yves,Glue] [--why=Pyz/Zed/Cart/Business/Foo]
+ *       [--root=DIR] [--limit=N] [--json]
  *
- * Tests (fixture project with one example per rule: coverage-gaps/fixture/README.md):
- *   vendor/bin/phpunit $UP/coverage-gaps/coverage-gaps/CoverageGapsTest.php
- * Progress goes to stderr, the report to stdout.
+ * Output: a verdict line with the counts, at most --limit findings per section (default 10), then the path of the
+ * full JSON report (<state dir>/coverage-gaps-report.json). --json prints the full report to stdout instead.
+ * Progress goes to stderr.
+ *
+ * Exit codes: 0 no core-extended class without a test and every class analysed; 1 core-extended classes without any
+ * test; 2 usage or requirements error; 3 classes or files could not be analysed (the report is incomplete).
+ *
+ * Tests (maintainer tooling, not in the plugin): vendor/bin/phpunit --no-configuration tests/scripts/coverage-gaps/CoverageGapsTest.php
  */
 
 declare(strict_types=1);
@@ -67,19 +51,167 @@ use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
 
+const COVERAGE_GAPS_EXIT_OK = 0;
+const COVERAGE_GAPS_EXIT_CORE_EXTENDED_UNTESTED = 1;
+const COVERAGE_GAPS_EXIT_USAGE = 2;
+const COVERAGE_GAPS_EXIT_NOT_ANALYSED = 3;
+const COVERAGE_GAPS_LOAD_CHECK_ENV = 'COVERAGE_GAPS_LOAD_CHECK';
+const COVERAGE_GAPS_PARSER_AUTOLOAD_ENV = 'COVERAGE_GAPS_PARSER_AUTOLOAD';
+const COVERAGE_GAPS_MARK = '@@coverage-gaps ';
+
 ini_set('memory_limit', '-1');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
+/**
+ * Autoloads the classes of the project namespaces from <root>/src/<Org>/, before Composer, so a stale or partial
+ * autoload map does not hide project classes.
+ *
+ * @param list<string> $orgs
+ */
+function coverageGapsRegisterSrcAutoloader(string $root, array $orgs): void
+{
+    spl_autoload_register(static function (string $class) use ($root, $orgs): void {
+        $org = strstr($class, '\\', true);
+        $file = $root . '/src/' . str_replace('\\', '/', $class) . '.php';
+        if (in_array($org, $orgs, true) && is_file($file)) {
+            require_once $file;
+        }
+    }, true, true);
+}
+
+/**
+ * Child process mode: loads the classes named on stdin one by one and prints one line per class.
+ * A fatal error stops the process after the BEGIN line of the class that caused it.
+ */
+function coverageGapsLoadCheckChild(): void
+{
+    $input = json_decode((string)stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    require_once $input['autoload'];
+    coverageGapsRegisterSrcAutoloader($input['root'], $input['orgs']);
+    foreach ($input['classes'] as $class) {
+        echo COVERAGE_GAPS_MARK . 'BEGIN ' . $class . "\n";
+        try {
+            $loaded = class_exists($class) || interface_exists($class) || trait_exists($class) || enum_exists($class);
+            echo COVERAGE_GAPS_MARK . ($loaded ? 'OK ' : 'ABSENT ') . $class . "\n";
+        } catch (Throwable $exception) {
+            echo COVERAGE_GAPS_MARK . 'ERROR ' . $class . "\t" . get_class($exception) . ': '
+                . (string)preg_replace('/\s+/', ' ', $exception->getMessage()) . "\n";
+        }
+    }
+    echo COVERAGE_GAPS_MARK . "DONE\n";
+}
+
+/**
+ * Loads each class in a child PHP process, never in this one: a compile-time fatal error in a project class
+ * (an incompatible signature, for example) would stop this process. After a fatal error the check goes on in a
+ * new child process with the next class.
+ *
+ * @param list<string> $orgs
+ * @param list<string> $classes
+ *
+ * @return array{failed: array<string, string>, absent: list<string>} failed: class => reason
+ */
+function coverageGapsLoadCheck(string $autoload, string $root, array $orgs, array $classes): array
+{
+    $failed = [];
+    $absent = [];
+    $pending = array_values($classes);
+    while ($pending !== []) {
+        $process = proc_open(
+            [PHP_BINARY, '-d', 'display_errors=stdout', '-d', 'log_errors=0', '-d', 'html_errors=0', '-d', 'memory_limit=-1', __FILE__],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            null,
+            [COVERAGE_GAPS_LOAD_CHECK_ENV => '1'] + getenv(),
+        );
+        if (!is_resource($process)) {
+            foreach ($pending as $class) {
+                $failed[$class] = 'could not start a PHP process to load the class';
+            }
+
+            break;
+        }
+        fwrite($pipes[0], json_encode(['autoload' => $autoload, 'root' => $root, 'orgs' => $orgs, 'classes' => $pending], JSON_THROW_ON_ERROR));
+        fclose($pipes[0]);
+        $stdout = (string)stream_get_contents($pipes[1]);
+        $stderr = (string)stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+
+        $current = null;
+        $done = false;
+        $output = [];
+        $checked = [];
+        foreach (explode("\n", $stdout) as $line) {
+            if (!str_starts_with($line, COVERAGE_GAPS_MARK)) {
+                if (trim($line) !== '') {
+                    $output[] = trim($line);
+                }
+
+                continue;
+            }
+            [$status, $rest] = explode(' ', substr($line, strlen(COVERAGE_GAPS_MARK)), 2) + [1 => ''];
+            if ($status === 'DONE') {
+                $done = true;
+
+                continue;
+            }
+            $class = strstr($rest, "\t", true) ?: $rest;
+            if ($status === 'BEGIN') {
+                $current = $class;
+                $output = [];
+
+                continue;
+            }
+            $checked[$class] = true;
+            $current = null;
+            if ($status === 'ERROR') {
+                $failed[$class] = substr($rest, strlen($class) + 1);
+            } elseif ($status === 'ABSENT') {
+                $absent[] = $class;
+            }
+        }
+        if ($done) {
+            break;
+        }
+        if ($current === null) {
+            foreach ($pending as $class) {
+                if (!isset($checked[$class])) {
+                    $failed[$class] = sprintf('the PHP process stopped before it loaded the class (exit %d): %s', $exitCode, trim($stderr . ' ' . implode(' ', $output)));
+                }
+            }
+
+            break;
+        }
+        $errors = preg_grep('/(Fatal|Parse) error/', $output) ?: [];
+        $failed[$current] = $errors !== []
+            ? trim((string)preg_replace('/^.*?((Fatal|Parse) error)/', '$1', (string)end($errors)))
+            : sprintf('the PHP process stopped while it loaded the class (exit %d)', $exitCode);
+        $pending = array_slice($pending, (int)array_search($current, $pending, true) + 1);
+    }
+    ksort($failed);
+
+    return ['failed' => $failed, 'absent' => $absent];
+}
+
+if (getenv(COVERAGE_GAPS_LOAD_CHECK_ENV) === '1') {
+    coverageGapsLoadCheckChild();
+    exit(0);
+}
+
 require __DIR__ . '/../bootstrap.php';
 
-$root = spryker_upgrade_project_root();
+$projectRoot = spryker_upgrade_project_root();
+$root = $projectRoot;
 defined('APPLICATION_ROOT_DIR') || define('APPLICATION_ROOT_DIR', $root);
 
 /**
  * Requirements (see coverage-gaps.md):
  *   - PHP >= 8.1
  *   - Composer dependencies installed (vendor/autoload.php in the project root)
- *   - nikic/php-parser ^5.0      composer require --dev nikic/php-parser:^5.0
+ *   - nikic/php-parser ^5.0: the version of the project, or one installed outside the project and named
+ *     by COVERAGE_GAPS_PARSER_AUTOLOAD (path of its vendor/autoload.php)
  *   - spryker/kernel             the analysed project must be a Spryker project
  * Optional: symfony/form and spryker/gui (only used by --skip-ui-definitions rules).
  *
@@ -94,18 +226,27 @@ function coverageGapsRequirementProblems(string $root): array
         return [sprintf('Composer dependencies are not installed: %s/vendor/autoload.php not found. Run: composer install', $root)];
     }
     require_once $root . '/vendor/autoload.php';
+    $parserAutoload = getenv(COVERAGE_GAPS_PARSER_AUTOLOAD_ENV);
+    if (is_string($parserAutoload) && $parserAutoload !== '') {
+        if (!is_file($parserAutoload)) {
+            return [sprintf('%s does not point to a file: %s', COVERAGE_GAPS_PARSER_AUTOLOAD_ENV, $parserAutoload)];
+        }
+        // Composer prepends its autoloader: the parser installed outside the project wins over the project's copy.
+        require_once $parserAutoload;
+    }
 
     $problems = [];
+    $installHint = sprintf(
+        'Use the version the project has (composer show nikic/php-parser), or install it outside the project and set %s to its vendor/autoload.php (see coverage-gaps.md).',
+        COVERAGE_GAPS_PARSER_AUTOLOAD_ENV,
+    );
     $installed = static fn (string $package): ?string => class_exists(Composer\InstalledVersions::class) && Composer\InstalledVersions::isInstalled($package)
         ? Composer\InstalledVersions::getPrettyVersion($package)
         : null;
     if (!class_exists(PhpParser\ParserFactory::class)) {
-        $problems[] = 'nikic/php-parser is not installed. Run: composer require --dev nikic/php-parser:^5.0';
+        $problems[] = 'nikic/php-parser is not installed. ' . $installHint;
     } elseif (!method_exists(PhpParser\ParserFactory::class, 'createForNewestSupportedVersion')) {
-        $problems[] = sprintf(
-            'nikic/php-parser ^5.0 is required, installed: %s. Run: composer require --dev nikic/php-parser:^5.0',
-            $installed('nikic/php-parser') ?? 'an older version',
-        );
+        $problems[] = sprintf('nikic/php-parser ^5.0 is required, installed: %s. %s', $installed('nikic/php-parser') ?? 'an older version', $installHint);
     }
     if (!class_exists('Spryker\\Zed\\Kernel\\Business\\AbstractFacade')) {
         $problems[] = 'spryker/kernel is not installed: this tool analyses Spryker projects (Spryker\\Zed\\Kernel\\Business\\AbstractFacade not found).';
@@ -117,7 +258,7 @@ function coverageGapsRequirementProblems(string $root): array
 $requirementProblems = coverageGapsRequirementProblems($root);
 if ($requirementProblems !== []) {
     fwrite(STDERR, "coverage-gaps.php: requirements not met\n  - " . implode("\n  - ", $requirementProblems) . "\n");
-    exit(2);
+    exit(COVERAGE_GAPS_EXIT_USAGE);
 }
 
 final class Ast
@@ -129,6 +270,9 @@ final class Ast
     /** @var array<string, array{stmts: array, methods: array<string, list<Stmt\ClassMethod>>}> */
     private array $cache = [];
 
+    /** @var array<string, string> path => parse error of every file that could not be parsed */
+    public array $errors = [];
+
     public function __construct(private int $limit = 600)
     {
         $this->parser = (new ParserFactory())->createForNewestSupportedVersion();
@@ -138,6 +282,21 @@ final class Ast
     public function file(string $path): array
     {
         return $this->load($path)['stmts'];
+    }
+
+    /**
+     * Parses a file without keeping its tree; records a parse error in $errors.
+     */
+    public function check(string $path): void
+    {
+        if (isset($this->cache[$path]) || isset($this->errors[$path])) {
+            return;
+        }
+        try {
+            $this->parser->parse((string)file_get_contents($path));
+        } catch (Throwable $exception) {
+            $this->errors[$path] = $exception->getMessage();
+        }
     }
 
     public function method(string $path, string $name, int $line): ?Stmt\ClassMethod
@@ -170,7 +329,8 @@ final class Ast
             $traverser = new NodeTraverser();
             $traverser->addVisitor(new NameResolver());
             $stmts = $traverser->traverse($stmts);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            $this->errors[$path] = $exception->getMessage();
             $stmts = [];
         }
 
@@ -250,18 +410,47 @@ final class Kernel
         return $position === false ? $type : substr($type, 0, $position);
     }
 
+    /**
+     * Project classes that failed to load in the child process: class => reason. They are never loaded here.
+     *
+     * @var array<string, string>
+     */
+    public array $unloadable = [];
+
     public function exists(string $class): bool
     {
-        $class = self::base($class);
+        $class = ltrim(self::base($class), '\\');
         if (!isset($this->exists[$class])) {
+            if (isset($this->unloadable[$class]) || ($this->isProject($class) && !isset($this->loadChecked[$class]))) {
+                return $this->exists[$class] = false;
+            }
             try {
                 $this->exists[$class] = class_exists($class) || interface_exists($class) || trait_exists($class);
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
                 $this->exists[$class] = false;
+                if ($this->isProject($class)) {
+                    $this->unloadable[$class] = get_class($exception) . ': ' . $exception->getMessage();
+                }
             }
         }
 
         return $this->exists[$class];
+    }
+
+    /** @var array<string, true> project classes that loaded without error in the child process */
+    private array $loadChecked = [];
+
+    /**
+     * @param list<string> $loaded project classes that loaded without error in the child process
+     * @param array<string, string> $failed class => reason
+     */
+    public function setLoadCheck(array $loaded, array $failed): void
+    {
+        $this->loadChecked = array_fill_keys($loaded, true);
+        $this->unloadable = $failed;
+        $this->exists = [];
+        $this->refl = [];
+        $this->resolved = [];
     }
 
     public function refl(string $class): ?ReflectionClass
@@ -468,6 +657,15 @@ final class Analyzer
 {
     private const TEST_PREFIX = '@test:';
 
+    private const SKIP_METHODS = ['markTestSkipped', 'markTestIncomplete'];
+
+    private const SET_UP_METHODS = ['setUp', '_before', '_setUp'];
+
+    private const MOCK_METHODS = [
+        'createMock', 'createStub', 'createPartialMock', 'createConfiguredMock', 'createTestProxy', 'getMockBuilder',
+        'getMockForAbstractClass', 'make', 'makeEmpty', 'makeEmptyExcept', 'construct', 'constructEmpty',
+    ];
+
     private const TEST_GETTERS = ['getFacade', 'getClient', 'getService', 'getFactory', 'getBusinessFactory', 'getRepository', 'getEntityManager'];
 
     private const FORM_FACTORY_METHODS = ['create', 'createNamed', 'createBuilder', 'createNamedBuilder', 'createForm'];
@@ -534,7 +732,7 @@ final class Analyzer
     /**
      * @param list<string> $dirs test directories, one per test namespace (tests/PyzTest, tests/<Org>Test, ...)
      *
-     * @return list<string> seed node keys (all methods of test classes)
+     * @return list<string> seed node keys (the public methods of test classes; helpers are reached through them)
      */
     public function registerTests(array $dirs): array
     {
@@ -555,7 +753,7 @@ final class Analyzer
                 $parts = explode('\\', $fqcn);
                 $methods = [];
                 foreach ($class->getMethods() as $method) {
-                    $methods[$method->name->toString()] = $method;
+                    $methods[$method->name->toString()] = $this->withoutCodeAfterSkip($method);
                 }
                 $this->testClasses[$fqcn] = [
                     'module' => count($parts) > 3 ? [$parts[1], $parts[2]] : null,
@@ -572,8 +770,8 @@ final class Analyzer
 
         $seeds = [];
         foreach ($this->testClasses as $fqcn => $test) {
-            foreach (array_keys($test['methods']) as $method) {
-                $key = $this->node(self::TEST_PREFIX . $fqcn, $method);
+            foreach ($test['methods'] as $name => $method) {
+                $key = $method->isPublic() ? $this->node(self::TEST_PREFIX . $fqcn, $name) : null;
                 if ($key !== null) {
                     $seeds[] = $key;
                 }
@@ -581,6 +779,202 @@ final class Analyzer
         }
 
         return $seeds;
+    }
+
+    /**
+     * A test method that calls markTestSkipped() or markTestIncomplete() as a top-level statement runs only up to that
+     * call: the statements after it are removed.
+     */
+    private function withoutCodeAfterSkip(Stmt\ClassMethod $method): Stmt\ClassMethod
+    {
+        foreach ($method->stmts ?? [] as $index => $stmt) {
+            if ($stmt instanceof Stmt\Expression && $this->isSkipCall($stmt->expr)) {
+                $method = clone $method;
+                $method->stmts = array_slice($method->stmts, 0, $index);
+
+                return $method;
+            }
+        }
+
+        return $method;
+    }
+
+    private function isSkipCall(Node $node): bool
+    {
+        return ($node instanceof Expr\MethodCall || $node instanceof Expr\StaticCall)
+            && $node->name instanceof Identifier
+            && in_array($node->name->toString(), self::SKIP_METHODS, true);
+    }
+
+    /**
+     * What a test seed replaces or skips, read from its own body, from the test helpers it calls and from the
+     * set-up methods of its class:
+     *   - blockFactories: setFactory() was called; no factory method counts as tested;
+     *   - blockFactoryMethods: factory methods replaced by mockFactoryMethod('name', ...);
+     *   - blockClasses: project classes replaced by createMock(X::class) and similar calls;
+     *   - notProven: reasons why the seed proves nothing (a conditional skip, setDependency() with a value that is
+     *     not a `new` expression, mockFactoryMethod() with a name that is not a string literal).
+     *
+     * @return array{blockFactories: bool, blockFactoryMethods: list<string>, blockClasses: list<string>, notProven: list<string>}
+     */
+    public function testSeedMarkers(string $seed): array
+    {
+        $markers = ['blockFactories' => false, 'blockFactoryMethods' => [], 'blockClasses' => [], 'notProven' => []];
+        [$runtime, , $name] = $this->nodes[$seed];
+        $fqcn = substr($runtime, strlen(self::TEST_PREFIX));
+        $methods = [];
+        $queue = [$seed];
+        foreach (self::SET_UP_METHODS as $setUp) {
+            $key = $name === $setUp ? null : $this->node($runtime, $setUp);
+            if ($key !== null) {
+                $queue[] = $key;
+            }
+        }
+        $visited = [];
+        while ($queue) {
+            $key = array_pop($queue);
+            if (isset($visited[$key])) {
+                continue;
+            }
+            $visited[$key] = true;
+            $method = $this->testMethod(substr($this->nodes[$key][0], strlen(self::TEST_PREFIX)), $this->nodes[$key][2]);
+            if ($method !== null) {
+                $methods[] = $method;
+            }
+            foreach (array_keys($this->edges[$key] ?? []) as $to) {
+                if (str_starts_with($this->nodes[$to][0], self::TEST_PREFIX)) {
+                    $queue[] = $to;
+                }
+            }
+        }
+
+        foreach ($methods as $method) {
+            $calls = $this->finder->find($method->stmts ?? [], static fn (Node $n): bool => ($n instanceof Expr\MethodCall || $n instanceof Expr\StaticCall)
+                && $n->name instanceof Identifier);
+            foreach ($calls as $call) {
+                $callName = $call->name->toString();
+                $args = array_values(array_filter($call->args, static fn ($arg): bool => $arg instanceof Node\Arg));
+                if (in_array($callName, self::SKIP_METHODS, true)) {
+                    $markers['notProven'][] = 'conditional ' . $callName . '()';
+                } elseif ($callName === 'setFactory') {
+                    $markers['blockFactories'] = true;
+                } elseif ($callName === 'mockFactoryMethod') {
+                    if (isset($args[0]) && $args[0]->value instanceof String_) {
+                        $markers['blockFactoryMethods'][] = $args[0]->value->value;
+                    } else {
+                        $markers['notProven'][] = 'mockFactoryMethod() with a computed name';
+                    }
+                } elseif ($callName === 'setDependency') {
+                    if (!isset($args[1]) || !$this->isRealObject($args[1]->value)) {
+                        $markers['notProven'][] = 'setDependency()';
+                    }
+                } elseif (in_array($callName, self::MOCK_METHODS, true) && isset($args[0])) {
+                    $mocked = $this->classConstant($args[0]->value);
+                    if ($mocked !== null && $this->kernel->isProject($mocked)) {
+                        $markers['blockClasses'][] = $mocked;
+                        $implementation = $this->kernel->implementationOf($mocked);
+                        if ($implementation !== null) {
+                            $markers['blockClasses'][] = $implementation;
+                        }
+                    }
+                }
+            }
+        }
+        $markers['blockFactoryMethods'] = array_values(array_unique($markers['blockFactoryMethods']));
+        if ($markers['blockFactories'] || $markers['blockFactoryMethods'] !== []) {
+            $testModule = $this->testClasses[$fqcn]['module'] ?? null;
+            array_push($markers['blockClasses'], ...$this->factoryProducts($markers['blockFactories'] ? null : $markers['blockFactoryMethods'], $testModule[1] ?? null));
+        }
+        $markers['blockClasses'] = array_values(array_unique($markers['blockClasses']));
+        $markers['notProven'] = array_values(array_unique($markers['notProven']));
+
+        return $markers;
+    }
+
+    /**
+     * Classes that factory methods of the graph return: the objects a replaced factory or factory method no longer
+     * creates. $methods null = every method of the factories of $module (every factory when the module is unknown).
+     *
+     * @param list<string>|null $methods
+     *
+     * @return list<string>
+     */
+    private function factoryProducts(?array $methods, ?string $module): array
+    {
+        $products = [];
+        foreach ($this->nodes as [$runtime, , $method]) {
+            $factory = Kernel::base($runtime);
+            if (str_starts_with($runtime, self::TEST_PREFIX) || !str_ends_with($factory, 'Factory')) {
+                continue;
+            }
+            $matches = $methods === null
+                ? $module === null || ($this->kernel->moduleOf($factory)['module'] ?? null) === $module
+                : in_array($method, $methods, true);
+            if (!$matches) {
+                continue;
+            }
+            foreach ($this->returnTypes($runtime, $method) as $type) {
+                $products[Kernel::base($type)] = true;
+            }
+        }
+
+        return array_keys($products);
+    }
+
+    /**
+     * Node keys reachable from the seeds; a blocked node is neither reached nor followed.
+     *
+     * @param list<string> $seeds
+     * @param (Closure(array{0: string, 1: string, 2: string}): bool)|null $isBlocked
+     *
+     * @return array<string, true>
+     */
+    public function reachable(array $seeds, ?Closure $isBlocked = null): array
+    {
+        $reached = [];
+        $queue = $seeds;
+        while ($queue) {
+            $key = array_pop($queue);
+            if (isset($reached[$key]) || ($isBlocked !== null && $isBlocked($this->nodes[$key]))) {
+                continue;
+            }
+            $reached[$key] = true;
+            foreach (array_keys($this->edges[$key] ?? []) as $to) {
+                if (!isset($reached[$to])) {
+                    $queue[] = $to;
+                }
+            }
+        }
+
+        return $reached;
+    }
+
+    /**
+     * `new X(...)` or an array of those: a real object, not a mock.
+     */
+    private function isRealObject(Node $expr): bool
+    {
+        if ($expr instanceof Expr\New_) {
+            return true;
+        }
+        if (!$expr instanceof Expr\Array_ || $expr->items === []) {
+            return false;
+        }
+        foreach ($expr->items as $item) {
+            if ($item === null || !$item->value instanceof Expr\New_) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function classConstant(Node $expr): ?string
+    {
+        return $expr instanceof Expr\ClassConstFetch && $expr->class instanceof Name && !$expr->class->isSpecialClassName()
+            && $expr->name instanceof Identifier && $expr->name->toLowerString() === 'class'
+            ? $expr->class->toString()
+            : null;
     }
 
     public function testFileCount(): int
@@ -777,7 +1171,7 @@ final class Analyzer
             if ($arg instanceof Node\Arg && $arg->value instanceof Expr\ClassConstFetch && $arg->value->class instanceof Name
                 && $arg->value->name instanceof Identifier && $arg->value->name->toLowerString() === 'class') {
                 $class = $arg->value->class->toString();
-                if ($this->kernel->isTracked($class) && is_subclass_of($class, 'Symfony\\Component\\Form\\FormTypeInterface')) {
+                if ($this->kernel->isTracked($class) && interface_exists('Symfony\\Component\\Form\\FormTypeInterface') && $this->kernel->refl($class)?->implementsInterface('Symfony\\Component\\Form\\FormTypeInterface') === true) {
                     $types[] = $class;
                 }
             }
@@ -1511,13 +1905,14 @@ final class ProjectScanner
                 continue;
             }
             $rc = $this->kernel->refl($class);
-            if ($rc === null || $rc->getFileName() !== $path || $rc->isInterface() || $rc->isTrait() || $rc->isAbstract() || $rc->isEnum()) {
+            if ($rc === null || $rc->getFileName() !== $path || $rc->isInterface() || $rc->isTrait() || $rc->isEnum()) {
                 continue;
             }
             $methods = [];
             $allMethods = [];
             foreach ($rc->getMethods() as $method) {
-                if ($method->getDeclaringClass()->getName() !== $class || $method->getFileName() !== $path || $method->getName() === '__construct') {
+                if ($method->getDeclaringClass()->getName() !== $class || $method->getFileName() !== $path || $method->getName() === '__construct'
+                    || $method->isAbstract()) {
                     continue;
                 }
                 $allMethods[] = $method->getName();
@@ -2030,52 +2425,120 @@ final class Report
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-$options = getopt('', ['layer:', 'module:', 'only-untested', 'no-entries', 'no-unused', 'hide-unused', 'skip-ui-definitions', 'show-skipped', 'skip-layer:', 'why:', 'root:', 'json', 'help']);
+const COVERAGE_GAPS_LAYERS = ['Zed', 'Client', 'Yves', 'Glue', 'Service', 'Shared'];
+
+/**
+ * Strict option parser: an unknown option, a missing value or a positional argument is a usage error.
+ *
+ * @param list<string> $arguments
+ *
+ * @return array<string, string|true|list<string>>|string the options, or the error message
+ */
+function coverageGapsParseOptions(array $arguments): array|string
+{
+    $flags = ['only-untested', 'no-entries', 'no-unused', 'hide-unused', 'skip-ui-definitions', 'show-skipped', 'json', 'help'];
+    $values = ['layer', 'module', 'skip-layer', 'why', 'root', 'limit'];
+    $options = [];
+    for ($i = 0; $i < count($arguments); $i++) {
+        $argument = $arguments[$i];
+        if (!str_starts_with($argument, '--')) {
+            return "unexpected argument '$argument'";
+        }
+        [$name, $value] = explode('=', substr($argument, 2), 2) + [1 => null];
+        if (in_array($name, $flags, true)) {
+            if ($value !== null) {
+                return "--$name takes no value";
+            }
+            $options[$name] = true;
+
+            continue;
+        }
+        if (!in_array($name, $values, true)) {
+            return "unknown option '--$name'";
+        }
+        if ($value === null) {
+            $value = $arguments[++$i] ?? null;
+            if ($value === null || str_starts_with($value, '--')) {
+                return "--$name needs a value";
+            }
+        }
+        if ($name === 'skip-layer') {
+            $options[$name][] = $value;
+        } else {
+            $options[$name] = $value;
+        }
+    }
+
+    return $options;
+}
+
+function coverageGapsUsageError(string $message): never
+{
+    fwrite(STDERR, "coverage-gaps.php: $message (see --help)\n");
+    exit(COVERAGE_GAPS_EXIT_USAGE);
+}
+
+function coverageGapsPlural(int $count, string $singular, string $plural): string
+{
+    return $count . ' ' . ($count === 1 ? $singular : $plural);
+}
+
+$options = coverageGapsParseOptions(array_slice($argv, 1));
+if (is_string($options)) {
+    coverageGapsUsageError($options);
+}
 if (isset($options['help'])) {
     echo "Usage: php coverage-gaps.php [--layer=Zed|Client|Yves|Glue|Service|Shared] [--module=Cart] [--only-untested]\n"
         . "       [--no-entries] [--no-unused] [--hide-unused] [--skip-ui-definitions] [--show-skipped] [--skip-layer=Yves,Glue]\n"
-        . "       [--why=FQCN] [--root=DIR] [--json]\n"
+        . "       [--why=FQCN] [--root=DIR] [--limit=N] [--json]\n"
+        . "  --layer=L        report only one layer\n"
+        . "  --module=M       report only one module\n"
         . "  --skip-layer=L   ignore layers the project does not use (comma-separated or repeated): not reported, not counted,\n"
         . "                   not production callers for unused code, not entry points\n"
         . "  --only-untested  hide partially tested classes\n"
-        . "  --no-entries     skip the 'test via' lookup and section 3\n"
-        . "  --no-unused      skip unused-code detection and section 4\n"
+        . "  --no-entries     skip the 'test via' lookup and the entry points\n"
+        . "  --no-unused      skip unused-code detection\n"
         . "  --hide-unused    detect unused code and drop it from the lists and counts (wins over --no-unused)\n"
         . "  --skip-ui-definitions  also skip form field definitions (buildForm, add*Field without logic), form expander plugins and Table::configure()\n"
-        . "  --show-skipped   list the skipped methods per reason (by default only the counts are printed)\n"
-        . "  --why=FQCN       print the call paths from entry points to the untested methods of FQCN (use / instead of \\ when running via docker/sdk)\n"
+        . "  --show-skipped   list the skipped methods (by default only the counts are printed)\n"
+        . "  --why=FQCN       print the call paths from entry points to the untested methods of FQCN to stderr (use / instead of \\ when running via docker/sdk)\n"
         . "  --root=DIR       analyse another project dir (its src/<Org> dirs are autoloaded, vendor/ stays this project's)\n"
-        . "  --json           print the result as JSON instead of the text report\n";
-    exit(0);
+        . "  --limit=N        findings per section in the summary (default 10, 0 prints the counts only)\n"
+        . "  --json           print the full report as JSON instead of the summary\n"
+        . "Exit codes: 0 OK, 1 core-extended classes without any test, 2 usage or requirements error, 3 classes or files could not be analysed.\n";
+    exit(COVERAGE_GAPS_EXIT_OK);
 }
+if (isset($options['limit']) && !ctype_digit((string)$options['limit'])) {
+    coverageGapsUsageError('--limit takes a number (0 prints the counts only)');
+}
+$limit = (int)($options['limit'] ?? 10);
 if (isset($options['hide-unused'])) {
     unset($options['no-unused']);
 }
 if (isset($options['root'])) {
-    $root = realpath($options['root']) ?: $options['root'];
+    $root = realpath((string)$options['root']) ?: (string)$options['root'];
     if (!is_dir($root . '/src')) {
-        fwrite(STDERR, "--root: no src/ directory in $root\n");
-        exit(1);
+        coverageGapsUsageError("--root: no src/ directory in $root");
     }
-    $rootOrgs = Kernel::detectProjectOrgs($root);
-    spl_autoload_register(static function (string $class) use ($root, $rootOrgs): void {
-        $org = strstr($class, '\\', true);
-        $file = $root . '/src/' . str_replace('\\', '/', $class) . '.php';
-        if (in_array($org, $rootOrgs, true) && is_file($file)) {
-            require_once $file;
-        }
-    }, true, true);
+}
+if (isset($options['layer'])) {
+    $options['layer'] = ucfirst(strtolower((string)$options['layer']));
+    if (!in_array($options['layer'], COVERAGE_GAPS_LAYERS, true)) {
+        coverageGapsUsageError("--layer: unknown layer '{$options['layer']}', use Zed, Client, Yves, Glue, Service or Shared");
+    }
 }
 if (isset($options['why'])) {
-    $options['why'] = ltrim(str_replace('/', '\\', $options['why']), '\\');
+    if (isset($options['no-entries'])) {
+        coverageGapsUsageError('--why needs the entry-point lookup: remove --no-entries');
+    }
+    $options['why'] = ltrim(str_replace('/', '\\', (string)$options['why']), '\\');
 }
 $skipLayers = [];
 foreach ((array)($options['skip-layer'] ?? []) as $value) {
     foreach (array_filter(array_map('trim', explode(',', (string)$value))) as $layer) {
         $layer = ucfirst(strtolower($layer));
-        if (!in_array($layer, ['Zed', 'Client', 'Yves', 'Glue', 'Service', 'Shared'], true)) {
-            fwrite(STDERR, "--skip-layer: unknown layer '$layer', use Zed, Client, Yves, Glue, Service or Shared\n");
-            exit(1);
+        if (!in_array($layer, COVERAGE_GAPS_LAYERS, true)) {
+            coverageGapsUsageError("--skip-layer: unknown layer '$layer', use Zed, Client, Yves, Glue, Service or Shared");
         }
         $skipLayers[$layer] = $layer;
     }
@@ -2084,17 +2547,38 @@ $skipLayers = array_values($skipLayers);
 $log = static fn (string $message) => fwrite(STDERR, sprintf("[%5.1fs] %s\n", microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], $message));
 
 $kernel = new Kernel(Kernel::detectProjectOrgs($root));
+coverageGapsRegisterSrcAutoloader($root, $kernel->projectOrgs);
 $ast = new Ast();
 $analyzer = new Analyzer($kernel, $ast);
 $report = new Report($kernel, $ast, $analyzer);
 $scanner = new ProjectScanner($kernel);
 $isIgnoredLayer = static fn (string $class): bool => in_array($kernel->moduleOf($class)['layer'] ?? '', $skipLayers, true);
+$isInScope = static function (string $class) use ($kernel, $isIgnoredLayer, $options): bool {
+    $module = $kernel->moduleOf($class);
+
+    return !$isIgnoredLayer($class)
+        && (!isset($options['layer']) || ($module['layer'] ?? null) === $options['layer'])
+        && (!isset($options['module']) || ($module['module'] ?? null) === $options['module']);
+};
 $projectFiles = $scanner->projectFiles($root);
 // --skip-layer: code of ignored layers is neither reported nor a production caller nor an entry point.
 $projectFilesInUse = array_filter($projectFiles, static fn (string $class): bool => !$isIgnoredLayer($class));
 if ($skipLayers !== []) {
     $log('Ignoring layers: ' . implode(', ', $skipLayers));
 }
+$projectFilesInScope = array_filter($projectFiles, $isInScope);
+if ($projectFilesInScope === [] && (isset($options['layer']) || isset($options['module']))) {
+    coverageGapsUsageError(sprintf(
+        'no project class matches%s%s',
+        isset($options['layer']) ? ' --layer=' . $options['layer'] : '',
+        isset($options['module']) ? ' --module=' . $options['module'] : '',
+    ));
+}
+
+// Load every project class in a child process first; a class that fails there is never loaded here.
+$log(sprintf('Loading %d project classes in a child process ...', count($projectFiles)));
+$loadCheck = coverageGapsLoadCheck($projectRoot . '/vendor/autoload.php', $root, $kernel->projectOrgs, array_values($projectFiles));
+$kernel->setLoadCheck(array_values(array_diff($projectFiles, array_keys($loadCheck['failed']))), $loadCheck['failed']);
 
 $log('Scanning src/{' . implode(',', $kernel->projectOrgs) . '} ...');
 $classes = $scanner->scan($root);
@@ -2113,12 +2597,53 @@ foreach ($seeds as $seed) {
     $analyzer->seed($seed);
 }
 $analyzer->run();
+
+// A seed with mocks reaches nothing through the replaced code; a seed that proves nothing gives "reachable, not proven".
+$cleanSeeds = [];
+$testedKeys = [];
+$notProvenKeys = [];
+foreach ($seeds as $seed) {
+    $markers = $analyzer->testSeedMarkers($seed);
+    if (!$markers['blockFactories'] && $markers['blockFactoryMethods'] === [] && $markers['blockClasses'] === [] && $markers['notProven'] === []) {
+        $cleanSeeds[] = $seed;
+
+        continue;
+    }
+    $blockedClasses = array_flip($markers['blockClasses']);
+    $blockedFactoryMethods = array_flip($markers['blockFactoryMethods']);
+    $reached = $analyzer->reachable([$seed], static function (array $node) use ($markers, $blockedClasses, $blockedFactoryMethods): bool {
+        [$runtime, $declaring, $method] = $node;
+        $runtime = Kernel::base($runtime);
+        $isFactory = str_ends_with($runtime, 'Factory');
+
+        return ($isFactory && ($markers['blockFactories'] || isset($blockedFactoryMethods[$method])))
+            || isset($blockedClasses[$runtime]) || isset($blockedClasses[$declaring]);
+    });
+    if ($markers['notProven'] === []) {
+        $testedKeys += $reached;
+
+        continue;
+    }
+    foreach (array_keys($reached) as $key) {
+        foreach ($markers['notProven'] as $reason) {
+            $notProvenKeys[$key][$reason] = true;
+        }
+    }
+}
+$testedKeys += $analyzer->reachable($cleanSeeds);
 $tested = [];
-foreach (array_keys($analyzer->processed) as $key) {
+foreach (array_keys($testedKeys) as $key) {
     [, $declaring, $method] = $analyzer->nodes[$key];
     $tested[$declaring][$method] = true;
 }
-$log(sprintf('%d test classes, %d reached methods', $analyzer->testFileCount(), count($analyzer->processed)));
+$notProven = [];
+foreach ($notProvenKeys as $key => $reasons) {
+    [, $declaring, $method] = $analyzer->nodes[$key];
+    if (!isset($tested[$declaring][$method])) {
+        $notProven[$declaring][$method] = array_values(array_unique(array_merge($notProven[$declaring][$method] ?? [], array_keys($reasons))));
+    }
+}
+$log(sprintf('%d test classes, %d reached methods, %d reachable but not proven', $analyzer->testFileCount(), count($testedKeys), count($notProvenKeys)));
 
 // Thin plugins: a plugin method that only delegates to tested project code counts as covered.
 $inScope = array_flip(array_column($classes, 'class'));
@@ -2258,6 +2783,56 @@ if (isset($options['hide-unused']) && $unused !== []) {
     $unused = [];
 }
 
+// Classes and files that could not be analysed: load failures in the child process, parse errors.
+foreach (array_keys($projectFilesInScope) as $path) {
+    $ast->check($path);
+}
+$notAnalysed = [];
+$relative = static fn (string $path): string => str_starts_with($path, $root . '/') ? substr($path, strlen($root) + 1) : $path;
+$testDirPrefixes = array_map(static fn (string $dir): string => $dir . '/', $testDirs);
+foreach ($ast->errors as $path => $error) {
+    $isTest = array_filter($testDirPrefixes, static fn (string $prefix): bool => str_starts_with($path, $prefix)) !== [];
+    $class = $projectFiles[$path] ?? null;
+    if (!$isTest && ($class === null || !isset($projectFilesInScope[$path]))) {
+        continue;
+    }
+    $notAnalysed[] = ['kind' => $isTest ? 'test file' : 'class', 'name' => $isTest ? $relative($path) : $class, 'file' => $relative($path), 'reason' => 'parse error: ' . $error];
+}
+$classFiles = array_flip($projectFilesInScope);
+foreach ($kernel->unloadable as $class => $reason) {
+    $path = $classFiles[$class] ?? null;
+    if ($path === null || isset($ast->errors[$path])) {
+        continue;
+    }
+    $notAnalysed[] = ['kind' => 'class', 'name' => $class, 'file' => $relative($path), 'reason' => str_replace($root . '/', '', $reason)];
+}
+foreach ($loadCheck['absent'] as $class) {
+    $path = $classFiles[$class] ?? null;
+    if ($path === null || isset($ast->errors[$path])) {
+        continue;
+    }
+    $declared = array_map(
+        static fn (Stmt\ClassLike $node): string => (string)$node->namespacedName?->toString(),
+        (new NodeFinder())->findInstanceOf($ast->file($path), Stmt\ClassLike::class),
+    );
+    if ($declared !== [] && !in_array($class, $declared, true)) {
+        $notAnalysed[] = ['kind' => 'class', 'name' => $class, 'file' => $relative($path), 'reason' => 'the file declares ' . implode(', ', $declared) . ', not the class its path names'];
+    }
+}
+usort($notAnalysed, static fn (array $a, array $b): int => [$a['kind'], $a['name']] <=> [$b['kind'], $b['name']]);
+$notAnalysedClasses = count(array_filter($notAnalysed, static fn (array $n): bool => $n['kind'] === 'class'));
+$notAnalysedTestFiles = count($notAnalysed) - $notAnalysedClasses;
+if ($notAnalysed !== []) {
+    $log(sprintf('Could not analyse %d classes and %d test files', $notAnalysedClasses, $notAnalysedTestFiles));
+}
+
+if (isset($options['why']) && !isset(array_column($classes, null, 'class')[$options['why']])) {
+    $why = array_values(array_filter($notAnalysed, static fn (array $n): bool => $n['name'] === $options['why']));
+    coverageGapsUsageError($why !== []
+        ? "--why: {$options['why']} could not be analysed: {$why[0]['reason']}"
+        : "--why: {$options['why']} is not a project class with own methods in the scope of this run");
+}
+
 // Entry points: build a module-restricted graph from Facade/Client/Service/Plugin/Controller/Console entries.
 $entriesByClass = [];
 $unitTestSuggestions = [];
@@ -2391,244 +2966,217 @@ if (!isset($options['no-entries']) && $gaps !== []) {
         }
     }
 }
+if (isset($options['why']) && !in_array($options['why'], array_column($gaps, 'class'), true)) {
+    fwrite(STDERR, "\n--why {$options['why']}: every counted method of this class is reached by a test or skipped\n");
+}
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-$printClass = static function (array $gap) use ($report, $analyzer, $entriesByClass, $unitTestSuggestions, $options, $unused): void {
-    $deadMethods = array_flip($unused[$gap['class']] ?? []);
-    $total = count($gap['methods']);
-    $marker = $gap['untested'] ? '✗' : '◐';
-    echo "  $marker {$gap['class']}" . ($gap['untested'] ? '' : sprintf('  (%d/%d methods tested)', $total - count($gap['missing']), $total)) . "\n";
-    echo "      file:      {$gap['file']}\n";
-    if ($gap['core'] !== null) {
-        echo "      extends:   {$gap['core']}\n";
-    }
-    echo '      untested:  ' . implode(', ', array_map(static fn (string $m): string => "$m()" . (isset($deadMethods[$m]) ? ' [unused]' : ''), $gap['missing'])) . "\n";
-    if (!array_diff($gap['missing'], array_keys($deadMethods))) {
-        echo "      test via:  — unused in production code: delete instead of testing (see section 4)\n";
+$label = static fn (string $key): string => Kernel::base($analyzer->nodes[$key][0]) . '::' . $analyzer->nodes[$key][2];
+$projectGaps = array_values(array_filter($gaps, static fn (array $g): bool => $g['core'] === null));
+$extendedGaps = array_values(array_filter($gaps, static fn (array $g): bool => $g['core'] !== null));
+$sortGaps = static function (array $items): array {
+    usort($items, static fn (array $a, array $b): int => [!$a['untested'], $a['layer'], $a['module'], $a['class']] <=> [!$b['untested'], $b['layer'], $b['module'], $b['class']]);
 
-        return;
+    return $items;
+};
+$projectGaps = $sortGaps($projectGaps);
+$extendedGaps = $sortGaps($extendedGaps);
+$allMethods = array_sum(array_map(static fn (array $c): int => count($withoutSkipped($c)), $classes));
+$missingMethods = array_sum(array_map(static fn (array $g): int => count($g['missing']), $gaps));
+$notProvenMethods = array_sum(array_map(static fn (array $g): int => count(array_intersect($g['missing'], array_keys($notProven[$g['class']] ?? []))), $gaps));
+$extendedUntested = count(array_filter($extendedGaps, static fn (array $g): bool => $g['untested']));
+$projectUntested = count(array_filter($projectGaps, static fn (array $g): bool => $g['untested']));
+$unusedMethods = array_sum(array_map('count', $unused));
+$counts = [
+    'core-extended without test' => $extendedUntested,
+    'core-extended partial' => count($extendedGaps) - $extendedUntested,
+    'project without test' => $projectUntested,
+    'project partial' => count($projectGaps) - $projectUntested,
+    'unused methods' => $unusedMethods,
+    'not analysed' => count($notAnalysed),
+];
+$exitCode = match (true) {
+    $notAnalysed !== [] => COVERAGE_GAPS_EXIT_NOT_ANALYSED,
+    $extendedUntested > 0 => COVERAGE_GAPS_EXIT_CORE_EXTENDED_UNTESTED,
+    default => COVERAGE_GAPS_EXIT_OK,
+};
+
+$result = [
+    'verdict' => $exitCode === COVERAGE_GAPS_EXIT_OK ? 'OK' : 'FOUND',
+    'exitCode' => $exitCode,
+    'counts' => $counts,
+    'projectOrgs' => $kernel->projectOrgs,
+    'ignoredLayers' => $skipLayers,
+    'summary' => [
+        'classes' => count($classes),
+        'methods' => $allMethods,
+        'testedMethods' => $allMethods - $missingMethods,
+        'notProvenMethods' => $notProvenMethods,
+        'hiddenUnusedMethods' => $hiddenUnused,
+    ],
+    'notAnalysed' => $notAnalysed,
+    'gaps' => [],
+    'entryPoints' => [],
+    'unused' => [],
+    'coveredByDelegates' => array_map('array_keys', $coveredByDelegates),
+    'skippedStubOnly' => $skippedByReason(SkipRules::REASON_STUB_ONLY),
+    'skipped' => $skipped,
+];
+foreach ($gaps as $gap) {
+    $entries = $entriesByClass[$gap['class']] ?? [];
+    $result['gaps'][$gap['class']] = [
+        'section' => $gap['core'] === null ? 'project' : 'core-extended',
+        'core' => $gap['core'],
+        'file' => $gap['file'],
+        'untested' => $gap['untested'],
+        'missing' => $gap['missing'],
+        'notProven' => array_intersect_key($notProven[$gap['class']] ?? [], array_flip($gap['missing'])),
+        'unusedMissing' => array_values(array_intersect($gap['missing'], $unused[$gap['class']] ?? [])),
+        'testVia' => array_values(array_unique(array_map($label, $entries))),
+        'suggestedUnitTests' => array_map(static fn (array $s): array => [
+            'test' => $s['test'],
+            'createWith' => $s['createWith'],
+            'reachedFrom' => array_values(array_unique($s['reachedFrom'])),
+        ], array_values($unitTestSuggestions[$gap['class']] ?? [])),
+    ];
+    if ($gap['core'] !== null) {
+        foreach ($entries as $entry) {
+            $result['entryPoints'][$label($entry)][] = $gap['class'];
+        }
+    }
+}
+uksort($result['entryPoints'], static fn (string $a, string $b): int => count($result['entryPoints'][$b]) <=> count($result['entryPoints'][$a]) ?: strcmp($a, $b));
+$classInfo = array_column($classes, null, 'class');
+foreach ($unused as $class => $dead) {
+    $result['unused'][$class] = [
+        'methods' => $dead,
+        'testsOnly' => array_values(array_filter($dead, static fn (string $m): bool => isset($tested[$class][$m]))),
+        'wholeClass' => count($dead) === count($classInfo[$class]['allMethods']),
+    ];
+}
+
+$reportFile = spryker_upgrade_state_dir($projectRoot) . '/coverage-gaps-report.json';
+file_put_contents($reportFile, json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n");
+
+if (isset($options['json'])) {
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
+    exit($exitCode);
+}
+
+/**
+ * One section of the summary: a title line, at most $limit lines, and the count of the lines left out.
+ *
+ * @param list<string> $lines
+ */
+$printSection = static function (string $title, array $lines) use ($limit): void {
+    echo "\n$title\n";
+    foreach (array_slice($lines, 0, $limit) as $line) {
+        echo "  $line\n";
+    }
+    if (count($lines) > $limit) {
+        printf("  (%d more in the report)\n", count($lines) - $limit);
+    }
+};
+$methodList = static fn (array $gap): string => implode(', ', array_map(static fn (string $m): string => "$m()"
+    . (in_array($m, $unused[$gap['class']] ?? [], true) ? ' [unused]' : '')
+    . (isset($notProven[$gap['class']][$m]) ? ' [not proven: ' . implode(', ', $notProven[$gap['class']][$m]) . ']' : ''), $gap['missing']));
+$testVia = static function (array $gap) use ($report, $analyzer, $entriesByClass, $unitTestSuggestions, $options, $unused): string {
+    if (!array_diff($gap['missing'], $unused[$gap['class']] ?? [])) {
+        return 'unused in production code: delete instead of testing';
     }
     if (isset($options['no-entries'])) {
-        return;
+        return '';
+    }
+    $suggestion = array_values($unitTestSuggestions[$gap['class']] ?? [])[0] ?? null;
+    if ($suggestion !== null) {
+        $method = substr($suggestion['test'], strrpos($suggestion['test'], ':') + 1);
+
+        return ($suggestion['class'] === $gap['class'] ? 'unit test of this class: ' : 'unit test of ')
+            . $report->short($suggestion['class']) . "::$method()"
+            . ($suggestion['createWith'] !== null ? ", create it with {$suggestion['createWith']}" : '');
     }
     $entries = $entriesByClass[$gap['class']] ?? [];
     if ($entries === []) {
-        echo "      test via:  — no entry point found (not created by a factory/DP reachable from the module API: dead code or wired dynamically)\n";
-
-        return;
+        return 'no entry point found (dead code or wired dynamically)';
     }
-    if (isset($unitTestSuggestions[$gap['class']])) {
-        foreach (array_values($unitTestSuggestions[$gap['class']]) as $index => $suggestion) {
-            echo $index === 0 ? '      test via:  ' : '                 ';
-            echo $suggestion['class'] === $gap['class']
-                ? 'unit test of this class: ' . $report->short($suggestion['class']) . '::' . substr($suggestion['test'], strrpos($suggestion['test'], ':') + 1) . "()\n"
-                : 'unit test of ' . $report->short($suggestion['class']) . '::' . substr($suggestion['test'], strrpos($suggestion['test'], ':') + 1) . "() — it runs this class\n";
-            if ($suggestion['createWith'] !== null) {
-                echo "                   create it with {$suggestion['createWith']}\n";
-            }
-            $controllers = array_map(static fn (string $action): string => $report->short(substr($action, 0, strpos($action, '::'))) . substr($action, strpos($action, '::')) . '()', array_unique($suggestion['reachedFrom']));
-            echo '                   reached over HTTP from ' . implode(', ', $controllers) . "\n";
-        }
-        printf("                   (an HTTP test - %s - also covers it, but HTTP tests are not counted by this script)\n", $gap['layer'] === 'Glue' ? 'Glue API Cest, Cypress' : 'Yves acceptance Cest, Cypress');
-
-        return;
-    }
-    $lines = [];
-    $direct = false;
+    $labels = [];
     foreach ($entries as $entry) {
-        if (Kernel::base($analyzer->nodes[$entry][0]) === $gap['class']) {
-            $direct = true;
-
-            continue;
-        }
-        $lines[] = $report->nodeLabel($entry);
-    }
-    if ($direct) {
         $registrations = $report->registrationsOf($gap['class']);
-        array_unshift($lines, 'directly (public API of this class)' . ($registrations ? '; registered in ' . implode(', ', $registrations) : ''));
+        $labels[] = Kernel::base($analyzer->nodes[$entry][0]) === $gap['class']
+            ? 'directly' . ($registrations !== [] ? ' (registered in ' . implode(', ', $registrations) . ')' : '')
+            : $report->nodeLabel($entry);
     }
-    foreach (array_slice($lines, 0, 4) as $index => $line) {
-        echo ($index === 0 ? '      test via:  ' : '                 ') . $line . "\n";
-    }
-    if (count($lines) > 4) {
-        echo '                 … +' . (count($lines) - 4) . " more\n";
-    }
+    $labels = array_values(array_unique($labels));
+
+    return 'test via ' . $labels[0] . (count($labels) > 1 ? sprintf(' (+%d more)', count($labels) - 1) : '');
+};
+$gapLine = static function (array $gap) use ($methodList, $testVia): string {
+    $total = count($gap['methods']);
+    $via = $testVia($gap);
+
+    return ($gap['untested'] ? '✗ ' : '◐ ') . $gap['class']
+        . ($gap['untested'] ? '' : sprintf(' (%d/%d methods tested)', $total - count($gap['missing']), $total))
+        . ($gap['core'] !== null ? ' extends ' . $gap['core'] : '')
+        . ': ' . $methodList($gap) . ($via !== '' ? "; $via" : '');
 };
 
-$printSection = static function (string $title, array $items) use ($printClass): void {
-    $untested = count(array_filter($items, static fn (array $g): bool => $g['untested']));
-    echo "\n" . str_repeat('=', 100) . "\n";
-    printf("%s — %d without any test, %d partially tested\n", $title, $untested, count($items) - $untested);
-    echo str_repeat('=', 100) . "\n";
-    $currentModule = null;
-    usort($items, static fn (array $a, array $b): int => [$a['layer'], $a['module'], !$a['untested'], $a['class']] <=> [$b['layer'], $b['module'], !$b['untested'], $b['class']]);
-    foreach ($items as $item) {
-        if ($currentModule !== $item['layer'] . '/' . $item['module']) {
-            $currentModule = $item['layer'] . '/' . $item['module'];
-            echo "\n$currentModule\n";
-        }
-        $printClass($item);
-    }
-};
-
-$projectGaps = array_values(array_filter($gaps, static fn (array $g): bool => $g['core'] === null));
-$extendedGaps = array_values(array_filter($gaps, static fn (array $g): bool => $g['core'] !== null));
-
-if (isset($options['json'])) {
-    $label = static fn (string $key): string => Kernel::base($analyzer->nodes[$key][0]) . '::' . $analyzer->nodes[$key][2];
-    $result = [
-        'projectOrgs' => $kernel->projectOrgs,
-        'ignoredLayers' => $skipLayers,
-        'summary' => [
-            'classes' => count($classes),
-            'methods' => $allMethods = array_sum(array_map(static fn (array $c): int => count($withoutSkipped($c)), $classes)),
-            'testedMethods' => $allMethods - array_sum(array_map(static fn (array $g): int => count($g['missing']), $gaps)),
-            'hiddenUnusedMethods' => $hiddenUnused,
-        ],
-        'gaps' => [],
-        'entryPoints' => [],
-        'unused' => [],
-        'coveredByDelegates' => array_map('array_keys', $coveredByDelegates),
-        'skippedStubOnly' => $skippedByReason(SkipRules::REASON_STUB_ONLY),
-        'skipped' => $skipped,
-    ];
-    foreach ($gaps as $gap) {
-        $entries = $entriesByClass[$gap['class']] ?? [];
-        $result['gaps'][$gap['class']] = [
-            'section' => $gap['core'] === null ? 'project' : 'core-extended',
-            'core' => $gap['core'],
-            'file' => $gap['file'],
-            'untested' => $gap['untested'],
-            'missing' => $gap['missing'],
-            'unusedMissing' => array_values(array_intersect($gap['missing'], $unused[$gap['class']] ?? [])),
-            'testVia' => array_values(array_unique(array_map($label, $entries))),
-            'suggestedUnitTests' => array_map(static fn (array $s): array => [
-                'test' => $s['test'],
-                'createWith' => $s['createWith'],
-                'reachedFrom' => array_values(array_unique($s['reachedFrom'])),
-            ], array_values($unitTestSuggestions[$gap['class']] ?? [])),
-        ];
-        if ($gap['core'] !== null) {
-            foreach ($entries as $entry) {
-                $result['entryPoints'][$label($entry)][] = $gap['class'];
-            }
-        }
-    }
-    $classInfo = array_column($classes, null, 'class');
-    foreach ($unused as $class => $dead) {
-        $result['unused'][$class] = [
-            'methods' => $dead,
-            'testsOnly' => array_values(array_filter($dead, static fn (string $m): bool => isset($tested[$class][$m]))),
-            'wholeClass' => count($dead) === count($classInfo[$class]['allMethods']),
-        ];
-    }
-    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
-    exit(0);
-}
-
-$printSection('1. Project classes', $projectGaps);
-$printSection('2. Classes extending core', $extendedGaps);
-
-if (!isset($options['no-entries'])) {
-    $byEntry = [];
-    foreach ($extendedGaps as $gap) {
-        foreach ($entriesByClass[$gap['class']] ?? [] as $entry) {
-            $byEntry[$entry][] = $gap['class'];
-        }
-    }
-    uksort($byEntry, static fn (string $a, string $b): int => count($byEntry[$b]) <=> count($byEntry[$a]) ?: strcmp($a, $b));
-
-    echo "\n" . str_repeat('=', 100) . "\n";
-    printf("3. Core entry points that execute the untested overrides — %d entry points\n", count($byEntry));
-    echo str_repeat('=', 100) . "\n";
-    foreach ($byEntry as $entry => $covered) {
-        [$runtime, , $method] = $analyzer->nodes[$entry];
-        $runtime = Kernel::base($runtime);
-        echo "\n  → " . $runtime . '::' . $method . "()\n";
-        foreach ($covered as $class) {
-            echo "      covers:  $class\n";
-        }
-        if (preg_match('/(Facade|Client|Service)$/', $runtime)) {
-            $plugins = $report->pluginsCalling($runtime, $method);
-            foreach (array_slice($plugins, 0, 3) as $plugin) {
-                echo "      plugin:  $plugin\n";
-            }
-            if (count($plugins) > 3) {
-                echo '               … +' . (count($plugins) - 3) . " more plugins\n";
-            }
-        }
-    }
-}
-
-if (!isset($options['no-unused']) && !isset($options['hide-unused'])) {
-    $classInfo = array_column($classes, null, 'class');
-    $wholeClasses = count(array_filter($unused, static fn (array $dead, string $class): bool => count($dead) === count($classInfo[$class]['allMethods']), ARRAY_FILTER_USE_BOTH));
-    echo "\n" . str_repeat('=', 100) . "\n";
-    printf("4. Unused code — %d methods in %d classes have no caller in production code (%d whole classes)\n", array_sum(array_map('count', $unused)), count($unused), $wholeClasses);
-    echo "   [tests only] = called only from tests; the test keeps dead code alive\n";
-    echo str_repeat('=', 100) . "\n";
-    $currentModule = null;
-    foreach ($unused as $class => $dead) {
-        $info = $classInfo[$class];
-        if ($currentModule !== $info['layer'] . '/' . $info['module']) {
-            $currentModule = $info['layer'] . '/' . $info['module'];
-            echo "\n$currentModule\n";
-        }
-        $whole = count($dead) === count($info['allMethods']);
-        echo "  ✗ $class" . ($whole ? '  (whole class unused)' : '') . "\n";
-        echo "      file:      {$info['file']}\n";
-        echo '      unused:    ' . implode(', ', array_map(static fn (string $m): string => "$m()" . (isset($tested[$class][$m]) ? ' [tests only]' : ''), $dead)) . "\n";
-    }
-}
-
-$allMethods = array_sum(array_map(static fn (array $c): int => count($withoutSkipped($c)), $classes));
-$missingMethods = array_sum(array_map(static fn (array $g): int => count($g['missing']), $gaps));
-echo "\n" . str_repeat('-', 100) . "\n";
+echo sprintf(
+    "coverage-gaps: %s %s\n",
+    $result['verdict'],
+    implode(', ', array_map(static fn (string $name, int $count): string => "$name $count", array_keys($counts), $counts)),
+);
 printf(
-    "Summary: %d classes / %d methods in scope; %d methods reached by tests (%.1f%%).\n"
-    . "         Project: %d untested, %d partial. Core-extended: %d untested, %d partial.\n"
-    . (isset($options['hide-unused'])
-        ? sprintf("         Unused in production code: %d methods hidden and not counted (--hide-unused).\n", $hiddenUnused)
-        : sprintf("         Unused in production code: %d methods in %d classes.\n", array_sum(array_map('count', $unused)), count($unused)))
-    . "         Thin plugins counted as covered via their tested delegates: %d methods in %d plugins.\n"
-    . "         Skipped (not listed, not counted): %d methods in %d classes.\n",
-    count($classes),
-    $allMethods,
+    "Scope: %s, %s, %d reached by tests (%.1f%%), %d reachable but not proven, %d skipped, %d covered by thin delegates%s.\n",
+    coverageGapsPlural(count($classes), 'class', 'classes'),
+    coverageGapsPlural($allMethods, 'method', 'methods'),
     $allMethods - $missingMethods,
     $allMethods ? ($allMethods - $missingMethods) / $allMethods * 100 : 0,
-    count(array_filter($projectGaps, static fn (array $g): bool => $g['untested'])),
-    count(array_filter($projectGaps, static fn (array $g): bool => !$g['untested'])),
-    count(array_filter($extendedGaps, static fn (array $g): bool => $g['untested'])),
-    count(array_filter($extendedGaps, static fn (array $g): bool => !$g['untested'])),
-    array_sum(array_map('count', $coveredByDelegates)),
-    count($coveredByDelegates),
+    $notProvenMethods,
     array_sum(array_map('count', $skipped)),
-    count($skipped),
+    array_sum(array_map('count', $coveredByDelegates)),
+    isset($options['hide-unused']) ? sprintf(', %d unused hidden', $hiddenUnused) : '',
 );
-if ($coveredByDelegates !== []) {
-    echo "         Covered via tested delegates (thin plugins):\n";
-    foreach ($coveredByDelegates as $plugin => $methods) {
-        echo "           - $plugin::" . implode('(), ', array_keys($methods)) . "()\n";
-    }
-}
-foreach ([SkipRules::REASON_BOOTSTRAP, SkipRules::REASON_ROUTING, SkipRules::REASON_STUB_ONLY, SkipRules::REASON_UI, SkipRules::REASON_DECLARATIVE] as $reason) {
-    $classesByReason = $skippedByReason($reason);
-    if ($classesByReason === []) {
-        continue;
-    }
-    printf("         Skipped — %s: %d methods in %d classes\n", $reason, array_sum(array_map('count', $classesByReason)), count($classesByReason));
-    if (!isset($options['show-skipped'])) {
-        continue;
-    }
-    foreach ($classesByReason as $class => $methods) {
-        echo "           - $class::" . implode('(), ', $methods) . "()\n";
-    }
-}
-if ($skipped !== [] && !isset($options['show-skipped'])) {
-    echo "         Use --show-skipped to list the skipped methods.\n";
-}
 if ($skipLayers !== []) {
-    echo '         Ignored layers: ' . implode(', ', $skipLayers) . " (not reported, not production callers, not entry points).\n";
+    echo 'Ignored layers: ' . implode(', ', $skipLayers) . ".\n";
 }
-echo "Note: static analysis — HTTP tests (Glue Cest, Cypress) and dynamically resolved calls are not followed.\n";
+if ($notAnalysed !== []) {
+    $printSection(
+        'Could not analyse: ' . coverageGapsPlural($notAnalysedClasses, 'class', 'classes')
+        . ($notAnalysedTestFiles > 0 ? ', ' . coverageGapsPlural($notAnalysedTestFiles, 'test file', 'test files') : '')
+        . ' (the counts above leave them out)',
+        array_map(static fn (array $n): string => $n['name'] . ($n['kind'] === 'class' ? " ({$n['file']})" : '') . ': ' . $n['reason'], $notAnalysed),
+    );
+}
+$printSection(
+    sprintf('Core-extended classes with untested methods: %d (%d without any test)', count($extendedGaps), $extendedUntested),
+    array_map($gapLine, $extendedGaps),
+);
+$printSection(
+    sprintf('Project classes with untested methods: %d (%d without any test)', count($projectGaps), $projectUntested),
+    array_map($gapLine, $projectGaps),
+);
+if (!isset($options['no-entries']) && $result['entryPoints'] !== []) {
+    $printSection(
+        sprintf('Entry points that run the untested core-extended classes: %d', count($result['entryPoints'])),
+        array_map(static fn (string $entry, array $covered): string => "$entry() runs " . implode(', ', $covered), array_keys($result['entryPoints']), $result['entryPoints']),
+    );
+}
+if (!isset($options['no-unused']) && !isset($options['hide-unused']) && $unused !== []) {
+    $printSection(
+        'Unused code: ' . coverageGapsPlural($unusedMethods, 'method', 'methods') . ' in ' . coverageGapsPlural(count($unused), 'class', 'classes'),
+        array_map(static fn (string $class, array $u): string => $class . ': ' . implode(', ', array_map(static fn (string $m): string => "$m()"
+            . (in_array($m, $u['testsOnly'], true) ? ' [tests only]' : ''), $u['methods'])) . ($u['wholeClass'] ? ' (whole class)' : ''), array_keys($result['unused']), $result['unused']),
+    );
+}
+if (isset($options['show-skipped']) && $skipped !== []) {
+    $lines = [];
+    foreach ([SkipRules::REASON_BOOTSTRAP, SkipRules::REASON_ROUTING, SkipRules::REASON_STUB_ONLY, SkipRules::REASON_UI, SkipRules::REASON_DECLARATIVE] as $reason) {
+        foreach ($skippedByReason($reason) as $class => $methods) {
+            $lines[] = "$class::" . implode('(), ', $methods) . "() — $reason";
+        }
+    }
+    $printSection(sprintf('Skipped methods: %d', array_sum(array_map('count', $skipped))), $lines);
+}
+echo "\nFull report: " . spryker_upgrade_rel($reportFile, $projectRoot) . "\n";
+exit($exitCode);

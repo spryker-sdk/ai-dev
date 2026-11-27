@@ -57,6 +57,9 @@ jobs:
                   extensions: mbstring, intl, bcmath
                   coverage: none
 
+            - name: Composer Install
+              run: composer install --prefer-dist --no-interaction --profile
+
             - name: Plugin manifests, skills and agents
               run: php bin/lint-plugins.php
 
@@ -65,6 +68,9 @@ jobs:
 
             - name: Feature install scripts
               run: php tests/scripts/feature-install/feature-install.test.php
+
+            - name: Coverage gaps analyser
+              run: vendor/bin/phpunit --no-configuration tests/scripts/coverage-gaps/CoverageGapsTest.php
 
             - name: Stop guard, under both harnesses
               run: php plugins/spryker-ai-dev-sdk/hooks/hooks.test.php

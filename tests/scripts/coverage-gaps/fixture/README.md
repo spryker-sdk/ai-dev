@@ -1,18 +1,13 @@
 # coverage-gaps.php fixture project
 
 A tiny Spryker-like project used by `../CoverageGapsTest.php`. Every class is an example of one rule of
-`../../coverage-gaps.php`. The code is parsed and reflected, never executed.
+`plugins/spryker-ai-dev-sdk/skills/spryker-upgrade/scripts/coverage-gaps/coverage-gaps.php`. The code is parsed and
+reflected, never executed.
 
-Run the analyser on it, from the project root (`$UP` is the `scripts/` directory of the `spryker-upgrade` skill):
-
-```bash
-php $UP/coverage-gaps/coverage-gaps.php --root=$UP/coverage-gaps/coverage-gaps/fixture
-```
-
-Run the tests:
+Run the tests from the repository root:
 
 ```bash
-vendor/bin/phpunit --no-configuration $UP/coverage-gaps/coverage-gaps/CoverageGapsTest.php
+vendor/bin/phpunit --no-configuration tests/scripts/coverage-gaps/CoverageGapsTest.php
 ```
 
 ## Layout
@@ -21,6 +16,7 @@ vendor/bin/phpunit --no-configuration $UP/coverage-gaps/coverage-gaps/CoverageGa
 |---|---|
 | `src/Example/`, `src/ExampleExtra/` | Two project dirs: every dir in `src/` is project code |
 | `src/Generated/` | Ignored, like `Orm` and `SprykerConfig` |
+| `stubs/` | Stubs of the core classes the fixture extends or implements (`Cart`, `CartExtension`, `GlueApplicationExtension`, `ProductManagementExtension`, `ShopApplication`). The tests load them after Composer, so the real classes win when `vendor/` has them |
 | `tests/PyzTest/Zed/Gizmo/Business/GizmoFacadeTest.php` | The test that sets the expected results; it calls the facade through `$this->tester->getFacade()` |
 | `tests/ExampleTest/Zed/Gizmo/Business/GizmoFacadeCalculateTest.php` | A second test namespace: every `tests/<Org>Test/` directory is read. It calls a facade method that the first test also calls, so it changes no expected result |
 
@@ -38,6 +34,7 @@ Classes are in `src/Example/Zed/Gizmo/` unless stated otherwise.
 | `Business/Model/OtherStep` | Same `StepImporter` class, but configured by an untested factory method (setter injection is tracked per call site) | Untested, test via `GizmoFacade::runOtherSteps()` |
 | `Communication/Plugin/GizmoExpanderPlugin` | Plugin stack resolved via `GizmoDependencyProvider` | Tested |
 | `Business/Model/HelloGreeter` | Template method called from the abstract project parent `AbstractGreeter` | Tested, not unused |
+| `Business/Model/AbstractGreeter` | Abstract class: `greet()` is reached through `HelloGreeter`, `shout()` is not | Partial: `shout` missing, reported in `AbstractGreeter` |
 | `Business/Model/ExtendedStorageProvider` | Extends core `NonPersistentProvider` | Section 2, entry point `GizmoFacade::addItems()` |
 | `Communication/Plugin/CalculatorItemExpanderPlugin` | Thin plugin delegating to tested code | Counted as covered by delegates |
 | `Communication/Plugin/FormatterItemExpanderPlugin` | Thin plugin, but the delegate is untested | Reported |
