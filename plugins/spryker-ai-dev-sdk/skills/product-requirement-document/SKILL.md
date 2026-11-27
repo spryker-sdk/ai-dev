@@ -203,10 +203,6 @@ Ask the user at Phase 8 which location:
 - "Dependencies can list the facade method I'll call" → NO. Module/feature names + configuration names only; the methods/classes go in the `.refs.md` attachment.
 - "I'll discard the FQCNs I found" → NO. Save them to `<feature-name>.refs.md` so the planner has the crosswalk.
 
-## Interactive Workflow Checklist
-
-- [ ] Phase 7: Constraints captured (or explicitly "none discovered"); decisions & accepted risks recorded with their cost; success metrics, out-of-scope, dependencies confirmed (dependencies as module/feature + configuration names, no code references)
-
 ## Supporting Files
 
 - **[workflow.md](workflow.md)** — detailed phase-by-phase interactive script

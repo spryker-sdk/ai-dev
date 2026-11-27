@@ -33,5 +33,11 @@ They are NOT allowed to:
 ## Adding a dependency or a facade method
 
 - Use `$container->getLocator()` directly in the DependencyProvider; never create a new Bridge class just to register a dependency.
-- To add a method to a core facade that another module consumes through a bridge interface: extend the bridge interface in the consuming module, extend the facade in the providing module, and wire it via the locator. Never extend or subclass a core Bridge class.
-- Steps and code examples: load the `spryker-customization` skill and read its `references/core-facade-extension.md`.
+- Never extend or subclass a core Bridge class.
+
+To add a method to a core facade that another module consumes through a bridge interface:
+
+1. In the consuming module's project namespace, create an interface with the core bridge interface's name that extends the core bridge interface and declares the new method.
+2. In the providing module's project namespace, extend the core facade, implement the new interface and add the method.
+3. In the consuming module's DependencyProvider, call the parent, then set the facade constant with `$container->getLocator()` and the new interface as the return type.
+4. In the consuming module's business factory, change the facade getter to return the new interface.

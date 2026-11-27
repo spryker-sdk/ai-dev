@@ -857,8 +857,11 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
 function csv_cli(array $argv): int
 {
     $command = $argv[1] ?? '';
-    if ($command === '--help') {
-        return csv_help($argv[2] ?? null);
+    $args = array_slice($argv, 1);
+    if (in_array('--help', $args, true)) {
+        $named = array_values(array_filter($args, static fn (string $a): bool => $a !== '--help'));
+
+        return csv_help($named[0] ?? null);
     }
     $rest = array_slice($argv, 2);
 

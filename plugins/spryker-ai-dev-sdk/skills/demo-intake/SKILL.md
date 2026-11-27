@@ -1,6 +1,6 @@
 ---
 name: demo-intake
-description: "Turns a customer brief (docx, pdf, text, demo script, URL or verbal) into structured input: platform, routing table, field mapping, brand colour, open questions. Use to classify a brief."
+description: "Classifies a customer brief (docx, pdf, text, demo script, URL, verbal): platform, routing table, field mapping, brand colour, open questions. Not for a full demo prep: use demo-prep-wizard."
 ---
 
 # demo-intake (briefing → wizard handoff)

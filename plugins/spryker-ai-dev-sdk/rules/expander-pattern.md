@@ -28,4 +28,4 @@ They are NOT allowed to:
 
 ## Example
 
-A correct expander fetches the related data through a Facade, returns the input transfer unchanged when that data is missing, and otherwise sets the data on the same instance and returns it.
+A correct expander fetches the related data through a Facade, a reader or the injected repository, returns the input transfer unchanged when that data is missing, and otherwise sets the data on the same instance and returns it.
