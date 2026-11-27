@@ -66,6 +66,9 @@ jobs:
             - name: Feature install scripts
               run: php tests/scripts/feature-install/feature-install.test.php
 
+            - name: Refresher plan and run
+              run: php plugins/spryker-ai-dev-sdk/skills/spryker-refresher/scripts/refresh.test.php
+
             - name: Stop guard, under both harnesses
               run: php plugins/spryker-ai-dev-sdk/hooks/hooks.test.php
 
