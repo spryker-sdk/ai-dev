@@ -53,7 +53,7 @@ php $UP/coverage-gaps/coverage-gaps.php --module=Cart    # one module
 php $UP/coverage-gaps/coverage-gaps.php --json           # full report on stdout
 ```
 
-A full run takes between 15 and 30 seconds. Progress goes to stderr.
+Progress goes to stderr.
 
 ## Flags
 
