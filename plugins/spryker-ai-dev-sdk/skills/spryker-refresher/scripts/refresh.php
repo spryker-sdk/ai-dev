@@ -37,6 +37,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../spryker-upgrade/scripts/run-tools.php';
+require_once __DIR__ . '/../../spryker-runtime/scripts/deploy-file.php';
 
 const RF_STATE = '.ai-dev/refresher';
 const RF_TAIL_LINES = 20;
@@ -277,12 +278,8 @@ function rf_files_from_args(string $root, array $args, string $base, bool $git, 
  */
 function rf_context(string $root, string $base, string $deployFile, bool $git): array
 {
-    $deploy = is_file($root . '/' . $deployFile) ? (string)file_get_contents($root . '/' . $deployFile) : null;
-    preg_match_all('/entry-point:\s*[\'"]?(Glue\w*)/', (string)$deploy, $entryPoints);
-    preg_match_all('/application:\s*[\'"]?(glue[\w-]*)/', (string)$deploy, $applications);
-    foreach ($applications[1] as $application) {
-        $entryPoints[1][] = str_replace(' ', '', ucwords(str_replace('-', ' ', $application)));
-    }
+    $loaded = df_load($root, $deployFile);
+    $deploy = is_array($loaded) ? $loaded : null;
 
     return [
         'root' => $root,
@@ -291,8 +288,9 @@ function rf_context(string $root, string $base, string $deployFile, bool $git): 
         'namespaces' => spryker_upgrade_project_namespaces($root),
         'deployFile' => $deployFile,
         'deploy' => $deploy,
-        'entryPoints' => array_values(array_unique($entryPoints[1])),
-        'dms' => $deploy !== null && preg_match('/SPRYKER_DYNAMIC_STORE_MODE:\s*[\'"]?(true|1)\b/i', $deploy) === 1,
+        'deployError' => is_string($loaded) ? $loaded : null,
+        'entryPoints' => $deploy === null ? [] : df_glue_entry_points($deploy),
+        'dms' => $deploy !== null && df_dynamic_store($deploy),
         'apiPlatform' => glob($root . '/src/Generated/Api/*', GLOB_ONLYDIR) !== [],
     ];
 }
@@ -720,6 +718,9 @@ function rf_plan(array $context, array $files, array $flags, array $unknown = []
     $steps = [];
     $manual = [];
     $decisions = [];
+    if (($context['deployError'] ?? null) !== null) {
+        $decisions[] = sprintf('%s. The plan does not use the deploy file (Glue entry points, dynamic store mode): pass --deploy-file with a file the reader parses, or check the Glue and per-store steps by hand.', $context['deployError']);
+    }
     $skipped = [];
     $unmatched = [];
     $imports = false;
@@ -832,7 +833,7 @@ function rf_plan(array $context, array $files, array $flags, array $unknown = []
             $add(['router:cache:warm-up', $router], $routerList . ' [router: --router ' . $router . ']');
         }
     }
-    if ($context['deploy'] === null && ($glueNeeded || $imports)) {
+    if ($context['deploy'] === null && ($context['deployError'] ?? null) === null && ($glueNeeded || $imports)) {
         $decisions[] = sprintf('deploy file %s not found: the Glue applications and the DMS mode (the per-store queue drain after an import) come from it, so their steps are not planned. Plan again with --deploy-file <the active deploy file>.', $context['deployFile']);
     } elseif ($glueNeeded) {
         $decisions = array_merge($decisions, $glue['decisions']);

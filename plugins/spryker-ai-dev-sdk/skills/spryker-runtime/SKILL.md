@@ -21,55 +21,57 @@ Keep findings factual and reproducible: someone should be able to repeat your st
 
 ## Environments
 
-**Hosts are NOT hard-coded truth — resolve them from `deploy.dev.yml` first.** The endpoint hostnames live under `groups.<region>.applications.<app>.endpoints` in `deploy.dev.yml`. Read that file at the start of a runtime session and use the hosts it declares; the defaults below are only the typical values for the EU group and may differ on this install.
+**Hosts are NOT hard-coded truth — resolve them from the active deploy file first** (`deploy.dev.yml` unless the project uses another one).
 
 Also: **if the user names a specific endpoint to use — e.g. a real cloud URL like `https://<env>.cloud.spryker.com` or a staging host — use that instead of the local one.** A user-provided target always wins over the local default.
 
-Each surface maps to a `deploy.dev.yml` **application** — resolve the host from that application's `endpoints` key, never hard-code it. The notation `<host:yves>` below means "the endpoint host of the `yves` application in `deploy.dev.yml`"; substitute the real value you resolved before issuing any request.
+**Locations.** `$RT` is `<skill-dir>/scripts`, where `<skill-dir>` is the path reported as `Base directory for this skill:` when this skill loaded. Substitute it inline as a literal path; never set a shell variable and never `cd`. Run the script from the project root.
 
-| Surface | `deploy.dev.yml` application | Host token | Login URL | Credentials |
-|---------|------------------------------|------------|-----------|-------------|
-| Yves storefront | `yves` | `<host:yves>` | `/DE/en/login` | `sonia@acme.com` / `change123` |
-| Back Office (Zed) | `backoffice` | `<host:backoffice>` | `/security-gui/login` | `admin@spryker.com` / `change123` |
-| Glue REST API | `glue` | `<host:glue>` | token via `/access-tokens` | customer credentials as above |
-| Glue Storefront | `glue-storefront` | `<host:glue-storefront>` | token | as above |
-| Glue Backend | `glue-backend` | `<host:glue-backend>` | token | Back Office user |
-| Backend API (Zed) | `zed` (entry-point `BackendApi`) | `<host:backend-api>` | — | Back Office user |
-| Merchant Portal | `merchant-portal` | `<host:merchant-portal>` | Merchant Portal login | merchant user |
-
-**Resolve the hosts at the start of the session** and reuse the values for every request. Each `endpoints:` block under an application lists its host(s); pick the one whose `region` matches your target store:
+**Resolve the environment at the start of the session** and reuse the values for every request:
 ```bash
-# Dump every application + its endpoint host(s) from the deploy file
-grep -nE 'application:|endpoints:|region:|entry-point:|\.spryker\.local|\.cloud\.' deploy.dev.yml
-
-# Or resolve the host for one application — picks the endpoint that carries `region:`
-# (the real store host), so it skips secondary endpoints like configurator entry-points.
-# Set APP to the deploy.dev.yml application name: yves | backoffice | glue | glue-storefront | glue-backend | merchant-portal | zed
-APP=yves; awk -v app="$APP" '
-  $0 ~ ("^[[:space:]]+application: " app "$"){f=1; next}
-  f && /^[[:space:]]+application:/ {exit}
-  f && /^[[:space:]]+[a-z0-9.-]+:[[:space:]]*$/ && !/endpoints:|services:|http:|session:/ {cand=$1; gsub(/[[:space:]:]/,"",cand)}
-  f && cand && /region:/ {print cand; exit}
-' deploy.dev.yml
+php $RT/runtime.php env --app <app>                  # one application, e.g. --app backoffice: use this form first
+php $RT/runtime.php env --region <region or store>   # the applications of the store in use + the service containers
+php $RT/runtime.php env                              # every store: long in a multi-store project
+php $RT/runtime.php env --deploy-file deploy.<name>.yml
 ```
-The hosts may be `*.spryker.local` on this install or anything else on another — always use what the file reports, not the literal values shown in the examples below.
+One line per application endpoint: application, store or region, URL with scheme and port, session cookie name, container; then the services (broker, database, search, key-value store, …) with their containers, named by the project's namespace. The notation `<host:yves>` below means "the URL the env call prints for the `yves` application" (for a multi-store project, the line of the target store); `<cookie:yves>` is the cookie name on that line. Substitute the real values before issuing any request.
+
+| Surface | Deploy application | Authentication |
+|---------|--------------------|----------------|
+| Yves storefront | `yves` | session (login form) |
+| Back Office (Zed) | `backoffice` | session (login form) |
+| Glue REST API | `glue` | token via `/access-tokens`, customer account |
+| Glue Storefront | `glue-storefront` | token via `/token`, customer account |
+| Glue Backend | `glue-backend` | token via `/token`, Back Office user |
+| Backend API (Zed) | `zed` (entry-point `BackendApi`) | Back Office user |
+| Merchant Portal | `merchant-portal` | session (login form), merchant user |
+
+**Fallback for a host that `env` does not list** (a user-provided target):
+- Session cookie name: the host with every `.` replaced by `-` (`backoffice.de.shop.local` → `backoffice-de-shop-local`).
+- Token request: legacy Glue (`glue`) takes `POST <host>/access-tokens` with `Content-Type: application/vnd.api+json` and `{"data":{"type":"access-tokens","attributes":{"username":"<user>","password":"<password>"}}}`; the Storefront API and the Backend API take `POST <host>/token` with the form `grant_type=password&username=<user>&password=<password>`.
 
 ## Login per role — full reference
 
-All demo accounts share the **same default password: `change123`**. Each actor has its own login URL and entry point — using the wrong one fails silently. Combine the login path with the **host resolved from `deploy.dev.yml`** (or the user-specified target).
+All demo accounts share the **same default password: `change123`**. Each actor has its own login URL and entry point — using the wrong one fails silently. Combine the login path with the **host from the env call** (or the user-specified target).
 
-Each row is `http://<resolved-host>/<path>` — substitute the host token (resolved from `deploy.dev.yml` per the table above) for the actual hostname.
+**Default accounts.** Use the default account of the actor in the table below first. Use the accounts call for another account, and when a default account fails:
+```bash
+php $RT/runtime.php accounts --role <role>     # one role, e.g. --role customer
+php $RT/runtime.php accounts --user <text>     # the user names that contain <text>
+php $RT/runtime.php accounts                   # every role: long in a demo shop
+```
+The accounts call lists the accounts the repository seeds: Back Office users and agents (`src/<Ns>/Zed/User/UserConfig.php`, else the vendor `UserConfig.php`), merchant users and customers (`data/import/**`, `data/import/common` first). It prints one line per user name, under one header line per file: the line in the file and where the password is. It never prints a password. `--limit N` sets the lines per role (default 20, at most 200).
 
-| Actor | Login URL (`http://<host>` + path) | Demo account | Lands on |
-|-------|------------------------------------|--------------|----------|
-| **Back Office user (admin)** | `<host:backoffice>/security-gui/login` | `admin@spryker.com` | Back Office dashboard |
-| **Customer** | `<host:yves>/DE/en/login` | `sonia@acme.com` | `/DE/en/customer/overview` |
-| **Agent** (customer assist) | `<host:yves>/agent/login` | `agent123@spryker.com` | Agent dashboard; can then impersonate a customer |
-| **Merchant user** | `<host:merchant-portal>/security-merchant-portal-gui/login` | `harald@spryker.com` | Merchant Portal — **one** merchant only (`harald` → "Spryker") |
-| **Merchant Agent** | `<host:merchant-portal>/security-merchant-portal-gui/login` | (merchant-agent account — see DB lookup below) | Merchant Portal — **across multiple** merchants |
+| Actor | Default account | Login URL (`<host>` + path) | Role in `runtime.php accounts` | Lands on |
+|-------|-----------------|------------------------------|--------------------------------|----------|
+| **Back Office user (admin)** | `admin@spryker.com` | `<host:backoffice>/security-gui/login` | `backoffice-user` | Back Office dashboard |
+| **Customer** | `sonia@acme.com` | `<host:yves>/DE/en/login` | `customer` | `/DE/en/customer/overview` |
+| **Agent** (customer assist) | `agent123@spryker.com` | `<host:yves>/agent/login` | `backoffice-user, agent` | Agent dashboard; can then impersonate a customer |
+| **Merchant user** | `harald@spryker.com` | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-user (<merchant reference>)` | Merchant Portal — **one** merchant only |
+| **Merchant Agent** | from the accounts call | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-agent` (else see the DB lookup below) | Merchant Portal — **across multiple** merchants |
 
-> The password is the **same `change123`** for every account above.
->
+**Log in without a browser:** `php $RT/runtime.php login <yves|agent|backoffice|merchant-portal|glue|glue-storefront|glue-backend> <user>` logs in to the host the deploy file names (`--region`, `--host` to choose one of them) and leaves the session in a cookie jar, or the API token in a file, under `.ai-dev/runtime/sessions/`. `--path` sets another login or token path; `--insecure` accepts a self-signed certificate. It takes the password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files, and prints one line: the result and the file. It never prints the password, the cookie value or the token. Exit 1 is a refused login (see the next section); exit 2 names what is missing or refused (a password, a host the deploy file does not have, a redirect to such a host, a deploy file the script cannot parse); exit 3 is a host that did not answer, or answered HTTP 4xx/5xx on a page that is not the login page.
+
 > **Merchant user vs Merchant Agent** share the same login URL; the difference is **scope**. A Merchant user is bound to exactly one merchant via `spy_merchant_user.fk_merchant` (e.g. `harald@spryker.com` → "Spryker", `michele@sony-experts.com` → "Sony Experts") and sees only that seller's data. A Merchant Agent acts across many merchants. Pick the account by the scope the task needs.
 
 ### When the default credentials don't work
@@ -117,35 +119,30 @@ Database / Redis / queue inspection (read-only checks for "does X exist / how is
 ```bash
 docker/sdk cli "mariadb -h database -u spryker -psecret -D eu-docker -e 'SELECT 1 as test;'"
 docker/sdk cli redis-cli -h key_value_store -n 1
-docker exec spryker_broker_1 rabbitmqadmin -u spryker -p secret list queues
+docker exec <broker container from the env call> rabbitmqadmin -u spryker -p secret list queues
 ```
 
 ## Mode 2 — HTTP / API (with a real session)
 
 Use this to call an endpoint and see exactly what it returns, without rendering UI.
 
-**Storefront / Back Office (cookie session)** — first obtain a session cookie (log in via Mode 3 once, copy the cookie), then:
-
-The session **cookie name is derived from the host**: take the resolved host and replace every `.` with `-` (e.g. host `yves.eu.spryker.local` → cookie `yves-eu-spryker-local`). Never hard-code the cookie name — derive it from the host you resolved from `deploy.dev.yml`.
+**Storefront / Back Office (cookie session)** — first obtain a session (the login call, or log in via Mode 3 once and copy the cookie), then:
 
 ```bash
-# <host:yves> and its cookie name both come from deploy.dev.yml (cookie = host with dots → dashes)
-curl -s -b '<cookie:yves>=<session_id>' \
-  http://<host:yves>/DE/en/customer/overview
+php $RT/runtime.php login yves <user>          # prints the cookie jar path
+curl -s -b <cookie jar> <host:yves>/DE/en/customer/overview
 ```
-The Back Office cookie follows the same rule: `<cookie:backoffice>` is `<host:backoffice>` with dots replaced by dashes.
+The env call prints the session cookie name of each application (`<cookie:yves>`, `<cookie:backoffice>`); never hard-code it. With a cookie copied from the browser: `curl -s -b '<cookie:yves>=<session_id>' <host:yves>/DE/en/customer/overview`.
 
 **Glue REST API (token)**:
 
 ```bash
-# 1) get an access token (<host:glue> resolved from deploy.dev.yml)
-curl -s -X POST http://<host:glue>/access-tokens \
-  -H 'Content-Type: application/json' \
-  -d '{"data":{"type":"access-tokens","attributes":{"username":"sonia@acme.com","password":"change123"}}}'
+# 1) get an access token: the token goes to a file, never to the output
+php $RT/runtime.php login glue <customer user>   # prints the token file path
 
 # 2) call a resource with the token
-curl -s http://<host:glue>/<resource> \
-  -H 'Authorization: Bearer <accessToken>'
+curl -s <host:glue>/<resource> \
+  -H "Authorization: Bearer $(cat <token file>)"
 ```
 
 Capture the **HTTP status, response shape, and key fields** — that's what downstream requirements/verification care about.
@@ -190,7 +187,7 @@ Session startup:
 
 > **Browser forms lose typed values on navigation — fill and submit atomically.** A common failure: setting field values, then navigating elsewhere (or letting a batch navigate) before submitting — the page reloads and the form is blank, so you land back on the login page. Type the email + password **and** click submit without navigating in between; only navigate *after* you've confirmed login succeeded. Where the setup supports batching several actions in one call, put the whole sequence in one batch. Note that setting a field value does **not** submit the form — you still need an actual click or Enter. Verify with a screenshot or a page-text read that you're past the login page before continuing.
 
-Login as a specific actor: use the exact login URL + demo account for that role from the **"Login per role" reference** above (each role has a different login path; the password is `change123` for all). If the default credentials fail, run the DB lookup there and, if still blocked, ask the user.
+Login as a specific actor: use the exact login URL for that role from the **"Login per role" reference** above and an account of that role from the accounts call (each role has a different login path). If the default credentials fail, run the DB lookup there and, if still blocked, ask the user.
 
 Reading state: prefer `get_page_text` / `read_page` for content, `read_network_requests` to see the actual XHR/endpoint a UI action hits (useful for resolving the real endpoint behind a button), and `read_console_messages` (with a `pattern` filter) for app logs.
 
@@ -198,7 +195,7 @@ Reading state: prefer `get_page_text` / `read_page` for content, `read_network_r
 ```
 Cookie: <cookie:yves>=<session_id>; last-visit=<ts>
 ```
-(`<cookie:yves>` = the resolved Yves host with dots replaced by dashes.)
+(`<cookie:yves>` = the cookie name the env call prints for `yves`.)
 
 ## Mode 4 — Browser-seeded curl (hybrid) — FAST PATH for complex scenarios
 
@@ -225,7 +222,7 @@ GET (read an endpoint with the live session):
 curl -s -i \
   -H 'Cookie: <cookie:backoffice>=<session_id>; last-visit=<ts>' \
   -H 'X-Requested-With: XMLHttpRequest' \
-  'http://<host:backoffice>/<module>/<controller>/<action>?<query>'
+  '<host:backoffice>/<module>/<controller>/<action>?<query>'
 ```
 
 POST a CSRF-protected Back Office form (token + cookie from Step 2):
@@ -235,12 +232,12 @@ curl -s -i -X POST \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode '<form>[field]=value' \
   --data-urlencode '<form>[_token]=<csrf_token>' \
-  'http://<host:backoffice>/<module>/<controller>/<action>'
+  '<host:backoffice>/<module>/<controller>/<action>'
 ```
 
 Glue (bearer token from `/access-tokens`, no cookie/CSRF):
 ```bash
-curl -s -i http://<host:glue>/<resource> \
+curl -s -i <host:glue>/<resource> \
   -H 'Authorization: Bearer <accessToken>' \
   -H 'Content-Type: application/json'
 ```
@@ -250,7 +247,7 @@ curl -s -i http://<host:glue>/<resource> \
 **Reuse the cookie across modes:** the `Cookie` header you harvest here is the same one Mode 2 uses — capture once, drive both. Save it to a shell variable for the session:
 ```bash
 COOKIE='<cookie:backoffice>=<session_id>; last-visit=<ts>'
-curl -s -H "Cookie: $COOKIE" 'http://<host:backoffice>/<...>'
+curl -s -H "Cookie: $COOKIE" '<host:backoffice>/<...>'
 ```
 
 **When NOT to use Mode 4:** if the behavior under test is client-side (JS rendering, in-page validation, redirects the browser follows automatically), curl won't exercise it — stay in Mode 3. Mode 4 tests the *server* response, not the rendered page.
@@ -300,7 +297,7 @@ What to do, every time after a rebuild:
 - **Hard reload bypassing cache** — `Cmd+Shift+R` (Mac) / `Ctrl+Shift+R`. Via the Chrome MCP, send the `computer` `key` action `cmd+shift+r` (Mac) on the tab, or re-`navigate` the tab which also refetches.
 - **Verify the server actually has the new code** (rules out "build didn't run"): fetch the real bundle URL with cache disabled and grep for a new symbol you just added, e.g.
   ```bash
-  curl -s 'http://<host:backoffice>/assets/js/spryker-zed-<name>.js?v=current' | grep -c '<new-symbol-you-added>'
+  curl -s '<host:backoffice>/assets/js/spryker-zed-<name>.js?v=current' | grep -c '<new-symbol-you-added>'
   ```
   If the server has it but the page doesn't show it → cache; hard-reload. If the server doesn't have it → the build didn't run / wrong entry; rebuild.
 - This is **HTTP disk cache**, not service workers / CacheStorage (those are empty here) — a hard reload is sufficient; no need to clear site data.
