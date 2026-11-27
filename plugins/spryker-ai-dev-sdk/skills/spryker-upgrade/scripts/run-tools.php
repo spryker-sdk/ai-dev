@@ -7,7 +7,7 @@
  * Usage (from the project root):
  *   php run-tools.php <run> <tool>... [--tests-args "<args>"]
  *                     [--sniffer "<command>"] [--env NAME=VALUE]... [--codecept-options "<options>"]...
- *                     [--pin-dir <dir>]
+ *                     [--pin-dir <dir>] [--force]
  *
  *   <run>   baseline, post-tooling, detect, verify, final, after, or another lower-case name.
  *   <tool>  phpstan, sniffer, evaluator, codecept-build, tests.
@@ -30,6 +30,13 @@
  *   evaluator-<run>.txt, codecept-build-<run>.txt, codecept-<run>.txt. Each file ends with
  *   `exit <code>`. tool-runs-<run>.json holds the commands, exit codes, results, the tests per suite
  *   and the names of the failing tests of the latest run of each tool; it is written after each tool.
+ *   failing-tests-<run>.txt holds the names of the failing tests, one per line under its suite.
+ *   Before a tool starts, its log and its entry in tool-runs-<run>.json are removed, so a run that
+ *   is stopped leaves no log of an earlier run.
+ *
+ * The baseline run refuses (exit 2) to replace a baseline log that holds a result when the state
+ * directory has a base-ref and HEAD is not that commit: the code changed since Phase 0. --force
+ * replaces it.
  *
  * The pinned invocation: the baseline run writes tool-invocation.json (sniffer entry point and how it
  * was chosen, environment variables from --env, codecept options per configuration); a repeated
@@ -51,7 +58,7 @@ require_once __DIR__ . '/tool-output.php';
 
 const RT_TOOLS = ['phpstan', 'sniffer', 'evaluator', 'codecept-build', 'tests'];
 const RT_PIN_FILE = 'tool-invocation.json';
-const RT_USAGE = "Usage: php run-tools.php <run> <tool>... [--tests-args \"<args>\"] [--sniffer \"<command>\"] [--env NAME=VALUE]... [--codecept-options \"<options>\"]... [--pin-dir <dir>]\n"
+const RT_USAGE = "Usage: php run-tools.php <run> <tool>... [--tests-args \"<args>\"] [--sniffer \"<command>\"] [--env NAME=VALUE]... [--codecept-options \"<options>\"]... [--pin-dir <dir>] [--force]\n"
     . "  <tool>: phpstan, sniffer, evaluator, codecept-build, tests\n";
 
 /**
@@ -199,10 +206,10 @@ function rt_execute_tests(array $commands, string $root, array $env, string $log
     foreach ($commands as $command) {
         $partFile = $logFile . '.part';
         $code = rt_execute(rt_wrap($command, PHP_OS_FAMILY), $root, $env, $partFile);
-        $part = (string)preg_replace('/\nexit \d+\s*$/', "\n", (string)file_get_contents($partFile));
+        $part = to_strip_exit((string)file_get_contents($partFile));
         @unlink($partFile);
         $highest = max($highest, $code);
-        $problem = $code === 126 || $code === 127 ? "exit $code" : to_result_problem('codecept', $part);
+        $problem = $code === 126 || $code === 127 ? "exit $code" : to_result_problem('codecept', $part, $code);
         if ($problem !== null) {
             $notRun[] = implode(' ', array_slice($command, 2)) . ': ' . (to_start_failure(to_plain_text($part)) ?? $problem);
         }
@@ -240,7 +247,7 @@ function rt_result(string $tool, string $contents, int $exitCode): array
         'sniffer' => 'sniff',
         'tests' => 'codecept',
         default => $tool,
-    }, (string)preg_replace('/\nexit \d+\s*$/', "\n", $contents));
+    }, to_strip_exit($contents), $exitCode);
     if ($problem !== null) {
         return ['ran' => false, 'result' => 'did not run: ' . ($startFailure ?? $problem)];
     }
@@ -297,6 +304,10 @@ function rt_parse_args(array $args): array|string
         $arg = $args[$i];
         if (!str_starts_with($arg, '--')) {
             $positional[] = $arg;
+            continue;
+        }
+        if ($arg === '--force') {
+            $options['force'] = true;
             continue;
         }
         [$name, $value] = str_contains($arg, '=') ? explode('=', substr($arg, 2), 2) : [substr($arg, 2), null];
@@ -387,6 +398,54 @@ function rt_pin(string $run, array $options, string $root, string $pinFile): arr
     return $pin;
 }
 
+/**
+ * The reason a baseline run must not replace the baseline logs of $tools, or null: a log holds a
+ * result and HEAD is not the commit in base-ref. No base-ref, or no readable HEAD: no check.
+ *
+ * @param list<string> $tools
+ */
+function rt_baseline_guard(array $tools, string $stateDir, string $root): ?string
+{
+    $baseRef = trim((string)@file_get_contents($stateDir . '/base-ref'));
+    if ($baseRef === '') {
+        return null;
+    }
+    $head = trim((string)shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse HEAD 2>/dev/null'));
+    if (!preg_match('/^[0-9a-f]{7,64}$/', $head) || str_starts_with($head, $baseRef)) {
+        return null;
+    }
+    $kept = [];
+    foreach (array_diff($tools, ['codecept-build']) as $tool) {
+        $contents = @file_get_contents($stateDir . '/' . rt_log_name($tool, 'baseline'));
+        $resultTool = ['sniffer' => 'sniff', 'tests' => 'codecept'][$tool] ?? $tool;
+        if ($contents !== false && to_result_problem($resultTool, to_strip_exit($contents), to_log_exit_code($contents)) === null) {
+            $kept[] = rt_log_name($tool, 'baseline');
+        }
+    }
+
+    return $kept === [] ? null : sprintf(
+        "HEAD (%s) is not the base ref (%s), and these baseline logs hold a result: %s. A baseline run now records the changed code. Compare with compare-tool-runs.php, or pass --force to replace the baseline.",
+        substr($head, 0, 12),
+        substr($baseRef, 0, 12),
+        implode(', ', $kept)
+    );
+}
+
+/**
+ * The failing tests of a tests result, one per line under its suite.
+ *
+ * @param array<string, list<string>> $failedTests
+ */
+function rt_failing_tests_text(array $failedTests): string
+{
+    $text = '';
+    foreach ($failedTests as $suite => $tests) {
+        $text .= $suite . "\n" . implode('', array_map(static fn (string $test): string => "  $test\n", $tests));
+    }
+
+    return $text;
+}
+
 function rt_main(array $argv): int
 {
     $parsed = rt_parse_args(array_slice($argv, 1));
@@ -398,6 +457,12 @@ function rt_main(array $argv): int
     $root = spryker_upgrade_project_root();
     $stateDir = spryker_upgrade_state_dir($root);
     $pinDir = isset($parsed['options']['pin-dir']) ? rtrim((string)$parsed['options']['pin-dir'], '/') : $stateDir;
+    $guard = $parsed['run'] === 'baseline' && empty($parsed['options']['force']) ? rt_baseline_guard($parsed['tools'], $stateDir, $root) : null;
+    if ($guard !== null) {
+        fwrite(STDERR, $guard . "\n");
+
+        return 2;
+    }
     $pin = rt_pin($parsed['run'], $parsed['options'], $root, $pinDir . '/' . RT_PIN_FILE);
     if (is_string($pin)) {
         fwrite(STDERR, $pin . "\n");
@@ -409,8 +474,26 @@ function rt_main(array $argv): int
     $runsFile = $stateDir . '/tool-runs-' . $parsed['run'] . '.json';
     $records = (array)(json_decode((string)@file_get_contents($runsFile), true)['tools'] ?? []);
     $notRun = 0;
+    $writeRecords = static function () use ($runsFile, $parsed, $pin, &$records): void {
+        file_put_contents($runsFile, json_encode([
+            'run' => $parsed['run'],
+            'createdAt' => date('c'),
+            'invocation' => $pin,
+            'tools' => (object)$records,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+    };
+    $failingTestsFile = $stateDir . '/failing-tests-' . $parsed['run'] . '.txt';
     foreach ($parsed['tools'] as $tool) {
         $logFile = $stateDir . '/' . rt_log_name($tool, $parsed['run']);
+        // A run that is stopped leaves no log or record of an earlier run of the tool.
+        @unlink($logFile);
+        if ($tool === 'tests') {
+            @unlink($failingTestsFile);
+        }
+        if (isset($records[$tool])) {
+            unset($records[$tool]);
+            $writeRecords();
+        }
         if ($tool === 'tests') {
             $commands = array_map(static fn (string $set): array => rt_tool_command($tool, $pin, $testsArgs, $set), $pin['codeceptOptions']);
             [$exitCode, $partsNotRun] = rt_execute_tests($commands, $root, $pin['env'], $logFile);
@@ -427,14 +510,17 @@ function rt_main(array $argv): int
         $notRun += $result['ran'] ? 0 : 1;
         $log = spryker_upgrade_rel($logFile, $root);
         $records[$tool] = ['command' => implode(' && ', array_map(static fn (array $command): string => implode(' ', $command), $commands)), 'exitCode' => $exitCode, 'log' => $log] + $result;
+        if ($tool === 'tests' && $result['ran']) {
+            $failed = $result['failedTests'] ?? [];
+            if ($failed === [] && ($result['suites'] ?? []) === []) {
+                $summary = to_codecept_summary(to_plain_text((string)file_get_contents($logFile)))['failing'];
+                $failed = $summary === [] ? [] : ['(no suite in the output)' => $summary];
+            }
+            file_put_contents($failingTestsFile, rt_failing_tests_text($failed));
+        }
         fwrite(STDOUT, sprintf("%-15s exit %-3d %s  %s\n", $tool, $exitCode, $result['result'], $log));
         // Written after each tool, so a run that is stopped keeps the tools that finished.
-        file_put_contents($runsFile, json_encode([
-            'run' => $parsed['run'],
-            'createdAt' => date('c'),
-            'invocation' => $pin,
-            'tools' => $records,
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
+        $writeRecords();
     }
 
     if ($parsed['run'] === 'baseline') {

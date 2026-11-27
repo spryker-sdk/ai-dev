@@ -245,9 +245,10 @@ if ($mode === 'snapshot') {
 
     spryker_upgrade_print_summary(
         sprintf('check-dead-overrides snapshot (%d vendor-method overrides recorded)', count($result['map'])),
+        false,
         ['classes that do not load' => count($result['unloadable'])],
         array_map(
-            static fn (string $class, string $error): array => spryker_upgrade_finding('UNLOADABLE', $class . ': ' . $error),
+            static fn (string $class, string $error): array => spryker_upgrade_finding('UNLOADABLE', $class . ': ' . spryker_upgrade_short($error)),
             array_keys($result['unloadable']),
             array_values($result['unloadable'])
         ),
@@ -256,6 +257,25 @@ if ($mode === 'snapshot') {
         $options['limit']
     );
     exit(0);
+}
+
+/**
+ * One finding line: the method and file when known, then the vendor class that declared the method
+ * (orphaned override) or the load error (broken class).
+ *
+ * @param array<string, string> $conflict
+ */
+function deadOverrideLine(array $conflict): string
+{
+    $subject = $conflict['method'] === '-' ? $conflict['class'] : $conflict['class'] . '::' . $conflict['method'];
+    if ($conflict['file'] !== '-') {
+        $subject .= ' (' . $conflict['file'] . ')';
+    }
+    if ($conflict['type'] === 'CLASS_BROKEN') {
+        return $subject . ' load error: ' . spryker_upgrade_short($conflict['detail']);
+    }
+
+    return $subject . ' was declared in ' . $conflict['vendorDeclaringClass'];
 }
 
 // verify
@@ -337,8 +357,9 @@ foreach ($conflicts as $c) {
 }
 spryker_upgrade_print_summary(
     sprintf('check-dead-overrides verify (%d recorded overrides)', count($snapshot['overrides'])),
+    $conflicts !== [],
     $counts,
-    array_map(static fn (array $c): array => spryker_upgrade_finding($c['type'], $c['class'] . '::' . $c['method'] . ' (' . $c['file'] . ')'), $conflicts),
+    array_map(static fn (array $c): array => spryker_upgrade_finding($c['type'], deadOverrideLine($c)), $conflicts),
     $reportFile,
     $root,
     $options['limit'],

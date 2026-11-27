@@ -40,6 +40,9 @@ require $root . '/vendor/autoload.php';
 
 $stateDir = spryker_upgrade_state_dir($root);
 $reportFile = $stateDir . '/typed-members-report.json';
+if ($options['baseline']) {
+    spryker_upgrade_guard_baseline($root, $stateDir, 'typed-members', $options['force']);
+}
 
 $dirs = array_slice($argv, 1);
 if ($dirs === []) {
@@ -221,16 +224,17 @@ $report = spryker_upgrade_compare_with_baseline(
     'typed-members',
     $report,
     ['problems'],
-    static fn (string $list, array $entry): string => implode(' ', [$entry['kind'] ?? '', $entry['class'] ?? '', $entry['member'] ?? '']),
+    static fn (string $list, array $entry): string => implode(' | ', [$entry['kind'] ?? '', $entry['class'] ?? '', $entry['member'] ?? '', $entry['parent'] ?? '', $entry['requiredType'] ?? '']),
     $options['baseline']
 ) ?? $report;
 file_put_contents($reportFile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
 spryker_upgrade_print_summary(
     'check-typed-members',
+    $problems !== [],
     ['typed-member fatals' => count($problems)],
     array_map(
-        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf('%s::%s (parent %s declares %s)', $p['class'], $p['member'], $p['parent'], $p['requiredType']), $p),
+        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf('%s::%s (parent %s declares %s) in %s fix: %s', $p['class'], $p['member'], $p['parent'], $p['requiredType'], $p['file'], spryker_upgrade_short($p['fix'])), $p),
         $report['problems']
     ),
     $reportFile,

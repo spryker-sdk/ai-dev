@@ -243,16 +243,24 @@ foreach ($problems as $p) {
 $replaced = array_filter($problems, static fn(array $p): bool => $p['kind'] === 'VENDOR_CLASS_REPLACED');
 spryker_upgrade_print_summary(
     sprintf('check-vendor-class-replacement (%d class declaration(s); project namespace roots: %s)', $scanned, implode(', ', $projectRoots)),
+    $replaced !== [],
     $counts === [] ? ['classes outside the project namespaces' => 0] : $counts,
     array_map(
-        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf('%s (%s, %d lines%s)', $p['class'], $p['file'], $p['lines'], $p['eagerlyIncluded'] ? ', force-loaded via autoload.files' : '')),
+        static fn (array $p): array => spryker_upgrade_finding($p['kind'], sprintf(
+            '%s (%s, %d lines%s)%s',
+            $p['class'],
+            $p['file'],
+            $p['lines'],
+            $p['eagerlyIncluded'] ? ', force-loaded via autoload.files' : '',
+            isset($p['diffCommand']) ? ' diff: ' . $p['diffCommand'] : ''
+        )),
         $problems
     ),
     $reportFile,
     $root,
     $options['limit'],
     $replaced === [] ? [] : [sprintf(
-        'VENDOR_CLASS_REPLACED: %d class(es) need a decision BEFORE the upgrade: diff the copy against the current vendor file (diffCommand in the report);'
+        'VENDOR_CLASS_REPLACED: %d class(es) need a decision BEFORE the upgrade: diff the copy against the current vendor file (the diff command on its line);'
         . ' re-express the delta as a subclass or a plugin where an extension point exists; else re-copy from the target release, re-apply the delta,'
         . ' and record it as upgrade debt with an extension-point request to the vendor.',
         count($replaced)

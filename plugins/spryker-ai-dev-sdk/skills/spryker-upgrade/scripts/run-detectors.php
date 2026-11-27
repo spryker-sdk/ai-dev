@@ -5,13 +5,15 @@
  * one verdict line, at most --limit findings, the report path.
  *
  * Usage (from the project root):
- *   php run-detectors.php phase0 [--limit N]
+ *   php run-detectors.php phase0 [--limit N] [--force]
  *   php run-detectors.php phase3 [--limit N] [--typed-members-dir <dir>]...
  *
  * phase0: check-platform-alignment, check-dead-overrides snapshot, twig-shadow-map snapshot,
  *         check-plugin-usage --baseline, check-config-constants --baseline,
- *         check-typed-members --baseline, check-constraint-style, check-test-coverage,
+ *         check-typed-members --baseline, check-constraint-style,
  *         check-vendor-class-replacement, check-constant-overrides --snapshot.
+ *         Phase 0.5 runs check-test-coverage. --force goes to the --baseline detectors: they
+ *         record their Phase 0 result again also when composer.lock differs from composer.lock.before.
  * phase3: check-typed-members (first: its fatals abort the console), list-major-bumps,
  *         check-dead-overrides verify, twig-shadow-map diff, check-plugin-usage,
  *         check-config-constants, check-constant-overrides, check-performance.
@@ -19,17 +21,19 @@
  * --typed-members-dir adds a directory to the check-typed-members scan (default src/Pyz), for
  * example a composer-merge-plugin bundle tree. Each detector stays callable alone.
  *
- * check-test-coverage.php prints its own output; the runner shows its first --limit lines.
+ * Each detector must print its verdict line (`<name>...: OK|FOUND`); exit 0 or 1 without one, or
+ * another exit code, is DID NOT RUN. The first line a detector writes to stderr is printed under its
+ * output.
  *
  * Exit codes: 0 no detector found anything; 1 a detector exited 1 (findings, also when Phase 0 had
- * them all); 2 a detector did not run (another exit code), or usage error.
+ * them all); 2 a detector did not run, or usage error.
  */
 
 declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
-const RD_USAGE = "Usage: php run-detectors.php phase0|phase3 [--limit N] [--typed-members-dir <dir>]...\n";
+const RD_USAGE = "Usage: php run-detectors.php phase0|phase3 [--limit N] [--force] [--typed-members-dir <dir>]...\n";
 
 /**
  * The detector calls of a phase: script and arguments, in order.
@@ -38,19 +42,19 @@ const RD_USAGE = "Usage: php run-detectors.php phase0|phase3 [--limit N] [--type
  *
  * @return list<array{0: string, 1: list<string>}>
  */
-function rd_plan(string $phase, array $typedMembersDirs): array
+function rd_plan(string $phase, array $typedMembersDirs, bool $force = false): array
 {
     $typedDirs = $typedMembersDirs === [] ? [] : array_merge(['src/Pyz'], $typedMembersDirs);
+    $baseline = $force ? ['--baseline', '--force'] : ['--baseline'];
     if ($phase === 'phase0') {
         return [
             ['check-platform-alignment.php', []],
             ['check-dead-overrides.php', ['snapshot']],
             ['twig-shadow-map.php', ['snapshot']],
-            ['check-plugin-usage.php', ['--baseline']],
-            ['check-config-constants.php', ['--baseline']],
-            ['check-typed-members.php', array_merge($typedDirs, ['--baseline'])],
+            ['check-plugin-usage.php', $baseline],
+            ['check-config-constants.php', $baseline],
+            ['check-typed-members.php', array_merge($typedDirs, $baseline)],
             ['check-constraint-style.php', []],
-            ['check-test-coverage.php', []],
             ['check-vendor-class-replacement.php', []],
             ['check-constant-overrides.php', ['--snapshot']],
         ];
@@ -95,20 +99,32 @@ function rd_run(string $script, array $args, string $root): array
 }
 
 /**
- * The first $limit lines of an output, then how many more there are.
+ * Does the output hold the verdict line of the detector (`<name>[ mode (...)]: OK|FOUND`)?
  */
-function rd_head(string $output, int $limit): string
+function rd_has_verdict(string $detector, string $stdout): bool
 {
-    $lines = explode("\n", rtrim($output, "\n"));
-    $head = implode("\n", array_slice($lines, 0, max(1, $limit)));
+    return preg_match('/^' . preg_quote($detector, '/') . '\b[^\n]*?: (OK|FOUND)\b/m', $stdout) === 1;
+}
 
-    return $head . "\n" . (count($lines) > max(1, $limit) ? sprintf("  (%d more lines: run the script alone)\n", count($lines) - max(1, $limit)) : '');
+/**
+ * The first line that is not empty, or ''.
+ */
+function rd_first_line(string $text): string
+{
+    foreach (explode("\n", $text) as $line) {
+        if (trim($line) !== '') {
+            return trim($line);
+        }
+    }
+
+    return '';
 }
 
 function rd_main(array $argv): int
 {
     $options = spryker_upgrade_output_options($argv);
     $phase = null;
+    $force = false;
     $typedMembersDirs = [];
     $args = array_slice($argv, 1);
     for ($i = 0; $i < count($args); $i++) {
@@ -116,6 +132,8 @@ function rd_main(array $argv): int
             $typedMembersDirs[] = $args[++$i];
         } elseif (str_starts_with($args[$i], '--typed-members-dir=')) {
             $typedMembersDirs[] = substr($args[$i], 20);
+        } elseif ($args[$i] === '--force') {
+            $force = true;
         } elseif ($phase === null && in_array($args[$i], ['phase0', 'phase3'], true)) {
             $phase = $args[$i];
         } else {
@@ -133,17 +151,21 @@ function rd_main(array $argv): int
 
     $found = false;
     $notRun = [];
-    foreach (rd_plan($phase, $typedMembersDirs) as [$script, $scriptArgs]) {
-        $summarised = $script !== 'check-test-coverage.php';
-        [$code, $stdout, $stderr] = rd_run($script, $summarised ? array_merge($scriptArgs, ['--limit', (string)$options['limit']]) : $scriptArgs, $root);
-        if ($code !== 0 && $code !== 1) {
-            $reason = trim(strtok(trim($stderr) !== '' ? trim($stderr) : trim($stdout), "\n") ?: '');
-            fwrite(STDOUT, sprintf("%s: DID NOT RUN (exit %d)%s\n", basename($script, '.php'), $code, $reason === '' ? '' : ': ' . $reason));
-            $notRun[] = basename($script, '.php');
+    foreach (rd_plan($phase, $typedMembersDirs, $force) as [$script, $scriptArgs]) {
+        $detector = basename($script, '.php');
+        [$code, $stdout, $stderr] = rd_run($script, array_merge($scriptArgs, ['--limit', (string)$options['limit']]), $root);
+        $error = rd_first_line($stderr);
+        if (($code !== 0 && $code !== 1) || !rd_has_verdict($detector, $stdout)) {
+            $reason = $error !== '' ? $error : rd_first_line($stdout);
+            if ($reason === '' && ($code === 0 || $code === 1)) {
+                $reason = 'no verdict line';
+            }
+            fwrite(STDOUT, sprintf("%s: DID NOT RUN (exit %d)%s\n", $detector, $code, $reason === '' ? '' : ': ' . $reason));
+            $notRun[] = $detector;
             continue;
         }
         $found = $found || $code === 1;
-        fwrite(STDOUT, $summarised ? $stdout : rd_head($stdout, $options['limit'] + 1));
+        fwrite(STDOUT, $stdout . ($error === '' ? '' : '  stderr: ' . $error . "\n"));
     }
     if ($notRun !== []) {
         fwrite(STDOUT, sprintf("Did not run: %s. Run each alone to see the full error.\n", implode(', ', $notRun)));

@@ -1031,6 +1031,7 @@ function pf_detect(string $root, string $stateDir, ?string $beforeLock, int $lim
     }
     spryker_upgrade_print_summary(
         sprintf('check-performance (shop-ui %s -> %s: %s)', $productGroupWidget['shopUiBefore'] ?? '-', $productGroupWidget['shopUiNow'] ?? '-', $crossing),
+        $productGroupWidget['finding'],
         ['PRODUCT_GROUP_WIDGET_REMOVED' => $productGroupWidget['finding'] ? 1 : 0],
         $findings,
         $reportFile,

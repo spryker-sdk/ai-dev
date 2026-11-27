@@ -565,6 +565,7 @@ function bo_finish(array $results, string $reportFile, string $baseUrl, bool $tr
     }
     spryker_upgrade_print_summary(
         sprintf('backoffice-smoke (%d page(s), %d table endpoint(s) requested on %s)', $pages, count($results) - $pages, $baseUrl),
+        $problems !== [],
         ['failing pages' => $counts['page'], 'failing table endpoints' => $counts['table']],
         array_map(
             static fn (array $problem): array => spryker_upgrade_finding(

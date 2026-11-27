@@ -119,6 +119,7 @@ file_put_contents($outFile, json_encode([
 
 spryker_upgrade_print_summary(
     'merge-shadowed-files ' . ($apply ? '(applied merges)' : '(dry run, nothing written)'),
+    $results['conflicted'] !== [],
     [
         'CLEAN' => count($results['clean']),
         'IDENTICAL (override carried no customisation: candidates for deletion)' => count($results['identical']),

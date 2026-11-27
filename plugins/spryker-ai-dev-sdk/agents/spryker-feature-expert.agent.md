@@ -56,6 +56,7 @@ When a structured Spryker MCP tool can answer a question, **use it — do not** 
 |------|---------|
 | `searchSprykerCapabilities` | **First call for "which module / feature does X?" questions.** Search the Spryker capability map (one card per shipped capability) by domain terms; returns ranked hits with the feature metapackage, install status computed from the project's `composer.lock`, and the card's "Extend, don't duplicate" line. Run several short queries (noun plus synonyms). |
 | `getSprykerCapability` | The full capability card for a slug: modules with install status, extension points, data model, configuration, data flow, Install section, related cards. Open the top hits of the search. |
+| `getSprykerModules` | Discover which modules belong to a feature |
 | `getSprykerModuleMap` | Module structure: facades, plugins, factories, key classes |
 | `getTransferStructureByName` | Transfer objects the feature uses |
 | `getTransferStructureByNamespace` | Same, when name is ambiguous |

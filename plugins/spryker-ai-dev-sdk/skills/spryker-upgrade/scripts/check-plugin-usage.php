@@ -14,8 +14,12 @@
  *
  * Usage:
  *   php $UP/check-plugin-usage.php --baseline   # Phase 0: also keeps the result in plugin-usage-baseline.json
+ *                                               # (after the update only with --force)
  *   php $UP/check-plugin-usage.php              # later: marks each finding inBaseline, lists the new ones
  *   [--limit N]                                 # findings printed (default 10, 0 = counts only)
+ *
+ * A finding is in Phase 0 when its list, class and note (deprecated) or reason (porting) are the
+ * same, so a plugin that stops loading or gets another deprecation note is new.
  *
  * Exit code 1 when MISSING plugins are found; 0 otherwise (deprecations are warnings).
  */
@@ -32,6 +36,9 @@ require $root . '/vendor/autoload.php';
 
 $stateDir = spryker_upgrade_state_dir($root);
 $reportFile = $stateDir . '/plugin-usage-report.json';
+if ($options['baseline']) {
+    spryker_upgrade_guard_baseline($root, $stateDir, 'plugin-usage', $options['force']);
+}
 
 function isVendorClass(string $fqcn): bool
 {
@@ -88,6 +95,7 @@ foreach ($usages as $fqcn => $files) {
         if (preg_match('/@deprecated\s*((?:.|\n)*?)(?:\n\s*\*\s*@|\n\s*\*\/)/', $doc, $dm2)) {
             $note = trim((string)preg_replace('/\n\s*\*\s?/', ' ', $dm2[1]));
         }
+        $note = trim((string)preg_replace('#\s*\*/\s*$#', '', $note));
         $deprecated[] = [
             'plugin' => $fqcn,
             'note' => $note !== '' ? $note : '(no deprecation note)',
@@ -154,7 +162,7 @@ $report = spryker_upgrade_compare_with_baseline(
     'plugin-usage',
     $report,
     ['missing', 'deprecated', 'projectPluginsNeedingPorting'],
-    static fn (string $list, array $entry): string => $list . ' ' . ($entry['plugin'] ?? $entry['projectPlugin'] ?? ''),
+    static fn (string $list, array $entry): string => implode(' | ', [$list, $entry['plugin'] ?? $entry['projectPlugin'] ?? '', $entry['note'] ?? $entry['reason'] ?? '']),
     $options['baseline']
 ) ?? $report;
 file_put_contents($reportFile, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
@@ -164,13 +172,14 @@ foreach ($report['missing'] as $m) {
     $findings[] = spryker_upgrade_finding('MISSING', $m['plugin'] . ' (used in: ' . implode(', ', $m['usedIn']) . ')', $m);
 }
 foreach ($report['deprecated'] as $d) {
-    $findings[] = spryker_upgrade_finding('DEPRECATED', $d['plugin'] . ' (used in: ' . implode(', ', $d['usedIn']) . ')', $d);
+    $findings[] = spryker_upgrade_finding('DEPRECATED', $d['plugin'] . ' (used in: ' . implode(', ', $d['usedIn']) . ') note: ' . spryker_upgrade_short($d['note']), $d);
 }
 foreach ($report['projectPluginsNeedingPorting'] as $p) {
-    $findings[] = spryker_upgrade_finding('PORTING', $p['projectPlugin'] . ': ' . $p['reason'], $p);
+    $findings[] = spryker_upgrade_finding('PORTING', $p['projectPlugin'] . ': ' . spryker_upgrade_short($p['reason']), $p);
 }
 spryker_upgrade_print_summary(
     'check-plugin-usage',
+    $missing !== [],
     ['missing' => count($missing), 'deprecated' => count($deprecated), 'porting' => count($portingNeeded)],
     $findings,
     $reportFile,

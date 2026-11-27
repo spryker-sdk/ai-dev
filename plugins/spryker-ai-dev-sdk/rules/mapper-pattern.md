@@ -31,4 +31,4 @@ They are NOT allowed to:
 
 ## Example
 
-A correct mapper method such as `mapProductTransferToEntity(ProductTransfer $productTransfer, SpyProduct $productEntity): SpyProduct` receives the target from the caller, copies the data (for example with `fromArray()`), and returns the target.
+A correct mapper method such as `mapProductTransferToEntity(ProductTransfer $productTransfer, SpyProduct $productEntity): SpyProduct` receives the target from the caller, sets the data on it (it copies, converts or builds values, for example with `fromArray()`), and returns the target.

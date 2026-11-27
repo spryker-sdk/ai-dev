@@ -36,7 +36,7 @@ SPRYKER_UPGRADE_STATE_DIR=/path/to/state     # move baselines/reports (e.g. a CI
 | `compare-tool-runs.php` | 1.2, 3, 5, 5.5 | which PHPStan errors, sniffer violations, evaluator findings and failing tests are new against the baselines? |
 | `backoffice-smoke.php` | 0 (`--baseline`), 4.9, 6.5 | does every Back Office navigation page and table data endpoint still answer? |
 | `check-platform-alignment.php` | 0, 1.2 | will a lock resolved on this host install on the project's image? |
-| `check-test-coverage.php` | 0, 0.5 | which customised modules would not notice if the upgrade broke them? |
+| `check-test-coverage.php` | 0.5 | which customised modules would not notice if the upgrade broke them? |
 | `check-vendor-class-replacement.php` | 0 | does the project declare classes in a vendor's namespace? |
 | `check-tooling-alignment.php` | 1.2, 5 | do tooling, the Docker SDK pin and the deploy files match the target release's reference demo shop? |
 | `check-constraint-style.php` | 0, 1.5 | which root constraints are patch-locked, exact, or merged in from another repository? |
@@ -133,22 +133,35 @@ php $UP/check-performance.php --verify        # gate: Phase 7 starts only when t
 ## Detector output and run-detectors.php
 
 Every detector prints one verdict line (the detector, `OK` or `FOUND`, a count per category), at
-most 10 findings of one line each, then "(K more in the report)", and the path of its report file,
-which holds the full list. `--limit N` sets the number of findings; `--limit 0` prints the counts only.
+most 10 findings of one line each, then "(K more: rerun with --category ... --limit N)", and the
+path of its report file, which holds the full list. `FOUND` is the condition of the detector's exit
+1; informational counts (minor/patch bumps, IDENTICAL merges, new overlaps) do not make it `FOUND`.
+Each finding line keeps the field to act on: the deprecation note, the typed-member fix, the vendor
+class or load error, the merge command, the project value with its file and line, the guide search
+URL, the diff command. A prose field is cut to about 120 characters.
+`--limit N` sets the number of findings; `--limit 0` prints the counts only. `--category <name>`
+(comma list or repeated; the name is the first word of a finding line) prints only that category,
+the Phase 0 entries marked `[Phase 0]`, so `--category X --limit N` replaces a read of the report.
 `check-plugin-usage.php`, `check-config-constants.php` and `check-typed-members.php` have no snapshot
 of their own: `--baseline` (Phase 0) also writes `<name>-baseline.json`, and a later run marks each
 finding `inBaseline` in its report, lists only the new findings and counts those Phase 0 already
-had. Exit codes do not change: exit 1 means findings exist, also when Phase 0 had them all.
+had. A finding is in Phase 0 only when the fields that give its meaning are the same (for
+`check-plugin-usage.php` the note or the reason, so a plugin that stops loading is new). When the
+baseline file exists and `composer.lock` differs from `composer.lock.before`, `--baseline` exits 2
+and keeps the file; `--force` records it again. A baseline file that is not valid JSON gives a note.
+Exit codes do not change: exit 1 means findings exist, also when Phase 0 had them all.
 
 ```bash
-php $UP/run-detectors.php phase0 [--limit N]
+php $UP/run-detectors.php phase0 [--limit N] [--force]
 php $UP/run-detectors.php phase3 [--limit N] [--typed-members-dir vendor/<v>/<pkg>/Bundles]
 ```
 
 Runs the detectors of the phase in the order of SKILL.md, each as its own process, and prints their
-summaries. A detector that exits with another code than 0 or 1 is reported as `DID NOT RUN` with its
-first error line; the others still run. `check-test-coverage.php` keeps its own output; the runner
-shows its first lines. Exit 0 nothing found, 1 findings, 2 a detector did not run or usage.
+summaries. `phase0` does not run `check-test-coverage.php`: Phase 0.5 runs it. `--force` goes to the
+`--baseline` detectors. A detector that exits with another code than 0 or 1, or that prints no
+verdict line, is reported as `DID NOT RUN` with its first error line; the others still run. The
+first stderr line of a detector that ran is printed under its output. Exit 0 nothing found,
+1 findings, 2 a detector did not run or usage.
 
 ## check-added-comments.php — no explanatory comments, no suppressions
 
@@ -212,9 +225,14 @@ the `--codecept-options` in `tool-invocation.json`; later runs use the pin (`--p
 another directory) and refuse values that differ from it. A project with several test configurations
 gives `--codecept-options` once for each (`--codecept-options "-c codeception.api.yml"`): the tests
 tool runs `codecept run` once per configuration into one log, and a configuration that did not start
-makes it "did not run". `tool-runs-<run>.json` holds the commands, exit codes, the tests per suite
-and the names of the failing tests; it is written after each tool, so a stopped run keeps the tools
-that finished. Exit 0 every tool ran, 1 a tool did not run, 2 usage or no pin.
+makes it "did not run". A sniffer or evaluator output without a result line and with an exit code
+other than 0 is "did not run" too. Before a tool starts, its log of an earlier run is removed.
+`tool-runs-<run>.json` holds the commands, exit codes, the tests per suite and the names of the
+failing tests; it is written after each tool, so a stopped run keeps the tools that finished.
+`failing-tests-<run>.txt` lists the failing tests, one per line under its suite. The baseline run
+refuses to replace a baseline log that holds a result when `base-ref` exists and HEAD is another
+commit; `--force` replaces it. Exit 0 every tool ran, 1 a tool did not run, 2 usage, no pin or a
+refused baseline run.
 
 ## compare-tool-runs.php — what is new against the baselines
 
@@ -222,15 +240,18 @@ that finished. Exit 0 every tool ran, 1 a tool did not run, 2 usage or no pin.
 php $UP/compare-tool-runs.php verify                       # every tool with a log of the run
 php $UP/compare-tool-runs.php final tests --limit 20
 php $UP/compare-tool-runs.php detect phpstan --baseline phase0
+SPRYKER_UPGRADE_STATE_DIR=$STATE/after php $UP/compare-tool-runs.php after --baseline-dir $STATE/baseline
 ```
 
 Compares the logs of a run with each tool's baseline: `*-post-tooling.txt` when it exists, else the
 Phase 0 file (`--baseline phase0` forces the Phase 0 file; the post-tooling run is always compared
-with it). Prints one verdict line per tool and at most `--limit` (default 10) new entries: PHPStan
-errors and sniffer violations by file and message, evaluator violations, and tests that fail now
-and did not fail in the baseline, per suite. The full lists go to `tool-comparison-<run>.json`.
-Exit 0 no regression, 1 regression or a run without a result, 2 usage, a missing log or a missing
-baseline.
+with it; `--baseline-dir` reads the baseline files from another directory). Prints one verdict line
+per tool and at most `--limit` (default 10) new entries: PHPStan errors and sniffer violations by
+file and message, printed as `file:line: message [identifier]`, evaluator violations, tests that fail
+now and did not fail in the baseline, and tests that passed in the baseline and are skipped or
+absent now, per suite. The tests verdict line holds the baseline totals. A log whose last line is
+not `exit <code>` is NO RESULT. The full lists go to `tool-comparison-<run>.json`. Exit 0 no
+regression, 1 regression or a run without a result, 2 usage, a missing log or a missing baseline.
 
 ## backoffice-smoke.php — crawl the whole Back Office
 

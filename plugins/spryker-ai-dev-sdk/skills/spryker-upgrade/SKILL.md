@@ -95,11 +95,18 @@ Before the first `composer` command, run the shared environment preflight in
 
 **Tool output.** `run-tools.php` and `compare-tool-runs.php` print a summary and write the full
 output to files in the state directory. Read the summary. Open a log file only for the failing part
-and search it for that part; never read the whole file. When a run is stopped before it ends,
-`tool-runs-<run>.json` holds the tools that finished: run the other tools again. The detectors and
-`run-detectors.php` print one verdict line per detector and at most 10 findings (`--limit N`); the
-full list is in the report file the line names. Read a report file when you start the lane that
-uses it.
+and search it for that part; never read the whole file. Do not read `tool-comparison-*.json`; to see
+more new findings, run `compare-tool-runs.php` again with `--limit N <tool>`. When a run is stopped
+before it ends, `tool-runs-<run>.json` holds the tools that finished: run the other tools again.
+The detectors and
+`run-detectors.php` print one verdict line per detector (`FOUND` = the detector's exit 1) and at
+most 10 findings (`--limit N`), each with the field to act on; the full list is in the report file
+the line names. The printed findings are a sample. Process each report entry where `inBaseline` is
+not true; an entry with `inBaseline` true is still processed where the lane says so. Do not read the
+report JSON: run the detector again with `--category <name>` (the first word of a finding line;
+comma list or repeated) and `--limit N` to print the entries of one category. The reports of
+`check-platform-alignment.php`, `check-vendor-class-replacement.php` (Phase 0 step 5) and
+`check-constraint-style.php` (Phase 1.5) belong to no lane: process them in those steps.
 
 **Coverage matrix.** Every known failure mode, what detects it and which phase resolves it is in
 [references/coverage-matrix.md](references/coverage-matrix.md). Read it when something turns up that
@@ -127,13 +134,17 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    `check-plugin-usage.php --baseline` (MISSING here = pre-existing damage),
    `check-config-constants.php --baseline` (problems here = pre-existing damage),
    `check-typed-members.php --baseline` (should be clean before upgrading),
-   `check-constraint-style.php` (patch-locked and merged constraints), `check-test-coverage.php` (is
-   the override surface verifiable at all?), `check-vendor-class-replacement.php` (classes declared in
-   vendor namespaces) and `check-constant-overrides.php --snapshot` (core values under project
-   constants). `--baseline` keeps the Phase 0 result of the detectors without a snapshot of their own.
-   Exit 2 names a detector that did not run: run it alone, fix the cause, run it again.
+   `check-constraint-style.php` (patch-locked and merged constraints),
+   `check-vendor-class-replacement.php` (classes declared in vendor namespaces) and
+   `check-constant-overrides.php --snapshot` (core values under project constants). Phase 0.5 runs
+   `check-test-coverage.php`. `--baseline` keeps the Phase 0 result of the detectors without a
+   snapshot of their own. Exit 2 names a detector that did not run: run it alone, fix the cause, run
+   it again. When `composer.lock` differs from `composer.lock.before`, `--baseline` does not replace
+   an existing Phase 0 result (exit 2); `--force` records it again.
 5. MISSING plugins, config problems or unloadable classes in these baselines are pre-existing breaks,
    usually leftovers of a removed feature. Surface them, offer to fix first, at minimum record counts.
+   Platform problems (`check-platform-alignment.php`) are fixed before the first composer update;
+   each VENDOR_CLASS_REPLACED entry (`check-vendor-class-replacement.php`) gets a decision here.
 6. **Static baselines** (record, don't fix) — PHPStan, the sniffer and the evaluator, into
    `phpstan-baseline-run.txt`, `sniff-baseline.txt` and `evaluator-baseline.txt`:
    ```bash
@@ -152,9 +163,9 @@ you cannot place, and before the Phase 7 report; a new failure mode gets a row a
    `--codecept-options "-c codeception.api.yml"`); the runner runs them in that order into one log.
    The baseline run pins the exact invocation, environment variables included, in
    `tool-invocation.json` (matrix #66); every later run uses it. It records pass/fail/skip per suite
-   and the names of the failing tests in `tool-runs-baseline.json`. The red tests
-   become the report's "Tests already red before the upgrade" list; a suite that cannot run is named
-   with the reason, never counted as passing.
+   and writes the names of the failing tests, by suite, to `failing-tests-baseline.txt`. Take the
+   report's "Tests already red before the upgrade" list from that file; a suite that cannot run is
+   named with the reason, never counted as passing.
 8. **Back Office crawl baseline** — every navigation page and every table data endpoint; `--baseline`
    writes `backoffice-smoke-baseline.json`. Exit 1 lists pages already failing (record them); exit 2
    is a failed login or an unreachable or wrong URL, and no baseline was written:
@@ -364,9 +375,12 @@ For each package in the MAJOR list of `.spryker-upgrade/state/lock-diff-report.j
 
 ## Lanes 1–4 — Conflict resolution
 
-Work lane by lane; commit each lane separately. **Closing a lane** means: all Phase 3 detectors
-re-run and green against the baseline, no PHPStan regression, `php $UP/check-added-comments.php`
-exits 0. Read the lane's section of [references/lanes.md](references/lanes.md) when you enter it.
+Work lane by lane; commit each lane separately. **Closing a lane** means: the detectors of that lane
+re-run and green against the baseline (Lane 1 `check-typed-members.php` and
+`check-dead-overrides.php verify`; Lane 2 `twig-shadow-map.php diff` and `check-performance.php`;
+Lane 3 `check-plugin-usage.php`; Lane 4 `check-config-constants.php`; `check-constant-overrides.php`
+for the lanes its entries name), `php $UP/run-detectors.php phase3 --limit 0` for the counts of the
+other detectors, no PHPStan regression, `php $UP/check-added-comments.php` exits 0. Read the lane's section of [references/lanes.md](references/lanes.md) when you enter it.
 `constant-overrides-report.json` entries name their lane: 3 DependencyProvider, 4 Config/Constants, 1 other.
 
 - **Lane 1 — Dead overrides and broken classes** (`dead-overrides-report.json`, `typed-members-report.json`,

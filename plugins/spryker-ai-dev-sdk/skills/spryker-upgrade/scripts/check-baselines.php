@@ -84,7 +84,7 @@ function bl_content_problem(string $file, string $contents): ?string
         return (int)($decoded['totalRows'] ?? 0) > 0 ? null : 'no rows: the environment held no published data (boot with --data, drain the queues)';
     }
 
-    return to_result_problem(explode('-', $file)[0], $contents);
+    return to_result_problem(explode('-', $file)[0], to_strip_exit($contents), to_log_exit_code($contents));
 }
 
 /**

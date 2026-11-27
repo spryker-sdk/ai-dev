@@ -219,6 +219,7 @@ if ($mode === 'snapshot') {
             count($current['scopes']),
             spryker_upgrade_rel($baselineDir, $root)
         ),
+        false,
         [],
         [],
         $mapFile,
@@ -289,17 +290,24 @@ $counts = ['VENDOR_FILE_CHANGED' => 0, 'VENDOR_FILE_REMOVED' => 0];
 foreach ($conflicts as $c) {
     $counts[$c['type']]++;
 }
-$findings = array_map(static fn (array $c): array => spryker_upgrade_finding($c['type'], $c['project'] . ' (vendor ' . $c['vendor'] . ')'), $conflicts);
+$findings = array_map(
+    static fn (array $c): array => spryker_upgrade_finding(
+        $c['type'],
+        $c['mergeCommand'] !== null ? $c['project'] . ' merge: ' . $c['mergeCommand'] : $c['project'] . ' (vendor ' . $c['vendor'] . ' removed: see the module changelog)'
+    ),
+    $conflicts
+);
 foreach ($info as $i) {
     $findings[] = spryker_upgrade_finding('NEW_VENDOR_FILE', $i['vendor'] . ' (informational)');
 }
 spryker_upgrade_print_summary(
     sprintf('twig-shadow-map diff (%d shadowed vendor files, %d new vendor files: informational)', count($snapshot['entries']), count($info)),
+    $conflicts !== [],
     $counts,
     $findings,
     $reportFile,
     $root,
     $options['limit'],
-    $conflicts === [] ? [] : ['Each VENDOR_FILE_CHANGED entry in the report has its three-way merge command.']
+    []
 );
 exit($conflicts === [] ? 0 : 1);

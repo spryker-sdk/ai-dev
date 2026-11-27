@@ -342,6 +342,8 @@ widgets; every vendor template the project overrides has lost the vendor's calls
    `after/mp-build.txt`, each ending with its exit code
    (`… 2>&1 | tee <file>; echo "exit ${PIPESTATUS[0]}" >> <file>`). Then
    `php $FI/compare-baselines.php $STATE`: every line is `ok`. A new failure is this run's damage.
+   For the list of new PHPStan errors, sniffer violations and failing tests, run
+   `SPRYKER_UPGRADE_STATE_DIR=$STATE/after php $UP/compare-tool-runs.php after --baseline-dir $STATE/baseline`.
 4. `getSprykerCapability(slug)` shows `installed` (or `partially_installed` for API packages skipped
    on purpose).
 5. A FAIL goes to `spryker-issue-diagnoser`; fix its root cause as a checklist row. A FAIL or
