@@ -95,6 +95,7 @@ foreach ($usages as $fqcn => $files) {
         if (preg_match('/@deprecated\s*((?:.|\n)*?)(?:\n\s*\*\s*@|\n\s*\*\/)/', $doc, $dm2)) {
             $note = trim((string)preg_replace('/\n\s*\*\s?/', ' ', $dm2[1]));
         }
+        $note = trim((string)preg_replace('#\s*\*/\s*$#', '', $note));
         $deprecated[] = [
             'plugin' => $fqcn,
             'note' => $note !== '' ? $note : '(no deprecation note)',

@@ -1174,6 +1174,7 @@ check('summary: counts without the exit-1 condition -> OK, the findings still li
 check('summary: a long field is cut to about 120 characters', strlen(spryker_upgrade_short(str_repeat('word ', 60))) === 120 && str_ends_with(spryker_upgrade_short(str_repeat('word ', 60)), '...'));
 
 [$puCat, $puCatOut] = run_script('check-plugin-usage.php', ['--category', 'deprecated'], $det, $detState);
+check('plugin-usage: a one-line docblock note has no trailing */', str_contains($puCatOut, '(note: Use NewPlugin.)') || (str_contains($puCatOut, 'Use NewPlugin.') && !str_contains($puCatOut, 'NewPlugin. */')));
 check('summary: --category prints only that category, the Phase 0 entries marked, the exit code unchanged', $puCat === 1 && str_contains($puCatOut, "\n  [Phase 0] DEPRECATED Spryker\\Zed\\Old\\Communication\\Plugin\\OldPlugin (used in: src/Pyz/Zed/Foo/FooDependencyProvider.php) note: Use NewPlugin.") && !str_contains($puCatOut, 'MISSING Spryker'));
 [, $puCatMissingOut] = run_script('check-plugin-usage.php', ['--category=missing,porting', '--limit', '1'], $det, $detState);
 check('summary: --category takes a comma list; --limit caps it and names the rerun', substr_count($puCatMissingOut, "\n  [") === 1 && str_contains($puCatMissingOut, '(1 more: rerun with --category missing,porting --limit 2)'));
