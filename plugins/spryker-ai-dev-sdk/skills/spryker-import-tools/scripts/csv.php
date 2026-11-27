@@ -857,6 +857,12 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
 function csv_cli(array $argv): int
 {
     $command = $argv[1] ?? '';
+    $args = array_slice($argv, 1);
+    if (in_array('--help', $args, true)) {
+        $named = array_values(array_filter($args, static fn (string $a): bool => $a !== '--help'));
+
+        return csv_help($named[0] ?? null);
+    }
     $rest = array_slice($argv, 2);
 
     // Leading positional args (before the first --flag) are input files. This lets
@@ -939,7 +945,37 @@ function csv_cli(array $argv): int
 
 function csv_usage(): int
 {
-    return csv_report(2, [], [
+    return csv_report(2, [], csv_usage_lines());
+}
+
+/**
+ * `--help` lists the commands and the general rules; `--help <command>` prints the full
+ * explanation of one command. Plain text, exit 0; an unknown command is a JSON error, exit 2.
+ */
+function csv_help(?string $command): int
+{
+    $texts = csv_help_texts();
+    if ($command === null) {
+        echo implode("\n", csv_usage_lines()) . "\n\n" . $texts['_general'] . "\n\nRun `csv.php --help <command>` for the full explanation of one command.\n";
+
+        return 0;
+    }
+    if ($command === '_general' || !isset($texts[$command])) {
+        $known = array_values(array_filter(array_keys($texts), static fn (string $k): bool => $k !== '_general'));
+
+        return csv_report(2, [], [sprintf("--help: unknown command '%s'; commands: %s", $command, implode(', ', $known))]);
+    }
+    echo $texts[$command] . "\n";
+
+    return 0;
+}
+
+/**
+ * @return list<string>
+ */
+function csv_usage_lines(): array
+{
+    return [
         'usage: csv.php <command> <file> [<file2>...] [options]',
         'Inspection (own output; --plain = line output; columns/distinct take many files):',
         '  read <file> [--limit N]',
@@ -961,7 +997,8 @@ function csv_usage(): int
         '  replace <file>... --column url.fr_CA --search /en/ --with /fr/ [--regex] [--where col=val] (--out f | --in-place)',
         '  scale <file>... --column value_gross (--by 1.08 | --rates PLN=4.3,UAH=45 [--currency-column currency]) [--no-round] [--json-keys a,b] [--where col=val] (--out f | --in-place)',
         '  derive <file>... --target value_gross --source value_net --factor 1.19 [--no-round] [--only-empty] [--where col=val] (--out f | --in-place)   (target = source × factor; creates target column; skips empty/non-numeric source)',
-    ]);
+        'Help: --help (this list and the general rules) | --help <command> (full explanation and examples)',
+    ];
 }
 
 /**
@@ -1469,4 +1506,164 @@ function csv_plain(array $lines): int
     echo implode("\n", $lines) . (count($lines) > 0 ? "\n" : '');
 
     return 0;
+}
+
+/**
+ * Help text for `--help <command>`.
+ *
+ * @return array<string, string>
+ */
+function csv_help_texts(): array
+{
+    return [
+        'read' => <<<'TXT'
+`read <file> [--limit N]` — dump header + rows as JSON. Takes one file — passing several is a clean error
+(no silent truncation to the first; use `columns`/`count` for many-file inspection).
+TXT,
+        'count' => <<<'TXT'
+`count <file> [<file2> …] [--plain]` — data-row count per file, many files in one call. `--plain` →
+`rowCount⇥file` per line. Use this for "how many rows across these N files" — never a shell `for … do
+… done` loop with `| grep rowCount`; one `count` call replaces the whole loop.
+TXT,
+        'columns' => <<<'TXT'
+`columns <file> [<file2> …] [--plain]` — header + row count. Accepts many files in one call (per-file
+output; a missing file is reported inline, batch survives). `--plain` → column names per line, with a `==
+<file> ==` delimiter when multiple.
+TXT,
+        'distinct' => <<<'TXT'
+`distinct <file>… --column C [--plain]` — distinct values of a column with row counts, sorted by count
+desc (`--plain` → `count⇥value` per line); takes many files in one call (aggregated). Use this to inspect
+data — never `awk`/`sort`/`uniq -c` (they corrupt multi-line quoted fields).
+TXT,
+        'filter' => <<<'TXT'
+`filter <file>... (--where col=val … [--match exact|prefix|contains] | --in col=v1,v2,… | --in-file
+col=path) [--out f | --in-place]` — keep matching rows. `--where` repeatable (AND); `--in`/`--in-file` =
+set-membership. Without a target it previews: `matchedRows`/`resultRows` are the full counts, the echoed
+`rows` are capped at 20 (`--limit N` to raise) — the counts are the destructive-gate evidence, not the row
+dump.
+
+Example / flag note: prefix/substring match uses `--match` — `csv filter cms_block.csv --where
+block_key=cms-block-email-- --match prefix` (there is no `--where-contains`; note the column is `block_key`,
+not `name`).
+
+Example / flag note: membership uses `--in` / `--in-file` — `csv filter product_abstract.csv --in
+abstract_sku=A1,A2` or `--in-file abstract_sku=keep.txt` (one value per line).
+TXT,
+        'delete' => <<<'TXT'
+`delete <file>... (same conditions) [--out f | --in-place]` — drop matching rows.
+
+Example / flag note: prefix/substring match uses `--match` — `csv filter cms_block.csv --where
+block_key=cms-block-email-- --match prefix` (there is no `--where-contains`; note the column is `block_key`,
+not `name`).
+
+Example / flag note: membership uses `--in` / `--in-file` — `csv filter product_abstract.csv --in
+abstract_sku=A1,A2` or `--in-file abstract_sku=keep.txt` (one value per line).
+TXT,
+        'duplicate-columns' => <<<'TXT'
+`duplicate-columns <file>... --from en_US --to fr_CA[,de_DE,…] [--skip-base url] (--out f | --in-place)` —
+for every `X.en_US` column, add `X.<to>` copying the value; `--skip-base` leaves families alone. `--to` takes
+a comma-list → all project locales in one call.
+TXT,
+        'duplicate-rows' => <<<'TXT'
+`duplicate-rows <file>... --column locale --from en_US --to fr_CA[,uk_UA,…] (--out f | --in-place)` —
+clone rows per `--to` value (glossary → all locales; store-relation rows → all stores).
+TXT,
+        'set' => <<<'TXT'
+`set <file>... --column store --value US [--where col=val ...] (--out f | --in-place)` — set a column on
+matching rows (empty `--where` = all rows).
+
+Example / flag note: `set` adds a missing column — `csv set url.uk_UA.csv --column url.uk_UA --value /uk/`
+creates `url.uk_UA` if absent (not only sets an existing one).
+TXT,
+        'replace' => <<<'TXT'
+`replace <file>... --column url.fr_CA --search /en/ --with /fr/ [--regex] [--where col=val] (--out f |
+--in-place)` — string/regex replace within an existing column.
+TXT,
+        'scale' => <<<'TXT'
+`scale <file>... --column value_gross [--column value_net] (--by 1.47 | --rates PLN=4.3,UAH=45
+[--currency-column currency]) [--no-round] [--json-keys net_price,gross_price] [--where col=val] (--out f |
+--in-place)` — multiply numeric values (currency conversion); `--column` is repeatable — net + gross scale
+together in one call (`--column value_net --column value_gross`); `--rates` applies a per-currency factor in
+one call; `--json-keys` scales embedded price tiers.
+
+Example / flag note: `scale` scales net+gross together — `csv scale product_price.csv --column value_net
+--column value_gross --rates PLN=4.3,UAH=45 --in-place`.
+TXT,
+        'derive' => <<<'TXT'
+`derive <file>... --target value_gross --source value_net --factor 1.19 [--no-round] [--only-empty] [--where
+col=val] [--out f | --in-place]` — cross-column arithmetic `scale` can't do: writes `target = source ×
+factor`, creating the target column if absent. Skips rows whose source is empty/non-numeric; a
+non-numeric/zero `--factor` is a hard error (never silently zeroes a column). `--only-empty` gap-fills (won't
+overwrite existing target values). E.g. fill gross from net + tax, or a base-currency price into a second
+column before converting.
+TXT,
+        'select' => <<<'TXT'
+`select <file> --columns a,b,c --out file` — project columns (single file, keep-list).
+TXT,
+        'drop-columns' => <<<'TXT'
+`drop-columns <file>... (--column name | --suffix .de_DE)... [--out f | --in-place]` — remove columns;
+`--suffix` drops a whole family across files. Repeatable; a named column absent from a file is reported
+(per-file `skippedColumns`), not fatal; idempotent.
+TXT,
+        'rename-columns' => <<<'TXT'
+`rename-columns <file>... --rename old:new [--rename old2:new2 …] [--out f | --in-place]` — rename header
+columns and the matching row keys, many files in one call (repeatable `--rename` = multiple pairs). A pair
+whose `old` is absent, or whose `new` already exists as a different column, is reported in `skippedColumns`
+(not fatal); idempotent; malformed `--rename` (no `:`) is a hard error. Use it instead of hand-authoring a
+near-duplicate file that differs only by column names — e.g. deriving `price_product_offer` from
+`product_price`: `replace` the values, `rename-columns` the ref column, done in two commands with no loop.
+TXT,
+        'apply-translations' => <<<'TXT'
+`apply-translations <file>... --target-column name.uk_UA [--source-column name.en_US] --map map.csv (--out f |
+--in-place)` — apply a `source→target` value map to one column (map file has `source,target`). Only the
+target column changes — safe by construction. Exact match, multi-line-safe; unmapped values left as-is.
+TXT,
+        'append' => <<<'TXT'
+`append <file> --from <rows.csv> [--dedupe-on <col>] (--out f | --in-place)` — the row-adding op for
+authoring passes. Appends every row of `rows.csv`, whose header must be a subset of the target's (columns the
+rows file lacks are written empty; a column the target lacks is a hard error); `--dedupe-on <col>` skips rows
+whose key already exists in the target. Writes LF, atomic. This is how new glossary keys, labels or store rows
+go into the one file per entity — never a second `<entity>_project.csv` source (the gate's
+`duplicateEntitySources` forbids it) and never a hand-rolled writer (Python's `csv` defaults to CRLF;
+`preflight` `lineEndings` flags it).
+
+Example / flag note: `append` adds rows from a file, `add-row` adds one — `csv append glossary.en_GB.csv
+--from new-keys.csv --dedupe-on key --in-place` (header of `new-keys.csv` ⊆ target's; missing columns
+empty); `csv add-row product_label.csv --set name=project-new --set is_active=1 --in-place` (unknown column =
+hard error).
+TXT,
+        'add-row' => <<<'TXT'
+`add-row <file> --set col=value [--set col2=value …] (--out f | --in-place)` — append one row: repeatable
+`--set`, an unknown column is a hard error, unset columns are empty. Same LF/atomic guarantees as `append`.
+For more than a handful of rows, build a `rows.csv` and `append` it.
+
+Example / flag note: `append` adds rows from a file, `add-row` adds one — `csv append glossary.en_GB.csv
+--from new-keys.csv --dedupe-on key --in-place` (header of `new-keys.csv` ⊆ target's; missing columns
+empty); `csv add-row product_label.csv --set name=project-new --set is_active=1 --in-place` (unknown column =
+hard error).
+TXT,
+        '_general' => <<<'TXT'
+Inspection commands (read, count, columns, distinct): add `--plain` for line output — no JSON to parse.
+
+Files are positional and come before the flags (`columns <file> --plain`, not `columns --plain <file>`).
+`columns`/`count`/`distinct` report a specific `no input file given` error for the flags-first shape instead
+of the generic usage dump — read the error text, which names the argument order as the problem.
+
+Mutation — write with `--out <file>` for one file, or `--in-place` for one-or-many files. Batch: list
+several files before the flags and add `--in-place` to apply the same op to all in a single command (per-file
+report in `files[]`) — this is how you avoid a shell `for` loop. Multiple files without `--in-place` is an
+error.
+
+Notes: all access is by header name, never index. A missing column returns a clean JSON error with exit `2`.
+Idempotent where sensible. Writes are atomic (temp file + rename — a crash mid-batch never leaves a
+truncated CSV) and LF-terminated (the repo is LF; `git add`'s `CRLF will be replaced by LF` warning means a
+file was written by something other than these tools). macOS/OrbStack bind-mounts lag — re-check a written
+file a beat later. Counting: never `| grep -c` — use `rowCount` (`columns`/`read`) or `matchedRows`
+(`filter` preview). Batch, don't loop.
+
+Example / flag note: `read` is one file;
+`columns`/`count`/`distinct`/`filter`/`delete`/`set`/`scale`/`drop-columns` take many (with `--in-place` for
+the mutations); `append`/`add-row` take one target file.
+TXT,
+    ];
 }

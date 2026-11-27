@@ -1,14 +1,6 @@
 ---
 name: demo-run-sheet
-description: >
-  Use to produce the demo handover report for a deployed demo environment — the document the
-  presenter works from and the team takes over: environment and links, demo accounts, products,
-  categories, one demo point per requirement of the brief with its status, what to watch out for, and
-  how each part is built. Triggers: "handover report", "demo cheat sheet", "run sheet", "what do I
-  show", "give me the links and logins for the demo", "prepare for the customer call". Every host,
-  URL, login, price and stock figure is read from the running system and tested before it ships. The
-  format is asked once: Markdown or HTML for a paste into a Google Doc or Confluence. The last phase
-  of `demo-prep-wizard`.
+description: "Writes the demo handover report from the running system: links, accounts, products, one demo point per requirement, risks. Use for a run sheet, cheat sheet or handover report of a demo."
 ---
 
 # demo-run-sheet
@@ -269,19 +261,3 @@ Before handing it over, confirm each of these and say so in one line:
 - [ ] Every count in the report enumerates its members.
 - [ ] Stock is per concrete, and out-of-stock variants of every demoed product are named.
 - [ ] Every feature in § 2.7 carries one of the labels, and no design opinion is in the report.
-
-## Pitfalls
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `## Products` / `\| sku \| price \|` appears literally in the customer's document | A Markdown file was pasted into a rich-text document | Ask the format once, first (§ 0). For a paste into a document, write HTML by `references/output-format.md` |
-| A format complaint is answered with the same file in new wording | The content was treated as the problem and the format as packaging | The next file changes **format**, not wording |
-| A requirement of the brief is missing from the demo points | Only what the demo does well was written down | One row per requirement, in the brief's order; what does not work gets `Not built` and the reason |
-| A demo point is `Ready` and fails on stage | "Built" was taken as "tested" | `Ready` only after the test in § 3; otherwise `Not yet tested` with the reason |
-| Several product/category links in the report 404 or land on the wrong page | URLs were composed from category/product names; Spryker slugs are generated from the *localized* name and are not derivable from keys or titles | Read every URL from the url table (`spy_url`) or copy it from the rendered storefront, then fetch each one and require ≥ 1 product tile |
-| A count appears in prose without naming its members | The reader cannot act on a number alone | Count gate (§ 4): never a count in prose without the members enumerated in the same sentence |
-| On stage the hero product's size is unavailable and the report never flagged the stock state | Stock was assumed rather than read; a sizeable share of concretes can carry zero stock | Read the stock rows per concrete and name the in-stock variants **and** the out-of-stock ones for every demoed product; confirm on the rendered variant selector |
-| The demo account cannot place an order — found in rehearsal, not in the report | The account's role was read as evidence of capability; no role carried the place-order permission | Exercise the whole path per account (delegate to `spryker-verifier`), read `company_role_permission` for the role, and record a "do not" for every account that cannot transact |
-| § 2.7 says "Custom" for a feature Spryker ships | The feature name was read, not the project's changes | Read the diff against the demoshop it started from; `Configured` when only data or configuration changed |
-| The report has no environment host, or a remembered one | The deploy file was never read | Resolve hosts from the deploy file of the environment being demoed (`groups.<region>.applications.<app>.endpoints`); a cloud URL the person named wins over the local default |
-| A price in the report is not the price on screen | Price read for the wrong store/currency, or the guest price recorded for a persona who sees a contract price | Read price rows for the store **and** currency being demoed, and assert the persona's price while logged in as that persona |

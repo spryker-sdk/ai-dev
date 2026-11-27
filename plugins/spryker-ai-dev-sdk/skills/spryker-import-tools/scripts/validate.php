@@ -2670,6 +2670,9 @@ function validate_report_gate(array $result, ?string $savePath = null): int
     if (validate_quiet()) {
         return $exit;
     }
+    if ($exit !== 0) {
+        $result['help'] = 'validate.php --help gate (one check: validate.php --help <check>)';
+    }
     if ($savePath !== null && isset($result['saved'])) {
         echo json_encode(['status' => $result['status'], 'check' => 'gate', 'saved' => $result['saved'] ?? null, 'gatingCount' => $result['gatingCount'], 'warningCount' => $result['warningCount'], 'summary' => $result['summary'], 'manifests' => $result['manifests'], 'locales' => $result['locales'], 'stores' => $result['stores']], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
@@ -3740,6 +3743,12 @@ if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__F
 function validate_cli(array $argv): int
 {
     $check = $argv[1] ?? '';
+    $args = array_slice($argv, 1);
+    if (in_array('--help', $args, true)) {
+        $named = array_values(array_filter($args, static fn (string $a): bool => $a !== '--help'));
+
+        return validate_help($named[0] ?? null);
+    }
     $opts = validate_parse_opts(array_slice($argv, 2));
     validate_quiet(isset($opts['quiet']));
 
@@ -4140,7 +4149,48 @@ function validate_cli(array $argv): int
                 return validate_report_known_set(validate_known_set($manifest, $map, $skills, $base));
 
             default:
-                return validate_report(2, $check, [], [
+                return validate_report(2, $check, [], validate_usage_lines());
+        }
+    } catch (Throwable $e) {
+        return validate_report(2, $check, [], [$e->getMessage()]);
+    }
+}
+
+/**
+ * `--help` lists the checks, the output format and the exit codes; `--help <check>` prints the full
+ * explanation of one check. Plain text, exit 0; an unknown check is a JSON error, exit 2.
+ */
+function validate_help(?string $check): int
+{
+    $texts = validate_help_texts();
+    $usage = validate_usage_lines();
+    if ($check === null) {
+        echo implode("\n", $usage) . "\n\n" . $texts['_general'] . "\n\nRun `validate.php --help <check>` for the full explanation of one check.\n";
+
+        return 0;
+    }
+    if ($check !== '_general' && isset($texts[$check])) {
+        echo $texts[$check] . "\n";
+
+        return 0;
+    }
+    foreach ($usage as $line) {
+        if (str_starts_with($line, $check . ' ')) {
+            echo $line . "\n";
+
+            return 0;
+        }
+    }
+
+    return validate_report(2, '--help', [], [sprintf("--help: unknown check '%s'", $check), $usage[0]]);
+}
+
+/**
+ * @return list<string>
+ */
+function validate_usage_lines(): array
+{
+    return [
                     'usage: validate.php <gate|inventory|sku-coverage|preflight|paths|manifest-refs|threshold-glossary|orphan-files|refs|required|unique|absent|product-refs|manifest-diff|known-set|import-order|store-coverage|locale-coverage|translation-coverage|duplicate-keys|cms-block-store|attribute-glossary|bundle-stock|tree-scope|demo-needs> ...',
                     'import-order [<yml>...] [--base dir]  — an action must not precede an action it depends on (GATE, gating)',
                     'store-coverage [<yml>...] [--base dir] [--stores a,b]  — a declared store with zero rows where other stores have rows (GATE, warning)',
@@ -4152,11 +4202,9 @@ function validate_cli(array $argv): int
                     'bundle-stock [<yml>...]  — every concrete a bundle slot offers must have stock (GATE, warning)',
                     'tree-scope [<yml>...]  — every project source under ONE top-level directory below data/import/ (GATE, warning)',
                     'demo-needs [<demo-prep.md>] [<yml>...] [--base dir]  — does the data support the demo: each named product exists and has a variant in stock, categories and blocks exist and are active, a named facet has more than one value among that beat\'s own products, the persona exists, and quoted wording is present verbatim in content rows or shipment/payment method names; a value that is not a SKU/key (prose) is listed under `skipped`, never a finding (not in gate: it needs a demo needs list)',
-                    'gate [<import-config.yml> ...] [--locales a,b] [--base dir] [--baseline <gate-or-preflight.json>] [--root dir]... [--strict] [--save <path>] [--quiet]  — one verdict over paths+preflight+manifest-refs+threshold-glossary+duplicate-keys+cms-block-store (gating), orphan-files (gating only with --strict) and sku-coverage+store-coverage+locale-coverage+attribute-glossary+bundle-stock+tree-scope (warnings); --save writes the report AFTER the run (the only safe way to capture a baseline — never `>`); auto-discovers the booted regions\' data/import/local/full_*.yml + the install recipe\'s --config manifests, the project locales, and .ai-dev/gate-baseline.json (else preflight-baseline.json)']);
-        }
-    } catch (Throwable $e) {
-        return validate_report(2, $check, [], [$e->getMessage()]);
-    }
+                    'gate [<import-config.yml> ...] [--locales a,b] [--base dir] [--baseline <gate-or-preflight.json>] [--root dir]... [--strict] [--save <path>] [--quiet]  — one verdict over paths+preflight+manifest-refs+threshold-glossary+duplicate-keys+cms-block-store (gating), orphan-files (gating only with --strict) and sku-coverage+store-coverage+locale-coverage+attribute-glossary+bundle-stock+tree-scope (warnings); --save writes the report AFTER the run (the only safe way to capture a baseline — never `>`); auto-discovers the booted regions\' data/import/local/full_*.yml + the install recipe\'s --config manifests, the project locales, and .ai-dev/gate-baseline.json (else preflight-baseline.json)',
+        'Help: --help (this list, the output format and exit codes) | --help <check> (full explanation and examples)',
+    ];
 }
 
 /**
@@ -4317,7 +4365,11 @@ function validate_report_preflight(array $result): int
     if (validate_quiet()) {
         return $exit;
     }
-    echo json_encode(validate_preflight_payload($result), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+    $payload = validate_preflight_payload($result);
+    if ($exit !== 0 || $payload['warningCount'] > 0) {
+        $payload['help'] = 'validate.php --help preflight';
+    }
+    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
     return $exit;
 }
@@ -4397,4 +4449,292 @@ function validate_report_manifest_diff(array $result): int
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 
     return $exit;
+}
+
+/**
+ * Help text for `--help <command>`.
+ *
+ * @return array<string, string>
+ */
+function validate_help_texts(): array
+{
+    return [
+        'gate' => <<<'TXT'
+`gate [<import-config.yml> …] [--locales a,b] [--base dir] [--baseline <gate-or-preflight.json>] [--root
+dir]… [--strict] [--save <path>] [--quiet]` — the close-out command: one call, one verdict. Runs `paths` +
+`preflight` + `manifest-refs` + `threshold-glossary` + `duplicate-keys` + `cms-block-store` (gating),
+`orphan-files` (gates only with `--strict`), and six warning-only checks over the active manifests and returns
+`{status, gatingCount, warningCount, summary[], checks{…}}`; exit `0` clean, `2` any gating finding, `1`
+warnings only. `--save <path>` writes the report itself after running and refuses when `baselineSafe` is false
+— this is how the baseline is captured (`php <VALIDATE> gate --save .ai-dev/gate-baseline.json`), never
+`gate > file`: the shell truncates the target before the gate runs, the gate reads its own empty baseline, and
+saves a falsely clean report. Everything is auto-discovered when omitted: the manifests
+(`data/import/local/full_<REGION>.yml` for every region `deploy.dev.yml` boots, plus every literal
+`data:import --config=<path>` in `config/install/docker.yml` — the vendor payment configs), the project
+locales (from the `locale-store` sources), the declared stores (from the `store` source — passed to every
+manifest so a vendor config naming a removed store is caught), and the baseline (`.ai-dev/gate-baseline.json`,
+else `.ai-dev/preflight-baseline.json`). `orphan-files` gates only under `--strict` (a fresh, un-consolidated
+demoshop legitimately carries files no manifest imports); use `--strict` for the project-data consolidation
+close-out and for `done`. A saved gate report is the baseline of choice — capture it on the untouched clone
+with `gate --save .ai-dev/gate-baseline.json`, and only new findings gate across every gating check (the
+shipped demoshop is not clean on `manifest-refs`/`threshold-glossary` either, which a preflight-only baseline
+cannot suppress). Run this gate yourself before any `docker/sdk reset|clean-data|up|console data:import` and
+stop on a gating finding. With a baseline on file, only gating findings the baseline does not hold count; with
+no baseline, any gating finding stops the rebuild verbs, and `data:import` proceeds (capture the baseline on
+the untouched clone). For the rebuild verbs (`reset`/`clean-data`/`up`), trusted rebuilds (a demo clone, first
+setup, or a recorded `standing_approval: { scope: rebuilds }`) run after a one-line announcement, a project
+with real data gets one question, and before the third and every later rebuild the decision log gets `rebuild
+#N: <why rung 1 cannot show it>`; the step report states the rebuild count. `console data:import` needs no
+question: it is rung 1 of the ladder and stays cheap. Vendor-owned sources (`vendor/`) are exempt from the
+project-data groups and checked for store references only; a vendor source absent on an un-booted clone (no
+`vendor/` yet) is not a finding.
+
+Example / flag note: `--baseline` takes a saved gate (or preflight) report — capture it with `--save`, never
+a redirect — `validate gate --save .ai-dev/gate-baseline.json` on the untouched clone (the tool writes after
+running and refuses when `baselineSafe` is false; `gate > file` truncates the target first, the gate reads its
+own empty baseline and saves a falsely clean report). Then `validate gate --baseline
+.ai-dev/gate-baseline.json` gates only new findings (`gate` also auto-discovers that path).
+TXT,
+        'preflight' => <<<'TXT'
+`preflight <import-config.yml> [--base dir]` — the manifest-wide invariant sweep `gate` runs for you (call
+it directly to drill into one manifest); one driver that auto-discovers and checks the boot-critical
+invariants across every file the manifest imports, so you never enumerate files by hand. Reads the manifest's
+`source:` list and, by column shape, bundles four checks: url.\<locale\> global uniqueness — cross-file,
+like the real `spy_url` constraint (a product URL colliding with a category/merchant URL is caught; one dup
+aborts the 30–60 min install; navigation-node sources are exempt — a nav node's url is a link *target*,
+legitimately repeated across menus), is_searchable.\<locale\> non-blank (blank = silently unsearchable), price
+completeness — gross-mode aware (a missing/`0` `value_gross`, or a missing net in a net-only file, is a hard
+problem; a missing net *beside a present gross* is how the shipped gross-mode stores legitimately look →
+reported under non-gating `priceNetWarnings`/`warningCount`), and base-before-relation import order
+(`currency` before `currency-store`, `store` before every `*-store`, and every store-definition entry —
+checked on its last occurrence — before the first product/category entity; a 3rd store's `locale-store`
+appended after the catalog = a silently empty store). Also flags any manifest `source:` that doesn't exist.
+`--baseline <previous-preflight.json>` suppresses findings already present in that report — capture a
+baseline on the untouched clone first, then only new findings gate (the shipped demoshop carries pre-existing
+quirks that are not yours to fix). It also runs generate-mode required-shape checks (`shapeWarnings`):
+`product-abstract` source has a `color_code` column (else 0 rows import silently), `visibility ∈
+{PDP,PLP,Cart,∅}`, `product-abstract` imported with an `*approval-status` entity (else 0 search docs,
+invisibly), `merchant-product-offer` accompanied by `merchant-product`, and `tax_set_name ⊆` the tax source.
+Returns one grouped verdict (`problemCount`, then
+`unreadableSources`/`urlDuplicates`/`searchableBlanks`/`priceMissing`/`foreignLocaleColumns`/`foreignLocaleRows`/`shapeWarnings`/`orderViolations`),
+exit `2` if any. Plus these invariant groups (each imports without an error and surfaces only later; all
+gating, all baseline-suppressible): `headerOnlySources` (a source with 0 data rows — the delete-vs-empty
+decision was never made), `glossaryMultiLocale` (a `glossary` source carrying more than one `locale` —
+glossary is one file per locale), `duplicateEntitySources` (one `data_entity` from several sources in the same
+directory not distinguished by a store/locale token — the `<entity>.csv` + `<entity>_extra.csv` split),
+`storeDirMismatch` (a source under a `<STORE>/` dir whose `store`/`store_name`/`included_store_names` name
+another store — the `cp -r` seeding leftover that boots a silently half-empty store), `undeclaredStore` (a
+store value not in the `store` source — a vendor config hardcoding a removed store aborts the reset after
+the project import reported Successful), `searchAttributeOverlap` (a key in both
+`product_search_attribute_map` and `product_search_attribute` — every facet count exactly doubled),
+`categoryTemplateUnknown` (`category.csv` `template_name` not in the category-template source — every
+category then fails, then every abstract, three importers later, aborting the install),
+`rootCategoryNotInMenu` (a root category with `is_in_menu` ≠ 1 — the category tree publishes `[]`),
+`approvalStatusMissing` (an abstract SKU with no approval-status row — the publisher writes nothing,
+silently), `priceNonInteger` (`value_gross`/`value_net`/`value_cost`/`amount`/`threshold` not an integer —
+Spryker money is minor units; a decimal renders 100x wrong), `embeddedPathsMissing` (a path inside a CSV cell
+— workflow XML, file assets — that does not exist; relative paths such as `file.csv`'s
+`common/common/files/X.pdf` are resolved against the base dir, `data/import/` and the CSV's own directory, so
+a relative asset reference is checked, never skipped), `lineEndings` (a manifest CSV containing CRLF —
+Python's `csv` writer default; the repo is LF and git flags it only at `add` time), `discountShipmentByName`
+(a discount `decision_rule_query_string`/`collector_query_string` clause `shipment-method`/`shipment-carrier`
+with a non-numeric value — both rules compare the numeric id, so `shipment-method = 'DHL Standard'` imports
+and never applies), `categoryStoreIncomplete` (a store whose `category_store` rows name some child categories
+but not others — `category-store` spreads the root's stores to children only when the root relation is first
+created, so a category added on a later import gets no store row and its page shows 0 products; state every
+category per store, included, excluded, or both lists empty = take the parent's stores). Shipment-price files
+are exempt from the empty-or-`0` price rule (free shipment is a real value). Add `--locales
+<pl_PL,uk_UA,en_US>` to also flag any `.<locale>` column or `locale` row value that isn't in the project's set
+— the "a finished project carries only its own locales" check, across `data/import/` (the `absent` sweep
+misses that tree). One exemption: `en_US` rows in a `glossary` source are never foreign — the en_US glossary
+is the translator fallback layer every project imports (`project-data` adapt step 1), whichever locales the
+stores serve. Use the individual checks below to drill into a specific file; `preflight` is the sweep that
+replaces remembering to run each one everywhere.
+
+Example / flag note: `preflight` / `manifest-diff` take a manifest yml — `validate preflight
+data/import/local/full_EE.yml --base . --locales en_US,pl_PL,uk_UA`; `validate manifest-diff
+data/import/local/full_EU.yml full_EE.yml --base .`.
+
+Example / flag note: `--baseline` takes a saved gate (or preflight) report — capture it with `--save`, never
+a redirect — `validate gate --save .ai-dev/gate-baseline.json` on the untouched clone (the tool writes after
+running and refuses when `baselineSafe` is false; `gate > file` truncates the target first, the gate reads its
+own empty baseline and saves a falsely clean report). Then `validate gate --baseline
+.ai-dev/gate-baseline.json` gates only new findings (`gate` also auto-discovers that path).
+TXT,
+        'manifest-diff' => <<<'TXT'
+`manifest-diff <reference.yml> <new.yml> [--base dir]` — diff the `data_entity` lists of two import
+manifests. Reports `missing` (entities the reference/demo manifest imports that the new one does not — each
+with its source row count so you can rank: rows ≈ product population → structural/required, rows ≪ →
+opt-in demo garnish) and `added`. Exit `2` if anything is missing. This is the mechanical guard against
+generate-mode silently dropping behavioural plumbing (e.g. `product-shipment-type`) — diff, then classify
+every omission as intentional-content-drop or must-keep-structural.
+
+Example / flag note: `preflight` / `manifest-diff` take a manifest yml — `validate preflight
+data/import/local/full_EE.yml --base . --locales en_US,pl_PL,uk_UA`; `validate manifest-diff
+data/import/local/full_EU.yml full_EE.yml --base .`.
+TXT,
+        'known-set' => <<<'TXT'
+`known-set [<manifest>] [--base dir] [--map <entity-map.yml>] [--skills <dir>] [--emit-map [--out <path>]]`
+— the maintainability gate: keep `data/entity-map.yml` honest against the shipped manifest, and keep record
+counts out of the skills. Defaults resolve relative to the script, so it runs from any cwd (default manifest
+`data/import/local/full_EU.yml`, default map `data/entity-map.yml`, default skills dir the plugin's
+`skills/`). Reports and gates (exit `2`) on: a manifest entity missing from the map; a stale map row the
+manifest no longer imports; a map `source` that isn't the file the manifest imports for that entity (or is
+gone from disk); any `class: unclassified` row (an undecided entity blocks the boot by design); a `structural`
+row with an empty `why`; and any bare record count (`N
+rows|files|entities|products|blocks|labels|SKUs|docs|CSVs|nodes|keys|columns|attributes|categories`) in a
+`.md` under the skills dir (a `0`/`~0` count or a `count-ok`-marked line is exempt). `--emit-map` regenerates
+the map skeleton from the manifest, preserving the class/why of entities already classified and marking new
+ones `unclassified` — a demo-data bump becomes a diff review, not a retype. It does not scan prose for stray
+identifiers/paths — `paths` and `product-refs` own that against the real files, where a
+`<placeholder>`-templated doc won't false-positive.
+
+Example / flag note: `known-set` runs from any cwd on its defaults — `validate known-set --base <repo-root>`
+(checks the map + the count gate); `validate known-set --emit-map --base <repo-root> --out
+<scratchpad>/skeleton.yml` to regenerate the map skeleton for a diff review after a demo-data bump (`--out`
+writes the file itself, like `gate --save`; without it the skeleton is printed — never a `>` redirect, and
+never `/tmp`: use the session scratchpad).
+TXT,
+        'refs' => <<<'TXT'
+`refs <file>... --column C [--column C2] (--in a,b,c | --ref-file F --ref-column K) [--split ,] [--composite]`
+— every value in the column(s) must be in the reference set. A missing column is a finding, never a silent
+pass. `--split` handles multi-value cells. Multi-file: pass several files — each column is checked only
+against the files that have it (a heterogeneous batch where `a.csv` has `key` and `b.csv` has `attribute_key`
+won't false-fail), and a column absent from every file is still flagged. (`--composite` uses the first file.)
+`--composite` treats the columns as one tuple and checks it against the ref file's `--ref-column`s
+(positional) — for cross-entity integrity. E.g. every `(merchant, store)` sold must exist in
+`merchant_store`. Plain `refs` would wrongly pass if each part exists independently.
+
+Example / flag note: `refs` reference set is `--in` OR `--ref-file`+`--ref-column` — `validate refs
+offer_store.csv --column store --ref-file store.csv --ref-column name` (not `--in-file`).
+TXT,
+        'required' => <<<'TXT'
+`required <file> --column C [--column C2]` — cells must be non-empty (e.g. `is_searchable.<locale>` — a
+blank imports as silently unsearchable).
+TXT,
+        'unique' => <<<'TXT'
+`unique <file> --column C` — no repeated values (empty cells ignored). E.g. `url.<locale>` — a duplicate
+fails the import.
+TXT,
+        'absent' => <<<'TXT'
+`absent <file-or-dir> [<path2>...] --string S [--string S2]` — none of the strings may appear (stale-literal
+sweep). Directories are recursed, so `absent config/ src/Pyz --string DE` sweeps whole trees in one call. A
+path resolving to nothing readable is a `CANNOT READ FILE` finding, never a silent pass. Triage tool, not an
+absolute gate — scope a hard check to files that must be zero-hit (`CodeBucketConfig.php`,
+`default_store.php`), classify the rest.
+TXT,
+        'paths' => <<<'TXT'
+`paths <import-config.yml> [--base dir]` — every `source:` in the import config resolves to an existing
+file.
+TXT,
+        'product-refs' => <<<'TXT'
+`product-refs <dir> (--keep-from <file>:<column> | --keep-in a,b,c)... [--pattern n1,n2] [--list-suffix _skus]
+[--exclude <substr>]... [--exclude-column <col>]...` — broad orphan scanner for a catalog reduction. Walks
+every CSV under `<dir>`, auto-discovers each product-ref column (name in `--pattern`, default
+`sku,abstract_sku,concrete_sku,product_sku,product`; plus any header carrying `sku` as an underscore token —
+`sku_concrete`, `abstract_product_sku`, `alternative_product_concrete_sku`, …; plus any column ending in
+`--list-suffix`, default `_skus`, treated as a comma-list), reports every token not in the kept union set
+(`--keep-from` file:columns ∪ `--keep-in`). The JSON carries a `columns` coverage summary (a 100%-orphan
+column is usually a non-product code, e.g. `product_option.sku`; `--exclude-column` it) and the orphan
+`findings`. `--exclude <substr>` skips files not in the active manifest. Exit 2 on any orphan. The coverage
+tool a catalog reduction needs (the reduce strategy in [[project-data]]).
+
+Example / flag note: `product-refs` takes a directory + `--keep-from <file>:<column>` (not a manifest) —
+`validate product-refs data/import/common --keep-from …/product_abstract.csv:abstract_sku`.
+TXT,
+        'manifest-refs' => <<<'TXT'
+`manifest-refs <import-config.yml> [--base dir]` — orphan sweep across the manifest's distinctive-key
+relations, in one command. By column-name convention it builds each key family's producer set from the entity
+that defines it (`abstract_sku`←product-abstract, `concrete_sku`←product-concrete, `sku`←both,
+`merchant_reference`←merchant, `product_offer_reference`←product-offer/merchant-product-offer,
+`category_key`←category, `sales_unit_key`←product-measurement-sales-unit), then flags every consumer cell
+with no producer. Reports `checked` families and `unchecked` ones (producer entity absent from the manifest
+→ not validated, never a false orphan). Exit 2 on any orphan. `category_key` is list-valued — the abstract
+importer `explode(',')`s it (`ProductAbstractWriterStep::getCategoryKeys()`), so a comma list is the shipped
+way to put a product in a second category; the check splits that family on `,` and reports one finding per
+unresolvable part, never per cell. Every other family stays single-value (splitting universally would mask
+real orphans in columns whose values legitimately contain a comma). It is not the whole FK graph: it covers
+only families whose column name is distinctive. Relations keyed on a generic column —
+`product-label-store`→`product-label` by `name`, `stock-address`→`stock` by `warehouse_name`, etc. —
+can't be represented without cross-entity false positives, so they are invisible here. Heuristic for the gap:
+any file the project copied from a seeded demo dir whose parent set the project then replaced (labels, sales
+units, warehouses, attributes) counts as unchecked until a targeted `refs --ref-file` against the project's
+own parent passes. Run `manifest-refs` as the cheap first net, then `refs --ref-file` per replaced-parent
+relation — don't treat a green `manifest-refs` as full referential integrity.
+TXT,
+        'duplicate-keys' => <<<'TXT'
+`duplicate-keys <import-config.yml> [--base dir]` — gating: the same primary key written twice in one
+source. Contradicting duplicates (two different values) gate; additive and identical ones are reported.
+TXT,
+        'cms-block-store' => <<<'TXT'
+`cms-block-store <import-config.yml> [--base dir]` — gating: a CMS block visible in one store and not its
+twin, which renders as an empty slot on exactly one storefront.
+TXT,
+        'orphan-files' => <<<'TXT'
+`orphan-files <import-config.yml> <root-dir> [<root2>…] [--base dir]` — the complement of `paths`: lists
+every import asset under the roots — every file type, not only CSV (state-machine XML, SSP PDFs; manifests,
+READMEs and dotfiles are skipped) — that no manifest source references, counting paths embedded in CSV cells
+as references (workflow.csv `definition`; `file.csv` `path`) — absolute `data/import/…` and relative
+(`common/common/files/X.pdf`, resolved against the base dir, `data/import/` and the CSV's own directory), so a
+referenced PDF is never declared an orphan. (A check limited to CSV files, or to absolute paths, would report
+the workflow XML or the SSP PDFs as orphans, and deleting them breaks the install or leaves `file.csv`
+dangling.) `paths` proves every source resolves to a file; `orphan-files` proves every file is a source.
+Reports `onDisk`/`referenced` counts + the orphan `findings`; exit 2 on any orphan. The gate the project-data
+"Consolidate & clean up" pass uses to prove the on-disk tree equals the active manifest.
+TXT,
+        'threshold-glossary' => <<<'TXT'
+`threshold-glossary <import-config.yml> --locales a,b [--base dir]` — asserts every Sales-Order-Threshold
+row's message key resolves in each project locale's glossary. The regular threshold (`data_entity:
+sales-order-threshold`) builds its key at runtime from type+store+currency
+(`sales-order-threshold.<type>.<store_lc>.<cur_lc>.message`) and looks it up unconditionally — the empty
+`message_glossary_key` column is not an exemption. For every threshold row × locale, flags the (key, locale)
+pairs missing from the manifest's `glossary` sources. Reports `thresholdRows`/`thresholdFiles`/`glossaryFiles`
+so a `0` finding count from *no threshold file found* is visible, not falsely reassuring. Skips
+`merchant-relationship-sales-order-threshold` (auto-generated, never glossary-seeded). Exit 2 on any miss.
+Catches the green-boot-then-500-at-add-to-cart defect the boot itself won't surface (the [[project-data]]
+threshold gate).
+TXT,
+        'sku-coverage' => <<<'TXT'
+`sku-coverage <import-config.yml> [--base dir]` — the complement of `manifest-refs`: which files is a SKU
+missing from? For every SKU (`abstract_sku`/`concrete_sku`/`sku` families across the manifest's catalogue
+sources) it compares the set of files the SKU appears in against the modal set across all SKUs and reports the
+files a SKU is absent from that its peers are in (a product added mid-project absent from
+`merchant_product.csv` and `product_shipment_type.csv` → no "Sold by", "No shipping types available for this
+product." — both invisible to every outbound check, both visible only on screen). Runs inside `gate` as a
+WARNING (non-gating: a deliberately unassigned SKU is legitimate) — read the findings, don't wait for exit
+2. Run it after every product add, standalone.
+
+Example / flag note: `sku-coverage` / `inventory` take a manifest yml, like `preflight` — `validate
+sku-coverage data/import/local/full_EU.yml --base .` after every product add; `validate inventory
+data/import/local/full_EU.yml --base . --plain` → record it in the evidence file and classify every line
+before `done`.
+TXT,
+        'translation-coverage' => <<<'TXT'
+`translation-coverage --from <locale> --to <locale> [<import-config.yml>|<dir>|<csv>…] [--base dir]` —
+untranslated text in a translated column: for every `<base>.<from>` column with a `<base>.<to>` twin, the rows
+whose two cells are identical (non-empty, at least three letters) — an English copy left in a `.<to>` column
+reads as translated to every other check. Not in `gate` (it needs the two locales named); run it after
+`duplicate-columns` and again when the translation is claimed done.
+TXT,
+        'inventory' => <<<'TXT'
+`inventory <import-config.yml> [--base dir] [--plain]` — the semantic read every referential check skips.
+One line per manifest source: `data_entity`, source path, row count, and a sample of its free-text values (the
+first distinctive cells). This is the artifact the [[project-data]] consolidation pass records (in its
+evidence file) and classifies `project` / `generic-plumbing` / `demo-leftover` before `done` — the sample
+cells show, for example, another vertical's demo assets ("Example Asset A") that are still imported under a
+green `gate --strict`. Not a gate, by design: project-data closes on the classified inventory, not on a green
+gate alone.
+
+Example / flag note: `sku-coverage` / `inventory` take a manifest yml, like `preflight` — `validate
+sku-coverage data/import/local/full_EU.yml --base .` after every product add; `validate inventory
+data/import/local/full_EU.yml --base . --plain` → record it in the evidence file and classify every line
+before `done`.
+TXT,
+        '_general' => <<<'TXT'
+Output: JSON `{status, check, findingCount, findings, errors}`, exit `0` clean, `1` warnings only (a
+warning-only check such as `sku-coverage`, or `gate` with warnings and no gating finding), `2` on a gating
+finding. Add `--quiet` to branch on the exit code alone. Run `php <path>/validate.php` with no arguments first
+— it lists every check; the prose names only a subset of them.
+TXT,
+    ];
 }

@@ -94,7 +94,7 @@ and the source of the handover report's demo points, and its `key: value` shape 
 
 | file | holds |
 |---|---|
-| `SKILL.md` | the phases and their owners, the needs list, run modes, the final review, skip-ahead and resume, delegation discipline, the closing checklist, pitfalls |
+| `SKILL.md` | the phases and their owners, the needs list, run modes, the final review, skip-ahead and resume, delegation discipline, the closing checklist |
 | `references/state-file.md` | the `.ai-dev/demo-prep.md` template (frontmatter, Steps table, decision log) and the rules the file follows |
 
 It reads, without restating: [work-classes.md](../demo-intake/references/work-classes.md) for

@@ -1,6 +1,6 @@
 ---
 name: boot-and-verify
-description: "Use to take a transformed Spryker project from 'files written' to 'verified running' — the first boot at project start (the wizard's last mandatory step and commit point), re-applying data changes on an already-booted stack, or standalone per-store verification of storefront, Back Office, search, and queues."
+description: "Boots a transformed Spryker project and verifies it per store: storefront, Back Office, search, queues. Use for the first boot at project start or to re-apply data changes on a booted stack."
 ---
 
 # boot-and-verify

@@ -1,16 +1,6 @@
 ---
 name: find-existing-capability
-description: >
-  The reuse gate for Spryker feature work. Use at the start of any feature work in a Spryker
-  project, BEFORE designing or building a new module: "build / add / implement X", "we need a
-  system for X", "create a new module for X", scoping a PRD, "is there something in Spryker for
-  X", "does Spryker already have X", "extend X", and when a customer requirement list or briefing
-  has to be mapped to what Spryker already offers. Searches the Spryker capability map (one card
-  per shipped capability, with its modules, feature metapackage, extension points and install
-  guide) with the searchSprykerCapabilities and getSprykerCapability tools, checks what the
-  project's composer.lock already has, and returns a per-capability verdict: extend it (installed),
-  install the missing part, install the feature first, build only the gap (partial card), or build
-  new (no relevant hit). Report-only: it never installs or edits anything; the user decides.
+description: "Checks the capability map and composer.lock for what Spryker already has and returns a reuse verdict per need. Use before 'build / add / implement X' or when mapping requirements to Spryker."
 ---
 
 # Find Existing Capability - the reuse gate
@@ -126,12 +116,4 @@ End with a verdict table and one **Reuse decision** block per capability that ma
 - Card: https://spryker-capability-map.s3.eu-central-1.amazonaws.com/<slug>.md
 ```
 
-State what you did not verify (a version-drift check you skipped, a fallback search, an API package you assumed is not needed). Then stop and let the user choose. A PRD for something that ships is framed as "configure / extend / install X", not "build X".
-
-## What you do not do
-
-- Do not install, `composer require`, edit config or write code. Proposals go to `spryker-feature-install` or `spryker-customization` after the user agrees.
-- Do not conclude "not shipped" from the map alone, and do not skip the cross-check on a miss.
-- Do not trust a card's detail over the installed code when the project's version is old.
-- Do not search once with one long sentence; run several short queries.
-- Do not treat a `body`-only match as a verdict - open the card and judge it.
+State what you did not verify (a version-drift check you skipped, a fallback search, an API package you assumed is not needed). Then stop and let the user choose. A PRD for something that ships is framed as "configure / extend / install X", not "build X". Proposals go to `spryker-feature-install` or `spryker-customization` after the user agrees.

@@ -1,6 +1,6 @@
 ---
 name: translate-content
-description: "Use when actually translating a Spryker project's storefront content into a project locale — glossary and/or catalog/CMS/navigation/labels — the opt-in localization pass that project setup defers: 'localize uk_UA', 'translate the shop content into Polish', 'the storefront is still English in my locale'. Standalone on a project, or offered by the wizard after boot; strictly per-locale and opt-in."
+description: "Translates the storefront content of a Spryker project (glossary, catalog, CMS, navigation) into one project locale at a time. Use for 'localize <locale>' or 'translate the shop content'."
 ---
 
 # translate-content

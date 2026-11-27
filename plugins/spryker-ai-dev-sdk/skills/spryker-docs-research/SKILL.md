@@ -1,6 +1,6 @@
 ---
 name: spryker-docs-research
-description: Research and summarize official Spryker public documentation — module behavior, configuration options, API/Glue references, architecture concepts, supported actors, feature/PBC names, and integration/installation guides. Use this whenever a task needs to understand how a Spryker feature, module, or pattern works according to the official docs BEFORE planning, writing a PRD, or implementing — for example "how does the OMS state machine work", "what are the installation steps for MerchantPortal", "is this behavior supported in Spryker", or any time you're about to describe Spryker behavior from memory. The product-requirement-document skill invokes this to ground PRDs in documented reality. Searches docs via MCP tools (Algolia, context7) or a no-MCP curl fallback and returns relevant documented content with source links. Docs-only — it does NOT read the installed codebase, modules, transfers, or endpoint paths.
+description: "Searches the official Spryker documentation and returns cited passages on modules, configuration, APIs and install guides. Use before a PRD, plan or code that depends on Spryker behaviour."
 ---
 
 ## Why this exists
@@ -81,10 +81,5 @@ Every piece of content carries its **Source** URL. Reproduce documentation subst
 ## Principles
 
 - **Docs before opinion.** Never describe Spryker behavior from memory when the documentation can confirm it.
-- **Always Return comprehensive relevant content, not just pointers.** Hand back the relevant documentation substance (steps, requirements, options, constraints, config) so the caller can act on it — each tied to its source link — rather than a list of URLs to go read.
-- **Short Algolia queries** (2–3 words) outperform long ones.
-- **Cite sources.** Every piece of content and every claim carries its doc URL.
-- **Public docs only.** If a question needs the installed code (exact module names, transfer fields, real endpoint paths), say so in "Open questions / gaps" — that is out of scope here and belongs to a code-investigation step.
 - **Docs are not trusted for identifier spellings.** The docs contradict themselves on exact names (`full-text` vs `full_text`, `string-facet` vs `string_facet`). Report the concept, but flag every field/index/route identifier as *"confirm in code or a live mapping"* — never present a doc spelling as the authoritative name.
 - **Anything you clone or download is ephemeral.** A docs-repo clone in the scratchpad is a working copy, not a deliverable — say so if you mention it (or clean it up); never report its path as a durable artifact.
-- **Surface gaps loudly.** A missing tool or an unanswered question is a finding, not something to paper over.

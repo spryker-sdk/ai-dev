@@ -66,7 +66,7 @@ flowchart TD
 
 | file | holds |
 |---|---|
-| `SKILL.md` | Rule 0, harvest root placement, the survey, the fetch list, the fetcher's shape, gaps, image roles, derivatives, editorial and brand imagery, coverage, the one-paragraph legal label, re-running and pivots, the output contract, the close checklist, pitfalls |
+| `SKILL.md` | Rule 0, harvest root placement, the survey, the fetch list, the fetcher's shape, gaps, image roles, derivatives, editorial and brand imagery, coverage, the one-paragraph legal label, re-running and pivots, the output contract, the close checklist |
 
 ## Design decisions baked in
 

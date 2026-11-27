@@ -1,6 +1,6 @@
 ---
 name: spryker-verifier
-description: Use whenever the user wants to verify, check, or test that a specific behaviour holds in a running Spryker environment. Triggers include "verify that X works", "check whether X", "test the feature", "run the ACs", "does X pass", "make sure X works", "confirm that the storefront/BO/API shows X", "assert that the DB has Y after Z". Drives Yves/Zed UI in the browser, exercises Glue/SAPI/BAPI APIs via curl, asserts DB state via read-only SQL, checks console outputs. Returns a PASS/FAIL/BLOCKED verdict per acceptance criterion with raw evidence. Never edits code, never attempts fixes.
+description: "Verifies acceptance criteria in a running Spryker environment through the browser UI, API calls, read-only SQL and console output, and returns PASS/FAIL/BLOCKED per criterion with raw evidence. Use to verify or test a feature. Never edits code."
 ---
 
 # Spryker Verifier
@@ -174,17 +174,11 @@ Report in the unified `spryker-qa-coverage` format. Each row is one acceptance c
 
 - Do not edit files. The one write you make is the report itself, `.ai-dev/verifier-report.md`.
 - Do not run console commands that change state, except those the AC itself requires (e.g. running an import the AC is testing).
-- Do not retry, fix, or "improve" a failing AC. Report and stop.
 - Do not claim a file (screenshot, GIF, log) was saved without verifying it exists on disk first (`Read` or `ls`). MCP-internal references are not files.
-- Do not seed missing test data; mark **BLOCKED** instead.
-- Do not diagnose — that's `spryker-issue-diagnoser`'s role.
 - Do not guess URLs, credentials, commands, or routes — `spryker-runtime` discovers them; if it can't, return BLOCKED naming what is missing.
 - Do not query the database via shell — use `spryker-runtime`'s read-only `executeDatabaseQuery` path only.
+- **Do not infer PASS from absence-of-error.** A 200 status, a non-empty page, no JS console errors — none of these proves the AC passes; they show only that the request did not fail. The AC's specific behavior must be directly observed and asserted.
 - **Visual fit — objective checks only, no subjective judgment.** When the AC adds a visible UI element (badge, label, button, field, banner, indicator, widget, table column), the verifier asserts what it can prove objectively and leaves subjective design judgment to the user:
   - **Objective (verifier asserts):** the element renders (DOM `querySelector` returns non-null), the element uses an existing atom/molecule class from `Theme/default/components/` (Yves; Back Office: Bootstrap 5 / Gui classes; Merchant Portal: an existing `web-spy-*` / `web-mp-*` element), the element's CSS classes match the convention of its siblings on the same page (`.button`, `.label`, etc.), no plain unstyled `<span>` containing raw text where siblings use a styled atom, and a measured contrast ratio when the AC names one (text and icons ≥ 4.5:1 against their computed background — the logged-in header row of `match-reference-design` §11a).
   - **Subjective (verifier reports, does not verdict):** *"does this colour/spacing/typography look right for the shop?"*. Capture a screenshot; include it in the evidence column; never mark PASS *or* FAIL on the basis of "it looks good / bad". Mark **PASS (visual review pending)** on the objective checks, put the screenshot inline, and leave the visual judgment to the user at the commit gate (under the demo preset, at the wizard's final review). Count it separately in the Summary; it is not a clean PASS until the user accepts the look.
   - **Objective fail signal**: a `<span>` / `<div>` containing the new text with no matching atom class while siblings have one. That's an integration miss, not subjective design — mark FAIL.
-- **Do not mark PASS when uncertain.** A false PASS lets a broken feature through the "all ACs passed" gate. If your assertion didn't specifically exercise the AC's behavior, if the evidence is ambiguous, if you skipped a part of a compound AC — mark BLOCKED, not PASS. The same applies to FAIL: a FAIL derived from probes the app never registered is also a wrong verdict. Ambiguity resolves to **BLOCKED**, not to FAIL (see **Anti-false-FAIL rules**).
-- **Do not infer PASS from absence-of-error.** A 200 status, a non-empty page, no JS console errors — none of these proves the AC passes; they show only that the request did not fail. The AC's specific behavior must be directly observed and asserted.
-- **Do not skip parts of compound ACs.** Every conjunct gets its own assertion. If you can't assert one, the verdict is BLOCKED, not PASS.
-- **A `PASS (server only)` is never a clean PASS for a user-flow AC.** A synthetic 200 (Mode 4/5) proves the server, not the button. Keep the UI-flow assertion FAIL/BLOCKED and record the server result as its `PASS (server only)` companion.

@@ -1,15 +1,6 @@
 ---
 name: spryker-profiler
-description: >
-  Read and configure the Spryker/Symfony WebProfiler. Use when someone asks why a page,
-  endpoint or Back Office screen is slow, wants the slowest request, asks how many queries a
-  page runs, suspects an N+1, wants Redis, Elasticsearch, Yves→Zed or external HTTP call counts,
-  or wants before/after evidence for a performance fix; also for what a request logged or
-  threw, which controller handled it, or what the audit log recorded. Covers setup too:
-  enabling the profiler for Yves, Zed/Back Office, Backend Gateway, Backend API, Glue or
-  Merchant Portal, a missing toolbar or empty collector, adding SQL/Redis/Elasticsearch
-  collectors. Use it before claiming a change improved or hurt performance: read the recorded
-  measurements instead of guessing.
+description: "Reads and configures the Spryker WebProfiler: slow requests, query counts, N+1, Redis, search and HTTP calls, exceptions. Use for performance questions or to prove a performance fix."
 ---
 
 # Reading Spryker profiler data

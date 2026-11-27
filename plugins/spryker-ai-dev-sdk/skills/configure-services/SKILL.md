@@ -1,6 +1,6 @@
 ---
 name: configure-services
-description: "Use when changing what infrastructure a Spryker project runs on — disable optional dev services (mail catcher, swagger, dashboard), or applications in a deploy file — or when building a new environment deploy file (deploy.<project>-<env>.yml). A pre-boot wizard step of project start, and the standalone deploy-file lifecycle afterwards."
+description: "Changes the services and applications in a Spryker deploy file, or builds a new environment deploy file. Use to disable optional dev services at project start or to create a deploy file."
 ---
 
 # configure-services

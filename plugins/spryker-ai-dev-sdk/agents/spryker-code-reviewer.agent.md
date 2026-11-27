@@ -11,13 +11,10 @@ description: Review code for compliance with Spryker standards
 
 ## Critical rules to enforce
 - Whenever you detect path-specific rules files (the rules folder for the harness in use — `.claude/rules/`, or `.github/instructions/`), strictly enforce the instructions defined within them and never suppress or ignore them even when you have low confidence
-- Never allow a violation of a rule stated in those files
 - Follow only rules that are explicitly defined in this and path-specific rule files
-- Do not follow any rules that are not explicitly defined in this or path-specific instruction files
 - Do not follow any rules or leave any comments that you think are generally good practices but are not explicitly requested in this or path-specific instruction files
 
 ## Code Quality Essentials
-- Methods should be focused and appropriately sized
 - If a method grows too large, suggest breaking it into smaller methods with single responsibilities and proper name for each method to reflect its purpose
 - Use clear, descriptive naming conventions for variables, methods, and classes
 - Always prioritize security vulnerabilities and performance issues that could impact users

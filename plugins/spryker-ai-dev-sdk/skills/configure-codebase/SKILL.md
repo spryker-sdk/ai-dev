@@ -1,6 +1,6 @@
 ---
 name: configure-codebase
-description: "Use when a Spryker project adopts a custom namespace instead of Pyz and the code layer must resolve, build, lint, and test it — namespace registration, composer autoload, frontend build config, codeception wiring. A pre-boot wizard step of project start; skipped entirely when the project keeps Pyz."
+description: "Registers a custom project namespace instead of Pyz: autoload, namespace config, frontend build, Codeception. Use at project start when the project does not keep Pyz (pre-boot wizard step)."
 ---
 
 # configure-codebase

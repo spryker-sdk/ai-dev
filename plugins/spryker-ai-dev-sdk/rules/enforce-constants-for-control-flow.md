@@ -38,9 +38,3 @@ public function noConstant2(int $id, string $name): string {
     return sprintf('Argument count has to match (%d, %s)', $id, $name);
 }
 ```
-
-WHY (this part of the instruction MUST be skipped by Agent, this block is for humans only):
- - Rule in [public documentation](https://docs.spryker.com/docs/dg/dev/guidelines/coding-guidelines/coding-guidelines.html)
- - Enhances readability: constants convey domain meaning clearly, making code self-documenting.
- - Facilitates project-level overrides: allows changing values in one place instead of overriding methods fully.
- - Reduces bugs: avoids typos and inconsistent values across the codebase.

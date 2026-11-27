@@ -78,7 +78,7 @@ is the wizard's routing table, and an item that cannot be placed is resolved by 
 
 | file | holds |
 |---|---|
-| `SKILL.md` | scope rules, platform and audience pin, classification and the routing table, source fidelity, data inventory and field mapping, measured brand assets, `purpose`, open questions, the output contract, the handoff checklist, pitfalls |
+| `SKILL.md` | scope rules, platform and audience pin, classification and the routing table, source fidelity, data inventory and field mapping, measured brand assets, `purpose`, open questions, the output contract, the handoff checklist |
 | `references/work-classes.md` | the four classes and *already works*: what each may write, who owns it, how a misrouted request gives itself away, and the split rule for a request that spans several classes |
 
 ## Design decisions baked in

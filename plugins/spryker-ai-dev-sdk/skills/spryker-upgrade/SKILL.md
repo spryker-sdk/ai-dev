@@ -1,17 +1,6 @@
 ---
 name: spryker-upgrade
-description: >-
-  Upgrade this Spryker project's modules/features to a newer release. First records baselines
-  (tests, PHPStan, code sniffer, evaluator and a crawl of the whole Back Office) and checks whether
-  the project's customisations are covered by tests, offering Facade/Client-level functional tests
-  where they are not. Then aligns dev tooling, the Docker SDK and the deploy files with the reference
-  demo shop of the target release, resolves the constraint blockers that stop a release-group bump,
-  and detects the silent damage (PHP 8.3 typed-member fatals, dead method overrides, shadowed
-  Twig/component changes, replaced plugin stacks, broken config constants, transfer strict
-  mismatches, vendor packages that must move together). Deprecated plugins are analysed for the
-  developer to decide; every major module bump needs its migration guide. Trigger on "upgrade the
-  project", "update to latest release", "update spryker modules/features", "run the upgrade", or any
-  request to bump spryker-feature/* or spryker/* packages.
+description: "Upgrades a Spryker project's modules and features to a newer release with baselines, test coverage, constraint fixes and damage detection. Use for 'upgrade the project' or a package bump."
 ---
 
 # Spryker Project Upgrade
@@ -561,15 +550,10 @@ Ask before committing or opening a pull request.
 
 ## Hard rules
 
+- Offline / lookup failure → say so and stop for that module; never invent migration steps.
 - All state lives in `.spryker-upgrade/state/` (gitignored); never commit baselines, reports, the
   reference demo shop clone or `*.merge-conflict` artifacts. Prefer explicit `git add <path>` over
   `git add -A` while a Lane 2 pass is in flight.
-- Offline / lookup failure → say so and stop for that module; never invent migration steps.
-- Damage is fixed: MISSING plugins, fatals, shadowed vendor changes, new Back Office failures.
-  Deprecated plugins and APIs are an analysed list the developer decides on at gate #3 — never
-  ignored, never swapped without that decision.
-- Tests pin behaviour through the Facade or the public Client/Service, before the upgrade. Never
-  tests for Factory, Config or DependencyProvider classes, and no getter/wiring tests.
 - Never claim "verified" for what could not run: a suite already red, unrunnable, or not touching the
   customised modules proves nothing; without a booted Back Office the visual and data-migration
   results are unverified; declined tests at gate #1 mean the report names the static-only lanes.

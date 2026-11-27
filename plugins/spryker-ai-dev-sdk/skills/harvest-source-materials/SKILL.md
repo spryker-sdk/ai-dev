@@ -1,14 +1,6 @@
 ---
 name: harvest-source-materials
-description: >
-  Use to collect the raw material a demo will be built from — product data, product imagery,
-  editorial/campaign imagery, brand assets — out of a customer's public website or a supplied export,
-  into a harvest directory that sits beside the project and never inside it. Triggers: "gather the
-  images", "harvest the product data", "scrape their site for the demo", "we need the materials for
-  the demo", "get the assets from <url>", "prepare the source data". Runs after `demo-intake` (which
-  pinned the platform and recorded where the material lives) and after the demo's needs list is derived —
-  the needs list decides what is fetched. It produces the `dataset:` input `project-data` consumes; it
-  does not write `data/import/**`, does not import, and does not build.
+description: "Collects product data, imagery and brand assets for a demo from a customer site or export into a harvest folder beside the project. Use to gather demo materials after demo-intake."
 ---
 
 # harvest-source-materials
@@ -432,21 +424,3 @@ Confirm each, in one line each:
       or face cut; output dimensions asserted.
 - [ ] The README's opening paragraph carries the illustrative-demo-data label and the price basis.
 - [ ] The handoff block was printed, with column names read from the written files.
-
-## Pitfalls
-
-Format: **symptom → cause → fix.**
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| A very large harvest that is missing the product the story needs, or a whole category | The harvest ran before the needs list existed, so breadth substituted for a target list | Rule 0: the needs list and the composition spec are the scope. §3 fetch list, confirmed, before the first image |
-| A range size stated from the harvest contradicts the live listing | The scraper's own colour cap and unvisited listings were recorded nowhere, so a scraper artefact was read as a fact about the customer's catalogue | §9 `coverage.json` + README coverage; every later claim cites it or says "in what we captured, these: <named>" |
-| The tiles show a studio side-view; the live product page shows a three-quarter front shot, and cropping does not fix it | The harvest's own directory order was trusted over what the source renders | §6 — read the live page's `<img src>` and match the asset family before wiring; `project-data` C16 |
-| Every product tile on every listing downloads a full-size image | The small derivative was produced by copying the large file rather than resizing it | §7 — resize for real, then assert the derivative's dimensions **and** byte size; equal byte size is a defect |
-| Imagery vanishes after a rebuild, but a markup check passes because the alt text still renders | Images were written into the published assets directory, which the build regenerates | §1 and §7 — the tracked static frontend directory only; a markup check cannot see a missing binary |
-| Tens of megabytes of imagery in git, no decision recorded anywhere | No size budget was set, and raw campaign heroes run to a couple of megabytes each | §7 — set and log a default budget before the first copy, report the actual total, carry any overrun to the final review |
-| Images with no recorded purpose remain after a pivot | The abandoned approach's intake was never swept | §11 — on a pivot, list harvest records, harvest imagery and copied derivatives as one removable set, in one message |
-| A referenced PDF is deleted by an orphan sweep | The only reference to it lived inside a CSV cell, and the sweep only looked at markup | §11 — grep CSV cells before any orphan sweep; a cell-embedded reference is a reference |
-| A proposal to tag ordinary products with an attribute they do not have, so a category looks fuller | The demo was treated as ground truth and the source as adjustable | §5 — the source is ground truth; a gap gets three options and no fourth, and fabrication is never one of them |
-| The data step spends question rounds reconstructing master / colour / size semantics out of the harvest CSVs | The run ended without the handoff block, so the field mapping had to be re-derived by hand | §12 — print the handoff block with column names read from the written files |
-| Homepage bands filled with product packshots, or editorial fetched without a panel count, inflating the harvest | Editorial was treated as a by-product of the product fetch instead of its own deliverable | §8 — editorial is sized by the composition spec's panels and ratios, kept in its own tree, with a manifest per file |

@@ -1,6 +1,6 @@
 ---
 name: technical-specification
-description: Use when the user asks for a technical specification (tech spec) or a technical design document for a new Spryker feature, from a PRD or from business requirements. Creates the spec in steps with the user — a template first, then module dependency graph, ERD, transfer model, flow (sequence) diagrams, module API, test coverage outline, and risks — all as Mermaid diagrams and method signatures, with no implementation code.
+description: "Writes a technical specification for a new Spryker feature step by step: module graph, ERD, transfers, sequence diagrams, API, tests, risks. Use when asked for a tech spec or design doc."
 user-invocable: true
 ---
 

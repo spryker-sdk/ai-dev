@@ -1,11 +1,6 @@
 ---
 name: cypress-tests
-description: >
-  Use this skill whenever the user wants to create, run, review, or validate Cypress end-to-end
-  tests in this project. Trigger on phrases like "add a cypress test", "write an e2e test",
-  "run the cypress tests", "run e2e tests", "check my cypress test", "review this cypress spec",
-  "does this test pass the quality gate", "cypress smoke test", or any request to test the
-  storefront, backoffice, merchant portal, or Glue API end-to-end.
+description: "Creates, runs, reviews and validates Cypress E2E tests for storefront, Back Office, Merchant Portal and Glue API. Use for 'add a cypress test', 'run e2e tests' or a quality-gate check."
 ---
 
 # Cypress E2E Tests

@@ -205,7 +205,12 @@ try {
         ? "\n\nThis is block #" . ($count + 1) . " on the same set of open steps; the steps table has not changed since the last block. One of these applies:\n  1. The table is out of date: it does not record work you have done. Update the row, with the evidence `done` requires.\n  2. The first open step has a blocker you have not named. Name it in one line and end the turn on that question; this hook lets that through."
         : '';
 
-    stop_decide('block', "Stop blocked: the run mode is `autonomous` and the next unfinished step is **{$next}**{$also}. An autonomous run continues without the person until every step is finished; a progress report does not end the turn.\n\nContinue with {$next} now.{$escalation}\n\nEnd the turn only when every row is `done` or `skipped`, or when you are blocked by something only the person can resolve: end the turn on a question only they can answer, or on a line that starts with `NEEDS YOU:` and names the blocker.", $cwd, $harness);
+    // The full end condition goes with the first block and with each change of the open steps; a repeated block on the same open steps states it in one line.
+    $endCondition = $count === 0 || !$sameWork
+        ? "An autonomous run continues without the person until every step is finished; a progress report does not end the turn.\n\nContinue with {$next} now.{$escalation}\n\nEnd the turn only when every row is `done` or `skipped`, or when you are blocked by something only the person can resolve: end the turn on a question only they can answer, or on a line that starts with `NEEDS YOU:` and names the blocker."
+        : "Continue with {$next} now.{$escalation}\n\nEnd condition as before: every row `done` or `skipped`, or a question only the person can answer, or a `NEEDS YOU:` line that names the blocker.";
+
+    stop_decide('block', "Stop blocked: the run mode is `autonomous` and the next unfinished step is **{$next}**{$also}. {$endCondition}", $cwd, $harness);
 } catch (Throwable $e) {
     fwrite(STDERR, 'spryker-ai-dev-sdk stop guard: ' . $e->getMessage() . "\n");
     exit(0);

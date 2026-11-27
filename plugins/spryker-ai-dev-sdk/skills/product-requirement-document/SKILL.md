@@ -1,9 +1,11 @@
 ---
 name: product-requirement-document
-description: Use when creating PRDs for Spryker features, before implementation planning, or when a user requests a spec/requirements document that another AI agent will turn into tasks. This is the START of the Spryker feature-building chain — "I want to build a feature" begins here, then flows to spryker-customization (which drives build, verification, and commit). Drives an interactive, research-grounded PRD — first investigates the real codebase and official Spryker docs, strictly assigns a real Spryker actor to every story, names the affected endpoint + path, and keeps the document business-focused (no implementation, no quality gates, no task breakdown).
+description: "Writes a research-based PRD for a Spryker feature with real actors and endpoints and no implementation detail. Use when a user wants to build a feature or asks for a PRD or requirements."
 ---
 
 # Product Requirement Document (PRD) Creation
+
+Boundary: this is the start of the Spryker feature-building chain. The PRD then goes to `spryker-customization`, which drives build, verification and commit.
 
 ## Overview
 
@@ -201,19 +203,6 @@ Ask the user at Phase 8 which location:
 - "Dependencies can list the facade method I'll call" → NO. Module/feature names + configuration names only; the methods/classes go in the `.refs.md` attachment.
 - "I'll discard the FQCNs I found" → NO. Save them to `<feature-name>.refs.md` so the planner has the crosswalk.
 
-## Interactive Workflow Checklist
-
-- [ ] Phase 0: Gathered codebase facts inline **first** (`searchSprykerCapabilities` as the very first call - reuse verdict per `find-existing-capability`, PRD framed as configure / extend / install when the capability ships - then `getSprykerModules`/`getSprykerModuleMap`/`getTransferStructureByName`, vendor paths from the module map — never guessed) and formed a hypothesis — started the server + asked the user to reload MCP if the tooling server was down; asked the user whether docs research is needed (and, only if yes, dispatched `spryker-docs-research` as **subagent(s) with your harness's subagent tool**, targeted by the hypothesis, non-overlapping scopes — or used the stated harness fallback: consent, else inline; merged their briefs); asked the user whether to validate existing endpoints/flows against the running app (and ran `spryker-runtime` only if yes); flagged any missing tools
-- [ ] Phase 3 (start): Asked the pacing question once (per-criterion / per-story / draft-then-review) and honoured it through Phases 3–4
-- [ ] Phase 2: Background & Goals approved
-- [ ] Phase 3: Each story approved at the chosen pacing — every checkpoint that occurred presented the **actor** and the **affected endpoint (URL path, or "no endpoint")** alongside the story, and the user confirmed both
-- [ ] Phase 4: Every acceptance criterion approved (individually, per story, or in the draft review — per the chosen pacing), all Gherkin + quantified
-- [ ] Phase 5: Each story records affected endpoint as a **URL path** (+ existing/greenfield + module name), or "no endpoint" — as confirmed at the Phase 3 checkpoint; the controller+action FQCN is recorded in `<feature-name>.refs.md`, not the body
-- [ ] Phase 6: Business NFRs approved (no tooling/test commands); numbers marked user-supplied vs baseline-default
-- [ ] Phase 7: Constraints captured (or explicitly "none discovered"); decisions & accepted risks recorded with their cost; success metrics, out-of-scope, dependencies confirmed (dependencies as module/feature + configuration names, no code references)
-- [ ] Phase 8: PRD body is code-free (no FQCNs/`::method`/file paths anywhere, including Dependencies); discovered code references captured in `<feature-name>.refs.md`; research header links the attachment
-- [ ] Final PRD approved before saving; saved the `.prd.md` and its sibling `.refs.md`, and told the user about both
-
 ## Supporting Files
 
 - **[workflow.md](workflow.md)** — detailed phase-by-phase interactive script
@@ -222,7 +211,3 @@ Ask the user at Phase 8 which location:
 - **[examples.md](examples.md)** — full PRD example and anti-patterns
 - **[template.md](template.md)** — allowed PRD section structure
 - **[refs-attachment.md](refs-attachment.md)** — structure of the `<feature-name>.refs.md` code-reference attachment (keeps the PRD body code-free)
-
-## Summary
-
-PRD creation is INTERACTIVE and RESEARCH-GROUNDED. Investigate real Spryker (docs + code, and run the app for existing flows) → ask → draft incrementally → assign a real actor and real endpoint to every story → approve at each checkpoint → keep it business-only. Alignment over speed.

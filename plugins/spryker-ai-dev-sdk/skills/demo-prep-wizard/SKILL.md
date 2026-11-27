@@ -1,6 +1,6 @@
 ---
 name: demo-prep-wizard
-description: "Use when a demo is coming and the job is to prepare it end to end — 'we have a demo coming up', 'help me prepare a demo for <customer>', 'prepare the demo', 'here is the briefing for the demo', 'what do we need for this demo'. The demo-side parallel of `project-starter-wizard`: that one turns a demoshop clone into a project, this one takes the demo the preparer already has and drives the gathering and shaping of everything it needs — intake, requirements, design reference, harvest, build, rehearsal, handover report. It orchestrates: every phase is owned by a named skill (`demo-intake`, `match-reference-design`, `harvest-source-materials`, `project-data`, `demo-run-sheet`, …) and this skill never re-implements harvesting, design or data mechanics. Also the resume entry when a prior run left `.ai-dev/demo-prep.md`."
+description: "Prepares a customer demo end to end through the owning skills: intake, requirements, design, harvest, build, rehearsal, handover. Use for 'prepare the demo' or to resume a demo-prep run."
 ---
 
 # demo-prep-wizard
@@ -417,50 +417,3 @@ The closing checklist. State each line at the close, with its evidence:
 
 Anything short of all four is reported as what it is. A demo is reported "prepared" only after every
 beat was walked end to end.
-
----
-
-## Pitfalls
-
-Format: **signature → cause → fix.**
-
-- **The demo scope arrives pasted halfway through the build, and every data gap is then found by playing
-  the story out by hand** — a category with two products where the story needed a range, a hero product
-  with one colour where the story said "show colour options" → the needs the beats create were never
-  written down before the data was shaped, so nothing had a requirements list to be checked against →
-  phase 2 comes before any harvesting or import; the needs list is the acceptance criterion.
-
-- **The demo is re-designed instead of read** — a set of beats proposed, or the supplied script
-  "tidied up" → the preparer already had the demo, and asking them to agree it again delays the run
-  and lets the demo drift from the brief → the beats are an input: read them, derive from them, and ask only when
-  nothing was supplied at all.
-
-- **Quoted UI strings from the scope replaced with the agent's own phrasing** → the script was
-  summarised instead of quoted → every quoted string is carried character for character out of the
-  brief, and is fixed wording from that moment for brand-project, the CMS pass and the handover report.
-
-- **Content work answered with new features — product hotspots, quick view, a bundle builder slipped into
-  the look-and-content work** → a demo-script wish was read as part of the restyle → phase 2's rule:
-  behaviour the platform lacks is its own customization row, shown to the preparer as "a small working
-  version" with its cost, and built only once confirmed.
-
-- **The preparer is asked something they cannot answer** — a work class, a namespace, a rebuild
-  strategy, a CI option → a technical decision was handed to the preparer → decide
-  it yourself, log it, and ask only about content, look and the story.
-
-- **Harvesting runs, then the design spec lands and asks for editorial panels at ratios nobody fetched
-  for** → the composition spec was treated as a look-and-feel step at the end rather than as an input to
-  gathering → phase 3 runs before phase 4, because it is what sizes the editorial imagery.
-
-- **The first end-to-end walk of the demo is the preparer's, live** → there is no phase
-  between "it booted" and "it is ready" → phase 6: every beat is walked, in the browser, as its
-  persona, before the handover report is written.
-
-- **A phase 5 delegation is about to start while `.ai-dev/demo-prep.md` carries no
-  `answers_confirmed_at`** → the routing table was never confirmed → do not stamp the file to get past
-  it: show the table, get the confirmation, then stamp.
-
-- **The wizard's interview is run on the demo clone to collect demo scope** → the two tracks were
-  conflated; `project-starter-wizard` collects *project setup* decisions and knows nothing about the
-  demo → this skill owns the demo's needs; phase 5 hands the project-setup decisions to the wizard and
-  lets it own its own state file and confirmation.

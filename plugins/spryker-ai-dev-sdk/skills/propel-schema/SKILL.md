@@ -1,10 +1,6 @@
 ---
 name: propel-schema
-description: >
-  Use when creating, updating or reviewing Propel schema XML for Spryker modules — new
-  tables and columns, foreign keys, indexes, unique constraints, many-to-many tables and the
-  timestampable, uuid, event and synchronization behaviors. Applies Spryker naming (spy_/pyz_
-  table prefixes, id_/fk_ columns, index and constraint names) and column-type conventions.
+description: "Creates, updates or reviews Propel schema XML for Spryker modules: tables, columns, keys, indexes, behaviors, naming. Use for any change to a schema.xml file of a Spryker module."
 ---
 
 # Propel Schema Generator

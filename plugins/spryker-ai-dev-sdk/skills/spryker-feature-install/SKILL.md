@@ -1,16 +1,6 @@
 ---
 name: spryker-feature-install
-description: >
-  Install a Spryker feature into the project end to end, from a capability card or a feature name:
-  "install the X feature", "add spryker-feature/x", "integrate feature X", "install the X Glue API",
-  after find-existing-capability proposed an install, or a feature that spryker-upgrade Phase 6
-  accepted. Resolves the feature, its required features and the release it needs (moving only the
-  modules it needs); parses the official install guide into a checklist with one row per step;
-  reconciles every row with the reference demo shop (plugin subset and order, merged config, files
-  the guide does not name); applies it in the project layer one guide section at a time; suggests
-  storefront placement; verifies each guide Verification block; and finds and proves the release
-  steps existing environments need (imports, republish, environment variables). Always confirms
-  before changing anything; never edits vendor/ or generated code; never auto-commits.
+description: "Installs a Spryker feature end to end from its install guide, checked against the demo shop, with verification and release steps. Use for 'install the X feature' or after a reuse check."
 ---
 
 # Spryker Feature Install

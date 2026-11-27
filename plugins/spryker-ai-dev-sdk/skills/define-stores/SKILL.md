@@ -1,6 +1,6 @@
 ---
 name: define-stores
-description: "Use when a Spryker DMS project's stores or region must be created or redefined pre-boot — a new store set, a region rename, or hardcoded store/locale literals (CodeBucketConfig, default_store, host maps) that block boot. Invoked by the wizard's store step, or standalone on an un-booted clone. Store skeleton only — catalog/CMS/price content is project-data's job."
+description: "Creates or redefines the stores and region of a Spryker DMS project before boot and fixes store or locale literals that block boot. Use for the wizard store step or a new store set."
 ---
 
 # define-stores (skeleton + config, files-mode)

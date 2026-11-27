@@ -143,6 +143,15 @@ check('stop guard: the block names the single next step, not a list dump', $d ==
 [$d, $r2] = run_hook('guard-stop.php', $stopPayload('Progress report two.'));
 check('stop guard: a second block on the SAME open steps escalates', $d === 'block' && str_contains($r2, 'block #2 on the same set of open steps'));
 check('stop guard: the escalation names the two options', str_contains($r2, 'out of date') && str_contains($r2, 'blocker'));
+check('stop guard: the first block states the full end condition',
+    str_contains($r, 'a progress report does not end the turn') && str_contains($r, 'End the turn only when every row is `done` or `skipped`') && str_contains($r, '`NEEDS YOU:`'));
+check('stop guard: a later block repeats the end condition in one line',
+    !str_contains($r2, 'a progress report does not end the turn') && str_contains($r2, 'End condition as before') && str_contains($r2, '`done` or `skipped`') && str_contains($r2, '`NEEDS YOU:`'));
+file_put_contents($proj . '/.ai-dev/project-setup.md', str_replace('| 2 | define-stores | in-progress | |', '| 2 | define-stores | done | ok |', $savedState));
+[$d, $r3] = run_hook('guard-stop.php', $stopPayload('Progress report three.'));
+check('stop guard: a later block on CHANGED open steps states the full end condition again',
+    $d === 'block' && str_contains($r3, 'a progress report does not end the turn') && !str_contains($r3, 'End condition as before') && !str_contains($r3, 'on the same set of open steps'));
+file_put_contents($proj . '/.ai-dev/project-setup.md', $savedState);
 @unlink($proj . '/.ai-dev/stop-blocks.json');
 
 [$d, , , $exit] = run_hook('guard-stop.php', []);
