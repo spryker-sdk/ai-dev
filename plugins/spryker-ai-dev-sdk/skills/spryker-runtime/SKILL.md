@@ -29,8 +29,8 @@ Also: **if the user names a specific endpoint to use — e.g. a real cloud URL l
 
 **Resolve the environment at the start of the session** and reuse the values for every request:
 ```bash
+php $RT/runtime.php env --app <app>                  # one application, e.g. --app backoffice: use this form first
 php $RT/runtime.php env --region <region or store>   # the applications of the store in use + the service containers
-php $RT/runtime.php env --app backoffice             # one application
 php $RT/runtime.php env                              # every store: long in a multi-store project
 php $RT/runtime.php env --deploy-file deploy.<name>.yml
 ```
@@ -41,26 +41,36 @@ One line per application endpoint: application, store or region, URL with scheme
 | Yves storefront | `yves` | session (login form) |
 | Back Office (Zed) | `backoffice` | session (login form) |
 | Glue REST API | `glue` | token via `/access-tokens`, customer account |
-| Glue Storefront | `glue-storefront` | token, customer account |
+| Glue Storefront | `glue-storefront` | token via `/token`, customer account |
 | Glue Backend | `glue-backend` | token via `/token`, Back Office user |
 | Backend API (Zed) | `zed` (entry-point `BackendApi`) | Back Office user |
 | Merchant Portal | `merchant-portal` | session (login form), merchant user |
+
+**Fallback for a host that `env` does not list** (a user-provided target):
+- Session cookie name: the host with every `.` replaced by `-` (`backoffice.de.shop.local` → `backoffice-de-shop-local`).
+- Token request: legacy Glue (`glue`) takes `POST <host>/access-tokens` with `Content-Type: application/vnd.api+json` and `{"data":{"type":"access-tokens","attributes":{"username":"<user>","password":"<password>"}}}`; the Storefront API and the Backend API take `POST <host>/token` with the form `grant_type=password&username=<user>&password=<password>`.
 
 ## Login per role — full reference
 
 All demo accounts share the **same default password: `change123`**. Each actor has its own login URL and entry point — using the wrong one fails silently. Combine the login path with the **host from the env call** (or the user-specified target).
 
-**The seeded accounts:** `php $RT/runtime.php accounts` lists the accounts the repository seeds — Back Office users and agents (`src/<Ns>/Zed/User/UserConfig.php`), merchant users and customers (`data/import/**`) — with the role, the user name, the file and line, and where the password is. It never prints a password (`--role <role>` for one role, `--limit 0` for all).
+**Default accounts.** Use the default account of the actor in the table below first. Use the accounts call for another account, and when a default account fails:
+```bash
+php $RT/runtime.php accounts --role <role>     # one role, e.g. --role customer
+php $RT/runtime.php accounts --user <text>     # the user names that contain <text>
+php $RT/runtime.php accounts                   # every role: long in a demo shop
+```
+The accounts call lists the accounts the repository seeds: Back Office users and agents (`src/<Ns>/Zed/User/UserConfig.php`, else the vendor `UserConfig.php`), merchant users and customers (`data/import/**`, `data/import/common` first). It prints one line per user name, under one header line per file: the line in the file and where the password is. It never prints a password. `--limit N` sets the lines per role (default 20, at most 200).
 
-| Actor | Login URL (`<host>` + path) | Role in `runtime.php accounts` | Lands on |
-|-------|------------------------------|--------------------------------|----------|
-| **Back Office user (admin)** | `<host:backoffice>/security-gui/login` | `backoffice-user` | Back Office dashboard |
-| **Customer** | `<host:yves>/DE/en/login` | `customer` | `/DE/en/customer/overview` |
-| **Agent** (customer assist) | `<host:yves>/agent/login` | `backoffice-user, agent` | Agent dashboard; can then impersonate a customer |
-| **Merchant user** | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-user (<merchant reference>)` | Merchant Portal — **one** merchant only |
-| **Merchant Agent** | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-agent` (else see the DB lookup below) | Merchant Portal — **across multiple** merchants |
+| Actor | Default account | Login URL (`<host>` + path) | Role in `runtime.php accounts` | Lands on |
+|-------|-----------------|------------------------------|--------------------------------|----------|
+| **Back Office user (admin)** | `admin@spryker.com` | `<host:backoffice>/security-gui/login` | `backoffice-user` | Back Office dashboard |
+| **Customer** | `sonia@acme.com` | `<host:yves>/DE/en/login` | `customer` | `/DE/en/customer/overview` |
+| **Agent** (customer assist) | `agent123@spryker.com` | `<host:yves>/agent/login` | `backoffice-user, agent` | Agent dashboard; can then impersonate a customer |
+| **Merchant user** | `harald@spryker.com` | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-user (<merchant reference>)` | Merchant Portal — **one** merchant only |
+| **Merchant Agent** | from the accounts call | `<host:merchant-portal>/security-merchant-portal-gui/login` | `merchant-agent` (else see the DB lookup below) | Merchant Portal — **across multiple** merchants |
 
-**Log in without a browser:** `php $RT/runtime.php login <yves|agent|backoffice|merchant-portal|glue|glue-storefront|glue-backend> <user>` logs in to the host the deploy file names (`--region`, `--host` to choose one of them) and leaves the session in a cookie jar, or the API token in a file, under `.ai-dev/runtime/sessions/`. It takes the password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files, and prints one line: the result and the file. It never prints the password, the cookie value or the token. Exit 1 is a refused login (see the next section); exit 2 names what is missing (a password, a host the deploy file does not have); exit 3 is a host that did not answer.
+**Log in without a browser:** `php $RT/runtime.php login <yves|agent|backoffice|merchant-portal|glue|glue-storefront|glue-backend> <user>` logs in to the host the deploy file names (`--region`, `--host` to choose one of them) and leaves the session in a cookie jar, or the API token in a file, under `.ai-dev/runtime/sessions/`. `--path` sets another login or token path; `--insecure` accepts a self-signed certificate. It takes the password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files, and prints one line: the result and the file. It never prints the password, the cookie value or the token. Exit 1 is a refused login (see the next section); exit 2 names what is missing or refused (a password, a host the deploy file does not have, a redirect to such a host, a deploy file the script cannot parse); exit 3 is a host that did not answer, or answered HTTP 4xx/5xx on a page that is not the login page.
 
 > **Merchant user vs Merchant Agent** share the same login URL; the difference is **scope**. A Merchant user is bound to exactly one merchant via `spy_merchant_user.fk_merchant` (e.g. `harald@spryker.com` → "Spryker", `michele@sony-experts.com` → "Sony Experts") and sees only that seller's data. A Merchant Agent acts across many merchants. Pick the account by the scope the task needs.
 

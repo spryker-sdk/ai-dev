@@ -238,6 +238,9 @@ $glue = rf_glue_apps(rf_context($project, 'HEAD', 'deploy.dev.yml', true));
 check('glue lookup: index.php without an entry point in the deploy file -> a decision, not a run', !isset($glue['apps']['GlueStorefront']) && str_contains(implode("\n", $glue['decisions']), 'Glue application GlueStorefront'));
 file_put_contents($project . '/deploy.storefront.yml', "applications:\n    x:\n        entry-point: GlueStorefront\n");
 check('glue lookup: entry-point: GlueStorefront in the deploy file given -> resolved', isset(rf_glue_apps(rf_context($project, 'HEAD', 'deploy.storefront.yml', true))['apps']['GlueStorefront']));
+file_put_contents($project . '/deploy.anchors.yml', "x-glue: &glue\n    application: glue-storefront\ngroups:\n    EU:\n        applications:\n            glue_storefront_eu:\n                <<: *glue\n");
+$anchorsPlan = rf_plan(rf_context($project, 'HEAD', 'deploy.anchors.yml', true), [], ['store' => [], 'router' => [], 'symptom' => []]);
+check('deploy file with anchors or merge keys and no symfony/yaml -> a decision, not a silent plan', str_contains(implode("\n", $anchorsPlan['decisions']), 'deploy.anchors.yml line 1 uses an anchor (&name)'));
 unlink($project . '/public/GlueStorefront/index.php');
 check('glue lookup: GLUE_STOREFRONT without index.php -> skipped', str_contains(implode("\n", rf_glue_apps($context)['skipped']), 'skipped (no such Glue application: no public/GlueStorefront/index.php)'));
 

@@ -231,7 +231,8 @@ function rf_files_from_args(string $root, array $args, string $base, bool $git, 
  */
 function rf_context(string $root, string $base, string $deployFile, bool $git): array
 {
-    $deploy = df_load($root, $deployFile);
+    $loaded = df_load($root, $deployFile);
+    $deploy = is_array($loaded) ? $loaded : null;
 
     return [
         'root' => $root,
@@ -240,6 +241,7 @@ function rf_context(string $root, string $base, string $deployFile, bool $git): 
         'namespaces' => spryker_upgrade_project_namespaces($root),
         'deployFile' => $deployFile,
         'deploy' => $deploy,
+        'deployError' => is_string($loaded) ? $loaded : null,
         'entryPoints' => $deploy === null ? [] : df_glue_entry_points($deploy),
         'dms' => $deploy !== null && df_dynamic_store($deploy),
         'apiPlatform' => glob($root . '/src/Generated/Api/*', GLOB_ONLYDIR) !== [],
@@ -587,6 +589,9 @@ function rf_plan(array $context, array $files, array $flags): array
     $steps = [];
     $manual = [];
     $decisions = [];
+    if (($context['deployError'] ?? null) !== null) {
+        $decisions[] = sprintf('%s. The plan does not use the deploy file (Glue entry points, dynamic store mode): pass --deploy-file with a file the reader parses, or check the Glue and per-store steps by hand.', $context['deployError']);
+    }
     $unmatched = [];
     $imports = false;
     $routerFiles = [];

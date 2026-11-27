@@ -1,7 +1,8 @@
 <?php
 
 /**
- * The facts of a Spryker deploy file (deploy.*.yml), read without a YAML library: the applications
+ * The facts of a Spryker deploy file (deploy.*.yml), read with the project's symfony/yaml or, without
+ * it, with a YAML subset that refuses syntax outside the subset: the applications
  * with their hosts, scheme, port, session cookie name and container, the services, the Glue entry
  * points and the dynamic multi-store mode. Shared by spryker-runtime and spryker-refresher.
  */
@@ -129,15 +130,60 @@ function df_scalar(string $value): mixed
 }
 
 /**
- * The parsed deploy file, or null when it does not exist.
- *
- * @return array<string, mixed>|null
+ * The first line that uses YAML the subset does not parse: anchors (`&name`), aliases (`*name`),
+ * merge keys (`<<:`) and flow mappings or sequences as values (`{...}`, `[...]`). Null when there is none.
  */
-function df_load(string $root, string $deployFile): ?array
+function df_unsupported_yaml(string $yaml): ?string
+{
+    foreach (preg_split('/\r?\n/', $yaml) ?: [] as $number => $raw) {
+        $text = trim(df_strip_comment($raw));
+        $feature = match (true) {
+            (bool)preg_match('/^<<\s*:/', $text) => 'a merge key (<<:)',
+            (bool)preg_match('/(?:^|:\s|^-\s)\s*&[\w-]+/', $text) => 'an anchor (&name)',
+            (bool)preg_match('/(?:^|:\s|^-\s)\s*\*[\w-]+/', $text) => 'an alias (*name)',
+            (bool)preg_match('/(?::\s|^-\s)\s*[{\[]/', $text) => 'a flow mapping or sequence ({...} or [...])',
+            default => null,
+        };
+        if ($feature !== null) {
+            return sprintf('line %d uses %s', $number + 1, $feature);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * The parsed deploy file; null when it does not exist; a string with the reason when it cannot be
+ * read. With Symfony\Component\Yaml\Yaml from the project's vendor/autoload.php, the full YAML
+ * syntax; without it, the subset of df_parse_yaml() and an error for YAML outside the subset.
+ *
+ * @return array<string, mixed>|string|null
+ */
+function df_load(string $root, string $deployFile): array|string|null
 {
     $path = $root . '/' . $deployFile;
+    if (!is_file($path)) {
+        return null;
+    }
+    $yaml = (string)file_get_contents($path);
+    if (!class_exists('Symfony\Component\Yaml\Yaml', false) && is_file($root . '/vendor/autoload.php')) {
+        require_once $root . '/vendor/autoload.php';
+    }
+    if (class_exists('Symfony\Component\Yaml\Yaml')) {
+        try {
+            $parsed = \Symfony\Component\Yaml\Yaml::parse($yaml);
+        } catch (Throwable $exception) {
+            return sprintf('%s cannot be parsed: %s', $deployFile, $exception->getMessage());
+        }
 
-    return is_file($path) ? df_parse_yaml((string)file_get_contents($path)) : null;
+        return is_array($parsed) ? $parsed : [];
+    }
+    $unsupported = df_unsupported_yaml($yaml);
+    if ($unsupported !== null) {
+        return sprintf('%s %s: without symfony/yaml in the project\'s vendor folder, the deploy file reader does not parse this syntax', $deployFile, $unsupported);
+    }
+
+    return df_parse_yaml($yaml);
 }
 
 /**

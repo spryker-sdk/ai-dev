@@ -168,19 +168,62 @@ $hash = password_hash($fixturePassword, PASSWORD_BCRYPT, ['cost' => 4]);
 write_file($project . '/data/import/common/common/customer.csv', "customer_reference,email,first_name,password\nDE--1,sonia@shop.local,Sonia,$customerPassword\nDE--2,karl@shop.local,Karl,$hash\nDE--3,nopw@shop.local,No,\n");
 write_file($project . '/tests/cypress-tests/cypress/fixtures/b2c/customer.json', json_encode(['defaultPassword' => $fixturePassword, 'customer' => ['email' => 'karl@shop.local']], JSON_PRETTY_PRINT));
 write_file($project . '/data/import/production/common/customer.csv', "customer_reference,email,password\n1,real.person@example.com,x\n");
+write_file($project . '/data/import/a-robot/customer.csv', "customer_reference,email,password\nR1,robot1@shop.local,\nR2,SONIA@shop.local,\n");
 [$accCode, $accOut] = runtime($project, ['accounts']);
 check('accounts: a production import folder is real data: skipped and named', !str_contains($accOut, 'real.person@example.com') && str_contains($accOut, 'Skipped data/import/production/common/customer.csv: real data'));
-check('accounts: roles, users, file and line', $accCode === 0 && preg_match('/^  admin@shop\.local\s+backoffice-user, agent\s+src\/Pyz\/Zed\/User\/UserConfig\.php:9; password in src\/Pyz\/Zed\/User\/UserConfig\.php:10$/m', $accOut) === 1 && str_contains($accOut, 'merchant-agent') && preg_match('/^  harald@shop\.local\s+merchant-user \(MER000001\)\s+data\/import\/common\/common\/marketplace\/merchant_user\.csv:2; password in src\/Pyz\/Zed\/User\/UserConfig\.php:/m', $accOut) === 1);
-check('accounts: customers with the password source, never the password', preg_match('/^  sonia@shop\.local\s+customer\s+data\/import\/common\/common\/customer\.csv:2; password in data\/import\/common\/common\/customer\.csv:2$/m', $accOut) === 1 && str_contains($accOut, 'karl@shop.local') && str_contains($accOut, 'password hash only (data/import/common/common/customer.csv:3)') && str_contains($accOut, 'nopw@shop.local') && str_contains($accOut, 'no password in the repository'));
+check('accounts: roles, one header line per file, user and line', $accCode === 0 && str_contains($accOut, "backoffice-user, agent (1):\n  src/Pyz/Zed/User/UserConfig.php\n    admin@shop.local line 9; password line 10\n") && str_contains($accOut, 'merchant-agent (1):') && str_contains($accOut, "merchant-user (1):\n  data/import/common/common/marketplace/merchant_user.csv\n    harald@shop.local (MER000001) line 2; password in src/Pyz/Zed/User/UserConfig.php:20\n"));
+check('accounts: customers with the password source, never the password', str_contains($accOut, "    sonia@shop.local line 2; password line 2; also in 1 other row(s)\n    karl@shop.local line 3; password hash only (line 3)\n    nopw@shop.local line 4; no password in the repository\n"));
+check('accounts: duplicates by user name removed, data/import/common before other folders', str_contains($accOut, "customer (4):\n  data/import/common/common/customer.csv\n    sonia@shop.local") && str_contains($accOut, "  data/import/a-robot/customer.csv\n    robot1@shop.local line 2; no password in the repository\n") && substr_count($accOut, 'sonia@shop.local') + substr_count($accOut, 'SONIA@shop.local') === 1);
 check('accounts: no password and no hash on standard output', !str_contains($accOut, $adminPassword) && !str_contains($accOut, $customerPassword) && !str_contains($accOut, $hash));
 [, $limitOut] = runtime($project, ['accounts', '--role', 'customer', '--limit', '1']);
-check('accounts --role --limit', str_starts_with($limitOut, 'customer (3):') && str_contains($limitOut, '(2 more: --role customer --limit 0)') && !str_contains($limitOut, 'admin@'));
+check('accounts --role --limit: the hint names --user and the cap', str_starts_with($limitOut, 'customer (4):') && str_contains($limitOut, '(3 more: filter with --user <text>, or --limit up to 200)') && !str_contains($limitOut, 'admin@'));
+[$userCode, $userOut] = runtime($project, ['accounts', '--user', 'SONIA']);
+check('accounts --user: a part of the user name, any case', $userCode === 0 && str_starts_with($userOut, "customer (1):\n  data/import/common/common/customer.csv\n    sonia@shop.local line 2") && !str_contains($userOut, 'karl@'));
+check('accounts --user without a match -> exit 2', runtime($project, ['accounts', '--user', 'nobody-here'])[0] === 2);
+
+$many = $tmp . '/project-many';
+write_file($many . '/data/import/common/common/customer.csv', "customer_reference,email,password\n" . implode('', array_map(static fn (int $n): string => "C$n,customer$n@shop.local,\n", range(1, 250))));
+[$manyCode, $manyOut] = runtime($many, ['accounts', '--limit', '0']);
+check('accounts --limit 0: capped at 200 lines per role, the hint names --user', $manyCode === 0 && substr_count($manyOut, ' line ') === 200 && str_contains($manyOut, '(50 more: filter with --user <text>)') && substr_count($manyOut, 'data/import/common/common/customer.csv') === 1);
+check('accounts: no padding', !str_contains($manyOut, '  ;') && preg_match('/\S {2,}\S/', $manyOut) === 0);
+
+$users = $tmp . '/project-users';
+write_file($users . '/src/Pyz/Zed/User/UserConfig.php', "<?php\nclass UserConfig\n{\n    public function getInstallerUsers(): array\n    {\n        return [\n            [\n                // the first admin\n                'username' => 'commented@shop.local', // inline\n                'password' => static::ADMIN_PASSWORD,\n                'roles' => ['root', 'acl'],\n            ],\n            [\n                'username' => getenv('ADMIN_USER'),\n                'password' => 'x',\n            ],\n        ];\n    }\n}\n");
+[$usersCode, $usersOut] = runtime($users, ['accounts']);
+check('accounts UserConfig: comments and nested arrays read, a password that is not a literal named', $usersCode === 0 && str_contains($usersOut, '    commented@shop.local line 9; password not a literal (line 10)'));
+check('accounts UserConfig: an entry that cannot be read is named with file and line', str_contains($usersOut, 'Could not read the entry at src/Pyz/Zed/User/UserConfig.php:14'));
+$vendorOnly = $tmp . '/project-vendor-user';
+write_file($vendorOnly . '/' . SR_VENDOR_USER_CONFIG, "<?php\nnamespace Spryker\\Zed\\User;\nclass UserConfig\n{\n    public function getInstallerUsers(): array\n    {\n        return [\n            [\n                'firstName' => 'Admin',\n                'username' => 'admin@spryker.com',\n                'password' => 'change123',\n            ],\n        ];\n    }\n}\n");
+[$vendorCode, $vendorOut] = runtime($vendorOnly, ['accounts']);
+check('accounts: no project UserConfig.php -> the vendor UserConfig.php', $vendorCode === 0 && str_contains($vendorOut, "  vendor/spryker/user/src/Spryker/Zed/User/UserConfig.php\n    admin@spryker.com line 10; password line 11") && !str_contains($vendorOut, 'change123'));
+
+write_file($tmp . '/multi-line.csv', "email,note,password\nfirst@shop.local,\"one\ntwo\nthree\",\nsecond@shop.local,x,\n");
+$rows = iterator_to_array(sr_csv($tmp . '/multi-line.csv'), false);
+check('csv: line numbers count physical lines (a quoted field with line breaks)', array_column($rows, 'line') === [2, 5]);
+
+// --- deploy files outside the YAML subset ---
+$anchors = "x-ssl: &ssl\n    enabled: true\nnamespace: anchor_dev\ngroups:\n    EU:\n        applications:\n            yves:\n                application: yves\n                endpoints:\n                    yves.anchor.local: {store: DE}\ndocker:\n    ssl: *ssl\n";
+write_file($project . '/deploy.anchors.yml', $anchors);
+[$anchorCode, $anchorOut] = runtime($project, ['env', '--deploy-file', 'deploy.anchors.yml']);
+check('deploy file with anchors, aliases or flow mappings and no symfony/yaml -> exit 2, the line named', $anchorCode === 2 && str_contains($anchorOut, 'deploy.anchors.yml line 1 uses an anchor (&name)') && !str_contains($anchorOut, 'http://'));
+check('deploy file: aliases, merge keys and flow collections are found', str_contains((string)df_unsupported_yaml("a:\n    b: *x\n"), 'an alias') && str_contains((string)df_unsupported_yaml("a:\n    <<: *x\n"), 'a merge key') && str_contains((string)df_unsupported_yaml("a:\n    b: [1, 2]\n"), 'a flow mapping') && df_unsupported_yaml("a: '*.x'\nb: \"{x}\"\nc: */5 * * * *\n") === null);
+check('login with such a deploy file -> exit 2', runtime($project, ['login', 'yves', 'sonia@shop.local', '--deploy-file', 'deploy.anchors.yml'])[0] === 2);
+$symfony = $tmp . '/project-symfony';
+write_file($symfony . '/deploy.dev.yml', $anchors);
+write_file($symfony . '/vendor/autoload.php', "<?php\nnamespace Symfony\\Component\\Yaml;\nclass Yaml\n{\n    public static function parse(string \$yaml): array\n    {\n        return ['namespace' => 'anchor_dev', 'docker' => ['ssl' => ['enabled' => true]], 'groups' => ['EU' => ['applications' => ['yves' => ['application' => 'yves', 'endpoints' => ['yves.anchor.local' => ['store' => 'DE']]]]]]];\n    }\n}\n");
+[$symfonyCode, $symfonyOut] = runtime($symfony, ['env']);
+check('deploy file: symfony/yaml from the project vendor parses the full syntax', $symfonyCode === 0 && str_contains($symfonyOut, 'namespace anchor_dev, https') && str_contains($symfonyOut, 'https://yves.anchor.local '));
 
 // --- login against a local test server ---
-$port = 0;
-$socket = stream_socket_server('tcp://127.0.0.1:0');
-$port = (int)substr((string)stream_socket_get_name($socket, false), strrpos((string)stream_socket_get_name($socket, false), ':') + 1);
-fclose($socket);
+$freePort = static function (): int {
+    $socket = stream_socket_server('tcp://127.0.0.1:0');
+    $name = (string)stream_socket_get_name($socket, false);
+    fclose($socket);
+
+    return (int)substr($name, strrpos($name, ':') + 1);
+};
+$port = $freePort();
+$port2 = $freePort();
 $cookieValue = 'cookie-value-0f9e8d';
 $tokenValue = 'token-value-7a6b5c';
 write_file($tmp . '/server/router.php', '<?php
@@ -197,6 +240,19 @@ if ($path === "/sso/login") {
 }
 if ($path === "/foreign-form/login") {
     echo str_replace("action=\"/login_check\"", "action=\"http://localhost:" . $_SERVER["SERVER_PORT"] . "/login_check\"", $form("auth"));
+    return true;
+}
+if ($path === "/redirect/login" || $path === "/broken/login") {
+    echo str_replace("action=\"/login_check\"", "action=\"" . ($path === "/redirect/login" ? "/redirect_check" : "/broken_check") . "\"", $form("auth"));
+    return true;
+}
+if ($path === "/redirect_check") {
+    header("Location: http://127.0.0.1:' . $port2 . '/steal", true, 307);
+    return true;
+}
+if ($path === "/broken_check") {
+    http_response_code(500);
+    echo "Internal error";
     return true;
 }
 if ($path === "/login_check") {
@@ -240,7 +296,13 @@ http_response_code(404);
 return true;
 ');
 $server = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $port, $tmp . '/server/router.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $serverPipes);
-for ($i = 0; $i < 50 && @fsockopen('127.0.0.1', $port) === false; $i++) {
+write_file($tmp . '/server2/router.php', '<?php
+file_put_contents(__DIR__ . "/requests.log", $_SERVER["REQUEST_METHOD"] . " " . $_SERVER["REQUEST_URI"] . " " . file_get_contents("php://input") . "\n", FILE_APPEND);
+echo "Dashboard";
+return true;
+');
+$server2 = proc_open([PHP_BINARY, '-S', '127.0.0.1:' . $port2, $tmp . '/server2/router.php'], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $server2Pipes);
+for ($i = 0; $i < 50 && (@fsockopen('127.0.0.1', $port) === false || @fsockopen('127.0.0.1', $port2) === false); $i++) {
     usleep(100000);
 }
 $local = '127.0.0.1:' . $port;
@@ -249,6 +311,7 @@ write_file($project . '/deploy.local.yml', "namespace: local_dev\ngroups:\n    E
     . "            boffice:\n                application: backoffice\n                endpoints:\n                    $local:\n                        region: EU\n"
     . "            glue:\n                application: glue\n                endpoints:\n                    $local:\n                        store: DE\n"
     . "            gluebackend:\n                application: glue-backend\n                endpoints:\n                    $local:\n                        region: EU\n"
+    . "            gluestorefront:\n                application: glue-storefront\n                endpoints:\n                    $local:\n                        store: DE\n"
     . "docker:\n    ssl:\n        enabled: false\n");
 $outputs = [];
 
@@ -270,7 +333,23 @@ $tokenFile = $project . '/.ai-dev/runtime/sessions/glue-karl-shop-local.token';
 check('login glue: a hashed password verified with the fixture password, token in a file', $glueCode === 0 && str_contains($glueOut, 'expires in 28800 s') && str_contains($glueOut, 'password from tests/cypress-tests/cypress/fixtures/b2c/customer.json:2 (verified against the hash in data/import/common/common/customer.csv:3)') && (string)@file_get_contents($tokenFile) === $tokenValue && (fileperms($tokenFile) & 0777) === 0600);
 [$backendCode, $backendOut] = runtime($project, ['login', 'glue-backend', 'admin@shop.local', '--deploy-file', 'deploy.local.yml']);
 $outputs[] = $backendOut;
-check('login glue-backend: token from /token', $backendCode === 0 && str_contains($backendOut, 'expires in 3600 s') && is_file($project . '/.ai-dev/runtime/sessions/glue-backend-admin-shop-local.token'));
+check('login glue-backend: token from /token', $backendCode === 0 && str_contains($backendOut, 'token from /token (HTTP 200, expires in 3600 s)') && is_file($project . '/.ai-dev/runtime/sessions/glue-backend-admin-shop-local.token'));
+[$storefrontCode, $storefrontOut] = runtime($project, ['login', 'glue-storefront', 'karl@shop.local', '--deploy-file', 'deploy.local.yml']);
+$outputs[] = $storefrontOut;
+check('login glue-storefront: token from /token (form grant), not /access-tokens', $storefrontCode === 0 && str_contains($storefrontOut, 'token from /token (HTTP 200, expires in 3600 s)') && (string)@file_get_contents($project . '/.ai-dev/runtime/sessions/glue-storefront-karl-shop-local.token') === $tokenValue);
+[$missingCode, $missingOut] = runtime($project, ['login', 'glue-storefront', 'karl@shop.local', '--deploy-file', 'deploy.local.yml', '--path', '/no-such-token']);
+$outputs[] = $missingOut;
+check('login --path: another token path; HTTP 404 -> exit 3, not a credentials question', $missingCode === 3 && str_contains($missingOut, 'the login page answered HTTP 404 (/no-such-token)') && !str_contains($missingOut, 'credentials'));
+[$brokenCode, $brokenOut] = runtime($project, ['login', 'backoffice', 'admin@shop.local', '--deploy-file', 'deploy.local.yml', '--path', '/broken/login']);
+$outputs[] = $brokenOut;
+check('login: HTTP 500 after the login form -> exit 3, the login page answered HTTP 500', $brokenCode === 3 && str_contains($brokenOut, 'the login page answered HTTP 500') && !str_contains($brokenOut, 'credentials'));
+[$redirectCode, $redirectOut] = runtime($project, ['login', 'backoffice', 'admin@shop.local', '--deploy-file', 'deploy.local.yml', '--path', '/redirect/login']);
+$outputs[] = $redirectOut;
+$stolen = (string)@file_get_contents($tmp . '/server2/requests.log');
+check('login: a 307 of the login POST to another host -> exit 2, not logged in, nothing sent there', $redirectCode === 2 && str_contains($redirectOut, "the login answer redirects to 127.0.0.1:$port2, a host that deploy.local.yml does not name") && !str_contains($redirectOut, 'logged in (') && $stolen === '' && !str_contains($stolen, $adminPassword));
+[$insecureCode, $insecureOut] = runtime($project, ['login', 'backoffice', 'admin@shop.local', '--deploy-file', 'deploy.local.yml', '--insecure']);
+$outputs[] = $insecureOut;
+check('login --insecure: a flag without a value, the login runs', $insecureCode === 0 && str_contains($insecureOut, 'logged in (HTTP 200'));
 [$glueFailCode, $glueFailOut] = runtime($project, ['login', 'glue', 'karl@shop.local', '--deploy-file', 'deploy.local.yml'], [SR_PASSWORD_ENV => 'wrong-password-123']);
 $outputs[] = $glueFailOut;
 check('login glue: a refused token -> exit 1', $glueFailCode === 1 && str_contains($glueFailOut, 'login failed (HTTP 401, no token in the response)'));
@@ -293,6 +372,8 @@ check('login: an account that is not seeded -> exit 2', $unknownCode === 2 && st
 check('login: an application the deploy file does not have -> exit 2', $noAppLoginCode === 2);
 proc_terminate($server);
 proc_close($server);
+proc_terminate($server2);
+proc_close($server2);
 [$downCode, $downOut] = runtime($project, ['login', 'backoffice', 'admin@shop.local', '--deploy-file', 'deploy.local.yml']);
 $outputs[] = $downOut;
 check('login: the host does not answer -> exit 3', $downCode === 3 && str_contains($downOut, 'the host did not answer'));

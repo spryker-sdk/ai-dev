@@ -82,10 +82,12 @@ flowchart TD
 | Call | What it does |
 |---|---|
 | `runtime.php env [--deploy-file <file>] [--app <application>] [--region <region or store>]` | One line per application endpoint of the deploy file (`deploy.dev.yml` by default): application, store or region, URL with scheme (`docker.ssl.enabled`) and port, session cookie name (the host with `.` → `-`), container (`<namespace>_<application key>_1`); then the services with their containers and endpoints. No credentials of the deploy file. |
-| `runtime.php accounts [--role <role>] [--limit N]` | The seeded accounts: Back Office users and agents from `src/<Ns>/Zed/User/UserConfig.php`, merchant users and customers from `data/import/**`, each with its file and line and where its password is. Never a password. |
-| `runtime.php login <app> <user> [--region …] [--host …]` | Logs in to a host the deploy file names: a session for `yves`, `agent`, `backoffice`, `merchant-portal` (cookie jar), a token for `glue`, `glue-storefront`, `glue-backend`. Password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files (a hashed one is matched against the plain passwords in the project's files and E2E fixtures). Writes `.ai-dev/runtime/sessions/` (ignored by git) and prints one line, never a secret. |
+| `runtime.php accounts [--role <role>] [--user <text>] [--limit N]` | The seeded accounts: Back Office users and agents from `src/<Ns>/Zed/User/UserConfig.php` (else the vendor `UserConfig.php`), merchant users and customers from `data/import/**` (`data/import/common` first). One line per user name under one header line per file, with the line and where its password is; at most 200 lines per role. Never a password. |
+| `runtime.php login <app> <user> [--region …] [--host …] [--path …] [--insecure]` | Logs in to a host the deploy file names: a session for `yves`, `agent`, `backoffice`, `merchant-portal` (cookie jar), a token for `glue` (`/access-tokens`), `glue-storefront`, `glue-backend` (`/token`). Redirects go only to hosts of the deploy file, as GET requests. Password from `SPRYKER_RUNTIME_PASSWORD`, else from the project's files (a hashed one is matched against the plain passwords in the project's files and E2E fixtures). Writes `.ai-dev/runtime/sessions/` (ignored by git) and prints one line, never a secret. |
 
-`scripts/deploy-file.php` reads the deploy file; `spryker-refresher` uses it too. Tests:
+`scripts/deploy-file.php` reads the deploy file: with `symfony/yaml` when the project's `vendor/` has it, else with a YAML subset that stops with an error on anchors, aliases, merge keys and flow collections.
+
+Dependencies inside the plugin: `runtime.php` requires `spryker-upgrade/scripts/backoffice-smoke.php` (the login form parser), and `spryker-refresher/scripts/refresh.php` requires `scripts/deploy-file.php`. Copy the skills together. Tests:
 `php scripts/runtime.test.php` (fixture deploy and data files, a local `php -S` server for the login).
 
 ## Actors and login
